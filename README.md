@@ -201,9 +201,8 @@ The user interface is built with **React** and **TypeScript**, offering a type-s
 |--------|----------|-------------|
 | `GET` | `/api/v1/keystore/secrets/` | List secret metadata (no actual keys returned) |
 | `PUT` | `/api/v1/keystore/secrets/` | Create or update a secret |
-| `GET` | `/api/v1/keystore/secrets/permissions/` | Retrieve keystore secrets permissions |
-| `PUT` | `/api/v1/keystore/secrets/permissions/` | Update keystore secrets permissions |
-| `DELETE` | `/api/v1/keystore/secrets/permissions/` | Delete keystore secrets permissions |
+| `GET` | `/api/v1/keystore/secrets/{id}` | Get specific secret metadata  (no actual keys returned) |
+
 
 **Note:** Permission scope, resource type, and access level are specified in the request body or query parameters of `/permissions` endpoints.
 
@@ -468,3 +467,32 @@ When a message contains widgets, the response follows this JSON structure:
     - **`structure`**: Widget configuration object
     - **`position`**: Character indices indicating where the widget appears in the content string
 
+
+## TODOs
+
+AIHub
+Event Processing für Traces dokumentieren SAAS + Tenant rein + Widgets anlegen (neben default) (mit instructions) + Widgets einer Application + instructions zuweisen + weitere überlegung am ende: semantic sesrch in den Chats etc + Argumente für eigenen Chat Historie store
+
+Argument:
+– hat jedes AgentSystem das wir anbinden einen guten conversstion Store? Kann man semantisch suchen, Filter etc. weitere Features aufführen (z.B. N8N?)
+– Flexibilität 
+– Neue Features wie enable semantic search für Application möglich 
+– Allgemein neue Features für die Plattform möglich
+– Chat with your Traces: in Traces Semantic Sesrch enablen
+– JETZT ist es ein Chat-UI; zukünftig vielleicht auch Integration von DEV Komponenten (DevUI? Custom Widgets direkt im AIHub entwickelt und deploaxen Etc.)
+– Mein Ziel: EIN UNIFIED-UI, damit ich mich komplett auf Backend konzentrieren kann 
+
+KONZEPT: Unified-UI for your AI
+AI-Integration Platformü
+
+Marketing-Sprech:
+Integrate you AI-Landscape into our ONE UNIFIED-AI AI-Hub Platform.
+Use the experience of our „Unified-UI for your AI“ to integrate various of AI-Agents such as …. Or trace your ai agent outputs to our unified tracing framework an monitor different AI-Agent from different platforms in ONE UNIFIED-UI. Chat with your traces, gain insights and improve blabla
+
+Welches Problem wird gelöst?
+- Wenn ich verschiedene Agentsysteme verwende, habe ich verschiedene Chat-experiences und je nach Technologie ggf. gar kein UI
+- Integration verschiedener Agentsysteme in ein UI
+- Plattformunabhänig. Sowohl die Agentsysteme können überall entwickelt werden, als auch der AIHub selbst kann auf den verschiedenen Cloud-Platzformen (Azure, AWS, GCP) deploed werden
+
+Was ist mit agents, die keine. Store haben? Man will nen Langgraph Multi-Agent bauen und dediziert deployen.
+Dieser hat keinen Store oder müsste extra implementiert werden: hier kann man dann einfach über unser aihub-SDK simpel auch diesen Agent einbinden (Thema: Custom Lösungen
