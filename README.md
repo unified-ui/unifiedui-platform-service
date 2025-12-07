@@ -10,6 +10,80 @@
 | **Status** | Draft |
 | **Last Updated** | 2025-12-07 |
 
+## AIHub Vision
+
+**AIHub** transforms the complexity of managing multiple AI systems into a single, unified experience. In today's AI landscape, organizations deploy agents across diverse platforms—Microsoft Foundry, n8n, LangGraph, Copilot, and custom solutions—resulting in fragmented user experiences, inconsistent monitoring, and operational silos. AIHub eliminates these challenges by providing a **Unified-UI for your AI**, where every agent, regardless of origin, converges into one cohesive platform.
+
+### The Problem We Solve
+
+**Fragmented AI Experiences**  
+When your organization leverages multiple agent platforms, users face:
+- **Inconsistent interfaces**: Each platform presents its own chat experience, creating friction and reducing productivity
+- **Missing UI layers**: Custom-built agents (e.g., LangGraph multi-agent systems) often lack any user interface, requiring developers to build and maintain separate front-ends
+- **Scattered monitoring**: Tracing and observability data lives in disparate systems, making it impossible to gain holistic insights into AI performance
+
+**Integration Complexity**  
+Connecting agents from different platforms demands significant engineering effort:
+- Custom API integrations for each agent system
+- Bespoke authentication and authorization flows
+- Redundant implementations of common features like conversation history and user management
+
+**Platform Lock-In**
+Organizations fear being tied to a single cloud provider or agent platform, limiting flexibility as technology evolves.
+
+### The AIHub Solution
+
+**One Unified Interface, Every Agent**  
+AIHub provides a single, consistent chat experience for all your AI agents—whether they're built on enterprise platforms like Microsoft Foundry, workflow automation tools like n8n, or custom frameworks like LangGraph. Users interact with every agent through the same intuitive interface, complete with:
+- **Custom widget integration** for specialized interactions (forms, data visualization, interactive components)
+- **Consistent conversation history** across all agent types
+- **Unified access control** via your existing identity provider (Microsoft Entra ID, Google OAuth)
+
+**Centralized Tracing and Observability**  
+AIHub's **unified tracing framework** ingests telemetry from all your agents—conversational and autonomous—into a single database:
+- **Monitor all agents** from one dashboard, regardless of their underlying platform
+- **Semantic search** across traces, conversations, and agent outputs
+- **Chat with your traces**: Ask natural language questions about agent behavior, performance patterns, and historical interactions
+- **No lock-in**: Even agents without native tracing stores (e.g., custom LangGraph deployments) can stream telemetry to AIHub via our SDK
+
+**Cloud-Agnostic Architecture**  
+Deploy AIHub wherever your business needs it:
+- **SaaS**: Fully managed, zero-ops deployment for rapid adoption
+- **Azure, AWS, or GCP**: Run AIHub in your preferred cloud environment with full control over data residency
+- **On-Premises**: Deploy entirely within your data center for maximum compliance and security
+
+Agent systems themselves remain platform-agnostic—develop and deploy them anywhere, and AIHub seamlessly integrates them through standardized APIs.
+
+**Native Support for Custom Agents**  
+Building a specialized LangGraph multi-agent system or deploying Azure Functions-based autonomous agents? AIHub's SDK makes integration effortless:
+- **Minimal code changes**: Add our SDK to send conversation data and tracing telemetry
+- **No UI development required**: Instantly expose your custom agents through AIHub's chat interface
+- **Built-in authentication**: Leverage AIHub's identity integration without implementing your own auth layer
+
+### Why AIHub Matters
+
+**For Business Leaders**  
+- **Accelerate AI adoption**: Users engage with AI through a single, familiar interface—no training on multiple platforms
+- **Reduce operational costs**: Consolidate monitoring, authentication, and UI development across all agents
+- **Future-proof your AI investments**: Add new agent platforms or migrate existing ones without disrupting user experiences
+
+**For Engineering Teams**  
+- **Developer velocity**: Integrate new agents in hours, not weeks, using standardized APIs and SDKs
+- **Comprehensive observability**: Gain visibility into every agent invocation, from interactive chats to background processing
+- **Flexible deployment**: Choose the infrastructure that aligns with your compliance, latency, and cost requirements
+
+**For End Users**  
+- **Consistent experience**: One chat interface for every AI capability—no context switching between platforms
+- **Contextual interactions**: Widgets adapt to business requirements, providing forms, visualizations, and custom UIs within conversations
+- **Trustworthy AI**: Transparent tracing and audit logs ensure accountability and explainability
+
+### The AIHub Advantage
+
+AIHub isn't just another chat interface—it's the **integration layer for your entire AI landscape**. Whether you're running enterprise agents on Microsoft platforms, automating workflows with n8n, or deploying cutting-edge custom solutions with LangGraph, AIHub provides the foundation for scalable, observable, and user-friendly AI operations.
+
+**Integrate your AI landscape. Unify your experience. Accelerate your innovation.**
+
+
 ## AIHub Overview
 
 **AIHub** is a unified interface platform for deploying and managing AI chat applications powered by external agent systems. It serves as a central hub that integrates diverse agent platforms—such as Microsoft Foundry, n8n, Copilot, and others—into a single, cohesive application environment.
@@ -75,6 +149,61 @@ AIHub implements a **caching layer** to optimize performance and reduce load on 
 - **Event-based invalidation**: Mutations to applications, permissions, or group memberships trigger explicit cache invalidation for affected keys
 - **Manual purge**: Administrative endpoints allow selective or complete cache clearing when needed
 
+#### Message Broker and Event Processing Layer
+
+AIHub implements an **event-driven architecture** for autonomous agent tracing ingestion, decoupling trace collection from the core API.
+
+**Purpose:**
+
+External agent systems write tracing data to a message broker instead of directly calling AIHub APIs. A dedicated microservice (consumer) processes these messages asynchronously and ingests them into the database.
+
+**Supported Message Brokers:**
+
+- **Azure**: Azure Event Hubs, Azure Service Bus
+- **AWS**: Amazon Kinesis, Amazon SQS
+- **GCP**: Google Cloud Pub/Sub
+- **Multi-Cloud/On-Premises**: Apache Kafka, RabbitMQ
+
+**Architecture Components:**
+
+1. **Message Producer (External Agent Systems)**
+    - Autonomous agents send tracing data as structured messages to the configured message broker
+    - Messages include agent ID, trace payload, timestamp, and correlation metadata
+    - Authentication uses the agent's identity provider credentials or dedicated service principal
+
+2. **Message Broker**
+    - Acts as the event buffer between external agents and AIHub
+    - Provides durability, ordering guarantees, and delivery semantics
+    - Scales independently to handle high-throughput tracing workloads
+
+3. **Tracing Consumer Microservice**
+    - Subscribes to the message broker and processes tracing events
+    - Validates agent identity and permissions before ingestion
+    - Enriches trace data with metadata (ingestion timestamp, correlation IDs)
+    - Writes validated traces to the database
+    - Implements retry logic and dead-letter queue handling for failed messages
+
+**Key Benefits:**
+
+- **Asynchronous Processing**: Tracing ingestion does not block agent execution or impact AIHub API performance
+- **Scalability**: Consumer microservice scales independently based on message throughput
+- **Resilience**: Message broker buffers traces during outages or high-load periods
+- **Decoupling**: External agents remain operational even if the consumer microservice is temporarily unavailable
+- **Flexibility**: Support for multiple message broker technologies across cloud providers
+
+**Security Considerations:**
+
+- **Authentication**: Agents authenticate to the message broker using managed identity or service principal credentials
+- **Authorization**: Consumer microservice validates agent permissions before writing to the database
+- **Encryption**: Messages are encrypted in transit (TLS) and at rest (broker-specific encryption)
+- **Audit Logging**: All trace ingestion events are logged for compliance and monitoring
+
+**Deployment Patterns:**
+
+- **SaaS**: AIHub operates a shared message broker and consumer service
+- **Cloud Deployment**: Customer-managed message broker with AIHub-managed consumer microservice
+- **On-Premises**: Fully customer-managed message broker and consumer infrastructure
+
 #### Secrets Management Layer
 
 **Purpose:**
@@ -96,6 +225,7 @@ Manages secrets required for AIHub's core infrastructure and operation.
 - Database connection strings
 - Identity provider client secrets (e.g., Microsoft Entra ID app registration credentials)
 - Cache connection credentials (Redis connection strings, access keys)
+- Message broker connection strings and access keys
 - Internal service-to-service authentication tokens
 - Encryption keys for data-at-rest protection
 
@@ -149,6 +279,10 @@ Uses the same underlying secrets management service as the infrastructure keysto
 #### Backend Layer
 The backend is implemented using **FastAPI**, a modern Python web framework that provides high performance through asynchronous request handling, automatic API documentation, and type-safe request/response validation.
 
+The backend consists of:
+- **API Service**: Handles user requests, authentication, authorization, and conversation management
+- **Tracing Consumer Microservice**: Processes autonomous agent tracing events from the message broker
+
 #### Frontend Layer
 The user interface is built with **React** and **TypeScript**, offering a type-safe, component-based architecture for building responsive chat interfaces and dynamically rendering custom widgets.
 
@@ -169,6 +303,9 @@ The user interface is built with **React** and **TypeScript**, offering a type-s
 | `GET` | `/api/v1/applications/{id}/` | Get application by ID |
 | `PATCH` | `/api/v1/applications/{id}/` | Update application by ID |
 | `GET` | `/api/v1/applications/{id}/conversations/` | List conversations for an application |
+| `POST` | `/api/v1/applications/{id}/widgets/{id}` | Add widget to application by ID |
+| `DELETE` | `/api/v1/applications/{id}/widgets/{id}` | Remove widget from application by ID |
+
 
 **Note:** Permission scope, resource type, and access level are specified in the request body or query parameters of `/permissions` endpoints.
 
@@ -190,6 +327,22 @@ The user interface is built with **React** and **TypeScript**, offering a type-s
 **Note:** Permission scope, resource type, and access level are specified in the request body or query parameters of `/permissions` endpoints.
 
 **Note:** Regular users may only modify their own user messages. System-level accounts with elevated permissions can modify assistant messages. Configure access via custom groups as needed.
+
+
+### Widgets
+
+**Widgets** enable the integration of custom UI components into chat conversations. Widgets can be either default components provided by AIHub or custom widgets embedded via iframe. Applications can be configured to include specific widget types along with instructions that guide the agent on how and when to integrate these widgets into the conversation.
+
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/v1/widgets/` | List all available widgets |
+| `POST` | `/api/v1/widgets/` | Register a new custom widget |
+| `GET` | `/api/v1/widgets/{id}` | Get widget by ID |
+| `PATCH` | `/api/v1/widgets/{id}` | Update widget configuration |
+| `DELETE` | `/api/v1/widgets/{id}` | Delete a custom widget |
+
+**Note:** This section is currently **work in progress**. Detailed specifications for default widget types, custom widget integration patterns, and application-widget assignment mechanisms will be added in future updates.
 
 ### Keystores
 
@@ -468,19 +621,78 @@ When a message contains widgets, the response follows this JSON structure:
     - **`position`**: Character indices indicating where the widget appears in the content string
 
 
+## Weitere überlegungen
+
+- semantic search enablen in applications, in autonomous agents, etc
+- Tenant support
+- als SASS Lösung bereitstellen
+
+## Warum ChatHistorie und Tracing in den AIHub integrieren
+
+Eine zentrale konzeptionelle Frage ist, ob Chat-Historie und Tracings direkt in die AIHub-Datenbank integriert werden sollen oder ob stattdessen immer der Store der jeweiligen Agent-Plattform genutzt und Daten on-the-fly in die benötigte Struktur übersetzt werden sollen.
+### Pro-Argumente für die Integration in AIHub
+
+1. **Heterogene Store-Qualität**: Nicht jedes Agent-System bietet einen ausgereiften Conversation Store mit vergleichbaren Funktionen und Leistungsmerkmalen.
+
+2. **Fehlende Suchfunktionen**: Viele Agent-Plattformen (z.B. n8n) bieten keine semantische Suche, erweiterte Filteroptionen oder andere moderne Such- und Analysefunktionen.
+
+3. **Plattformübergreifende Flexibilität**: Durch zentrale Datenhaltung können neue Features unabhängig von den Fähigkeiten einzelner Agent-Plattformen entwickelt und plattformübergreifend bereitgestellt werden.
+
+4. **Erweiterte Suchfunktionen**: Semantic Search kann für Applications, Conversations und Tracings einheitlich aktiviert werden, ohne auf externe Stores angewiesen zu sein.
+
+5. **Innovative Funktionen**: Features wie "Chat with your Traces" – semantische Analyse und Konversation über historische Tracing-Daten – sind nur mit zentraler Datenhaltung effizient umsetzbar.
+
+6. **Support für Custom Agents**: Selbst entwickelte Agents (z.B. mit LangGraph) haben oft gar keinen eigenen Tracing- oder Logging-Store und können nahtlos integriert werden.
+
+7. **Einheitliche Datenstruktur**: Eine vordefinierte JSON-Struktur ermöglicht konsistentes Querying, Auswertung und Visualisierung über alle Agent-Systeme hinweg.
+
+8. **Integration autonomer Logs**: Logs aus autonomen Agents (z.B. Azure Functions) lassen sich ohne zusätzliche externe Logging-Infrastruktur direkt in AIHub aufbereiten und anzeigen.
+
+9. **Zukunftssicherheit**: AIHub kann über ein reines Chat-UI hinauswachsen – z.B. durch Dev-Komponenten, direktes Entwickeln und Deployen von Custom Widgets innerhalb der Plattform.
+
+10. **Unified-UI Vision**: Ein zentraler Datenstore ermöglicht ein konsistentes, einheitliches UI-Erlebnis und erlaubt dem Entwicklerteam, sich auf Backend-Innovation zu konzentrieren.
+
+### Contra-Argumente für die Integration in AIHub
+
+1. **Doppelte Datenhaltung**: Daten werden sowohl im Agent-Store als auch im AIHub gespeichert, was zu Redundanz und potenziellem Synchronisationsbedarf führt.
+
+2. **Erhöhte Infrastrukturkosten**: Zusätzliche Speicher- und Datenbankressourcen in AIHub erhöhen die Betriebskosten.
+
+3. **Wartungsaufwand**: Zusätzliche Microservices (z.B. Tracing Consumer) und Datenbankschemata erfordern kontinuierliche Wartung und Updates.
+
+### Entscheidungsmatrix
+
+| **Kategorie** | **Kriterium** | **Integration in AIHub** | **On-the-fly Übersetzung** | **Gewichtung** | **Bewertung (1-5)** |
+|---------------|---------------|---------------------------|----------------------------|----------------|---------------------|
+| **Funktionalität** | Erweiterte Suchfunktionen (Semantic Search) | ✅ Nativ möglich | ⚠️ Abhängig von externen Stores | Hoch | AIHub: 5, Extern: 2 |
+| **Funktionalität** | Support für Custom Agents ohne Store | ✅ Vollständig unterstützt | ❌ Nicht möglich | Hoch | AIHub: 5, Extern: 1 |
+| **Funktionalität** | Einheitliche Datenstruktur | ✅ Garantiert | ⚠️ Übersetzungsaufwand | Mittel | AIHub: 5, Extern: 3 |
+| **Funktionalität** | Innovative Features (Chat with Traces) | ✅ Einfach umsetzbar | ❌ Technisch komplex | Hoch | AIHub: 5, Extern: 2 |
+| **Skalierbarkeit** | Unterstützung für autonome Agents | ✅ Zentralisiert | ⚠️ Verteilte Datenquellen | Hoch | AIHub: 5, Extern: 3 |
+| **Kosten** | Infrastrukturkosten | ⚠️ Höhere Speicherkosten | ✅ Niedrigere Kosten | Mittel | AIHub: 3, Extern: 5 |
+| **Kosten** | Entwicklungs- und Wartungsaufwand | ⚠️ Zusätzliche Services | ✅ Geringer | Mittel | AIHub: 3, Extern: 4 |
+| **Komplexität** | Datensynchronisation | ⚠️ Erforderlich | ✅ Nicht erforderlich | Mittel | AIHub: 3, Extern: 5 |
+| **Flexibilität** | Plattformübergreifende Features | ✅ Unabhängig | ❌ Limitiert | Hoch | AIHub: 5, Extern: 2 |
+| **Flexibilität** | Zukunftssicherheit (neue Features) | ✅ Volle Kontrolle | ⚠️ Eingeschränkt | Hoch | AIHub: 5, Extern: 3 |
+
+### Gewichtete Gesamtbewertung
+
+**Integration in AIHub**: **4.5/5** (gewichtet nach Priorität für Funktionalität und Flexibilität)  
+**On-the-fly Übersetzung**: **2.9/5** (gewichtet nach Priorität für Funktionalität und Flexibilität)
+
+### Empfehlung
+
+Die Integration von Chat-Historie und Tracings direkt in AIHub wird **stark empfohlen**, da:
+
+1. Die Vision eines **Unified-UI für AI** zentrale Datenhaltung erfordert
+2. Innovative Features wie **Semantic Search** und **Chat with Traces** nur so effektiv umsetzbar sind
+3. Die **Flexibilität** für zukünftige Features und Custom-Agent-Integration höher gewichtet wird als Infrastrukturkosten
+4. Die **Heterogenität externer Agent-Stores** eine konsistente UX nur über zentrale Datenhaltung ermöglicht
+
+Die erhöhten Infrastrukturkosten und der Wartungsaufwand sind durch die strategischen Vorteile gerechtfertigt, insbesondere wenn AIHub als langfristige Plattform für AI-Integration positioniert wird.
+
 ## TODOs
 
-AIHub
-Event Processing für Traces dokumentieren SAAS + Tenant rein + Widgets anlegen (neben default) (mit instructions) + Widgets einer Application + instructions zuweisen + weitere überlegung am ende: semantic sesrch in den Chats etc + Argumente für eigenen Chat Historie store
-
-Argument:
-– hat jedes AgentSystem das wir anbinden einen guten conversstion Store? Kann man semantisch suchen, Filter etc. weitere Features aufführen (z.B. N8N?)
-– Flexibilität 
-– Neue Features wie enable semantic search für Application möglich 
-– Allgemein neue Features für die Plattform möglich
-– Chat with your Traces: in Traces Semantic Sesrch enablen
-– JETZT ist es ein Chat-UI; zukünftig vielleicht auch Integration von DEV Komponenten (DevUI? Custom Widgets direkt im AIHub entwickelt und deploaxen Etc.)
-– Mein Ziel: EIN UNIFIED-UI, damit ich mich komplett auf Backend konzentrieren kann 
 
 KONZEPT: Unified-UI for your AI
 AI-Integration Platformü
