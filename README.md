@@ -83,7 +83,6 @@ AIHub isn't just another chat interface—it's the **integration layer for your 
 
 **Integrate your AI landscape. Unify your experience. Accelerate your innovation.**
 
-
 ## AIHub Overview
 
 **AIHub** is a unified interface platform for deploying and managing AI chat applications powered by external agent systems. It serves as a central hub that integrates diverse agent platforms—such as Microsoft Foundry, n8n, Copilot, and others—into a single, cohesive application environment.
