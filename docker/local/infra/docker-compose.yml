@@ -1,0 +1,67 @@
+name: aihub-infra
+services:
+  mongodb:
+    image: mongo:8.2
+    container_name: aihub-document-database
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: admin
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - aihub_network
+
+  redis:
+    image: redis:8.4
+    container_name: aihub-cache
+    environment:
+      REDIS_PASSWORD: admin
+    command: ["redis-server", "--requirepass", "admin"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - aihub_network
+
+  rabbitmq:
+    image: rabbitmq:4.2-management
+    container_name: aihub-message-broker
+    ports:
+      - "5672:5672"   # AMQP protocol
+      - "15672:15672" # Management UI
+    environment:
+      RABBITMQ_DEFAULT_USER: admin
+      RABBITMQ_DEFAULT_PASS: admin
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - aihub_network
+
+  minio:
+    image: minio/minio
+    container_name: aihub-object-storage
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: adminminio
+      MINIO_ROOT_PASSWORD: adminminio
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+    networks:
+      - aihub_network
+  
+volumes:
+  mongo_data:
+  redis_data:
+  rabbitmq_data:
+  minio_data:
+
+networks:
+  aihub_network:
+    name: aihub_network
+    driver: bridge

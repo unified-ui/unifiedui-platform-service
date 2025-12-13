@@ -1,0 +1,3 @@
+include:
+  - docker/local/infra/docker-compose.yml
+  - docker/local/n8n/docker-compose.yml
