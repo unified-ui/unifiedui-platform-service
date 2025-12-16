@@ -4,8 +4,10 @@
 
 - Identity:
     - Bekommt man die Extra-Gruppen in den Token?
+        - nein, aber über API
+        - tenantID (tid) bekommt man aus dem JWT Token
     - Token-Validation
-    - ID aus Token für Cache
+    - ID + tenantID aus Token für Cache
     - Frontend -> MSAL Flow für Token
 
 - tenant
