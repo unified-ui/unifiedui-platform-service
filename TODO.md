@@ -32,6 +32,8 @@
     - in tenants einbauen und testen
     - chacing strategie: tenantid immer in den key -> wenn was an permissions gemacht wird -> einfach alles aus was mit dem tenantid im key ist aus dem cache killen (step 1; später besser!)
 
+- software tests für tenants, inkl cache
+
 - custom_groups
     - route /api/v1/custom/groups
     - CRUD

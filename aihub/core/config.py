@@ -11,6 +11,15 @@ class Settings(BaseSettings):
     mongodb_connection_string: str
     mongodb_database_name: str = "aihub"
     
+    # Cache Configuration
+    cache_enabled: bool = True
+    cache_backend: str = "REDIS"
+    redis_host: str = "localhost"
+    redis_port: int = 6379
+    redis_db: int = 0
+    redis_password: Optional[str] = None
+    cache_default_ttl: int = 3600  # 1 hour
+    
     # API Configuration
     api_title: str = "AIHub API"
     api_description: str = "AIHub - AI Application Management Platform"
