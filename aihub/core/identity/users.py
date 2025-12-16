@@ -1,12 +1,12 @@
 from typing import TYPE_CHECKING
 
+from aihub.core.handlers.tenants import TenantHandler
+from aihub.core.database.models.permissions import AssignedTo
 from aihub.core.identity.factory import IdentityProviderFactory, IdentityTokenFactory
 from aihub.schema.responses.identity import IdentityGroupResponse, IdentityUserResponse
 from aihub.schema.responses.tenants import TenantResponse
 from aihub.utils.api_query import APIFilterQuery
-
-if TYPE_CHECKING:
-    from aihub.database.client import DatabaseClient
+from aihub.database.client import DatabaseClient
 
 
 class IdentityUser:
@@ -84,7 +84,6 @@ class IdentityUser:
             return self._tenants
         
         # Build assigned_to list
-        from aihub.core.database.models.permissions import AssignedTo
         
         assigned_to_list = [AssignedTo(type="user", id=self.identity.get_id())]
         
@@ -128,9 +127,10 @@ class IdentityUser:
             )
             
             # Convert to TenantResponse
-            from aihub.core.handlers.tenants import TenantHandler
-            handler = TenantHandler(self._database_client)
-            self._tenants = [handler._model_to_response(t) for t in tenants]
+            self._tenants = [
+                TenantHandler._model_to_response(t)
+                for t in tenants
+            ]
         
         return self._tenants
 
