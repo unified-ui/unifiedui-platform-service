@@ -1,5 +1,5 @@
 """Redis cache client implementation."""
-from typing import Optional
+from typing import Optional, Any
 
 from aihub.core.caching.client import BaseCacheClient
 from aihub.caching.redis.cache import RedisCache
@@ -40,6 +40,14 @@ class RedisCacheClient(BaseCacheClient):
         )
         self._tenants_cache = RedisTenantsCacheCollection(self._cache)
         logger.info("Redis cache client initialized")
+
+    def get(self, key: str) -> Optional[Any]:
+        """Get a value from Redis cache by key."""
+        return self._cache.get(key)
+
+    def set(self, key: str, value: Any, ttl: int | None = None) -> None:
+        """Set a value in Redis cache with an optional TTL."""
+        self._cache.set(key, value, ttl=ttl)
 
     def tenants(self) -> TenantsCacheCollection:
         """Get the tenants cache collection."""

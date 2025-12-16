@@ -27,7 +27,7 @@ class IdentityUser:
         self._groups = None
         self._custom_groups = None
         self._tenants = None
-        self._cache_client = cache_client
+        self._cache = cache_client
         self._database_client = database_client
     
     @property
@@ -42,9 +42,9 @@ class IdentityUser:
         cache_key = f"identity:groups:user:{user_id}"
         
         # Check Redis cache
-        if self._use_cache and self._cache_client:
+        if self._use_cache and self._cache:
             try:
-                cached_data = self._cache_client._client._cache.get(cache_key)
+                cached_data = self._cache.client.get(cache_key)
                 if cached_data is not None:
                     self._groups = [IdentityGroupResponse(**item) for item in cached_data]
                     logger.debug(f"Returning cached groups for user {user_id}")
@@ -58,10 +58,10 @@ class IdentityUser:
         logger.debug(f"Fetched {len(self._groups)} groups from identity provider")
 
         # cache the groups with 60s TTL
-        if self._cache_client:
+        if self._cache:
             try:
                 groups_data = [g.model_dump() for g in self._groups]
-                self._cache_client._client._cache.set(cache_key, groups_data, ttl=60)
+                self._cache.client.set(cache_key, groups_data, ttl=60)
                 logger.debug(f"Cached groups for user {user_id} (TTL: 60s)")
             except Exception as e:
                 logger.warning(f"Failed to cache groups: {e}")
@@ -122,10 +122,10 @@ class IdentityUser:
         user_id = self.identity.get_id()
         cache_key = f"identity:tenants:user:{user_id}"
         
-        # Check Redis cache
-        if self._use_cache and self._cache_client:
+        # Check Redis cache / TODO: in tenant handler!!!
+        if self._use_cache and self._cache:
             try:
-                cached_data = self._cache_client._client._cache.get(cache_key)
+                cached_data = self._cache.client.get(cache_key)
                 if cached_data is not None:
                     self._tenants = [TenantResponse(**item) for item in cached_data]
                     logger.debug(f"Returning cached tenants for user {user_id}")
@@ -183,11 +183,11 @@ class IdentityUser:
         
         logger.debug(f"Fetched {len(self._tenants)} tenants from database")
         
-        # Cache the tenants
-        if self._cache_client:
+        # Cache the tenants / TODO: in tenant handler!!!
+        if self._cache:
             try:
                 tenants_data = [t.model_dump() for t in self._tenants]
-                self._cache_client._client._cache.set(cache_key, tenants_data)
+                self._cache._client._cache.set(cache_key, tenants_data)
                 logger.debug(f"Cached tenants for user {user_id}")
             except Exception as e:
                 logger.warning(f"Failed to cache tenants: {e}")

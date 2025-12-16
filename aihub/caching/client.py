@@ -28,6 +28,11 @@ class CacheClient:
         """Get the tenants cache collection."""
         return self._client.tenants()
 
+    @property
+    def client(self) -> BaseCacheClient:
+        """Get the underlying cache client."""
+        return self._client
+
     def close(self) -> None:
         """Close cache client connection."""
         self._client.close()
