@@ -4,6 +4,7 @@ from pymongo.database import Database
 from aihub.core.database.base import BaseDatabaseClient
 from aihub.database.mongo.collections.tenants import MongoDBTenantsCollection
 from aihub.database.mongo.collections.permissions import MongoDBPermissionsCollection
+from aihub.database.mongo.collections.custom_groups import MongoDBCustomGroupsCollection
 
 
 class MongoDBDatabaseClient(BaseDatabaseClient):
@@ -15,6 +16,7 @@ class MongoDBDatabaseClient(BaseDatabaseClient):
         self._client: MongoClient = None
         self._db: Database = None
         self._tenants_collection = None
+        self._custom_groups_collection = None
 
     def connect(self) -> None:
         """Establish database connection."""
@@ -56,3 +58,13 @@ class MongoDBDatabaseClient(BaseDatabaseClient):
             raise RuntimeError("Database not connected. Call connect() first.")
         
         return MongoDBPermissionsCollection(self._db)
+
+    def custom_groups(self) -> MongoDBCustomGroupsCollection:
+        """Get the custom groups collection."""
+        if self._db is None:
+            raise RuntimeError("Database not connected. Call connect() first.")
+        
+        if self._custom_groups_collection is None:
+            self._custom_groups_collection = MongoDBCustomGroupsCollection(self._db["custom_groups"])
+        
+        return self._custom_groups_collection

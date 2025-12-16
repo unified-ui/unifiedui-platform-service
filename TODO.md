@@ -13,9 +13,6 @@
 - identity provider (Extra ID) implementieren
 - routes für identity impl
 - user MUSS get_id -> haben
-
-## TODO
-
 - tenant
     - CRUD
     - Gibt TenantID, ClientID und ClientSecret für Service Principal an
@@ -25,7 +22,6 @@
 
 - Permissions
     - CRUD
-    - has_permissions refactoren und auslagern -> am besten in middleware decorator!
 
 - cache implementieren
     - cache
@@ -33,14 +29,22 @@
     - chacing strategie: tenantid immer in den key -> wenn was an permissions gemacht wird -> einfach alles aus was mit dem tenantid im key ist aus dem cache killen (step 1; später besser!)
 
 - software tests für tenants, inkl cache
+## TODO
 
-- custom_groups
-    - route /api/v1/custom/groups
+- identity/users/{id}
+
+- refactoring:
+    - has_permissions refactoren und auslagern -> am besten in middleware decorator!
+    - caching besser implementieren!!! für tenants, groups, permissions!!! und clear
+
+- custom_groups (/api/v1/tenants/{id}/custom/groups)
     - CRUD
-
+    - Caching
 
 - Credentials
     - CRUD
+    - metadaten in db; key in secrets vault
+    - key auch cachen, aber mit encryption key (aus env)
 
 - Applications
     - CRUD

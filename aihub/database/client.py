@@ -6,6 +6,7 @@ from aihub.database.enums import DocumentDatabaseTypeEnum
 from aihub.database.mongo.client import MongoDBDatabaseClient
 from aihub.core.database.collections.tenants import TenantsCollection
 from aihub.core.database.collections.permissions import PermissionsCollection
+from aihub.core.database.collections.custom_groups import CustomGroupsCollection
 
 
 class DatabaseClient:
@@ -43,6 +44,16 @@ class DatabaseClient:
             PermissionsCollection: The permissions collection interface
         """
         return self._client.permissions()
+
+    @property
+    def custom_groups(self) -> CustomGroupsCollection:
+        """
+        Get the custom groups collection.
+        
+        Returns:
+            CustomGroupsCollection: The custom groups collection interface
+        """
+        return self._client.custom_groups()
 
     def health_check(self) -> bool:
         """

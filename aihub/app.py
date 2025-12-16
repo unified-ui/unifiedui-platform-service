@@ -64,6 +64,25 @@ def create_app() -> FastAPI:
             content={"detail": str(exc)}
         )
     
+    # Custom Group exception handlers
+    from aihub.exc.custom_groups import CustomGroupNotFoundError, CustomGroupError
+    
+    @app.exception_handler(CustomGroupNotFoundError)
+    async def custom_group_not_found_handler(request: Request, exc: CustomGroupNotFoundError):
+        """Handle custom group not found errors."""
+        return JSONResponse(
+            status_code=404,
+            content={"detail": str(exc)}
+        )
+    
+    @app.exception_handler(CustomGroupError)
+    async def custom_group_error_handler(request: Request, exc: CustomGroupError):
+        """Handle general custom group errors."""
+        return JSONResponse(
+            status_code=400,
+            content={"detail": str(exc)}
+        )
+    
     # Include routers
     app.include_router(
         healthcheck.router,
@@ -81,6 +100,13 @@ def create_app() -> FastAPI:
         tenants.router,
         prefix="/api/v1/tenants",
         tags=["Tenants"]
+    )
+    
+    from aihub.apis.v1 import custom_groups
+    app.include_router(
+        custom_groups.router,
+        prefix="/api/v1/tenants/{tenant_id}/custom/groups",
+        tags=["Custom Groups"]
     )
     
     # Lifecycle events

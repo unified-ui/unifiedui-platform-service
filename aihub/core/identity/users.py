@@ -70,25 +70,38 @@ class IdentityUser:
 
     @property
     def custom_groups(self) -> list[IdentityGroupResponse]:
-        return []
+        """
+        Get all custom groups the user is a member of.
+        Returns groups where user_id is in member_ids.
+        """
         # in-memory cache
         if self._custom_groups is not None:
             return self._custom_groups
         
         self._custom_groups = []
-        if self._use_cache and self._cache_client:
-            # redis cache
-            cache_custom_groups = self._cache_client.get_user_custom_groups(self.identity.get_id())
-            if cache_custom_groups is not None:
-                self._custom_groups = cache_custom_groups
-                return self._custom_groups
-
-        # database
-        self._custom_groups = self._database_client.get_user_custom_groups(self.identity.get_id())
-
-        # cache the custom groups
-        self._cache_client.set_user_custom_groups(self.identity.get_id(), self._custom_groups)
-
+        
+        if not self._database_client:
+            return self._custom_groups
+        
+        user_id = self.identity.get_id()
+        
+        # Query custom groups where user is a member
+        groups = self._database_client.custom_groups.get_list(
+            filters={"member_ids": user_id},
+            limit=1000
+        )
+        
+        # Convert to IdentityGroupResponse format
+        self._custom_groups = [
+            IdentityGroupResponse(
+                id=g.id,
+                display_name=g.name
+            )
+            for g in groups
+        ]
+        
+        logger.debug(f"Fetched {len(self._custom_groups)} custom groups from database")
+        
         return self._custom_groups
 
     @property
