@@ -2,7 +2,7 @@ from typing import Optional, List
 from pymongo.database import Database
 from pymongo.collection import Collection
 
-from aihub.database.collections.tenants import TenantsCollection
+from aihub.core.database.collections.tenants import TenantsCollection
 from aihub.core.database.models.tenants import TenantModel
 from aihub.utils.default_factory_functions import current_iso_datetime
 

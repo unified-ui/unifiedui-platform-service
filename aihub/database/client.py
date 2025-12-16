@@ -1,10 +1,10 @@
 import os
 from typing import Optional
 
-from aihub.database.base import BaseDatabaseClient
+from aihub.core.database.base import BaseDatabaseClient
 from aihub.database.enums import DocumentDatabaseTypeEnum
 from aihub.database.mongo.client import MongoDBDatabaseClient
-from aihub.database.collections.tenants import TenantsCollection
+from aihub.core.database.collections.tenants import TenantsCollection
 
 
 class DatabaseClient:

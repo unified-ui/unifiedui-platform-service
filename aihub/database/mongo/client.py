@@ -1,7 +1,7 @@
 from pymongo import MongoClient
 from pymongo.database import Database
 
-from aihub.database.base import BaseDatabaseClient
+from aihub.core.database.base import BaseDatabaseClient
 from aihub.database.mongo.collections.tenants import MongoDBTenantsCollection
 
 
