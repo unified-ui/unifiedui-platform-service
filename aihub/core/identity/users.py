@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 from aihub.core.handlers.tenants import TenantHandler
 from aihub.core.database.models.permissions import AssignedTo
@@ -7,41 +7,64 @@ from aihub.schema.responses.identity import IdentityGroupResponse, IdentityUserR
 from aihub.schema.responses.tenants import TenantResponse
 from aihub.utils.api_query import APIFilterQuery
 from aihub.database.client import DatabaseClient
+from aihub.caching.client import CacheClient
+from aihub.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 class IdentityUser:
-    def __init__(self, token: str, database_client: "DatabaseClient" = None, use_cache: bool = True):
+    def __init__(
+        self,
+        token: str,
+        database_client: Optional["DatabaseClient"] = None,
+        cache_client: Optional[CacheClient] = None,
+        use_cache: bool = True
+    ):
         self.identity = IdentityTokenFactory.create(token)
         self.idp = IdentityProviderFactory.create(self.identity)
         self._use_cache = use_cache
         self._groups = None
         self._custom_groups = None
         self._tenants = None
-        self._cache_client = None
+        self._cache_client = cache_client
         self._database_client = database_client
     
     @property
     def groups(self) -> list[IdentityGroupResponse]:
+        """Get user groups with Redis caching (TTL: 60s)."""
         # in-memory cache
         if self._groups is not None:
             return self._groups
         
         self._groups = []
+        user_id = self.identity.get_id()
+        cache_key = f"identity:groups:user:{user_id}"
+        
+        # Check Redis cache
         if self._use_cache and self._cache_client:
-            # redis cache
-            cache_groups = self._cache_client.get_user_groups(self.identity.get_id())
-            if cache_groups is not None:
-                self._groups = cache_groups
-                return self._groups
+            try:
+                cached_data = self._cache_client._client._cache.get(cache_key)
+                if cached_data is not None:
+                    self._groups = [IdentityGroupResponse(**item) for item in cached_data]
+                    logger.debug(f"Returning cached groups for user {user_id}")
+                    return self._groups
+            except Exception as e:
+                logger.warning(f"Failed to get cached groups: {e}")
 
         # fetch from identity provider
         query = APIFilterQuery(top=999)
         self._groups = self.idp.get_current_user_security_groups(query=query)
-        # self._identity_provider_client.get_user_groups(self.identity.get_id())
+        logger.debug(f"Fetched {len(self._groups)} groups from identity provider")
 
-        # cache the groups
+        # cache the groups with 60s TTL
         if self._cache_client:
-            self._cache_client.set_user_groups(self.identity.get_id(), self._groups)
+            try:
+                groups_data = [g.model_dump() for g in self._groups]
+                self._cache_client._client._cache.set(cache_key, groups_data, ttl=60)
+                logger.debug(f"Cached groups for user {user_id} (TTL: 60s)")
+            except Exception as e:
+                logger.warning(f"Failed to cache groups: {e}")
 
         return self._groups
 
@@ -83,9 +106,22 @@ class IdentityUser:
         if not self._database_client:
             return self._tenants
         
-        # Build assigned_to list
+        user_id = self.identity.get_id()
+        cache_key = f"identity:tenants:user:{user_id}"
         
-        assigned_to_list = [AssignedTo(type="user", id=self.identity.get_id())]
+        # Check Redis cache
+        if self._use_cache and self._cache_client:
+            try:
+                cached_data = self._cache_client._client._cache.get(cache_key)
+                if cached_data is not None:
+                    self._tenants = [TenantResponse(**item) for item in cached_data]
+                    logger.debug(f"Returning cached tenants for user {user_id}")
+                    return self._tenants
+            except Exception as e:
+                logger.warning(f"Failed to get cached tenants: {e}")
+        
+        # Build assigned_to list
+        assigned_to_list = [AssignedTo(type="user", id=user_id)]
         
         # Add identity groups
         for group in self.groups:
@@ -131,6 +167,17 @@ class IdentityUser:
                 TenantHandler._model_to_response(t)
                 for t in tenants
             ]
+        
+        logger.debug(f"Fetched {len(self._tenants)} tenants from database")
+        
+        # Cache the tenants
+        if self._cache_client:
+            try:
+                tenants_data = [t.model_dump() for t in self._tenants]
+                self._cache_client._client._cache.set(cache_key, tenants_data)
+                logger.debug(f"Cached tenants for user {user_id}")
+            except Exception as e:
+                logger.warning(f"Failed to cache tenants: {e}")
         
         return self._tenants
 

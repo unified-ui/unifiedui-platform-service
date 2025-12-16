@@ -48,6 +48,12 @@ async def list_tenants(
         list[TenantResponse]: List of tenants user has access to
     """
     user: IdentityUser = request.state.user
+    user_id = user.identity.get_id()
+    
+    # Build route string for caching
+    route = f"/api/v1/tenants?skip={skip}&limit={limit}"
+    if name:
+        route += f"&name={name}"
     
     # Get accessible tenant IDs from user.tenants
     tenant_ids = [t.id for t in user.tenants]
@@ -61,7 +67,9 @@ async def list_tenants(
         filters=filters,
         skip=skip,
         limit=limit,
-        tenant_ids=tenant_ids
+        tenant_ids=tenant_ids,
+        user_id=user_id,
+        route=route
     )
 
 
@@ -94,13 +102,17 @@ async def get_tenant(
         PermissionDeniedError: If user doesn't have access to this tenant
     """
     user: IdentityUser = request.state.user
+    user_id = user.identity.get_id()
+    
+    # Build route string for caching
+    route = f"/api/v1/tenants/{tenant_id}"
     
     # Check if user has access to this tenant
     accessible_tenant_ids = [t.id for t in user.tenants]
     if tenant_id not in accessible_tenant_ids:
         raise PermissionDeniedError("tenants", tenant_id, "read")
     
-    return handler.get_tenant(tenant_id)
+    return handler.get_tenant(tenant_id, user_id, route)
 
 
 @router.post(
