@@ -12,10 +12,9 @@
 
 - identity provider (Extra ID) implementieren
 - routes für identity impl
+- user MUSS get_id -> haben
 
 ## TODO
-
-- route /api/v1/custom/groups
 
 - tenant
     - CRUD
@@ -24,11 +23,13 @@
     - hier vielleicht doch eher immer mit den UserToken arbeiten? der kann doch Gruppen und so auslesen?
     - und beim anmelden einen tenant anlegen; man kann aber auch neuen anlegen
 
-- custom_groups
-    - CRUD
-
 - Permissions
     - CRUD
+
+- custom_groups
+    - route /api/v1/custom/groups
+    - CRUD
+
 
 - Credentials
     - CRUD

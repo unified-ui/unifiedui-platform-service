@@ -21,7 +21,7 @@ class BaseIdentityToken(ABC):
         pass
 
     @abstractmethod
-    def get_tenant_id(self) -> str:
+    def get_identity_tenant_id(self) -> str:
         pass
 
     @abstractmethod
@@ -48,7 +48,7 @@ class BaseIdentityToken(ABC):
         return {
             "identity_provider": self.get_identity_provider(),
             "id": self.get_id(),
-            "tenant_id": self.get_tenant_id(),
+            "tenant_id": self.get_identity_tenant_id(),
             "display_name": self.get_display_name(),
             "firstname": self.get_firstname(),
             "lastname": self.get_lastname(),

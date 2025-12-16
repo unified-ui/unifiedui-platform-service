@@ -60,6 +60,12 @@ def authenticate(func: Callable) -> Callable:
         # Create User object
         try:
             user = IdentityUser(token=token, use_cache=use_cache)
+            if not user.identity.get_id():
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Invalid token: unable to retrieve user identity id.",
+                    headers={"WWW-Authenticate": "Bearer"}
+                )
         except ValueError as e:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,

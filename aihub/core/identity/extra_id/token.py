@@ -16,7 +16,7 @@ class ExtraIDIdentityTokenSerializer(BaseIdentityToken):
     def get_id(self) -> str:
         return self.deserialized_token.get("oid")
 
-    def get_tenant_id(self) -> str:
+    def get_identity_tenant_id(self) -> str:
         return self.deserialized_token.get("tid", "")
 
     def get_display_name(self) -> str:

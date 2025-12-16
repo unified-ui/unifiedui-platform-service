@@ -11,10 +11,13 @@ class IdentityGroupResponse(BaseModel):
 class IdentityUserResponse(BaseModel):
     """Identity user response model."""
     id: str
+    identity_provider: str
+    identity_tenant_id: str | None = None
     display_name: str
     firstname: str | None = None
     lastname: str | None = None
     mail: str | None = None
+    tenants: list[dict] | None = None
     groups: list[IdentityGroupResponse] | None = None
     custom_groups: list[IdentityGroupResponse] | None = None
 

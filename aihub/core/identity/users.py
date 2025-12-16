@@ -64,10 +64,13 @@ class IdentityUser:
     def get_me(self) -> IdentityUserResponse:
         return IdentityUserResponse(
             id=self.identity.get_id(),
+            identity_provider=self.identity.get_identity_provider(),
+            identity_tenant_id=self.identity.get_identity_tenant_id(),
             display_name=self.identity.get_display_name(),
             mail=self.identity.get_mail(),
             firstname=self.identity.get_firstname(),
             lastname=self.identity.get_lastname(),
+            tenants=[],
             groups=self.groups,
             custom_groups=self.custom_groups
         )
