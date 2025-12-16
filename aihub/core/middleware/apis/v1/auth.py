@@ -74,9 +74,11 @@ def authenticate(func: Callable) -> Callable:
         
         # Attach user to request state (FastAPI best practice)
         request.state.user = user
+        request.state.use_cache = use_cache
         
         # Also inject user into function kwargs for convenience
         kwargs["user"] = user
+        kwargs["use_cache"] = use_cache
         
         return await func(*args, **kwargs)
 

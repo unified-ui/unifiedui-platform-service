@@ -1,3 +1,7 @@
+import jwt
+
+from jwt.exceptions import InvalidTokenError
+
 from core.identity.base import BaseIdentityTokenSerializer
 from core.identity.extra_id.token import ExtraIDIdentityTokenSerializer
 
@@ -6,18 +10,16 @@ class IdentityTokenFactory:
 
     @staticmethod
     def create(token: str) -> BaseIdentityTokenSerializer:
-        desierialized_token = {
-            "iss": "https://microsoft.com/",
-            "id": "user_id_example",
-            "tid": "tenant_id_example",
-            "display_name": "John Doe",
-            "firstname": "John",
-            "lastname": "Doe"
-        }
+        try:
+            deserialized_token: dict = jwt.decode(
+                token, 
+                options={"verify_signature": False}
+            )
+        except InvalidTokenError as e:
+            raise ValueError(f"Invalid JWT token: {str(e)}")
 
-        iss = desierialized_token.get("iss")
-        match iss:
-            case "https://microsoft.com/":
-                return ExtraIDIdentityTokenSerializer(token, desierialized_token)
-            case _:
-                raise ValueError(f"Unsupported token issuer: {iss}")
+        iss: str = deserialized_token.get("iss")
+        if iss.startswith("https://sts.windows.net/"):
+            return ExtraIDIdentityTokenSerializer(token, deserialized_token)
+        
+        raise ValueError(f"Unsupported token issuer: {iss}")

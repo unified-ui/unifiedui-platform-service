@@ -3,8 +3,9 @@ from core.identity.base import BaseIdentityTokenSerializer
 
 class ExtraIDIdentityTokenSerializer(BaseIdentityTokenSerializer):
 
-    def __init__(self, token):
-        super().__init__(token)
+    def __init__(self, token: str, deserialized_token: dict):
+        self._identity_provider = "EXTRA_ID"
+        super().__init__(token, deserialized_token)
 
     def get_token(self) -> str:
         return self.token
@@ -13,20 +14,38 @@ class ExtraIDIdentityTokenSerializer(BaseIdentityTokenSerializer):
         return self.deserialized_token
 
     def get_id(self) -> str:
-        # Placeholder implementation
-        return self.deserialized_token.get("id")
+        return self.deserialized_token.get("oid")
 
     def get_tenant_id(self) -> str:
-        # Placeholder implementation
-        return self.deserialized_token.get("tid")
+        return self.deserialized_token.get("tid", "")
 
     def get_display_name(self) -> str:
-        # Placeholder implementation
-        return self.deserialized_token.get("display_name")
+        return self.deserialized_token.get("name", "")
+
     def get_firstname(self) -> str:
-        # Placeholder implementation
-        return self.deserialized_token.get("firstname")
+        given_name = self.deserialized_token.get("given_name", "")
+        if given_name:
+            return given_name
+        
+        name = self.deserialized_token.get("name", "")
+        if name and " " in name:
+            return name.split(" ", 1)[0]
+        
+        return ""
 
     def get_lastname(self) -> str:
-        # Placeholder implementation
-        return self.deserialized_token.get("lastname")
+        family_name = self.deserialized_token.get("family_name", "")
+        if family_name:
+            return family_name
+        
+        name = self.deserialized_token.get("name", "")
+        if name and " " in name:
+            return name.split(" ", 1)[1]
+        
+        return ""
+
+    def get_mail(self):
+        return self.deserialized_token.get("mail", "")
+
+    def get_identity_provider(self) -> str:
+        return self._identity_provider
