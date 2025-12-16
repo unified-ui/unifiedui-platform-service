@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from aihub.apis.v1 import healthcheck, auth
+from aihub.apis.v1 import healthcheck, identity
 
 
 def create_app() -> FastAPI:
@@ -33,9 +33,9 @@ def create_app() -> FastAPI:
     )
     
     app.include_router(
-        auth.router,
-        prefix="/api/v1/auth",
-        tags=["Authentication"]
+        identity.router,
+        prefix="/api/v1/identity",
+        tags=["Identity"]
     )
     
     return app

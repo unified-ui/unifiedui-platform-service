@@ -2,14 +2,15 @@ import jwt
 
 from jwt.exceptions import InvalidTokenError
 
-from aihub.core.identity.base import BaseIdentityTokenSerializer
+from aihub.core.identity.base import BaseIdentityProvider, BaseIdentityToken, IdenityProviderEnum
+from aihub.core.identity.extra_id.provider import ExtraIDIdentityProvider
 from aihub.core.identity.extra_id.token import ExtraIDIdentityTokenSerializer
 
 
 class IdentityTokenFactory:
 
     @staticmethod
-    def create(token: str) -> BaseIdentityTokenSerializer:
+    def create(token: str) -> BaseIdentityToken:
         try:
             deserialized_token: dict = jwt.decode(
                 token, 
@@ -23,3 +24,14 @@ class IdentityTokenFactory:
             return ExtraIDIdentityTokenSerializer(token, deserialized_token)
         
         raise ValueError(f"Unsupported token issuer: {iss}")
+
+
+class IdentityProviderFactory:
+
+    @staticmethod
+    def create(identity_token: BaseIdentityToken) -> BaseIdentityProvider:
+        match identity_token.get_identity_provider():
+            case IdenityProviderEnum.EXTRA_ID.value:
+                return ExtraIDIdentityProvider(identity_token=identity_token)
+        
+        raise ValueError(f"Unsupported identity provider for: {identity_token.get_identity_provider()}")

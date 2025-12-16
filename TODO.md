@@ -2,8 +2,6 @@
 
 ## Done
 
-## TODO
-
 - Identity:
     - Bekommt man die Extra-Gruppen in den Token?
         - nein, aber über API
@@ -11,6 +9,13 @@
     - Token-Validation
     - ID + tenantID aus Token für Cache
     - Frontend -> MSAL Flow für Token
+
+- identity provider (Extra ID) implementieren
+- routes für identity impl
+
+## TODO
+
+- route /api/v1/custom/groups
 
 - tenant
     - CRUD

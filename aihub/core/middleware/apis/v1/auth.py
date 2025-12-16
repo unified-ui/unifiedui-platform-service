@@ -3,7 +3,7 @@ from typing import Callable, Any
 
 from fastapi import Request, HTTPException, status
 
-from aihub.core.identity.user import IdentityUser
+from aihub.core.identity.users import IdentityUser
 
 
 def authenticate(func: Callable) -> Callable:

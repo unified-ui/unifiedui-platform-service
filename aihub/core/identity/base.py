@@ -1,12 +1,17 @@
 from abc import ABC, abstractmethod
+from enum import Enum
+
+from aihub.utils.api_query import APIFilterQuery
+from aihub.schema.responses.identity import IdentityGroupResponse, IdentityUserResponse
 
 
-class BaseGroup:
-    id: str
-    name: str
+class IdenityProviderEnum(str, Enum):
+    EXTRA_ID = "EXTRA_ID"
+    AWS_COGNITO = "AWS_COGNITO"
+    GOOGLE_IDENTITY = "GOOGLE_IDENTITY"
 
 
-class BaseIdentityTokenSerializer(ABC):
+class BaseIdentityToken(ABC):
     def __init__(self, token: str, deserialized_token: dict):
         self.token = token
         self.deserialized_token = deserialized_token
@@ -49,3 +54,33 @@ class BaseIdentityTokenSerializer(ABC):
             "lastname": self.get_lastname(),
             "mail": self.get_mail()
         }
+
+
+class BaseIdentityProvider(ABC):
+    """Base class for identity provider implementations."""
+    def __init__(self, identity_token: BaseIdentityToken):
+        self.identity_token = identity_token
+
+    @abstractmethod
+    def get_current_user_security_groups(
+        self,
+        query: APIFilterQuery | None = None
+    ) -> list[IdentityGroupResponse]:
+        """Get security groups for the current user."""
+        pass
+
+    @abstractmethod
+    def get_security_groups(
+        self,
+        query: APIFilterQuery | None = None
+    ) -> list[IdentityGroupResponse]:
+        """Get all security groups from the directory."""
+        pass
+
+    @abstractmethod
+    def get_users(
+        self,
+        query: APIFilterQuery | None = None
+    ) -> list[IdentityUserResponse]:
+        """Get users from the directory."""
+        pass

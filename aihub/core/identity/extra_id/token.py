@@ -1,10 +1,10 @@
-from aihub.core.identity.base import BaseIdentityTokenSerializer
+from aihub.core.identity.base import BaseIdentityToken, IdenityProviderEnum
 
 
-class ExtraIDIdentityTokenSerializer(BaseIdentityTokenSerializer):
+class ExtraIDIdentityTokenSerializer(BaseIdentityToken):
 
     def __init__(self, token: str, deserialized_token: dict):
-        self._identity_provider = "EXTRA_ID"
+        self._identity_provider = IdenityProviderEnum.EXTRA_ID.value
         super().__init__(token, deserialized_token)
 
     def get_token(self) -> str:
