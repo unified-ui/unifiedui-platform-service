@@ -10,4 +10,8 @@ $ uvicorn aihub.main:app --reload
 $ uv sync
 
 $ uv remove flask
+
+$ uvicorn aihub.app:app --reload --host 0.0.0.0 --port 8000
 ```
+
+[OpenAPI Docs](http://localhost:8000/docs)

@@ -1,4 +1,4 @@
-from core.identity.base import BaseIdentityTokenSerializer
+from aihub.core.identity.base import BaseIdentityTokenSerializer
 
 
 class ExtraIDIdentityTokenSerializer(BaseIdentityTokenSerializer):

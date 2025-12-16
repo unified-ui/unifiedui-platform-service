@@ -3,7 +3,7 @@ from typing import Callable, Any
 
 from fastapi import Request, HTTPException, status
 
-from core.identity.user import IdentityUser
+from aihub.core.identity.user import IdentityUser
 
 
 def authenticate(func: Callable) -> Callable:
@@ -75,10 +75,6 @@ def authenticate(func: Callable) -> Callable:
         # Attach user to request state (FastAPI best practice)
         request.state.user = user
         request.state.use_cache = use_cache
-        
-        # Also inject user into function kwargs for convenience
-        kwargs["user"] = user
-        kwargs["use_cache"] = use_cache
         
         return await func(*args, **kwargs)
 

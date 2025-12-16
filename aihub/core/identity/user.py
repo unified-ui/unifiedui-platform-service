@@ -1,5 +1,5 @@
-from core.identity.factory import IdentityTokenFactory
-from core.identity.base import BaseGroup
+from aihub.core.identity.factory import IdentityTokenFactory
+from aihub.core.identity.base import BaseGroup
 
 
 class IdentityUser:
