@@ -1,5 +1,4 @@
 """Business logic handlers for tenant operations."""
-import logging
 from typing import Optional, List
 
 from aihub.database.client import DatabaseClient
@@ -8,8 +7,9 @@ from aihub.schema.requests.tenants import CreateTenantRequest, UpdateTenantReque
 from aihub.schema.responses.tenants import TenantResponse
 from aihub.exc.tenants import TenantNotFoundError
 from aihub.core.handlers.permissions import PermissionHandler
+from aihub.logger import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class TenantHandler:

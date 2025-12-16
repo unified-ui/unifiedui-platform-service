@@ -1,4 +1,3 @@
-import logging
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -8,13 +7,13 @@ from aihub.apis.v1 import healthcheck, identity, tenants
 from aihub.database.dependencies import close_db_client
 from aihub.core.config import settings
 from aihub.exc.tenants import TenantNotFoundError, TenantError
+from aihub.exc.permissions import PermissionDeniedError
+from aihub.logger import setup_logging, get_logger
 
 
 # Configure logging
-logging.basicConfig(
-    level=getattr(logging, settings.log_level),
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
+setup_logging()
+logger = get_logger(__name__)
 
 load_dotenv()
 
@@ -41,6 +40,14 @@ def create_app() -> FastAPI:
     )
     
     # Exception Handlers
+    @app.exception_handler(PermissionDeniedError)
+    async def permission_denied_handler(request: Request, exc: PermissionDeniedError):
+        """Handle permission denied errors."""
+        return JSONResponse(
+            status_code=403,
+            content={"detail": str(exc)}
+        )
+    
     @app.exception_handler(TenantNotFoundError)
     async def tenant_not_found_handler(request: Request, exc: TenantNotFoundError):
         """Handle tenant not found errors."""

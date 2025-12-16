@@ -1,5 +1,4 @@
 """Business logic handlers for permission operations."""
-import logging
 from typing import List
 from collections import defaultdict
 
@@ -8,8 +7,9 @@ from aihub.core.database.models.permissions import PermissionModel, AssignedTo
 from aihub.schema.requests.permissions import SetPermissionsRequest, DeletePermissionRequest
 from aihub.schema.responses.permissions import ResourcePermissionsResponse, PermissionAssignmentResponse
 from aihub.utils.default_factory_functions import current_iso_datetime, generate_id
+from aihub.logger import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class PermissionHandler:
@@ -88,7 +88,7 @@ class PermissionHandler:
         user_id: str
     ) -> ResourcePermissionsResponse:
         """
-        Set permissions for a resource (replaces existing permissions).
+        Set permissions for a resource (replaces existing permissions for specified assigned_to entities).
         
         Args:
             resource_type: Type of resource
@@ -109,18 +109,28 @@ class PermissionHandler:
             }
         )
         
-        # Delete all existing permissions for this resource
-        deleted_count = self.db_client.permissions.delete_resource_permissions(
-            resource_type=resource_type,
-            resource_id=resource_id,
-            tenant_id=tenant_id
-        )
-        
-        logger.debug(f"Deleted {deleted_count} existing permissions")
-        
-        # Create new permissions
+        total_deleted = 0
         new_permissions = []
+        
+        # For each assignment, delete existing permissions for that specific assigned_to
+        # and create new ones
         for assignment in request.assignments:
+            assigned_to = AssignedTo(type=assignment.type, id=assignment.id)
+            
+            # Delete existing permissions for this specific assigned_to
+            deleted_count = self.db_client.permissions.delete_resource_permissions(
+                resource_type=resource_type,
+                resource_id=resource_id,
+                tenant_id=tenant_id,
+                assigned_to=assigned_to
+            )
+            total_deleted += deleted_count
+            
+            logger.debug(
+                f"Deleted {deleted_count} existing permissions for {assignment.type}:{assignment.id}"
+            )
+            
+            # Create new permissions for this assigned_to
             for action in assignment.actions:
                 perm = PermissionModel(
                     id=generate_id(),
@@ -129,7 +139,7 @@ class PermissionHandler:
                     resource_id=resource_id,
                     action=action,
                     scope="specific",
-                    assigned_to=AssignedTo(type=assignment.type, id=assignment.id),
+                    assigned_to=assigned_to,
                     created_at=current_iso_datetime(),
                     created_by=user_id
                 )
@@ -143,6 +153,7 @@ class PermissionHandler:
             extra={
                 "resource_type": resource_type,
                 "resource_id": resource_id,
+                "deleted_count": total_deleted,
                 "new_count": len(new_permissions)
             }
         )

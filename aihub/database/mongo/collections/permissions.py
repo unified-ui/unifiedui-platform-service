@@ -181,7 +181,9 @@ class MongoDBPermissionsCollection(PermissionsCollection):
         }
         
         if assigned_to:
-            query["assigned_to"] = {"type": assigned_to.type, "id": assigned_to.id}
+            # Use field-level matching for nested object (MongoDB doesn't match nested objects correctly)
+            query["assigned_to.type"] = assigned_to.type
+            query["assigned_to.id"] = assigned_to.id
         
         result = self._collection.delete_many(query)
         return result.deleted_count
