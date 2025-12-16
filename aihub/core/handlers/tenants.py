@@ -1,10 +1,14 @@
 """Business logic handlers for tenant operations."""
+import logging
 from typing import Optional, List
 
 from aihub.database.client import DatabaseClient
 from aihub.core.database.models.tenants import TenantModel
 from aihub.schema.requests.tenants import CreateTenantRequest, UpdateTenantRequest
 from aihub.schema.responses.tenants import TenantResponse
+from aihub.exc.tenants import TenantNotFoundError
+
+logger = logging.getLogger(__name__)
 
 
 class TenantHandler:
@@ -36,15 +40,18 @@ class TenantHandler:
         Returns:
             List of tenant responses
         """
+        logger.info("Listing tenants", extra={"filters": filters, "skip": skip, "limit": limit})
+        
         tenants = self.db_client.tenants.get_list(
             filters=filters,
             skip=skip,
             limit=limit
         )
         
+        logger.info("Retrieved tenants", extra={"count": len(tenants)})
         return [self._model_to_response(tenant) for tenant in tenants]
 
-    def get_tenant(self, tenant_id: str) -> Optional[TenantResponse]:
+    def get_tenant(self, tenant_id: str) -> TenantResponse:
         """
         Get a specific tenant by ID.
         
@@ -52,12 +59,19 @@ class TenantHandler:
             tenant_id: The ID of the tenant
             
         Returns:
-            Tenant response if found, None otherwise
+            Tenant response
+            
+        Raises:
+            TenantNotFoundError: If tenant not found
         """
+        logger.info("Fetching tenant", extra={"tenant_id": tenant_id})
+        
         tenant = self.db_client.tenants.get(tenant_id)
         if not tenant:
-            return None
+            logger.warning("Tenant not found", extra={"tenant_id": tenant_id})
+            raise TenantNotFoundError(tenant_id)
         
+        logger.info("Tenant retrieved", extra={"tenant_id": tenant_id})
         return self._model_to_response(tenant)
 
     def create_tenant(
@@ -75,6 +89,8 @@ class TenantHandler:
         Returns:
             Created tenant response
         """
+        logger.info("Creating tenant", extra={"tenant_name": request.name, "user_id": user_id})
+        
         tenant = TenantModel(
             name=request.name,
             description=request.description,
@@ -84,6 +100,7 @@ class TenantHandler:
         )
         
         created_tenant = self.db_client.tenants.create(tenant)
+        logger.info("Tenant created", extra={"tenant_id": created_tenant.id, "user_id": user_id})
         return self._model_to_response(created_tenant)
 
     def update_tenant(
@@ -91,7 +108,7 @@ class TenantHandler:
         tenant_id: str,
         request: UpdateTenantRequest,
         user_id: str
-    ) -> Optional[TenantResponse]:
+    ) -> TenantResponse:
         """
         Update an existing tenant.
         
@@ -101,8 +118,13 @@ class TenantHandler:
             user_id: ID of the user updating the tenant
             
         Returns:
-            Updated tenant response if found, None otherwise
+            Updated tenant response
+            
+        Raises:
+            TenantNotFoundError: If tenant not found
         """
+        logger.info("Updating tenant", extra={"tenant_id": tenant_id, "user_id": user_id})
+        
         # Build update data
         update_data = {}
         if request.name is not None:
@@ -117,21 +139,30 @@ class TenantHandler:
         
         updated_tenant = self.db_client.tenants.update(tenant_id, update_data)
         if not updated_tenant:
-            return None
+            logger.warning("Tenant not found for update", extra={"tenant_id": tenant_id})
+            raise TenantNotFoundError(tenant_id)
         
+        logger.info("Tenant updated", extra={"tenant_id": tenant_id, "user_id": user_id})
         return self._model_to_response(updated_tenant)
 
-    def delete_tenant(self, tenant_id: str) -> bool:
+    def delete_tenant(self, tenant_id: str) -> None:
         """
         Delete a tenant by ID.
         
         Args:
             tenant_id: The ID of the tenant to delete
             
-        Returns:
-            True if deleted successfully, False otherwise
+        Raises:
+            TenantNotFoundError: If tenant not found
         """
-        return self.db_client.tenants.delete(tenant_id)
+        logger.info("Deleting tenant", extra={"tenant_id": tenant_id})
+        
+        success = self.db_client.tenants.delete(tenant_id)
+        if not success:
+            logger.warning("Tenant not found for deletion", extra={"tenant_id": tenant_id})
+            raise TenantNotFoundError(tenant_id)
+        
+        logger.info("Tenant deleted", extra={"tenant_id": tenant_id})
 
     @staticmethod
     def _model_to_response(tenant: TenantModel) -> TenantResponse:
