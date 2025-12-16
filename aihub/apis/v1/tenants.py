@@ -1,12 +1,14 @@
 """Tenants API endpoints."""
 from typing import Optional
-from fastapi import APIRouter, status, HTTPException, Query, Depends
+from fastapi import APIRouter, status, HTTPException, Query, Depends, Request
 
 from aihub.database.client import DatabaseClient
 from aihub.database.dependencies import get_db_client
-from aihub.core.database.models.tenants import TenantModel
+from aihub.core.handlers.tenants import TenantHandler
+from aihub.core.middleware.apis.v1.auth import authenticate
+from aihub.core.identity.users import IdentityUser
 from aihub.schema.requests.tenants import CreateTenantRequest, UpdateTenantRequest
-from aihub.schema.responses.tenants import TenantResponse, TenantsListResponse
+from aihub.schema.responses.tenants import TenantResponse
 
 
 router = APIRouter()
@@ -19,7 +21,9 @@ router = APIRouter()
     summary="List Tenants",
     description="Get a paginated list of tenants"
 )
+@authenticate
 async def list_tenants(
+    request: Request,
     skip: int = Query(0, ge=0, description="Number of items to skip"),
     limit: int = Query(100, ge=1, le=1000, description="Maximum number of items to return"),
     name: Optional[str] = Query(None, description="Filter by tenant name"),
@@ -29,6 +33,7 @@ async def list_tenants(
     Get a paginated list of tenants.
     
     Args:
+        request: FastAPI request object
         skip: Number of items to skip (for pagination)
         limit: Maximum number of items to return
         name: Optional filter by tenant name
@@ -38,28 +43,14 @@ async def list_tenants(
         list[TenantResponse]: List of tenants
     """
     try:
+        handler = TenantHandler(db_client)
+        
         # Build filters
         filters = {}
         if name:
-            filters["name"] = {"$regex": name, "$options": "i"}  # Case-insensitive search
+            filters["name"] = {"$regex": name, "$options": "i"}
         
-        # Get tenants
-        tenants = db_client.tenants.get_list(filters=filters, skip=skip, limit=limit)
-        
-        # Convert to response models
-        tenant_responses = [
-            TenantResponse(
-                id=tenant.id,
-                name=tenant.name,
-                description=tenant.description,
-                meta=tenant.meta,
-                created_at=tenant.created_at,
-                updated_at=tenant.updated_at
-            )
-            for tenant in tenants
-        ]
-        
-        return tenant_responses
+        return handler.list_tenants(filters=filters, skip=skip, limit=limit)
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -74,7 +65,9 @@ async def list_tenants(
     summary="Get Tenant",
     description="Get a specific tenant by ID"
 )
+@authenticate
 async def get_tenant(
+    request: Request,
     tenant_id: str,
     db_client: DatabaseClient = Depends(get_db_client)
 ) -> TenantResponse:
@@ -82,6 +75,7 @@ async def get_tenant(
     Get a specific tenant by ID.
     
     Args:
+        request: FastAPI request object
         tenant_id: The ID of the tenant to retrieve
         db_client: Database client dependency
     
@@ -92,7 +86,8 @@ async def get_tenant(
         HTTPException: If tenant not found
     """
     try:
-        tenant = db_client.tenants.get(tenant_id)
+        handler = TenantHandler(db_client)
+        tenant = handler.get_tenant(tenant_id)
         
         if not tenant:
             raise HTTPException(
@@ -100,14 +95,7 @@ async def get_tenant(
                 detail=f"Tenant with ID '{tenant_id}' not found"
             )
         
-        return TenantResponse(
-            id=tenant.id,
-            name=tenant.name,
-            description=tenant.description,
-            meta=tenant.meta,
-            created_at=tenant.created_at,
-            updated_at=tenant.updated_at
-        )
+        return tenant
     except HTTPException:
         raise
     except Exception as e:
@@ -124,7 +112,9 @@ async def get_tenant(
     summary="Create Tenant",
     description="Create a new tenant"
 )
+@authenticate
 async def create_tenant(
+    http_request: Request,
     request: CreateTenantRequest,
     db_client: DatabaseClient = Depends(get_db_client)
 ) -> TenantResponse:
@@ -132,6 +122,7 @@ async def create_tenant(
     Create a new tenant.
     
     Args:
+        http_request: FastAPI request object (contains user in request.state)
         request: Tenant creation data
         db_client: Database client dependency
     
@@ -139,24 +130,11 @@ async def create_tenant(
         TenantResponse: The created tenant
     """
     try:
-        # Create tenant model
-        tenant = TenantModel(
-            name=request.name,
-            description=request.description,
-            meta=request.meta
-        )
+        user: IdentityUser = http_request.state.user
+        user_id = user.identity.get_id()
         
-        # Save to database
-        created_tenant = db_client.tenants.create(tenant)
-        
-        return TenantResponse(
-            id=created_tenant.id,
-            name=created_tenant.name,
-            description=created_tenant.description,
-            meta=created_tenant.meta,
-            created_at=created_tenant.created_at,
-            updated_at=created_tenant.updated_at
-        )
+        handler = TenantHandler(db_client)
+        return handler.create_tenant(request, user_id)
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -171,7 +149,9 @@ async def create_tenant(
     summary="Update Tenant",
     description="Update an existing tenant"
 )
+@authenticate
 async def update_tenant(
+    http_request: Request,
     tenant_id: str,
     request: UpdateTenantRequest,
     db_client: DatabaseClient = Depends(get_db_client)
@@ -180,6 +160,7 @@ async def update_tenant(
     Update an existing tenant.
     
     Args:
+        http_request: FastAPI request object (contains user in request.state)
         tenant_id: The ID of the tenant to update
         request: Tenant update data
         db_client: Database client dependency
@@ -191,23 +172,11 @@ async def update_tenant(
         HTTPException: If tenant not found
     """
     try:
-        # Build update data (only include provided fields)
-        update_data = {}
-        if request.name is not None:
-            update_data["name"] = request.name
-        if request.description is not None:
-            update_data["description"] = request.description
-        if request.meta is not None:
-            update_data["meta"] = request.meta
+        user: IdentityUser = http_request.state.user
+        user_id = user.identity.get_id()
         
-        if not update_data:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="No fields to update"
-            )
-        
-        # Update tenant
-        updated_tenant = db_client.tenants.update(tenant_id, update_data)
+        handler = TenantHandler(db_client)
+        updated_tenant = handler.update_tenant(tenant_id, request, user_id)
         
         if not updated_tenant:
             raise HTTPException(
@@ -215,14 +184,7 @@ async def update_tenant(
                 detail=f"Tenant with ID '{tenant_id}' not found"
             )
         
-        return TenantResponse(
-            id=updated_tenant.id,
-            name=updated_tenant.name,
-            description=updated_tenant.description,
-            meta=updated_tenant.meta,
-            created_at=updated_tenant.created_at,
-            updated_at=updated_tenant.updated_at
-        )
+        return updated_tenant
     except HTTPException:
         raise
     except Exception as e:
@@ -238,7 +200,9 @@ async def update_tenant(
     summary="Delete Tenant",
     description="Delete a tenant by ID"
 )
+@authenticate
 async def delete_tenant(
+    request: Request,
     tenant_id: str,
     db_client: DatabaseClient = Depends(get_db_client)
 ) -> None:
@@ -246,6 +210,7 @@ async def delete_tenant(
     Delete a tenant by ID.
     
     Args:
+        request: FastAPI request object
         tenant_id: The ID of the tenant to delete
         db_client: Database client dependency
     
@@ -253,7 +218,8 @@ async def delete_tenant(
         HTTPException: If tenant not found
     """
     try:
-        success = db_client.tenants.delete(tenant_id)
+        handler = TenantHandler(db_client)
+        success = handler.delete_tenant(tenant_id)
         
         if not success:
             raise HTTPException(

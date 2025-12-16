@@ -12,6 +12,8 @@ class TenantResponse(BaseModel):
     meta: dict | None = Field(None, description="Optional metadata for the tenant")
     created_at: str = Field(..., description="Timestamp when the tenant was created")
     updated_at: str = Field(..., description="Timestamp when the tenant was last updated")
+    created_by: str | None = Field(None, description="User ID who created this tenant")
+    updated_by: str | None = Field(None, description="User ID who last updated this tenant")
 
 
 class TenantsListResponse(BaseModel):
