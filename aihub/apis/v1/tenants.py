@@ -46,22 +46,20 @@ async def list_tenants(
         list[TenantResponse]: List of tenants user has access to
     """
     user: IdentityUser = request.state.user
-    user_id = user.identity.get_id()
+    
+    # Get accessible tenant IDs from user.tenants
+    tenant_ids = [t.id for t in user.tenants]
     
     # Build filters
     filters = {}
     if name:
         filters["name"] = {"$regex": name, "$options": "i"}
     
-    # Get user groups from identity provider
-    user_groups = [{"id": g.id} for g in user.groups]
-    
     return handler.list_tenants(
         filters=filters,
         skip=skip,
         limit=limit,
-        user_id=user_id,
-        user_groups=user_groups
+        tenant_ids=tenant_ids
     )
 
 
