@@ -1,7 +1,12 @@
+from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from aihub.apis.v1 import healthcheck, identity
+from aihub.apis.v1 import healthcheck, identity, tenants
+from aihub.database.dependencies import close_db_client
+
+
+load_dotenv()
 
 
 def create_app() -> FastAPI:
@@ -37,6 +42,18 @@ def create_app() -> FastAPI:
         prefix="/api/v1/identity",
         tags=["Identity"]
     )
+    
+    app.include_router(
+        tenants.router,
+        prefix="/api/v1/tenants",
+        tags=["Tenants"]
+    )
+    
+    # Lifecycle events
+    @app.on_event("shutdown")
+    async def shutdown_event():
+        """Close database connection on shutdown."""
+        close_db_client()
     
     return app
 
