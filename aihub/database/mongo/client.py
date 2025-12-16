@@ -3,6 +3,7 @@ from pymongo.database import Database
 
 from aihub.core.database.base import BaseDatabaseClient
 from aihub.database.mongo.collections.tenants import MongoDBTenantsCollection
+from aihub.database.mongo.collections.permissions import MongoDBPermissionsCollection
 
 
 class MongoDBDatabaseClient(BaseDatabaseClient):
@@ -48,3 +49,10 @@ class MongoDBDatabaseClient(BaseDatabaseClient):
             self._tenants_collection = MongoDBTenantsCollection(self._db)
         
         return self._tenants_collection
+
+    def permissions(self) -> MongoDBPermissionsCollection:
+        """Get the permissions collection."""
+        if self._db is None:
+            raise RuntimeError("Database not connected. Call connect() first.")
+        
+        return MongoDBPermissionsCollection(self._db)

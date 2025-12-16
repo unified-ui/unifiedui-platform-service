@@ -57,9 +57,13 @@ def authenticate(func: Callable) -> Callable:
         use_cache_header = request.headers.get("X-Use-Cache", "true")
         use_cache = use_cache_header.lower() in ("true", "1", "yes")
         
+        # Get database client for user
+        from aihub.database.dependencies import get_db_client
+        db_client = get_db_client()
+        
         # Create User object
         try:
-            user = IdentityUser(token=token, use_cache=use_cache)
+            user = IdentityUser(token=token, database_client=db_client, use_cache=use_cache)
             if not user.identity.get_id():
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,

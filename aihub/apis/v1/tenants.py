@@ -4,10 +4,14 @@ from fastapi import APIRouter, status, Query, Depends, Request
 
 from aihub.core.handlers.tenants import TenantHandler
 from aihub.core.handlers.dependencies import get_tenant_handler
+from aihub.core.handlers.permissions import PermissionHandler
+from aihub.core.handlers.dependencies_permissions import get_permission_handler
 from aihub.core.middleware.apis.v1.auth import authenticate
 from aihub.core.identity.users import IdentityUser
 from aihub.schema.requests.tenants import CreateTenantRequest, UpdateTenantRequest
 from aihub.schema.responses.tenants import TenantResponse
+from aihub.schema.requests.permissions import SetPermissionsRequest, DeletePermissionRequest
+from aihub.schema.responses.permissions import ResourcePermissionsResponse
 
 
 router = APIRouter()
@@ -18,7 +22,7 @@ router = APIRouter()
     response_model=list[TenantResponse],
     status_code=status.HTTP_200_OK,
     summary="List Tenants",
-    description="Get a paginated list of tenants"
+    description="Get a paginated list of tenants (filtered by permissions)"
 )
 @authenticate
 async def list_tenants(
@@ -29,7 +33,7 @@ async def list_tenants(
     handler: TenantHandler = Depends(get_tenant_handler)
 ) -> list[TenantResponse]:
     """
-    Get a paginated list of tenants.
+    Get a paginated list of tenants (filtered by user permissions).
     
     Args:
         request: FastAPI request object
@@ -39,14 +43,26 @@ async def list_tenants(
         handler: Tenant handler dependency
     
     Returns:
-        list[TenantResponse]: List of tenants
+        list[TenantResponse]: List of tenants user has access to
     """
+    user: IdentityUser = request.state.user
+    user_id = user.identity.get_id()
+    
     # Build filters
     filters = {}
     if name:
         filters["name"] = {"$regex": name, "$options": "i"}
     
-    return handler.list_tenants(filters=filters, skip=skip, limit=limit)
+    # Get user groups from identity provider
+    user_groups = [{"id": g.id} for g in user.groups]
+    
+    return handler.list_tenants(
+        filters=filters,
+        skip=skip,
+        limit=limit,
+        user_id=user_id,
+        user_groups=user_groups
+    )
 
 
 @router.get(
@@ -168,3 +184,115 @@ async def delete_tenant(
         TenantNotFoundError: If tenant not found (handled by global exception handler)
     """
     handler.delete_tenant(tenant_id)
+
+
+# Permission Management Routes
+
+@router.get(
+    "/{tenant_id}/permissions",
+    response_model=ResourcePermissionsResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Get Tenant Permissions",
+    description="Get all permissions for a specific tenant"
+)
+@authenticate
+async def get_tenant_permissions(
+    request: Request,
+    tenant_id: str,
+    handler: PermissionHandler = Depends(get_permission_handler)
+) -> ResourcePermissionsResponse:
+    """
+    Get all permissions for a specific tenant.
+    
+    Args:
+        request: FastAPI request object
+        tenant_id: The ID of the tenant
+        handler: Permission handler dependency
+    
+    Returns:
+        ResourcePermissionsResponse: All permissions for the tenant
+    """
+    user: IdentityUser = request.state.user
+    # TODO: Check if user has 'admin' permission on this tenant
+    
+    return handler.get_resource_permissions(
+        resource_type="tenants",
+        resource_id=tenant_id,
+        tenant_id=tenant_id  # Self-referential
+    )
+
+
+@router.put(
+    "/{tenant_id}/permissions",
+    response_model=ResourcePermissionsResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Set Tenant Permissions",
+    description="Set permissions for a tenant (replaces existing)"
+)
+@authenticate
+async def set_tenant_permissions(
+    request: Request,
+    tenant_id: str,
+    permission_data: SetPermissionsRequest,
+    handler: PermissionHandler = Depends(get_permission_handler)
+) -> ResourcePermissionsResponse:
+    """
+    Set permissions for a tenant.
+    
+    Args:
+        request: FastAPI request object
+        tenant_id: The ID of the tenant
+        permission_data: Permission assignments
+        handler: Permission handler dependency
+    
+    Returns:
+        ResourcePermissionsResponse: Updated permissions
+    """
+    user: IdentityUser = request.state.user
+    user_id = user.identity.get_id()
+    # TODO: Check if user has 'admin' permission on this tenant
+    
+    return handler.set_resource_permissions(
+        resource_type="tenants",
+        resource_id=tenant_id,
+        tenant_id=tenant_id,  # Self-referential
+        request=permission_data,
+        user_id=user_id
+    )
+
+
+@router.delete(
+    "/{tenant_id}/permissions",
+    response_model=ResourcePermissionsResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Delete Tenant Permissions",
+    description="Delete permissions for a specific user/group on a tenant"
+)
+@authenticate
+async def delete_tenant_permissions(
+    request: Request,
+    tenant_id: str,
+    permission_data: DeletePermissionRequest,
+    handler: PermissionHandler = Depends(get_permission_handler)
+) -> ResourcePermissionsResponse:
+    """
+    Delete permissions for a specific user/group on a tenant.
+    
+    Args:
+        request: FastAPI request object
+        tenant_id: The ID of the tenant
+        permission_data: Entity to remove permissions for
+        handler: Permission handler dependency
+    
+    Returns:
+        ResourcePermissionsResponse: Updated permissions
+    """
+    user: IdentityUser = request.state.user
+    # TODO: Check if user has 'admin' permission on this tenant
+    
+    return handler.delete_resource_permission(
+        resource_type="tenants",
+        resource_id=tenant_id,
+        tenant_id=tenant_id,  # Self-referential
+        request=permission_data
+    )

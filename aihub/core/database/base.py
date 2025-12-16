@@ -74,3 +74,13 @@ class BaseDatabaseClient(ABC):
             TenantsCollection: The tenants collection interface
         """
         pass
+
+    @abstractmethod
+    def permissions(self):
+        """
+        Get the permissions collection.
+        
+        Returns:
+            PermissionsCollection: The permissions collection interface
+        """
+        pass

@@ -5,6 +5,7 @@ from aihub.core.database.base import BaseDatabaseClient
 from aihub.database.enums import DocumentDatabaseTypeEnum
 from aihub.database.mongo.client import MongoDBDatabaseClient
 from aihub.core.database.collections.tenants import TenantsCollection
+from aihub.core.database.collections.permissions import PermissionsCollection
 
 
 class DatabaseClient:
@@ -32,6 +33,16 @@ class DatabaseClient:
             TenantsCollection: The tenants collection interface
         """
         return self._client.tenants()
+
+    @property
+    def permissions(self) -> PermissionsCollection:
+        """
+        Get the permissions collection.
+        
+        Returns:
+            PermissionsCollection: The permissions collection interface
+        """
+        return self._client.permissions()
 
     def health_check(self) -> bool:
         """

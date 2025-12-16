@@ -14,11 +14,3 @@ class TenantResponse(BaseModel):
     updated_at: str = Field(..., description="Timestamp when the tenant was last updated")
     created_by: str | None = Field(None, description="User ID who created this tenant")
     updated_by: str | None = Field(None, description="User ID who last updated this tenant")
-
-
-class TenantsListResponse(BaseModel):
-    """Response schema for listing tenants."""
-    tenants: List[TenantResponse] = Field(..., description="List of tenants")
-    total: int = Field(..., description="Total number of tenants")
-    skip: int = Field(0, description="Number of items skipped")
-    limit: int = Field(100, description="Maximum number of items returned")
