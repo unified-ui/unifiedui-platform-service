@@ -3,7 +3,7 @@ from typing import Callable, Any
 
 from fastapi import Request, HTTPException, status
 
-from aihub.core.identity.users import IdentityUser
+from aihub.core.identity.users import ContextIdentityUser
 
 
 def authenticate(func: Callable) -> Callable:
@@ -65,7 +65,7 @@ def authenticate(func: Callable) -> Callable:
         
         # Create User object
         try:
-            user = IdentityUser(
+            user = ContextIdentityUser(
                 token=token,
                 database_client=db_client,
                 cache_client=cache_client,
@@ -120,7 +120,7 @@ def check_permissions(func: Callable) -> Callable:
                 headers={"WWW-Authenticate": "Bearer"}
             )
         
-        user: IdentityUser = request.state.user
+        user: ContextIdentityUser = request.state.user
         return await func(*args, **kwargs)
     
     return wrapper

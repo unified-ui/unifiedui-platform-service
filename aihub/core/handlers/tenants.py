@@ -11,6 +11,7 @@ from aihub.core.database.models import Tenant, TenantPrincipal
 from aihub.schema.requests.tenants import CreateTenantRequest, UpdateTenantRequest
 from aihub.schema.responses.tenants import TenantResponse
 from aihub.exc.tenants import TenantNotFoundError
+from aihub.caching.client import CacheClient
 from aihub.logger import get_logger
 
 logger = get_logger(__name__)
@@ -19,14 +20,16 @@ logger = get_logger(__name__)
 class TenantHandler:
     """Handler class for tenant business logic using SQLAlchemy."""
 
-    def __init__(self, db_client: SQLAlchemyClient):
+    def __init__(self, db_client: SQLAlchemyClient, cache_client: Optional[CacheClient] = None):
         """
         Initialize the tenant handler.
         
         Args:
             db_client: SQLAlchemy database client instance
+            cache_client: Optional cache client for Redis caching
         """
         self.db_client = db_client
+        self.cache_client = cache_client
 
     def list_tenants(
         self,
@@ -267,6 +270,125 @@ class TenantHandler:
                 "Retrieved tenants by principal IDs",
                 extra={"tenant_count": len(response)}
             )
+            return response
+    
+    def get_user_tenants_with_roles(
+        self,
+        user_id: str,
+        identity_group_ids: List[str],
+        custom_group_ids: List[str],
+        use_cache: bool = True
+    ) -> List[dict]:
+        """
+        Get all tenants and roles for a user based on their user ID, identity groups, and custom groups.
+        
+        Args:
+            user_id: The identity user ID
+            identity_group_ids: List of identity group IDs the user belongs to
+            custom_group_ids: List of custom group IDs the user belongs to
+            use_cache: Whether to use caching (default: True)
+            
+        Returns:
+            List of dicts with 'tenant' and 'roles' keys, where roles are deduplicated
+        """
+        logger.info(
+            "Getting user tenants with roles",
+            extra={
+                "user_id": user_id,
+                "identity_groups_count": len(identity_group_ids),
+                "custom_groups_count": len(custom_group_ids)
+            }
+        )
+        
+        cache_key = f"tenants:user:{user_id}:with_roles"
+        
+        # Check cache
+        if use_cache and self.cache_client:
+            try:
+                cached_data = self.cache_client.client.get(cache_key)
+                if cached_data is not None:
+                    logger.debug(f"Returning cached tenants with roles for user {user_id}")
+                    return cached_data
+            except Exception as e:
+                logger.warning(f"Failed to get cached user tenants: {e}")
+        
+        with self.db_client.get_session() as session:
+            # Build conditions for all principal types
+            conditions = []
+            
+            # Add user condition
+            conditions.append(
+                and_(
+                    TenantPrincipal.principal_id == user_id,
+                    TenantPrincipal.principal_type == "IDENTITY_USER"
+                )
+            )
+            
+            # Add identity group conditions
+            if identity_group_ids:
+                for group_id in identity_group_ids:
+                    conditions.append(
+                        and_(
+                            TenantPrincipal.principal_id == group_id,
+                            TenantPrincipal.principal_type == "IDENTITY_GROUP"
+                        )
+                    )
+            
+            # Add custom group conditions
+            if custom_group_ids:
+                for group_id in custom_group_ids:
+                    conditions.append(
+                        and_(
+                            TenantPrincipal.principal_id == group_id,
+                            TenantPrincipal.principal_type == "CUSTOM_GROUP"
+                        )
+                    )
+            
+            # Query to get all tenant principals matching any condition
+            query = (
+                select(Tenant, TenantPrincipal)
+                .join(TenantPrincipal, Tenant.id == TenantPrincipal.tenant_id)
+                .where(or_(*conditions))
+                .order_by(Tenant.name, TenantPrincipal.role)
+            )
+            
+            results = session.execute(query).all()
+            
+            # Group by tenant and deduplicate roles
+            tenants_dict = {}
+            for tenant, principal in results:
+                if tenant.id not in tenants_dict:
+                    tenants_dict[tenant.id] = {
+                        "tenant": tenant,
+                        "roles": set()  # Use set for deduplication
+                    }
+                # Add role to set (automatically deduplicates)
+                tenants_dict[tenant.id]["roles"].add(principal.role)
+            
+            # Convert to response format
+            response = []
+            for tenant_data in tenants_dict.values():
+                tenant_response = self._model_to_response(tenant_data["tenant"])
+                # Convert set of roles to sorted list
+                roles_list = sorted(list(tenant_data["roles"]))
+                response.append({
+                    "tenant": tenant_response.model_dump(),
+                    "roles": roles_list
+                })
+            
+            logger.info(
+                "Retrieved user tenants with roles",
+                extra={"user_id": user_id, "tenant_count": len(response)}
+            )
+            
+            # Cache the result
+            if self.cache_client:
+                try:
+                    self.cache_client.client.set(cache_key, response, ttl=300)  # Cache for 5 minutes
+                    logger.debug(f"Cached user tenants with roles for {user_id} (TTL: 300s)")
+                except Exception as e:
+                    logger.warning(f"Failed to cache user tenants: {e}")
+            
             return response
     
     @staticmethod

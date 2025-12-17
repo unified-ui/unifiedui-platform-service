@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Request, status, Query
 
 from aihub.core.middleware.apis.v1.auth import authenticate
-from aihub.core.identity.users import IdentityUser
+from aihub.core.identity.users import ContextIdentityUser
 from aihub.schema.responses.identity import (
     IdentityUserResponse,
     IdentityGroupResponse,
@@ -33,7 +33,7 @@ async def get_current_user(request: Request) -> IdentityUserResponse:
         UserIdentityResponse: User's identity information
     """
     try:
-        user: IdentityUser = request.state.user
+        user: ContextIdentityUser = request.state.user
         return user.get_me()
     except Exception as e:
         print(f"Error retrieving current user: {e}")
@@ -66,7 +66,7 @@ async def get_users(
     Returns:
         Paginated response with identity users and next_link
     """
-    user: IdentityUser = request.state.user
+    user: ContextIdentityUser = request.state.user
     query = APIFilterQuery(search=search, top=top, next_link=next_link)
     users, next_link = user.idp.get_users(query=query)
     return IdentityUsersResponse(value=users, next_link=next_link)
@@ -98,7 +98,7 @@ async def get_groups(
     Returns:
         Paginated response with identity groups and next_link
     """
-    user: IdentityUser = request.state.user
+    user: ContextIdentityUser = request.state.user
     query = APIFilterQuery(search=search, top=top, next_link=next_link)
     groups, next_link = user.idp.get_security_groups(query=query)
     return IdentityGroupsResponse(value=groups, next_link=next_link)

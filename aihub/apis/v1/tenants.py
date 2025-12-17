@@ -5,7 +5,7 @@ from fastapi import APIRouter, status, Query, Depends, Request
 from aihub.core.handlers.tenants import TenantHandler
 from aihub.core.handlers.dependencies import get_tenant_handler
 from aihub.core.middleware.apis.v1.auth import authenticate
-from aihub.core.identity.users import IdentityUser
+from aihub.core.identity.users import ContextIdentityUser
 from aihub.schema.requests.tenants import (
     CreateTenantRequest,
     UpdateTenantRequest,
@@ -111,7 +111,7 @@ async def create_tenant(
     Returns:
         TenantResponse: The created tenant
     """
-    user: IdentityUser = request.state.user
+    user: ContextIdentityUser = request.state.user
     user_id = user.identity.get_id()
     
     return handler.create_tenant(tenant_data, user_id)
@@ -146,7 +146,7 @@ async def update_tenant(
     Raises:
         TenantNotFoundError: If tenant not found (handled by global exception handler)
     """
-    user: IdentityUser = request.state.user
+    user: ContextIdentityUser = request.state.user
     user_id = user.identity.get_id()
     
     return handler.update_tenant(tenant_id, tenant_data, user_id)
@@ -275,7 +275,7 @@ async def set_principal_role(
     Raises:
         TenantNotFoundError: If tenant not found
     """
-    user: IdentityUser = request.state.user
+    user: ContextIdentityUser = request.state.user
     user_id = user.identity.get_id()
     
     result = handler.set_principal_role(

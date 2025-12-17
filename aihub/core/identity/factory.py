@@ -2,7 +2,8 @@ import jwt
 
 from jwt.exceptions import InvalidTokenError
 
-from aihub.core.identity.base import BaseIdentityProvider, BaseIdentityToken, IdenityProviderEnum
+from aihub.core.identity.providers import BaseIdentityProvider, BaseIdentityToken
+from aihub.core.identity.enums import IdenityProviderEnum
 from aihub.core.identity.extra_id.provider import ExtraIDIdentityProvider
 from aihub.core.identity.extra_id.token import ExtraIDIdentityTokenSerializer
 

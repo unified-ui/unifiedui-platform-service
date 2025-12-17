@@ -102,13 +102,6 @@ def create_app() -> FastAPI:
         tags=["Tenants"]
     )
     
-    from aihub.apis.v1 import custom_groups
-    app.include_router(
-        custom_groups.router,
-        prefix="/api/v1/tenants/{tenant_id}/custom/groups",
-        tags=["Custom Groups"]
-    )
-    
     # Lifecycle events
     @app.on_event("shutdown")
     async def shutdown_event():

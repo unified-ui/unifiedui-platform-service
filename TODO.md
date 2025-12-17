@@ -74,3 +74,8 @@
     - CRUD + get_messages_until (siehe agentmemory-py!)
     - invoke -> use n8n chat-model
         - wie macht man es, wenn eine rückfrage gestellt wird? geht ja in einem Workflow
+
+---
+
+- /tenants/{id}/principals
+    - noch im identity provider (idp) get_user_by_id und get_group_by_id implementieren um die Namen zu fetchen!

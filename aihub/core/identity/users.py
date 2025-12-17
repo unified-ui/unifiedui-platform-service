@@ -13,7 +13,7 @@ from aihub.logger import get_logger
 logger = get_logger(__name__)
 
 
-class IdentityUser:
+class ContextIdentityUser:
     def __init__(
         self,
         token: str,
@@ -74,6 +74,7 @@ class IdentityUser:
         Get all custom groups the user is a member of.
         Returns groups where user_id is in member_ids.
         """
+        return []
         # in-memory cache
         if self._custom_groups is not None:
             return self._custom_groups
@@ -105,10 +106,11 @@ class IdentityUser:
         return self._custom_groups
 
     @property
-    def tenants(self) -> list[TenantResponse]:
+    def tenants(self) -> list[dict]:
         """
-        Get all tenants the user has access to.
-        Returns tenants where user has any permission.
+        Get all tenants the user has access to with their roles.
+        Returns list of dicts with 'tenant' and 'roles' keys.
+        Roles are deduplicated across IDENTITY_USER, IDENTITY_GROUP, and CUSTOM_GROUP.
         """
         # in-memory cache
         if self._tenants is not None:
@@ -119,84 +121,33 @@ class IdentityUser:
         if not self._database_client:
             return self._tenants
         
+        # Get user ID and group IDs
         user_id = self.identity.get_id()
-        cache_key = f"identity:tenants:user:{user_id}"
+        identity_group_ids = [group.id for group in self.groups]
+        custom_group_ids = [group.id for group in self.custom_groups]
         
-        # Check Redis cache / TODO: in tenant handler!!!
-        if self._use_cache and self._cache:
-            try:
-                cached_data = self._cache.client.get(cache_key)
-                if cached_data is not None:
-                    self._tenants = [TenantResponse(**item) for item in cached_data]
-                    logger.debug(f"Returning cached tenants for user {user_id}")
-                    return self._tenants
-            except Exception as e:
-                logger.warning(f"Failed to get cached tenants: {e}")
+        # Use TenantHandler to get tenants with roles (caching is handled in the handler)
+        from aihub.core.database.client import SQLAlchemyClient
+        from aihub.core.database.config import DatabaseConfig
         
-        # Build assigned_to list
-        assigned_to_list = [AssignedTo(type="user", id=user_id)]
+        db_config = DatabaseConfig.from_env()
+        db_client = SQLAlchemyClient(config=db_config)
+        handler = TenantHandler(db_client, self._cache)
         
-        # Add identity groups
-        for group in self.groups:
-            assigned_to_list.append(AssignedTo(type="identity_group", id=group.id))
-        
-        # Add custom groups
-        for group in self.custom_groups:
-            assigned_to_list.append(AssignedTo(type="custom_group", id=group.id))
-        
-        # Get all distinct tenant_ids from permissions where user has access to "tenants" resources
-        tenant_ids = set()
-        
-        # Build $or query for MongoDB (nested objects don't work with $in)
-        or_conditions = []
-        for at in assigned_to_list:
-            or_conditions.append({
-                "assigned_to.type": at.type,
-                "assigned_to.id": at.id
-            })
-        
-        # Query permissions for tenants resources
-        permissions = self._database_client.permissions.get_list(
-            filters={
-                "resource_type": "tenants",
-                "$or": or_conditions
-            },
-            limit=1000
+        self._tenants = handler.get_user_tenants_with_roles(
+            user_id=user_id,
+            identity_group_ids=identity_group_ids,
+            custom_group_ids=custom_group_ids,
+            use_cache=self._use_cache
         )
         
-        # Extract resource_ids (these are the tenant IDs user has access to)
-        for perm in permissions:
-            tenant_ids.add(perm.resource_id)
-        
-        # Fetch actual tenant objects
-        if tenant_ids:
-            tenants = self._database_client.tenants.get_list(
-                filters={"id": {"$in": list(tenant_ids)}},
-                limit=len(tenant_ids)
-            )
-            
-            # Convert to TenantResponse
-            self._tenants = [
-                TenantHandler._model_to_response(t)
-                for t in tenants
-            ]
-        
-        logger.debug(f"Fetched {len(self._tenants)} tenants from database")
-        
-        # Cache the tenants / TODO: in tenant handler!!!
-        if self._cache:
-            try:
-                tenants_data = [t.model_dump() for t in self._tenants]
-                self._cache._client._cache.set(cache_key, tenants_data)
-                logger.debug(f"Cached tenants for user {user_id}")
-            except Exception as e:
-                logger.warning(f"Failed to cache tenants: {e}")
+        logger.debug(f"Fetched {len(self._tenants)} tenants with roles for user {user_id}")
         
         return self._tenants
 
     def get_me(self) -> IdentityUserResponse:
-        # Convert TenantResponse objects to dicts
-        tenants_dict = [t.model_dump() for t in self.tenants]
+        # Tenants are already dicts with 'tenant' and 'roles' keys
+        tenants_with_roles = self.tenants
         
         return IdentityUserResponse(
             id=self.identity.get_id(),
@@ -206,7 +157,7 @@ class IdentityUser:
             mail=self.identity.get_mail(),
             firstname=self.identity.get_firstname(),
             lastname=self.identity.get_lastname(),
-            tenants=tenants_dict,
+            tenants=tenants_with_roles,
             groups=self.groups,
             custom_groups=self.custom_groups
         )

@@ -9,7 +9,7 @@ import fakeredis
 from aihub.app import create_app
 from aihub.docdatabase.client import DatabaseClient
 from aihub.caching.client import CacheClient
-from aihub.core.identity.users import IdentityUser
+from aihub.core.identity.users import ContextIdentityUser
 
 
 # Set test environment variables
@@ -79,7 +79,7 @@ def mock_cache_client(fake_redis_client):
 def mock_identity_user(mock_db_client, mock_cache_client):
     """Create a mock authenticated user."""
     # Mock the token and identity
-    mock_user = Mock(spec=IdentityUser)
+    mock_user = Mock(spec=ContextIdentityUser)
     
     # Create mock identity object
     mock_identity = Mock()

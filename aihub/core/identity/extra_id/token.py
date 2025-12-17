@@ -1,4 +1,5 @@
-from aihub.core.identity.base import BaseIdentityToken, IdenityProviderEnum
+from aihub.core.identity.providers import BaseIdentityToken
+from aihub.core.identity.enums import IdenityProviderEnum
 
 
 class ExtraIDIdentityTokenSerializer(BaseIdentityToken):

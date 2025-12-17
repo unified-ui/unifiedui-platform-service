@@ -1,6 +1,6 @@
 import requests
 
-from aihub.core.identity.base import BaseIdentityProvider, BaseIdentityToken
+from aihub.core.identity.providers import BaseIdentityProvider, BaseIdentityToken
 from aihub.schema.responses.identity import IdentityGroupResponse, IdentityUserResponse
 from aihub.utils.api_client import APIJSONBearerClient
 from aihub.utils.api_query import APIFilterQuery
