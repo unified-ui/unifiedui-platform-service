@@ -1,4 +1,5 @@
 from typing import TYPE_CHECKING, Optional
+from sqlalchemy import select
 
 from aihub.core.handlers.tenants import TenantHandler
 from aihub.core.docdatabase.models.permissions import AssignedTo
@@ -8,6 +9,9 @@ from aihub.schema.responses.tenants import TenantResponse
 from aihub.utils.api_query import APIFilterQuery
 from aihub.docdatabase.client import DatabaseClient
 from aihub.caching.client import CacheClient
+from aihub.core.database.client import SQLAlchemyClient
+from aihub.core.database.config import DatabaseConfig
+from aihub.core.database.models import CustomGroup, CustomGroupPermission
 from aihub.logger import get_logger
 
 logger = get_logger(__name__)
@@ -94,11 +98,6 @@ class ContextIdentityUser:
                 logger.warning(f"Failed to get cached custom groups: {e}")
         
         # Query custom groups from custom_group_permissions where user is a principal
-        from aihub.core.database.client import SQLAlchemyClient
-        from aihub.core.database.config import DatabaseConfig
-        from aihub.core.database.models import CustomGroup, CustomGroupPermission
-        from sqlalchemy import select
-        
         db_config = DatabaseConfig.from_env()
         db_client = SQLAlchemyClient(config=db_config)
         
@@ -155,9 +154,6 @@ class ContextIdentityUser:
         custom_group_ids = [group.id for group in self.custom_groups]
         
         # Use TenantHandler to get tenants with roles (caching is handled in the handler)
-        from aihub.core.database.client import SQLAlchemyClient
-        from aihub.core.database.config import DatabaseConfig
-        
         db_config = DatabaseConfig.from_env()
         db_client = SQLAlchemyClient(config=db_config)
         handler = TenantHandler(db_client, self._cache)

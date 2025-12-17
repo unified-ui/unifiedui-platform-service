@@ -2,8 +2,18 @@ from functools import wraps
 from typing import Callable, Any
 
 from fastapi import Request, HTTPException, status
+from sqlalchemy import select
 
 from aihub.core.identity.users import ContextIdentityUser
+from aihub.core.database.client import SQLAlchemyClient
+from aihub.core.database.config import DatabaseConfig
+from aihub.core.database.models import (
+    ApplicationPermission,
+    CredentialPermission,
+    AutonomousAgentPermission,
+    CustomGroupPermission,
+    ConversationPermission
+)
 
 
 def authenticate(func: Callable) -> Callable:
@@ -193,14 +203,6 @@ def check_permissions(
             
             else:
                 # Handle resource entities (application, credential, autonomous_agent, custom_group, conversation)
-                from aihub.core.database.client import SQLAlchemyClient
-                from aihub.core.database.config import DatabaseConfig
-                from aihub.core.database.models import (
-                    ApplicationPermission, CredentialPermission, AutonomousAgentPermission,
-                    CustomGroupPermission, ConversationPermission
-                )
-                from sqlalchemy import select, or_
-                
                 # Map entity type to permission model and ID parameter name
                 entity_config = {
                     "application": (ApplicationPermission, "application_id"),

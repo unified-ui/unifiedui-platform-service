@@ -143,6 +143,7 @@ class ExtraIDIdentityProvider(BaseIdentityProvider, APIJSONBearerClient):
         return [
             IdentityUserResponse(
                 id=item["id"],
+                identity_provider=self.identity_token.get_identity_provider(),
                 display_name=item.get("displayName", item.get("userPrincipalName", "")),
                 user_principal_name=item.get("userPrincipalName")
             )

@@ -1,12 +1,21 @@
 """Redis cache implementation."""
 import json
 from typing import Any, Optional
+from datetime import datetime
 import redis
 
 from aihub.core.caching.cache import BaseCache
 from aihub.logger import get_logger
 
 logger = get_logger(__name__)
+
+
+class DateTimeEncoder(json.JSONEncoder):
+    """Custom JSON encoder that handles datetime objects."""
+    def default(self, obj):
+        if isinstance(obj, datetime):
+            return obj.isoformat()
+        return super().default(obj)
 
 
 class RedisCache(BaseCache):
@@ -71,7 +80,7 @@ class RedisCache(BaseCache):
             ttl: Time-to-live in seconds
         """
         try:
-            serialized = json.dumps(value)
+            serialized = json.dumps(value, cls=DateTimeEncoder)
             expire_time = ttl if ttl is not None else self.default_ttl
             self.client.setex(key, expire_time, serialized)
             logger.debug(f"Cache SET: {key} (TTL: {expire_time}s)")

@@ -35,7 +35,8 @@ def get_cache_client() -> CacheClient | None:
     global _cache_client
     if _cache_client is None:
         try:
-            _cache_client = CacheClient()
+            from aihub.caching.client import CacheClientFactory
+            _cache_client = CacheClientFactory.create()
         except Exception as e:
             # If cache initialization fails, log and return None
             from aihub.logger import get_logger
