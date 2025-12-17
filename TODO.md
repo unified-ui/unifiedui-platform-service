@@ -55,6 +55,9 @@
 - custom_groups (/api/v1/tenants/{id}/custom/groups)
     - CRUD
 
+- identity/users/{id}
+- identity/groups/{id}
+
 - refactoring
     - db client wird in users.py noch initialisiert -> sollte injected werden!
 - Caching
@@ -66,10 +69,8 @@
     - tenant
     - custom groups
 
+- Spec-Driven Vibe-Coding machen (in einem Spec projekt etc beschreiben)
 
-
-- identity/users/{id}
-- identity/groups/{id}
 
 - Credentials
     - CRUD

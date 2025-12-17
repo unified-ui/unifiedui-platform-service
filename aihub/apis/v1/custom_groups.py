@@ -6,15 +6,17 @@ from aihub.core.handlers.custom_groups import CustomGroupHandler
 from aihub.core.handlers.dependencies import get_custom_group_handler
 from aihub.core.middleware.apis.v1.auth import authenticate, check_permissions
 from aihub.core.identity.users import ContextIdentityUser
+from aihub.core.database.enums import TenantPermissionEnum, PermissionActionEnum
 from aihub.schema.requests.custom_groups import (
     CreateCustomGroupRequest,
     UpdateCustomGroupRequest,
-    SetCustomGroupPermissionRequest,
-    DeleteCustomGroupPermissionRequest
+    SetPrincipalPermissionRequest,
+    DeletePrincipalPermissionRequest
 )
 from aihub.schema.responses.custom_groups import (
     CustomGroupResponse,
-    CustomGroupPermissionsResponse
+    CustomGroupPrincipalsResponse,
+    PrincipalsResponse
 )
 
 
@@ -26,7 +28,7 @@ router = APIRouter()
     response_model=list[CustomGroupResponse],
     status_code=status.HTTP_200_OK,
     summary="List Custom Groups",
-    description="Get a paginated list of custom groups in a tenant (readable by all tenant members)"
+    description="Get a paginated list of custom groups in a tenant"
 )
 @authenticate
 async def list_custom_groups(
@@ -98,7 +100,7 @@ async def get_custom_group(
     description="Create a new custom group and assign creator as ADMIN (requires CUSTOM_GROUP_CREATOR, CUSTOM_GROUPS_ADMIN, or GLOBAL_ADMIN on tenant)"
 )
 @authenticate
-@check_permissions(entity="tenant", required_permissions=["CUSTOM_GROUP_CREATOR", "CUSTOM_GROUPS_ADMIN", "GLOBAL_ADMIN"])
+@check_permissions(entity="tenant", required_permissions=[TenantPermissionEnum.CUSTOM_GROUP_CREATOR, TenantPermissionEnum.CUSTOM_GROUPS_ADMIN, TenantPermissionEnum.GLOBAL_ADMIN])
 async def create_custom_group(
     request: Request,
     tenant_id: str,
@@ -132,7 +134,7 @@ async def create_custom_group(
     description="Update an existing custom group (requires WRITE/ADMIN on group or GLOBAL_ADMIN/CUSTOM_GROUPS_ADMIN on tenant)"
 )
 @authenticate
-@check_permissions(entity="custom_group", required_permissions=["WRITE", "ADMIN"])
+@check_permissions(entity="custom_group", required_permissions=[PermissionActionEnum.WRITE, PermissionActionEnum.ADMIN])
 async def update_custom_group(
     request: Request,
     tenant_id: str,
@@ -167,7 +169,7 @@ async def update_custom_group(
     description="Delete a custom group (requires ADMIN on group or GLOBAL_ADMIN/CUSTOM_GROUPS_ADMIN on tenant)"
 )
 @authenticate
-@check_permissions(entity="custom_group", required_permissions=["ADMIN"])
+@check_permissions(entity="custom_group", required_permissions=[PermissionActionEnum.ADMIN])
 async def delete_custom_group(
     request: Request,
     tenant_id: str,
@@ -187,25 +189,26 @@ async def delete_custom_group(
     handler.delete_custom_group(tenant_id, custom_group_id)
 
 
-# Permission Management Routes
+# Principal Management Routes
 
 @router.get(
-    "/{custom_group_id}/permissions",
-    response_model=CustomGroupPermissionsResponse,
+    "/{custom_group_id}/principals",
+    response_model=CustomGroupPrincipalsResponse,
     status_code=status.HTTP_200_OK,
-    summary="Get Custom Group Permissions",
-    description="Get all permissions for a custom group"
+    summary="List Custom Group Principals",
+    description="Get all principals and their permissions for a custom group"
 )
 @authenticate
-async def get_custom_group_permissions(
+@check_permissions(entity="custom_group", required_permissions=[PermissionActionEnum.READ, PermissionActionEnum.WRITE, PermissionActionEnum.ADMIN])
+async def list_custom_group_principals(
     request: Request,
     tenant_id: str,
     custom_group_id: str,
     handler: CustomGroupHandler = Depends(get_custom_group_handler)
-) -> CustomGroupPermissionsResponse:
+) -> CustomGroupPrincipalsResponse:
     """
-    Get all permissions for a specific custom group.
-    Accessible by all authenticated tenant members.
+    Get all principals and their permissions for a specific custom group.
+    Requires READ, WRITE, or ADMIN permission on the group, or GLOBAL_ADMIN/CUSTOM_GROUPS_ADMIN on tenant.
     
     Args:
         request: FastAPI request object
@@ -214,27 +217,62 @@ async def get_custom_group_permissions(
         handler: Custom group handler dependency
     
     Returns:
-        CustomGroupPermissionsResponse: All permissions for the custom group
+        CustomGroupPrincipalsResponse: All principals with their permissions on the custom group
     """
-    return handler.get_custom_group_permissions(tenant_id, custom_group_id)
+    result = handler.list_custom_group_principals(tenant_id, custom_group_id)
+    return CustomGroupPrincipalsResponse(**result)
 
 
-@router.put(
-    "/{custom_group_id}/permissions",
-    response_model=CustomGroupPermissionsResponse,
+@router.get(
+    "/{custom_group_id}/principals/{principal_id}",
+    response_model=PrincipalsResponse,
     status_code=status.HTTP_200_OK,
-    summary="Set Custom Group Permission",
-    description="Add or update a permission on a custom group (requires ADMIN)"
+    summary="Get Principal Permissions",
+    description="Get all permissions for a specific principal on a custom group"
 )
 @authenticate
-@check_permissions(entity="custom_group", required_permissions=["ADMIN"])
-async def set_custom_group_permission(
+@check_permissions(entity="custom_group", required_permissions=[PermissionActionEnum.READ, PermissionActionEnum.WRITE, PermissionActionEnum.ADMIN])
+async def get_principal_permissions(
     request: Request,
     tenant_id: str,
     custom_group_id: str,
-    permission_data: SetCustomGroupPermissionRequest,
+    principal_id: str,
     handler: CustomGroupHandler = Depends(get_custom_group_handler)
-) -> CustomGroupPermissionsResponse:
+) -> PrincipalsResponse:
+    """
+    Get all permissions for a specific principal on a custom group.
+    Requires READ, WRITE, or ADMIN permission on the group, or GLOBAL_ADMIN/CUSTOM_GROUPS_ADMIN on tenant.
+    
+    Args:
+        request: FastAPI request object
+        tenant_id: The ID of the tenant
+        custom_group_id: The ID of the custom group
+        principal_id: The ID of the principal
+        handler: Custom group handler dependency
+    
+    Returns:
+        PrincipalsResponse: Principal's permissions on the custom group
+    """
+    result = handler.get_principal_permissions(tenant_id, custom_group_id, principal_id)
+    return PrincipalsResponse(**result)
+
+
+@router.put(
+    "/{custom_group_id}/principals",
+    response_model=PrincipalsResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Set Principal Permission",
+    description="Add or update a permission for a principal on a custom group (requires ADMIN)"
+)
+@authenticate
+@check_permissions(entity="custom_group", required_permissions=[PermissionActionEnum.ADMIN])
+async def set_principal_permission(
+    request: Request,
+    tenant_id: str,
+    custom_group_id: str,
+    permission_data: SetPrincipalPermissionRequest,
+    handler: CustomGroupHandler = Depends(get_custom_group_handler)
+) -> PrincipalsResponse:
     """
     Add or update a permission for a principal on a custom group.
     Requires ADMIN permission on the group, or GLOBAL_ADMIN/CUSTOM_GROUPS_ADMIN on tenant.
@@ -243,55 +281,63 @@ async def set_custom_group_permission(
         request: FastAPI request object
         tenant_id: The ID of the tenant
         custom_group_id: The ID of the custom group
+        principal_id: The ID of the principal (from path, must match request body)
         permission_data: Permission data to set
         handler: Custom group handler dependency
     
     Returns:
-        CustomGroupPermissionsResponse: Updated permissions for the custom group
+        PrincipalsResponse: Updated principal's permissions on the custom group
     """
     user: ContextIdentityUser = request.state.user
     user_id = user.identity.get_id()
     
-    return handler.set_custom_group_permission(
+    result = handler.set_principal_permission(
         tenant_id=tenant_id,
         custom_group_id=custom_group_id,
-        permission_data=permission_data,
+        principal_id=permission_data.principal_id,
+        principal_type=permission_data.principal_type,
+        permission=permission_data.permission,
         user_id=user_id
     )
+    return PrincipalsResponse(**result)
 
 
 @router.delete(
-    "/{custom_group_id}/permissions",
-    response_model=CustomGroupPermissionsResponse,
+    "/{custom_group_id}/principals",
+    response_model=PrincipalsResponse,
     status_code=status.HTTP_200_OK,
-    summary="Delete Custom Group Permission",
-    description="Remove a permission from a custom group (requires ADMIN)"
+    summary="Delete Principal Permission",
+    description="Remove a specific permission from a principal on a custom group (requires ADMIN)"
 )
 @authenticate
-@check_permissions(entity="custom_group", required_permissions=["ADMIN"])
-async def delete_custom_group_permission(
+@check_permissions(entity="custom_group", required_permissions=[PermissionActionEnum.ADMIN])
+async def delete_principal_permission(
     request: Request,
     tenant_id: str,
     custom_group_id: str,
-    permission_data: DeleteCustomGroupPermissionRequest,
+    permission_data: DeletePrincipalPermissionRequest,
     handler: CustomGroupHandler = Depends(get_custom_group_handler)
-) -> CustomGroupPermissionsResponse:
+) -> PrincipalsResponse:
     """
-    Remove a permission from a custom group.
+    Remove a specific permission from a principal on a custom group.
     Requires ADMIN permission on the group, or GLOBAL_ADMIN/CUSTOM_GROUPS_ADMIN on tenant.
     
     Args:
         request: FastAPI request object
         tenant_id: The ID of the tenant
         custom_group_id: The ID of the custom group
+        principal_id: The ID of the principal (from path, must match request body)
         permission_data: Permission data to delete
         handler: Custom group handler dependency
     
     Returns:
-        CustomGroupPermissionsResponse: Remaining permissions for the custom group
+        PrincipalsResponse: Remaining principal's permissions on the custom group
     """
-    return handler.delete_custom_group_permission(
+    result = handler.delete_principal_permission(
         tenant_id=tenant_id,
         custom_group_id=custom_group_id,
-        permission_data=permission_data
+        principal_id=permission_data.principal_id,
+        principal_type=permission_data.principal_type,
+        permission=permission_data.permission
     )
+    return PrincipalsResponse(**result)

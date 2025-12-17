@@ -17,11 +17,6 @@ class CreateCustomGroupRequest(BaseModel):
         max_length=1000,
         description="Group description"
     )
-    
-    member_ids: list[str] = Field(
-        default_factory=list,
-        description="Initial list of user IDs to add as members"
-    )
 
 
 class UpdateCustomGroupRequest(BaseModel):
@@ -41,24 +36,20 @@ class UpdateCustomGroupRequest(BaseModel):
     )
 
 
-class AddMembersRequest(BaseModel):
-    """Request model for adding members to a group."""
+class SetPrincipalPermissionRequest(BaseModel):
+    """Request model for setting a principal permission on a custom group."""
     
-    member_ids: list[str] = Field(
-        ...,
-        min_length=1,
-        description="List of user IDs to add to the group"
-    )
+    principal_id: str = Field(..., description="Principal ID")
+    principal_type: str = Field(..., description="Principal type (IDENTITY_USER, IDENTITY_GROUP, CUSTOM_GROUP)")
+    permission: str = Field(..., description="Permission to grant (READ, WRITE, ADMIN)")
 
 
-class RemoveMembersRequest(BaseModel):
-    """Request model for removing members from a group."""
+class DeletePrincipalPermissionRequest(BaseModel):
+    """Request model for deleting a principal permission from a custom group."""
     
-    member_ids: list[str] = Field(
-        ...,
-        min_length=1,
-        description="List of user IDs to remove from the group"
-    )
+    principal_id: str = Field(..., description="Principal ID")
+    principal_type: str = Field(..., description="Principal type (IDENTITY_USER, IDENTITY_GROUP, CUSTOM_GROUP)")
+    permission: str = Field(..., description="Permission to remove (READ, WRITE, ADMIN)")
 
 
 class SetCustomGroupPermissionRequest(BaseModel):

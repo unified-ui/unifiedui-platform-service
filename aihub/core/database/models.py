@@ -16,6 +16,8 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from sqlalchemy.types import JSON
 from sqlalchemy import Enum as SAEnum
 
+from aihub.core.database.enums import PermissionActionEnum, TenantPermissionEnum, PrincipalTypeEnum
+
 
 # ---------- Base ----------
 class Base(DeclarativeBase):
@@ -28,34 +30,24 @@ PortableJSON = JSON().with_variant(postgresql.JSONB(), "postgresql").with_varian
 
 
 # ---------- Enums (DB-agnostic via CHECK constraints) ----------
-TenantPermissionEnum = SAEnum(
-    "READER",
-    "GLOBAL_ADMIN",
-    "CUSTOM_GROUPS_ADMIN",
-    "CUSTOM_GROUP_CREATOR",
-    "APPLICATIONS_ADMIN",
-    "CREDENTIALS_ADMIN",
-    "AUTONOMOUS_AGENTS_ADMIN",
+TenantPermissionSAEnum = SAEnum(
+    *TenantPermissionEnum.all(),
     name="tenant_role",
     native_enum=False,
     create_constraint=True,
     validate_strings=True,
 )
 
-PermissionActionEnum = SAEnum(
-    "READ",
-    "WRITE",
-    "ADMIN",
+PermissionActionSAEnum = SAEnum(
+    *PermissionActionEnum.all(),
     name="permission_action",
     native_enum=False,
     create_constraint=True,
     validate_strings=True,
 )
 
-PrincipalTypeEnum = SAEnum(
-    "IDENTITY_USER",
-    "IDENTITY_GROUP",
-    "CUSTOM_GROUP",
+PrincipalTypeSAEnum = SAEnum(
+    *PrincipalTypeEnum.all(),
     name="principal_type",
     native_enum=False,
     create_constraint=True,
@@ -102,7 +94,7 @@ class TenantMember(Base, IdNameDescriptionMixin):
         String(36), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False
     )
     principal_id: Mapped[str] = mapped_column(String(50), nullable=False)
-    principal_type: Mapped[str] = mapped_column(PrincipalTypeEnum, nullable=False)
+    principal_type: Mapped[str] = mapped_column(PrincipalTypeSAEnum, nullable=False)
 
     tenant: Mapped["Tenant"] = relationship(back_populates="members")
     permissions: Mapped[list["TenantMemberPermission"]] = relationship(
@@ -126,7 +118,7 @@ class TenantMemberPermission(Base, IdNameDescriptionMixin):
     tenant_member_id: Mapped[str] = mapped_column(
         String(36), ForeignKey("tenant_members.id", ondelete="CASCADE"), nullable=False
     )
-    permission: Mapped[str] = mapped_column(TenantPermissionEnum, nullable=False)
+    permission: Mapped[str] = mapped_column(TenantPermissionSAEnum, nullable=False)
 
     tenant_member: Mapped["TenantMember"] = relationship(back_populates="permissions")
 
@@ -138,13 +130,54 @@ class TenantMemberPermission(Base, IdNameDescriptionMixin):
 
 # ---------- Resources ----------
 class CustomGroup(Base, IdNameDescriptionMixin, TenantScopedMixin):
+    """Custom group entity."""
     __tablename__ = "custom_groups"
 
-    permissions: Mapped[list["CustomGroupPermission"]] = relationship(
+    members: Mapped[list["CustomGroupMember"]] = relationship(
         back_populates="custom_group", cascade="all, delete-orphan"
     )
 
     __table_args__ = (Index("ix_custom_groups_tenant", "tenant_id"),)
+
+
+class CustomGroupMember(Base, IdNameDescriptionMixin):
+    """Custom group membership table."""
+    __tablename__ = "custom_group_members"
+
+    tenant_id: Mapped[str] = mapped_column(String(36), nullable=False)
+    custom_group_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("custom_groups.id", ondelete="CASCADE"), nullable=False
+    )
+    principal_id: Mapped[str] = mapped_column(String(50), nullable=False)
+    principal_type: Mapped[str] = mapped_column(PrincipalTypeSAEnum, nullable=False)
+
+    custom_group: Mapped["CustomGroup"] = relationship(back_populates="members")
+    permissions: Mapped[list["CustomGroupMemberPermission"]] = relationship(
+        back_populates="custom_group_member", cascade="all, delete-orphan"
+    )
+
+    __table_args__ = (
+        UniqueConstraint("custom_group_id", "principal_id", "principal_type", name="uq_custom_group_members"),
+        Index("ix_cgm_custom_group", "custom_group_id"),
+        Index("ix_cgm_principal", "principal_id"),
+    )
+
+
+class CustomGroupMemberPermission(Base, IdNameDescriptionMixin):
+    """Permissions for custom group members."""
+    __tablename__ = "custom_group_member_permissions"
+
+    custom_group_member_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("custom_group_members.id", ondelete="CASCADE"), nullable=False
+    )
+    permission: Mapped[str] = mapped_column(PermissionActionSAEnum, nullable=False)
+
+    custom_group_member: Mapped["CustomGroupMember"] = relationship(back_populates="permissions")
+
+    __table_args__ = (
+        UniqueConstraint("custom_group_member_id", "permission", name="uq_custom_group_member_permissions"),
+        Index("ix_cgmp_member", "custom_group_member_id"),
+    )
 
 
 class Application(Base, IdNameDescriptionMixin, TenantScopedMixin):
@@ -194,24 +227,6 @@ class Credential(Base, IdNameDescriptionMixin, TenantScopedMixin):
 
 
 # ---------- Permission tables ----------
-class CustomGroupPermission(Base, IdNameDescriptionMixin, TenantScopedMixin):
-    __tablename__ = "custom_group_permissions"
-
-    custom_group_id: Mapped[str] = mapped_column(
-        String(36), ForeignKey("custom_groups.id", ondelete="CASCADE"), nullable=False
-    )
-    principal_id: Mapped[str] = mapped_column(String(50), nullable=False)
-    action: Mapped[str] = mapped_column(PermissionActionEnum, nullable=False)
-
-    custom_group: Mapped["CustomGroup"] = relationship(back_populates="permissions")
-
-    __table_args__ = (
-        UniqueConstraint("tenant_id", "custom_group_id", "principal_id", "action", name="uq_cgp"),
-        Index("ix_cgp_lookup", "tenant_id", "custom_group_id"),
-        Index("ix_cgp_principal", "principal_id"),
-    )
-
-
 class ApplicationPermission(Base, IdNameDescriptionMixin, TenantScopedMixin):
     __tablename__ = "application_permissions"
 
@@ -219,7 +234,7 @@ class ApplicationPermission(Base, IdNameDescriptionMixin, TenantScopedMixin):
         String(36), ForeignKey("applications.id", ondelete="CASCADE"), nullable=False
     )
     principal_id: Mapped[str] = mapped_column(String(50), nullable=False)
-    action: Mapped[str] = mapped_column(PermissionActionEnum, nullable=False)
+    action: Mapped[str] = mapped_column(PermissionActionSAEnum, nullable=False)
 
     application: Mapped["Application"] = relationship(back_populates="permissions")
 
@@ -237,7 +252,7 @@ class ConversationPermission(Base, IdNameDescriptionMixin, TenantScopedMixin):
         String(36), ForeignKey("conversations.id", ondelete="CASCADE"), nullable=False
     )
     principal_id: Mapped[str] = mapped_column(String(50), nullable=False)
-    action: Mapped[str] = mapped_column(PermissionActionEnum, nullable=False)
+    action: Mapped[str] = mapped_column(PermissionActionSAEnum, nullable=False)
 
     conversation: Mapped["Conversation"] = relationship(back_populates="permissions")
 
@@ -255,7 +270,7 @@ class AutonomousAgentPermission(Base, IdNameDescriptionMixin, TenantScopedMixin)
         String(36), ForeignKey("autonomous_agents.id", ondelete="CASCADE"), nullable=False
     )
     principal_id: Mapped[str] = mapped_column(String(50), nullable=False)
-    action: Mapped[str] = mapped_column(PermissionActionEnum, nullable=False)
+    action: Mapped[str] = mapped_column(PermissionActionSAEnum, nullable=False)
 
     autonomous_agent: Mapped["AutonomousAgent"] = relationship(back_populates="permissions")
 
@@ -273,7 +288,7 @@ class CredentialPermission(Base, IdNameDescriptionMixin, TenantScopedMixin):
         String(36), ForeignKey("credentials.id", ondelete="CASCADE"), nullable=False
     )
     principal_id: Mapped[str] = mapped_column(String(50), nullable=False)
-    action: Mapped[str] = mapped_column(PermissionActionEnum, nullable=False)
+    action: Mapped[str] = mapped_column(PermissionActionSAEnum, nullable=False)
 
     credential: Mapped["Credential"] = relationship(back_populates="permissions")
 

@@ -24,8 +24,24 @@ class CustomGroupPermissionResponse(BaseModel):
     created_at: datetime = Field(..., description="Creation timestamp")
 
 
-class CustomGroupPermissionsResponse(BaseModel):
-    """Response containing all permissions for a custom group."""
+class PrincipalPermissionsResponse(BaseModel):
+    """Response model for a principal's permissions on a custom group."""
+    principal_id: str = Field(..., description="Principal ID")
+    principal_type: str | None = Field(None, description="Principal type (IDENTITY_USER, IDENTITY_GROUP, CUSTOM_GROUP)")
+    permissions: list[str] = Field(..., description="List of permissions")
+
+
+class PrincipalsResponse(BaseModel):
+    """Response for a single principal's permissions on a custom group."""
     custom_group_id: str = Field(..., description="The custom group ID")
     tenant_id: str = Field(..., description="The tenant ID")
-    permissions: list[CustomGroupPermissionResponse] = Field(..., description="List of permissions")
+    principal_id: str = Field(..., description="The principal ID")
+    principal_type: str | None = Field(None, description="The principal type")
+    permissions: list[str] = Field(..., description="List of permissions")
+
+
+class CustomGroupPrincipalsResponse(BaseModel):
+    """Response containing all principals and their permissions for a custom group."""
+    custom_group_id: str = Field(..., description="The custom group ID")
+    tenant_id: str = Field(..., description="The tenant ID")
+    principals: list[PrincipalPermissionsResponse] = Field(..., description="List of principals with their permissions")

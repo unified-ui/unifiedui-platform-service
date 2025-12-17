@@ -39,6 +39,10 @@ class UpdateTenantRequest(BaseModel):
 
 class SetPrincipalRequest(BaseModel):
     """Schema for setting/adding a permission for a principal on a tenant."""
+    principal_id: str = Field(
+        ...,
+        description="ID of the principal (user or group)"
+    )
     principal_type: str = Field(
         ...,
         description="Type of principal (IDENTITY_USER, IDENTITY_GROUP, CUSTOM_GROUP)"
@@ -51,8 +55,8 @@ class SetPrincipalRequest(BaseModel):
     model_config = {
         "json_schema_extra": {
             "examples": [
-                {"principal_type": "IDENTITY_USER", "permission": "GLOBAL_ADMIN"},
-                {"principal_type": "IDENTITY_GROUP", "permission": "READER"}
+                {"principal_id": "id", "principal_type": "IDENTITY_USER", "permission": "GLOBAL_ADMIN"},
+                {"principal_id": "id", "principal_type": "IDENTITY_GROUP", "permission": "READER"}
             ]
         }
     }
@@ -60,6 +64,10 @@ class SetPrincipalRequest(BaseModel):
 
 class DeletePrincipalRequest(BaseModel):
     """Schema for deleting a permission for a principal on a tenant."""
+    principal_id: str = Field(
+        ...,
+        description="ID of the principal (user or group)"
+    )
     principal_type: str = Field(
         ...,
         description="Type of principal (IDENTITY_USER, IDENTITY_GROUP, CUSTOM_GROUP)"
@@ -72,7 +80,7 @@ class DeletePrincipalRequest(BaseModel):
     model_config = {
         "json_schema_extra": {
             "examples": [
-                {"principal_type": "IDENTITY_USER", "permission": "GLOBAL_ADMIN"}
+                {"principal_id": "id", "principal_type": "IDENTITY_USER", "permission": "GLOBAL_ADMIN"}
             ]
         }
     }

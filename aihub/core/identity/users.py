@@ -10,7 +10,7 @@ from aihub.utils.api_query import APIFilterQuery
 from aihub.docdatabase.client import DatabaseClient
 from aihub.caching.client import CacheClient
 from aihub.core.handlers.dependencies import get_db_client
-from aihub.core.database.models import CustomGroup, CustomGroupPermission
+from aihub.core.database.models import CustomGroup, CustomGroupMember
 from aihub.logger import get_logger
 
 logger = get_logger(__name__)
@@ -100,10 +100,11 @@ class ContextIdentityUser:
         db_client = get_db_client()
         
         with db_client.get_session() as session:
+            from aihub.core.database.models import CustomGroupMember
             query = (
                 select(CustomGroup)
-                .join(CustomGroupPermission, CustomGroup.id == CustomGroupPermission.custom_group_id)
-                .where(CustomGroupPermission.principal_id == user_id)
+                .join(CustomGroupMember, CustomGroup.id == CustomGroupMember.custom_group_id)
+                .where(CustomGroupMember.principal_id == user_id)
                 .distinct()
             )
             groups = session.execute(query).scalars().all()

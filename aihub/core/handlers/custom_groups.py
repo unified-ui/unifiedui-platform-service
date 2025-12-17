@@ -1,37 +1,44 @@
-"""Custom groups handler for business logic."""
+"""Business logic handlers for custom group operations using SQLAlchemy."""
 import uuid
+from typing import Optional, List
 from datetime import datetime
-from typing import Optional
 
-from sqlalchemy import select
+from sqlalchemy import select, and_, or_
 from sqlalchemy.orm import Session
 
 from aihub.core.database.client import SQLAlchemyClient
-from aihub.core.database.models import CustomGroup, CustomGroupPermission
+from aihub.core.database.models import CustomGroup, CustomGroupMember, CustomGroupMemberPermission
 from aihub.caching.client import CacheClient
 from aihub.schema.requests.custom_groups import (
     CreateCustomGroupRequest,
     UpdateCustomGroupRequest,
-    SetCustomGroupPermissionRequest,
-    DeleteCustomGroupPermissionRequest
+    SetPrincipalPermissionRequest,
+    DeletePrincipalPermissionRequest
 )
 from aihub.schema.responses.custom_groups import (
     CustomGroupResponse,
-    CustomGroupPermissionResponse,
-    CustomGroupPermissionsResponse
+    CustomGroupPrincipalsResponse,
+    PrincipalsResponse
 )
-from aihub.exc.tenants import TenantNotFoundError
+from aihub.exc.custom_groups import CustomGroupNotFoundError
 from aihub.logger import get_logger
 
 logger = get_logger(__name__)
 
 
 class CustomGroupHandler:
-    """Handler for custom group operations."""
+    """Handler class for custom group business logic using SQLAlchemy."""
     
     def __init__(self, db_client: SQLAlchemyClient, cache_client: Optional[CacheClient] = None):
-        self.db = db_client
-        self.cache = cache_client
+        """
+        Initialize the custom group handler.
+        
+        Args:
+            db_client: SQLAlchemy database client instance
+            cache_client: Optional cache client for Redis caching
+        """
+        self.db_client = db_client
+        self.cache_client = cache_client
     
     def list_custom_groups(
         self,
@@ -39,9 +46,22 @@ class CustomGroupHandler:
         skip: int = 0,
         limit: int = 100,
         name_filter: Optional[str] = None
-    ) -> list[CustomGroupResponse]:
-        """List all custom groups in a tenant."""
-        with self.db.get_session() as session:
+    ) -> List[CustomGroupResponse]:
+        """
+        Get a list of custom groups in a tenant.
+        
+        Args:
+            tenant_id: The ID of the tenant
+            skip: Number of items to skip
+            limit: Maximum number of items to return
+            name_filter: Optional filter by group name (case-insensitive partial match)
+            
+        Returns:
+            List of custom group responses
+        """
+        logger.info("Listing custom groups", extra={"tenant_id": tenant_id, "skip": skip, "limit": limit})
+        
+        with self.db_client.get_session() as session:
             query = select(CustomGroup).where(CustomGroup.tenant_id == tenant_id)
             
             if name_filter:
@@ -50,11 +70,26 @@ class CustomGroupHandler:
             query = query.offset(skip).limit(limit)
             groups = session.execute(query).scalars().all()
             
-            return [self._to_response(group) for group in groups]
+            logger.info("Retrieved custom groups", extra={"count": len(groups)})
+            return [self._model_to_response(group) for group in groups]
     
     def get_custom_group(self, tenant_id: str, custom_group_id: str) -> CustomGroupResponse:
-        """Get a specific custom group by ID."""
-        with self.db.get_session() as session:
+        """
+        Get a specific custom group by ID.
+        
+        Args:
+            tenant_id: The ID of the tenant
+            custom_group_id: The ID of the custom group
+            
+        Returns:
+            Custom group response
+            
+        Raises:
+            CustomGroupNotFoundError: If custom group not found
+        """
+        logger.info("Fetching custom group", extra={"tenant_id": tenant_id, "custom_group_id": custom_group_id})
+        
+        with self.db_client.get_session() as session:
             query = select(CustomGroup).where(
                 CustomGroup.id == custom_group_id,
                 CustomGroup.tenant_id == tenant_id
@@ -62,59 +97,115 @@ class CustomGroupHandler:
             group = session.execute(query).scalar_one_or_none()
             
             if not group:
-                raise TenantNotFoundError(f"Custom group {custom_group_id} not found")
+                logger.warning("Custom group not found", extra={"custom_group_id": custom_group_id})
+                raise CustomGroupNotFoundError(custom_group_id)
             
-            return self._to_response(group)
+            logger.info("Custom group retrieved", extra={"custom_group_id": custom_group_id})
+            return self._model_to_response(group)
     
     def create_custom_group(
         self,
         tenant_id: str,
-        group_data: CreateCustomGroupRequest,
+        request: CreateCustomGroupRequest,
         user_id: str
     ) -> CustomGroupResponse:
-        """Create a new custom group and assign creator as ADMIN."""
-        with self.db.get_session() as session:
-            # Create the group
+        """
+        Create a new custom group and assign the creator as ADMIN.
+        
+        Args:
+            tenant_id: The ID of the tenant
+            request: Custom group creation data
+            user_id: ID of the user creating the group (principal_id)
+            
+        Returns:
+            Created custom group response
+        """
+        logger.info("Creating custom group", extra={"tenant_id": tenant_id, "group_name": request.name, "user_id": user_id})
+        
+        group_id = str(uuid.uuid4())
+        
+        with self.db_client.get_session() as session:
+            # Create custom group
             group = CustomGroup(
-                id=str(uuid.uuid4()),
+                id=group_id,
                 tenant_id=tenant_id,
-                name=group_data.name,
-                description=group_data.description,
+                name=request.name,
+                description=request.description,
                 created_by=user_id,
                 updated_by=user_id
             )
             session.add(group)
             session.flush()
             
-            # Add creator as ADMIN
-            permission = CustomGroupPermission(
-                id=str(uuid.uuid4()),
+            # Create group member for the creator
+            member_id = str(uuid.uuid4())
+            group_member = CustomGroupMember(
+                id=member_id,
                 tenant_id=tenant_id,
-                custom_group_id=group.id,
+                custom_group_id=group_id,
                 principal_id=user_id,
-                action="ADMIN",
-                name=f"ADMIN permission for {user_id}",
-                description="Auto-created for group creator",
+                principal_type="IDENTITY_USER",
+                name=f"Member: {user_id}",
+                description=f"Custom group member for user {user_id} on group {request.name}",
                 created_by=user_id,
                 updated_by=user_id
             )
-            session.add(permission)
+            session.add(group_member)
+            session.flush()
+            
+            # Create ADMIN permission for the member
+            permission_id = str(uuid.uuid4())
+            group_permission = CustomGroupMemberPermission(
+                id=permission_id,
+                custom_group_member_id=member_id,
+                permission="ADMIN",
+                name=f"ADMIN permission",
+                description=f"Administrator permission for user {user_id} on group {request.name}",
+                created_by=user_id,
+                updated_by=user_id
+            )
+            session.add(group_permission)
             
             session.commit()
             session.refresh(group)
             
-            logger.info(f"Created custom group {group.id} with creator {user_id} as ADMIN")
-            return self._to_response(group)
+            # Invalidate cache
+            if self.cache_client:
+                try:
+                    cache_key = f"custom_groups:user:{user_id}:*"
+                    self.cache_client.client.delete(cache_key)
+                    logger.debug(f"Invalidated custom group cache for user {user_id}")
+                except Exception as e:
+                    logger.warning(f"Failed to invalidate cache: {e}")
+            
+            logger.info("Custom group created", extra={"custom_group_id": group_id})
+            return self._model_to_response(group)
     
     def update_custom_group(
         self,
         tenant_id: str,
         custom_group_id: str,
-        group_data: UpdateCustomGroupRequest,
+        request: UpdateCustomGroupRequest,
         user_id: str
     ) -> CustomGroupResponse:
-        """Update an existing custom group."""
-        with self.db.get_session() as session:
+        """
+        Update an existing custom group.
+        
+        Args:
+            tenant_id: The ID of the tenant
+            custom_group_id: The ID of the custom group to update
+            request: Custom group update data
+            user_id: ID of the user updating the group
+            
+        Returns:
+            Updated custom group response
+            
+        Raises:
+            CustomGroupNotFoundError: If custom group not found
+        """
+        logger.info("Updating custom group", extra={"tenant_id": tenant_id, "custom_group_id": custom_group_id, "user_id": user_id})
+        
+        with self.db_client.get_session() as session:
             query = select(CustomGroup).where(
                 CustomGroup.id == custom_group_id,
                 CustomGroup.tenant_id == tenant_id
@@ -122,12 +213,13 @@ class CustomGroupHandler:
             group = session.execute(query).scalar_one_or_none()
             
             if not group:
-                raise TenantNotFoundError(f"Custom group {custom_group_id} not found")
+                logger.warning("Custom group not found", extra={"custom_group_id": custom_group_id})
+                raise CustomGroupNotFoundError(custom_group_id)
             
-            if group_data.name is not None:
-                group.name = group_data.name
-            if group_data.description is not None:
-                group.description = group_data.description
+            if request.name is not None:
+                group.name = request.name
+            if request.description is not None:
+                group.description = request.description
             
             group.updated_by = user_id
             group.updated_at = datetime.utcnow()
@@ -135,12 +227,23 @@ class CustomGroupHandler:
             session.commit()
             session.refresh(group)
             
-            logger.info(f"Updated custom group {custom_group_id}")
-            return self._to_response(group)
+            logger.info("Custom group updated", extra={"custom_group_id": custom_group_id})
+            return self._model_to_response(group)
     
     def delete_custom_group(self, tenant_id: str, custom_group_id: str) -> None:
-        """Delete a custom group."""
-        with self.db.get_session() as session:
+        """
+        Delete a custom group by ID.
+        
+        Args:
+            tenant_id: The ID of the tenant
+            custom_group_id: The ID of the custom group to delete
+            
+        Raises:
+            CustomGroupNotFoundError: If custom group not found
+        """
+        logger.info("Deleting custom group", extra={"tenant_id": tenant_id, "custom_group_id": custom_group_id})
+        
+        with self.db_client.get_session() as session:
             query = select(CustomGroup).where(
                 CustomGroup.id == custom_group_id,
                 CustomGroup.tenant_id == tenant_id
@@ -148,95 +251,295 @@ class CustomGroupHandler:
             group = session.execute(query).scalar_one_or_none()
             
             if not group:
-                raise TenantNotFoundError(f"Custom group {custom_group_id} not found")
+                logger.warning("Custom group not found", extra={"custom_group_id": custom_group_id})
+                raise CustomGroupNotFoundError(custom_group_id)
             
             session.delete(group)
             session.commit()
             
-            logger.info(f"Deleted custom group {custom_group_id}")
+            logger.info("Custom group deleted", extra={"custom_group_id": custom_group_id})
     
-    def get_custom_group_permissions(
+    def list_custom_group_principals(
         self,
         tenant_id: str,
         custom_group_id: str
-    ) -> CustomGroupPermissionsResponse:
-        """Get all permissions for a custom group."""
-        with self.db.get_session() as session:
-            query = select(CustomGroupPermission).where(
-                CustomGroupPermission.custom_group_id == custom_group_id,
-                CustomGroupPermission.tenant_id == tenant_id
-            )
-            permissions = session.execute(query).scalars().all()
+    ) -> dict:
+        """
+        Get all principals and their permissions for a specific custom group.
+        
+        Args:
+            tenant_id: The ID of the tenant
+            custom_group_id: The ID of the custom group
             
-            return CustomGroupPermissionsResponse(
-                custom_group_id=custom_group_id,
-                tenant_id=tenant_id,
-                permissions=[self._permission_to_response(p) for p in permissions]
+        Returns:
+            Dict with custom_group_id and list of principals with their permissions
+            
+        Raises:
+            CustomGroupNotFoundError: If custom group not found
+        """
+        logger.info("Listing all principals for custom group", extra={"tenant_id": tenant_id, "custom_group_id": custom_group_id})
+        
+        with self.db_client.get_session() as session:
+            # Verify group exists
+            group = session.get(CustomGroup, custom_group_id)
+            if not group or group.tenant_id != tenant_id:
+                raise CustomGroupNotFoundError(custom_group_id)
+            
+            # Get all members and their permissions
+            query = (
+                select(CustomGroupMember, CustomGroupMemberPermission)
+                .join(CustomGroupMemberPermission, CustomGroupMember.id == CustomGroupMemberPermission.custom_group_member_id)
+                .where(CustomGroupMember.custom_group_id == custom_group_id)
+                .order_by(CustomGroupMember.principal_id, CustomGroupMemberPermission.permission)
             )
+            
+            results = session.execute(query).all()
+            
+            # Group by principal
+            principals_dict = {}
+            for member, permission in results:
+                if member.principal_id not in principals_dict:
+                    principals_dict[member.principal_id] = {
+                        "principal_id": member.principal_id,
+                        "principal_type": member.principal_type,
+                        "permissions": []
+                    }
+                principals_dict[member.principal_id]["permissions"].append(permission.permission)
+            
+            principals = list(principals_dict.values())
+            
+            logger.info("Retrieved custom group principals", extra={"custom_group_id": custom_group_id, "principal_count": len(principals)})
+            
+            return {
+                "custom_group_id": custom_group_id,
+                "tenant_id": tenant_id,
+                "principals": principals
+            }
     
-    def set_custom_group_permission(
+    def get_principal_permissions(
         self,
         tenant_id: str,
         custom_group_id: str,
-        permission_data: SetCustomGroupPermissionRequest,
-        user_id: str
-    ) -> CustomGroupPermissionsResponse:
-        """Set a permission for a principal on a custom group."""
-        with self.db.get_session() as session:
-            # Check if permission already exists
-            query = select(CustomGroupPermission).where(
-                CustomGroupPermission.custom_group_id == custom_group_id,
-                CustomGroupPermission.tenant_id == tenant_id,
-                CustomGroupPermission.principal_id == permission_data.principal_id,
-                CustomGroupPermission.action == permission_data.action
-            )
-            existing = session.execute(query).scalar_one_or_none()
+        principal_id: str
+    ) -> dict:
+        """
+        Get all permissions for a specific principal on a custom group.
+        
+        Args:
+            tenant_id: The ID of the tenant
+            custom_group_id: The ID of the custom group
+            principal_id: The ID of the principal
             
-            if not existing:
-                # Create new permission
-                permission = CustomGroupPermission(
-                    id=str(uuid.uuid4()),
+        Returns:
+            Dict with custom_group_id, principal_id, and permissions list
+            
+        Raises:
+            CustomGroupNotFoundError: If custom group not found
+        """
+        logger.info(
+            "Getting principal permissions",
+            extra={"tenant_id": tenant_id, "custom_group_id": custom_group_id, "principal_id": principal_id}
+        )
+        
+        with self.db_client.get_session() as session:
+            # Verify group exists
+            group = session.get(CustomGroup, custom_group_id)
+            if not group or group.tenant_id != tenant_id:
+                raise CustomGroupNotFoundError(custom_group_id)
+            
+            # Get member and permissions
+            query = (
+                select(CustomGroupMember, CustomGroupMemberPermission)
+                .join(CustomGroupMemberPermission, CustomGroupMember.id == CustomGroupMemberPermission.custom_group_member_id)
+                .where(
+                    CustomGroupMember.custom_group_id == custom_group_id,
+                    CustomGroupMember.principal_id == principal_id
+                )
+            )
+            
+            results = session.execute(query).all()
+            
+            if not results:
+                # Principal has no permissions on this group
+                return {
+                    "custom_group_id": custom_group_id,
+                    "tenant_id": tenant_id,
+                    "principal_id": principal_id,
+                    "principal_type": None,
+                    "permissions": []
+                }
+            
+            member = results[0][0]
+            permissions = [perm.permission for _, perm in results]
+            
+            return {
+                "custom_group_id": custom_group_id,
+                "tenant_id": tenant_id,
+                "principal_id": principal_id,
+                "principal_type": member.principal_type,
+                "permissions": permissions
+            }
+    
+    def set_principal_permission(
+        self,
+        tenant_id: str,
+        custom_group_id: str,
+        principal_id: str,
+        principal_type: str,
+        permission: str,
+        user_id: str
+    ) -> dict:
+        """
+        Add or update a permission for a principal on a custom group.
+        
+        Args:
+            tenant_id: The ID of the tenant
+            custom_group_id: The ID of the custom group
+            principal_id: The ID of the principal
+            principal_type: The type of principal (IDENTITY_USER, IDENTITY_GROUP, CUSTOM_GROUP)
+            permission: The permission to assign
+            user_id: The ID of the user making the change
+            
+        Returns:
+            Dict with custom_group_id, principal_id, and updated permissions list
+            
+        Raises:
+            CustomGroupNotFoundError: If custom group not found
+        """
+        logger.info(
+            "Setting principal permission",
+            extra={"tenant_id": tenant_id, "custom_group_id": custom_group_id, "principal_id": principal_id, "permission": permission}
+        )
+        
+        with self.db_client.get_session() as session:
+            # Verify group exists
+            group = session.get(CustomGroup, custom_group_id)
+            if not group or group.tenant_id != tenant_id:
+                raise CustomGroupNotFoundError(custom_group_id)
+            
+            # Find or create member
+            query = select(CustomGroupMember).where(
+                CustomGroupMember.custom_group_id == custom_group_id,
+                CustomGroupMember.principal_id == principal_id,
+                CustomGroupMember.principal_type == principal_type
+            )
+            member = session.execute(query).scalar_one_or_none()
+            
+            if not member:
+                # Create new member
+                member_id = str(uuid.uuid4())
+                member = CustomGroupMember(
+                    id=member_id,
                     tenant_id=tenant_id,
                     custom_group_id=custom_group_id,
-                    principal_id=permission_data.principal_id,
-                    action=permission_data.action,
-                    name=f"{permission_data.action} permission for {permission_data.principal_id}",
+                    principal_id=principal_id,
+                    principal_type=principal_type,
+                    name=f"Member: {principal_id}",
+                    description=f"Custom group member for principal {principal_id}",
+                    created_by=user_id,
+                    updated_by=user_id
+                )
+                session.add(member)
+                session.flush()
+            
+            # Check if permission already exists
+            query = select(CustomGroupMemberPermission).where(
+                CustomGroupMemberPermission.custom_group_member_id == member.id,
+                CustomGroupMemberPermission.permission == permission
+            )
+            existing_permission = session.execute(query).scalar_one_or_none()
+            
+            if not existing_permission:
+                # Create new permission
+                permission_id = str(uuid.uuid4())
+                new_permission = CustomGroupMemberPermission(
+                    id=permission_id,
+                    custom_group_member_id=member.id,
+                    permission=permission,
+                    name=f"{permission} permission",
                     description=f"Permission granted by {user_id}",
                     created_by=user_id,
                     updated_by=user_id
                 )
-                session.add(permission)
-                session.commit()
-                
-                logger.info(f"Added {permission_data.action} permission for {permission_data.principal_id} on group {custom_group_id}")
+                session.add(new_permission)
             
-            return self.get_custom_group_permissions(tenant_id, custom_group_id)
+            session.commit()
+            
+            logger.info(f"Set {permission} permission for {principal_id} on custom group {custom_group_id}")
+            
+            return self.get_principal_permissions(tenant_id, custom_group_id, principal_id)
     
-    def delete_custom_group_permission(
+    def delete_principal_permission(
         self,
         tenant_id: str,
         custom_group_id: str,
-        permission_data: DeleteCustomGroupPermissionRequest
-    ) -> CustomGroupPermissionsResponse:
-        """Delete a permission from a custom group."""
-        with self.db.get_session() as session:
-            query = select(CustomGroupPermission).where(
-                CustomGroupPermission.custom_group_id == custom_group_id,
-                CustomGroupPermission.tenant_id == tenant_id,
-                CustomGroupPermission.principal_id == permission_data.principal_id,
-                CustomGroupPermission.action == permission_data.action
+        principal_id: str,
+        principal_type: str,
+        permission: str
+    ) -> dict:
+        """
+        Remove a specific permission from a principal on a custom group.
+        
+        Args:
+            tenant_id: The ID of the tenant
+            custom_group_id: The ID of the custom group
+            principal_id: The ID of the principal
+            principal_type: The type of principal
+            permission: The permission to remove
+            
+        Returns:
+            Dict with custom_group_id, principal_id, and remaining permissions list
+            
+        Raises:
+            CustomGroupNotFoundError: If custom group not found
+        """
+        logger.info(
+            "Deleting principal permission",
+            extra={"tenant_id": tenant_id, "custom_group_id": custom_group_id, "principal_id": principal_id, "permission": permission}
+        )
+        
+        with self.db_client.get_session() as session:
+            # Verify group exists
+            group = session.get(CustomGroup, custom_group_id)
+            if not group or group.tenant_id != tenant_id:
+                raise CustomGroupNotFoundError(custom_group_id)
+            
+            # Find member
+            query = select(CustomGroupMember).where(
+                CustomGroupMember.custom_group_id == custom_group_id,
+                CustomGroupMember.principal_id == principal_id,
+                CustomGroupMember.principal_type == principal_type
             )
-            permission = session.execute(query).scalar_one_or_none()
+            member = session.execute(query).scalar_one_or_none()
             
-            if permission:
-                session.delete(permission)
-                session.commit()
-                logger.info(f"Deleted {permission_data.action} permission for {permission_data.principal_id} on group {custom_group_id}")
+            if member:
+                # Find and delete permission
+                query = select(CustomGroupMemberPermission).where(
+                    CustomGroupMemberPermission.custom_group_member_id == member.id,
+                    CustomGroupMemberPermission.permission == permission
+                )
+                permission_obj = session.execute(query).scalar_one_or_none()
+                
+                if permission_obj:
+                    session.delete(permission_obj)
+                    
+                    # Check if member has any remaining permissions
+                    query = select(CustomGroupMemberPermission).where(
+                        CustomGroupMemberPermission.custom_group_member_id == member.id
+                    )
+                    remaining_permissions = session.execute(query).scalars().all()
+                    
+                    # If no permissions left, delete the member
+                    if not remaining_permissions:
+                        session.delete(member)
+                    
+                    session.commit()
+                    logger.info(f"Deleted {permission} permission for {principal_id} on custom group {custom_group_id}")
             
-            return self.get_custom_group_permissions(tenant_id, custom_group_id)
+            return self.get_principal_permissions(tenant_id, custom_group_id, principal_id)
     
     @staticmethod
-    def _to_response(group: CustomGroup) -> CustomGroupResponse:
+    def _model_to_response(group: CustomGroup) -> CustomGroupResponse:
         """Convert CustomGroup model to response."""
         return CustomGroupResponse(
             id=group.id,
@@ -247,14 +550,4 @@ class CustomGroupHandler:
             updated_at=group.updated_at,
             created_by=group.created_by,
             updated_by=group.updated_by
-        )
-    
-    @staticmethod
-    def _permission_to_response(permission: CustomGroupPermission) -> CustomGroupPermissionResponse:
-        """Convert CustomGroupPermission model to response."""
-        return CustomGroupPermissionResponse(
-            id=permission.id,
-            principal_id=permission.principal_id,
-            action=permission.action,
-            created_at=permission.created_at
         )

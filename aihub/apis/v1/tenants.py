@@ -6,6 +6,7 @@ from aihub.core.handlers.tenants import TenantHandler
 from aihub.core.handlers.dependencies import get_tenant_handler
 from aihub.core.middleware.apis.v1.auth import authenticate, check_permissions
 from aihub.core.identity.users import ContextIdentityUser
+from aihub.core.database.enums import TenantPermissionEnum
 from aihub.schema.requests.tenants import (
     CreateTenantRequest,
     UpdateTenantRequest,
@@ -125,7 +126,7 @@ async def create_tenant(
     description="Update an existing tenant"
 )
 @authenticate
-@check_permissions(entity="tenant", required_permissions=["GLOBAL_ADMIN"])
+@check_permissions(entity="tenant", required_permissions=[TenantPermissionEnum.GLOBAL_ADMIN])
 async def update_tenant(
     request: Request,
     tenant_id: str,
@@ -160,7 +161,7 @@ async def update_tenant(
     description="Delete a tenant by ID"
 )
 @authenticate
-@check_permissions(entity="tenant", required_permissions=["GLOBAL_ADMIN"])
+@check_permissions(entity="tenant", required_permissions=[TenantPermissionEnum.GLOBAL_ADMIN])
 async def delete_tenant(
     request: Request,
     tenant_id: str,
@@ -247,18 +248,17 @@ async def get_principal_permissions(
 
 
 @router.put(
-    "/{tenant_id}/principals/{principal_id}",
+    "/{tenant_id}/principals",
     response_model=PrincipalsResponse,
     status_code=status.HTTP_200_OK,
     summary="Set Principal Role",
     description="Add or update a role for a principal on a tenant"
 )
 @authenticate
-@check_permissions(entity="tenant", required_permissions=["GLOBAL_ADMIN"])
+@check_permissions(entity="tenant", required_permissions=[TenantPermissionEnum.GLOBAL_ADMIN])
 async def set_principal_permission(
     request: Request,
     tenant_id: str,
-    principal_id: str,
     role_data: SetPrincipalRequest,
     handler: TenantHandler = Depends(get_tenant_handler)
 ) -> PrincipalsResponse:
@@ -283,27 +283,26 @@ async def set_principal_permission(
     
     result = handler.set_principal_permission(
         tenant_id=tenant_id,
-        principal_id=principal_id,
+        principal_id=role_data.principal_id,
         principal_type=role_data.principal_type,
-        role=role_data.role,
+        permission=role_data.permission,
         user_id=user_id
     )
     return PrincipalsResponse(**result)
 
 
 @router.delete(
-    "/{tenant_id}/principals/{principal_id}",
+    "/{tenant_id}/principals",
     response_model=PrincipalsResponse,
     status_code=status.HTTP_200_OK,
     summary="Delete Principal Role",
     description="Remove a specific role from a principal on a tenant"
 )
 @authenticate
-@check_permissions(entity="tenant", required_permissions=["GLOBAL_ADMIN"])
+@check_permissions(entity="tenant", required_permissions=[TenantPermissionEnum.GLOBAL_ADMIN])
 async def delete_principal_permission(
     request: Request,
     tenant_id: str,
-    principal_id: str,
     role_data: DeletePrincipalRequest,
     handler: TenantHandler = Depends(get_tenant_handler)
 ) -> PrincipalsResponse:
@@ -325,8 +324,8 @@ async def delete_principal_permission(
     """
     result = handler.delete_principal_permission(
         tenant_id=tenant_id,
-        principal_id=principal_id,
+        principal_id=role_data.principal_id,
         principal_type=role_data.principal_type,
-        role=role_data.role
+        permission=role_data.permission
     )
     return PrincipalsResponse(**result)
