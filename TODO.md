@@ -58,6 +58,8 @@
 - identity/users/{id}
 - identity/groups/{id}
 
+- next_link bei /users testen -> funktioniert das?
+
 - refactoring
     - db client wird in users.py noch initialisiert -> sollte injected werden!
 - Caching

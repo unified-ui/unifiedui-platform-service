@@ -103,3 +103,55 @@ async def get_groups(
     groups, next_link = user.idp.get_security_groups(query=query)
     return IdentityGroupsResponse(value=groups, next_link=next_link)
 
+
+@router.get(
+    "/users/{user_id}",
+    response_model=IdentityUserResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Get User by ID",
+    description="Returns a specific user from the identity provider by their ID"
+)
+@authenticate
+async def get_user_by_id(
+    request: Request,
+    user_id: str
+) -> IdentityUserResponse:
+    """
+    Get a specific user by ID from the identity provider.
+    
+    Args:
+        request: FastAPI request object (contains user in request.state)
+        user_id: The ID of the user to retrieve
+    
+    Returns:
+        IdentityUserResponse: User details
+    """
+    user: ContextIdentityUser = request.state.user
+    return user.idp.get_user_by_id(user_id)
+
+
+@router.get(
+    "/groups/{group_id}",
+    response_model=IdentityGroupResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Get Group by ID",
+    description="Returns a specific security group from the identity provider by its ID"
+)
+@authenticate
+async def get_group_by_id(
+    request: Request,
+    group_id: str
+) -> IdentityGroupResponse:
+    """
+    Get a specific security group by ID from the identity provider.
+    
+    Args:
+        request: FastAPI request object (contains user in request.state)
+        group_id: The ID of the group to retrieve
+    
+    Returns:
+        IdentityGroupResponse: Group details
+    """
+    user: ContextIdentityUser = request.state.user
+    return user.idp.get_group_by_id(group_id)
+

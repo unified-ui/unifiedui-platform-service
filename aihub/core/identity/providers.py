@@ -78,3 +78,13 @@ class BaseIdentityProvider(ABC):
     ) -> list[IdentityUserResponse]:
         """Get users from the directory."""
         pass
+
+    @abstractmethod
+    def get_user_by_id(self, user_id: str) -> IdentityUserResponse:
+        """Get a specific user by ID."""
+        pass
+
+    @abstractmethod
+    def get_group_by_id(self, group_id: str) -> IdentityGroupResponse:
+        """Get a specific group by ID."""
+        pass

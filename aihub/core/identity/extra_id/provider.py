@@ -138,6 +138,62 @@ class ExtraIDIdentityProvider(BaseIdentityProvider, APIJSONBearerClient):
             for item in data.get("value", [])
         ]
 
+    def get_user_by_id(self, user_id: str) -> IdentityUserResponse:
+        """
+        Get a specific user by ID.
+        
+        Args:
+            user_id: The user ID to retrieve
+            
+        Returns:
+            IdentityUserResponse with user details
+        """
+        headers = self._get_headers(self.identity_token.token)
+        url = self._url(f"/users/{user_id}")
+        params = {
+            "$select": "displayName,id,userPrincipalName,givenName,surname,mail"
+        }
+        
+        response = requests.get(url, headers=headers, params=params)
+        response.raise_for_status()
+        
+        data = response.json()
+        return IdentityUserResponse(
+            id=data["id"],
+            identity_provider=self.identity_token.get_identity_provider(),
+            identity_tenant_id=self.identity_token.get_identity_tenant_id(),
+            display_name=data.get("displayName", data.get("userPrincipalName", "")),
+            firstname=data.get("givenName"),
+            lastname=data.get("surname"),
+            mail=data.get("mail"),
+            user_principal_name=data.get("userPrincipalName")
+        )
+
+    def get_group_by_id(self, group_id: str) -> IdentityGroupResponse:
+        """
+        Get a specific group by ID.
+        
+        Args:
+            group_id: The group ID to retrieve
+            
+        Returns:
+            IdentityGroupResponse with group details
+        """
+        headers = self._get_headers(self.identity_token.token)
+        url = self._url(f"/groups/{group_id}")
+        params = {
+            "$select": "displayName,id"
+        }
+        
+        response = requests.get(url, headers=headers, params=params)
+        response.raise_for_status()
+        
+        data = response.json()
+        return IdentityGroupResponse(
+            id=data["id"],
+            display_name=data["displayName"]
+        )
+
     def _parse_users_response(self, data: dict) -> list[IdentityUserResponse]:
         """Parse Microsoft Graph API users response."""
         return [
