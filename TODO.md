@@ -62,7 +62,9 @@
         - und wichtig: users.py wird noch außerhalb ge
     - cusgroups
 
-
+- permissions mit zweitem account testen auf
+    - tenant
+    - custom groups
 
 
 

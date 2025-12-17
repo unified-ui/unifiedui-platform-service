@@ -5,8 +5,7 @@ from fastapi import Request, HTTPException, status
 from sqlalchemy import select
 
 from aihub.core.identity.users import ContextIdentityUser
-from aihub.core.database.client import SQLAlchemyClient
-from aihub.core.database.config import DatabaseConfig
+from aihub.core.handlers.dependencies import get_db_client
 from aihub.core.database.models import (
     ApplicationPermission,
     CredentialPermission,
@@ -236,6 +235,25 @@ def check_permissions(
                         detail="tenant_id not found in path parameters"
                     )
                 
+                # Check tenant-level permissions first (for custom_group, check GLOBAL_ADMIN and CUSTOM_GROUPS_ADMIN)
+                user_tenants = user.tenants
+                matching_tenant = next(
+                    (t for t in user_tenants if t["tenant"]["id"] == tenant_id),
+                    None
+                )
+                
+                if matching_tenant:
+                    user_tenant_permissions = [p["permission"] for p in matching_tenant["permissions"]]
+                    
+                    # For custom_group: GLOBAL_ADMIN or CUSTOM_GROUPS_ADMIN grants access
+                    if entity == "custom_group":
+                        if "GLOBAL_ADMIN" in user_tenant_permissions or "CUSTOM_GROUPS_ADMIN" in user_tenant_permissions:
+                            return await func(*args, **kwargs)
+                    
+                    # For other entities: GLOBAL_ADMIN grants access
+                    elif "GLOBAL_ADMIN" in user_tenant_permissions:
+                        return await func(*args, **kwargs)
+                
                 # Get user's principal IDs
                 user_id = user.identity.get_id()
                 identity_group_ids = [group.id for group in user.groups]
@@ -243,8 +261,7 @@ def check_permissions(
                 all_principal_ids = [user_id] + identity_group_ids + custom_group_ids
                 
                 # Query permissions for this entity
-                db_config = DatabaseConfig.from_env()
-                db_client = SQLAlchemyClient(config=db_config)
+                db_client = get_db_client()
                 
                 with db_client.get_session() as session:
                     query = (

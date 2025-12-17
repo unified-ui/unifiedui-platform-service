@@ -59,3 +59,15 @@ class RemoveMembersRequest(BaseModel):
         min_length=1,
         description="List of user IDs to remove from the group"
     )
+
+
+class SetCustomGroupPermissionRequest(BaseModel):
+    """Request model for setting a permission on a custom group."""
+    principal_id: str = Field(..., description="ID of the principal (user or group)")
+    action: str = Field(..., description="Permission action (READ, WRITE, ADMIN)")
+
+
+class DeleteCustomGroupPermissionRequest(BaseModel):
+    """Request model for deleting a permission from a custom group."""
+    principal_id: str = Field(..., description="ID of the principal (user or group)")
+    action: str = Field(..., description="Permission action (READ, WRITE, ADMIN)")
