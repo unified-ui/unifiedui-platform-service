@@ -1,6 +1,7 @@
 import jwt
+import time
 
-from jwt.exceptions import InvalidTokenError
+from jwt.exceptions import InvalidTokenError, ExpiredSignatureError
 
 from aihub.core.identity.providers import BaseIdentityProvider, BaseIdentityToken
 from aihub.core.identity.enums import IdenityProviderEnum
@@ -19,6 +20,13 @@ class IdentityTokenFactory:
             )
         except InvalidTokenError as e:
             raise ValueError(f"Invalid JWT token: {str(e)}")
+        
+        # Check token expiration
+        exp = deserialized_token.get("exp")
+        if exp:
+            current_time = int(time.time())
+            if current_time >= exp:
+                raise ValueError("Token has expired")
 
         iss: str = deserialized_token.get("iss")
         if iss.startswith("https://sts.windows.net/"):

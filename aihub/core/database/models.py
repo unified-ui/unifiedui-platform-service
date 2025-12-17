@@ -28,7 +28,7 @@ PortableJSON = JSON().with_variant(postgresql.JSONB(), "postgresql").with_varian
 
 
 # ---------- Enums (DB-agnostic via CHECK constraints) ----------
-TenantRoleEnum = SAEnum(
+TenantPermissionEnum = SAEnum(
     "READER",
     "GLOBAL_ADMIN",
     "CUSTOM_GROUPS_ADMIN",
@@ -125,7 +125,7 @@ class TenantMemberPermission(Base, IdNameDescriptionMixin):
     tenant_member_id: Mapped[str] = mapped_column(
         String(36), ForeignKey("tenant_members.id", ondelete="CASCADE"), nullable=False
     )
-    permission: Mapped[str] = mapped_column(String(100), nullable=False)
+    permission: Mapped[str] = mapped_column(TenantPermissionEnum, nullable=False)
 
     tenant_member: Mapped["TenantMember"] = relationship(back_populates="permissions")
 
