@@ -42,6 +42,8 @@
         - messages
         - traces
         - also überall, wo man immer auf eine id zugreift und nur eintweder ein doc oder mehrere docs, aber zu einem objekt zugreift
+    - TODOs
+        - Datenmodell überlegen
 
 - refactoring:
     - has_permissions refactoren und auslagern -> am besten in middleware decorator!

@@ -1,5 +1,23 @@
 name: aihub-infra
 services:
+  aihub-postgres:
+    image: postgres:16-alpine
+    container_name: aihub-postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=aihub
+      - POSTGRES_PASSWORD=aihub_password
+      - POSTGRES_DB=aihub
+    volumes:
+      - postgres_data_aihub:/var/lib/postgresql/data
+    networks:
+      - aihub_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aihub"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   mongodb:
     image: mongo:8.2
     container_name: aihub-document-database
@@ -75,6 +93,7 @@ volumes:
   redis_data:
   rabbitmq_data:
   minio_data:
+  postgres_data_aihub:
 
 networks:
   aihub_network:
