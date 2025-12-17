@@ -33,6 +33,16 @@
 
 - identity/users/{id}
 
+- ppostgres mit einbauen als core für access und list operations
+    - permissions
+    - appplications
+    - conversations
+    - credentials
+    - JSON-DB nur bei
+        - messages
+        - traces
+        - also überall, wo man immer auf eine id zugreift und nur eintweder ein doc oder mehrere docs, aber zu einem objekt zugreift
+
 - refactoring:
     - has_permissions refactoren und auslagern -> am besten in middleware decorator!
     - caching besser implementieren!!! für tenants, groups, permissions!!! und clear
