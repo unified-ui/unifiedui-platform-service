@@ -1,8 +1,8 @@
-"""initial_schema
+"""initial_schema_with_tenant_members
 
-Revision ID: 8dec5d126360
+Revision ID: a991b16bd047
 Revises: 
-Create Date: 2025-12-17 10:22:14.891321
+Create Date: 2025-12-17 11:50:02.485835
 
 """
 from typing import Sequence, Union
@@ -13,7 +13,7 @@ from sqlalchemy.dialects import mssql
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision: str = '8dec5d126360'
+revision: str = 'a991b16bd047'
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -27,6 +27,9 @@ def upgrade() -> None:
     sa.Column('name', sa.String(length=255), nullable=False),
     sa.Column('description', sa.String(length=2000), nullable=True),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('created_by', sa.String(length=50), nullable=True),
+    sa.Column('updated_by', sa.String(length=50), nullable=True),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_table('applications',
@@ -35,6 +38,9 @@ def upgrade() -> None:
     sa.Column('name', sa.String(length=255), nullable=False),
     sa.Column('description', sa.String(length=2000), nullable=True),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('created_by', sa.String(length=50), nullable=True),
+    sa.Column('updated_by', sa.String(length=50), nullable=True),
     sa.Column('tenant_id', sa.String(length=36), nullable=False),
     sa.ForeignKeyConstraint(['tenant_id'], ['tenants.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id')
@@ -46,6 +52,9 @@ def upgrade() -> None:
     sa.Column('name', sa.String(length=255), nullable=False),
     sa.Column('description', sa.String(length=2000), nullable=True),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('created_by', sa.String(length=50), nullable=True),
+    sa.Column('updated_by', sa.String(length=50), nullable=True),
     sa.Column('tenant_id', sa.String(length=36), nullable=False),
     sa.ForeignKeyConstraint(['tenant_id'], ['tenants.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id')
@@ -56,6 +65,9 @@ def upgrade() -> None:
     sa.Column('name', sa.String(length=255), nullable=False),
     sa.Column('description', sa.String(length=2000), nullable=True),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('created_by', sa.String(length=50), nullable=True),
+    sa.Column('updated_by', sa.String(length=50), nullable=True),
     sa.Column('tenant_id', sa.String(length=36), nullable=False),
     sa.ForeignKeyConstraint(['tenant_id'], ['tenants.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id')
@@ -67,6 +79,9 @@ def upgrade() -> None:
     sa.Column('name', sa.String(length=255), nullable=False),
     sa.Column('description', sa.String(length=2000), nullable=True),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('created_by', sa.String(length=50), nullable=True),
+    sa.Column('updated_by', sa.String(length=50), nullable=True),
     sa.Column('tenant_id', sa.String(length=36), nullable=False),
     sa.ForeignKeyConstraint(['tenant_id'], ['tenants.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id')
@@ -77,25 +92,31 @@ def upgrade() -> None:
     sa.Column('name', sa.String(length=255), nullable=False),
     sa.Column('description', sa.String(length=2000), nullable=True),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('created_by', sa.String(length=50), nullable=True),
+    sa.Column('updated_by', sa.String(length=50), nullable=True),
     sa.Column('tenant_id', sa.String(length=36), nullable=False),
     sa.ForeignKeyConstraint(['tenant_id'], ['tenants.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_index('ix_custom_groups_tenant', 'custom_groups', ['tenant_id'], unique=False)
-    op.create_table('tenant_roles',
+    op.create_table('tenant_members',
     sa.Column('tenant_id', sa.String(length=36), nullable=False),
     sa.Column('principal_id', sa.String(length=50), nullable=False),
-    sa.Column('role', sa.Enum('READER', 'GLOBAL_ADMIN', 'CUSTOM_GROUPS_ADMIN', 'APPLICATIONS_ADMIN', 'CREDENTIALS_ADMIN', 'AUTONOMOUS_AGENTS_ADMIN', name='tenant_role', native_enum=False, create_constraint=True), nullable=False),
+    sa.Column('principal_type', sa.Enum('IDENTITY_USER', 'IDENTITY_GROUP', 'CUSTOM_GROUP', name='principal_type', native_enum=False, create_constraint=True), nullable=False),
     sa.Column('id', sa.String(length=36), nullable=False),
     sa.Column('name', sa.String(length=255), nullable=False),
     sa.Column('description', sa.String(length=2000), nullable=True),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('created_by', sa.String(length=50), nullable=True),
+    sa.Column('updated_by', sa.String(length=50), nullable=True),
     sa.ForeignKeyConstraint(['tenant_id'], ['tenants.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id'),
-    sa.UniqueConstraint('tenant_id', 'principal_id', 'role', name='uq_tenant_roles')
+    sa.UniqueConstraint('tenant_id', 'principal_id', 'principal_type', name='uq_tenant_members')
     )
-    op.create_index('ix_tenant_roles_principal', 'tenant_roles', ['principal_id'], unique=False)
-    op.create_index('ix_tenant_roles_tenant', 'tenant_roles', ['tenant_id'], unique=False)
+    op.create_index('ix_tenant_members_principal', 'tenant_members', ['principal_id'], unique=False)
+    op.create_index('ix_tenant_members_tenant', 'tenant_members', ['tenant_id'], unique=False)
     op.create_table('application_permissions',
     sa.Column('application_id', sa.String(length=36), nullable=False),
     sa.Column('principal_id', sa.String(length=50), nullable=False),
@@ -104,6 +125,9 @@ def upgrade() -> None:
     sa.Column('name', sa.String(length=255), nullable=False),
     sa.Column('description', sa.String(length=2000), nullable=True),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('created_by', sa.String(length=50), nullable=True),
+    sa.Column('updated_by', sa.String(length=50), nullable=True),
     sa.Column('tenant_id', sa.String(length=36), nullable=False),
     sa.ForeignKeyConstraint(['application_id'], ['applications.id'], ondelete='CASCADE'),
     sa.ForeignKeyConstraint(['tenant_id'], ['tenants.id'], ondelete='CASCADE'),
@@ -120,6 +144,9 @@ def upgrade() -> None:
     sa.Column('name', sa.String(length=255), nullable=False),
     sa.Column('description', sa.String(length=2000), nullable=True),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('created_by', sa.String(length=50), nullable=True),
+    sa.Column('updated_by', sa.String(length=50), nullable=True),
     sa.Column('tenant_id', sa.String(length=36), nullable=False),
     sa.ForeignKeyConstraint(['autonomous_agent_id'], ['autonomous_agents.id'], ondelete='CASCADE'),
     sa.ForeignKeyConstraint(['tenant_id'], ['tenants.id'], ondelete='CASCADE'),
@@ -136,6 +163,9 @@ def upgrade() -> None:
     sa.Column('name', sa.String(length=255), nullable=False),
     sa.Column('description', sa.String(length=2000), nullable=True),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('created_by', sa.String(length=50), nullable=True),
+    sa.Column('updated_by', sa.String(length=50), nullable=True),
     sa.Column('tenant_id', sa.String(length=36), nullable=False),
     sa.ForeignKeyConstraint(['conversation_id'], ['conversations.id'], ondelete='CASCADE'),
     sa.ForeignKeyConstraint(['tenant_id'], ['tenants.id'], ondelete='CASCADE'),
@@ -152,6 +182,9 @@ def upgrade() -> None:
     sa.Column('name', sa.String(length=255), nullable=False),
     sa.Column('description', sa.String(length=2000), nullable=True),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('created_by', sa.String(length=50), nullable=True),
+    sa.Column('updated_by', sa.String(length=50), nullable=True),
     sa.Column('tenant_id', sa.String(length=36), nullable=False),
     sa.ForeignKeyConstraint(['credential_id'], ['credentials.id'], ondelete='CASCADE'),
     sa.ForeignKeyConstraint(['tenant_id'], ['tenants.id'], ondelete='CASCADE'),
@@ -168,6 +201,9 @@ def upgrade() -> None:
     sa.Column('name', sa.String(length=255), nullable=False),
     sa.Column('description', sa.String(length=2000), nullable=True),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('created_by', sa.String(length=50), nullable=True),
+    sa.Column('updated_by', sa.String(length=50), nullable=True),
     sa.Column('tenant_id', sa.String(length=36), nullable=False),
     sa.ForeignKeyConstraint(['custom_group_id'], ['custom_groups.id'], ondelete='CASCADE'),
     sa.ForeignKeyConstraint(['tenant_id'], ['tenants.id'], ondelete='CASCADE'),
@@ -176,12 +212,29 @@ def upgrade() -> None:
     )
     op.create_index('ix_cgp_lookup', 'custom_group_permissions', ['tenant_id', 'custom_group_id'], unique=False)
     op.create_index('ix_cgp_principal', 'custom_group_permissions', ['principal_id'], unique=False)
+    op.create_table('tenant_member_permissions',
+    sa.Column('tenant_member_id', sa.String(length=36), nullable=False),
+    sa.Column('permission', sa.Enum('READER', 'GLOBAL_ADMIN', 'CUSTOM_GROUPS_ADMIN', 'APPLICATIONS_ADMIN', 'CREDENTIALS_ADMIN', 'AUTONOMOUS_AGENTS_ADMIN', name='tenant_role', native_enum=False, create_constraint=True), nullable=False),
+    sa.Column('id', sa.String(length=36), nullable=False),
+    sa.Column('name', sa.String(length=255), nullable=False),
+    sa.Column('description', sa.String(length=2000), nullable=True),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('created_by', sa.String(length=50), nullable=True),
+    sa.Column('updated_by', sa.String(length=50), nullable=True),
+    sa.ForeignKeyConstraint(['tenant_member_id'], ['tenant_members.id'], ondelete='CASCADE'),
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('tenant_member_id', 'permission', name='uq_tenant_member_permissions')
+    )
+    op.create_index('ix_tmp_tenant_member', 'tenant_member_permissions', ['tenant_member_id'], unique=False)
     # ### end Alembic commands ###
 
 
 def downgrade() -> None:
     """Downgrade schema."""
     # ### commands auto generated by Alembic - please adjust! ###
+    op.drop_index('ix_tmp_tenant_member', table_name='tenant_member_permissions')
+    op.drop_table('tenant_member_permissions')
     op.drop_index('ix_cgp_principal', table_name='custom_group_permissions')
     op.drop_index('ix_cgp_lookup', table_name='custom_group_permissions')
     op.drop_table('custom_group_permissions')
@@ -197,9 +250,9 @@ def downgrade() -> None:
     op.drop_index('ix_ap_principal', table_name='application_permissions')
     op.drop_index('ix_ap_lookup', table_name='application_permissions')
     op.drop_table('application_permissions')
-    op.drop_index('ix_tenant_roles_tenant', table_name='tenant_roles')
-    op.drop_index('ix_tenant_roles_principal', table_name='tenant_roles')
-    op.drop_table('tenant_roles')
+    op.drop_index('ix_tenant_members_tenant', table_name='tenant_members')
+    op.drop_index('ix_tenant_members_principal', table_name='tenant_members')
+    op.drop_table('tenant_members')
     op.drop_index('ix_custom_groups_tenant', table_name='custom_groups')
     op.drop_table('custom_groups')
     op.drop_index('ix_credentials_tenant', table_name='credentials')

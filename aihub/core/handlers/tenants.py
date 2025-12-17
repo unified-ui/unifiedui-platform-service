@@ -7,7 +7,7 @@ from sqlalchemy import select, and_, or_
 from sqlalchemy.orm import Session
 
 from aihub.core.database.client import SQLAlchemyClient
-from aihub.core.database.models import Tenant, TenantPrincipal
+from aihub.core.database.models import Tenant, TenantMember, TenantMemberPermission
 from aihub.schema.requests.tenants import CreateTenantRequest, UpdateTenantRequest
 from aihub.schema.responses.tenants import TenantResponse
 from aihub.exc.tenants import TenantNotFoundError
@@ -119,27 +119,40 @@ class TenantHandler:
                 updated_by=user_id
             )
             session.add(tenant)
-            session.flush()  # Flush to get the tenant ID for the role
+            session.flush()  # Flush to get the tenant ID for the member
             
-            # Create GLOBAL_ADMIN role for the creator
-            role_id = str(uuid.uuid4())
-            tenant_role = TenantPrincipal(
-                id=role_id,
+            # Create tenant member for the creator
+            member_id = str(uuid.uuid4())
+            tenant_member = TenantMember(
+                id=member_id,
                 tenant_id=tenant_id,
                 principal_id=user_id,
                 principal_type="IDENTITY_USER",
-                role="GLOBAL_ADMIN",
-                name=f"Global Admin for {request.name}",
-                description=f"Global administrator role for user {user_id} on tenant {request.name}",
+                name=f"Member: {user_id}",
+                description=f"Tenant member for user {user_id} on tenant {request.name}",
                 created_by=user_id,
                 updated_by=user_id
             )
-            session.add(tenant_role)
+            session.add(tenant_member)
+            session.flush()  # Flush to get the member ID for the permission
+            
+            # Create GLOBAL_ADMIN permission for the member
+            permission_id = str(uuid.uuid4())
+            tenant_permission = TenantMemberPermission(
+                id=permission_id,
+                tenant_member_id=member_id,
+                permission="GLOBAL_ADMIN",
+                name=f"GLOBAL_ADMIN permission",
+                description=f"Global administrator permission for user {user_id} on tenant {request.name}",
+                created_by=user_id,
+                updated_by=user_id
+            )
+            session.add(tenant_permission)
             
             # Commit happens automatically in context manager
             logger.info(
-                "Tenant created with GLOBAL_ADMIN role",
-                extra={"tenant_id": tenant_id, "user_id": user_id, "role_id": role_id}
+                "Tenant created with GLOBAL_ADMIN permission",
+                extra={"tenant_id": tenant_id, "user_id": user_id, "member_id": member_id, "permission_id": permission_id}
             )
             
             return self._model_to_response(tenant)
@@ -236,10 +249,10 @@ class TenantHandler:
         with self.db_client.get_session() as session:
             # Query to get all tenant_roles for the given principal_ids
             query = (
-                select(Tenant, TenantPrincipal)
-                .join(TenantPrincipal, Tenant.id == TenantPrincipal.tenant_id)
-                .where(TenantPrincipal.principal_id.in_(principal_ids))
-                .order_by(Tenant.name, TenantPrincipal.role)
+                select(Tenant, TenantMember)
+                .join(TenantMember, Tenant.id == TenantMember.tenant_id)
+                .where(TenantMember.principal_id.in_(principal_ids))
+                .order_by(Tenant.name, TenantMember.role)
             )
             
             results = session.execute(query).all()
@@ -250,7 +263,7 @@ class TenantHandler:
                 if tenant.id not in tenants_dict:
                     tenants_dict[tenant.id] = {
                         "tenant": tenant,
-                        "roles": []
+                        "permissions": []
                     }
                 tenants_dict[tenant.id]["roles"].append(role)
             
@@ -263,7 +276,7 @@ class TenantHandler:
                 ]
                 response.append({
                     "tenant": tenant_response,
-                    "roles": roles_response
+                    "permissions": roles_response
                 })
             
             logger.info(
@@ -272,7 +285,7 @@ class TenantHandler:
             )
             return response
     
-    def get_user_tenants_with_roles(
+    def get_user_tenants_with_permissions(
         self,
         user_id: str,
         identity_group_ids: List[str],
@@ -280,7 +293,7 @@ class TenantHandler:
         use_cache: bool = True
     ) -> List[dict]:
         """
-        Get all tenants and roles for a user based on their user ID, identity groups, and custom groups.
+        Get all tenants and permissions for a user based on their user ID, identity groups, and custom groups.
         
         Args:
             user_id: The identity user ID
@@ -289,10 +302,10 @@ class TenantHandler:
             use_cache: Whether to use caching (default: True)
             
         Returns:
-            List of dicts with 'tenant' and 'roles' keys, where roles are deduplicated
+            List of dicts with 'tenant' and 'permissions' keys, where permissions are deduplicated
         """
         logger.info(
-            "Getting user tenants with roles",
+            "Getting user tenants with permissions",
             extra={
                 "user_id": user_id,
                 "identity_groups_count": len(identity_group_ids),
@@ -300,14 +313,14 @@ class TenantHandler:
             }
         )
         
-        cache_key = f"tenants:user:{user_id}:with_roles"
+        cache_key = f"tenants:user:{user_id}:with_permissions"
         
         # Check cache
         if use_cache and self.cache_client:
             try:
                 cached_data = self.cache_client.client.get(cache_key)
                 if cached_data is not None:
-                    logger.debug(f"Returning cached tenants with roles for user {user_id}")
+                    logger.debug(f"Returning cached tenants with permissions for user {user_id}")
                     return cached_data
             except Exception as e:
                 logger.warning(f"Failed to get cached user tenants: {e}")
@@ -319,8 +332,8 @@ class TenantHandler:
             # Add user condition
             conditions.append(
                 and_(
-                    TenantPrincipal.principal_id == user_id,
-                    TenantPrincipal.principal_type == "IDENTITY_USER"
+                    TenantMember.principal_id == user_id,
+                    TenantMember.principal_type == "IDENTITY_USER"
                 )
             )
             
@@ -329,8 +342,8 @@ class TenantHandler:
                 for group_id in identity_group_ids:
                     conditions.append(
                         and_(
-                            TenantPrincipal.principal_id == group_id,
-                            TenantPrincipal.principal_type == "IDENTITY_GROUP"
+                            TenantMember.principal_id == group_id,
+                            TenantMember.principal_type == "IDENTITY_GROUP"
                         )
                     )
             
@@ -339,45 +352,46 @@ class TenantHandler:
                 for group_id in custom_group_ids:
                     conditions.append(
                         and_(
-                            TenantPrincipal.principal_id == group_id,
-                            TenantPrincipal.principal_type == "CUSTOM_GROUP"
+                            TenantMember.principal_id == group_id,
+                            TenantMember.principal_type == "CUSTOM_GROUP"
                         )
                     )
             
-            # Query to get all tenant principals matching any condition
+            # Query to get all tenant members and their permissions matching any condition
             query = (
-                select(Tenant, TenantPrincipal)
-                .join(TenantPrincipal, Tenant.id == TenantPrincipal.tenant_id)
+                select(Tenant, TenantMember, TenantMemberPermission)
+                .join(TenantMember, Tenant.id == TenantMember.tenant_id)
+                .join(TenantMemberPermission, TenantMember.id == TenantMemberPermission.tenant_member_id)
                 .where(or_(*conditions))
-                .order_by(Tenant.name, TenantPrincipal.role)
+                .order_by(Tenant.name, TenantMemberPermission.permission)
             )
             
             results = session.execute(query).all()
             
-            # Group by tenant and deduplicate roles
+            # Group by tenant and deduplicate permissions
             tenants_dict = {}
-            for tenant, principal in results:
+            for tenant, member, permission in results:
                 if tenant.id not in tenants_dict:
                     tenants_dict[tenant.id] = {
                         "tenant": tenant,
-                        "roles": set()  # Use set for deduplication
+                        "permissions": set()  # Use set for deduplication
                     }
-                # Add role to set (automatically deduplicates)
-                tenants_dict[tenant.id]["roles"].add(principal.role)
+                # Add permission to set (automatically deduplicates)
+                tenants_dict[tenant.id]["permissions"].add(permission.permission)
             
             # Convert to response format
             response = []
             for tenant_data in tenants_dict.values():
                 tenant_response = self._model_to_response(tenant_data["tenant"])
-                # Convert set of roles to sorted list
-                roles_list = sorted(list(tenant_data["roles"]))
+                # Convert set of permissions to sorted list
+                permissions_list = sorted(list(tenant_data["permissions"]))
                 response.append({
                     "tenant": tenant_response.model_dump(),
-                    "roles": roles_list
+                    "permissions": permissions_list
                 })
             
             logger.info(
-                "Retrieved user tenants with roles",
+                "Retrieved user tenants with permissions",
                 extra={"user_id": user_id, "tenant_count": len(response)}
             )
             
@@ -385,7 +399,7 @@ class TenantHandler:
             if self.cache_client:
                 try:
                     self.cache_client.client.set(cache_key, response, ttl=300)  # Cache for 5 minutes
-                    logger.debug(f"Cached user tenants with roles for {user_id} (TTL: 300s)")
+                    logger.debug(f"Cached user tenants with permissions for {user_id} (TTL: 300s)")
                 except Exception as e:
                     logger.warning(f"Failed to cache user tenants: {e}")
             
@@ -437,24 +451,25 @@ class TenantHandler:
                 logger.warning("Tenant not found", extra={"tenant_id": tenant_id})
                 raise TenantNotFoundError(tenant_id)
             
-            # Query all roles for this tenant
+            # Query all members and their permissions for this tenant
             query = (
-                select(TenantPrincipal)
-                .where(TenantPrincipal.tenant_id == tenant_id)
-                .order_by(TenantPrincipal.principal_id, TenantPrincipal.role)
+                select(TenantMember, TenantMemberPermission)
+                .join(TenantMemberPermission, TenantMember.id == TenantMemberPermission.tenant_member_id)
+                .where(TenantMember.tenant_id == tenant_id)
+                .order_by(TenantMember.principal_id, TenantMemberPermission.permission)
             )
             
-            roles = session.execute(query).scalars().all()
+            results = session.execute(query).all()
             
-            # Group roles by principal_id
+            # Group permissions by principal_id
             principals_dict = {}
-            for role in roles:
-                if role.principal_id not in principals_dict:
-                    principals_dict[role.principal_id] = {
-                        "principal_id": role.principal_id,
-                        "roles": []
+            for member, permission in results:
+                if member.principal_id not in principals_dict:
+                    principals_dict[member.principal_id] = {
+                        "principal_id": member.principal_id,
+                        "permissions": []
                     }
-                principals_dict[role.principal_id]["roles"].append(self._role_to_response(role))
+                principals_dict[member.principal_id]["permissions"].append(self._permission_to_response(permission))
             
             # Convert to list
             principals = list(principals_dict.values())
@@ -469,13 +484,13 @@ class TenantHandler:
                 "principals": principals
             }
     
-    def get_principal_roles(
+    def get_principal_permissions(
         self,
         tenant_id: str,
         principal_id: str
     ) -> dict:
         """
-        Get all roles for a specific principal on a tenant.
+        Get all permissions for a specific principal on a tenant.
         
         Args:
             tenant_id: The ID of the tenant
@@ -499,45 +514,55 @@ class TenantHandler:
                 logger.warning("Tenant not found", extra={"tenant_id": tenant_id})
                 raise TenantNotFoundError(tenant_id)
             
-            # Query roles for this principal on this tenant
+            # Query member and their permissions
             query = (
-                select(TenantPrincipal)
+                select(TenantMember)
                 .where(
-                    TenantPrincipal.tenant_id == tenant_id,
-                    TenantPrincipal.principal_id == principal_id
+                    TenantMember.tenant_id == tenant_id,
+                    TenantMember.principal_id == principal_id
                 )
-                .order_by(TenantPrincipal.role)
             )
             
-            roles = session.execute(query).scalars().all()
+            member = session.execute(query).scalar_one_or_none()
+            
+            if member:
+                # Get permissions for this member
+                query = (
+                    select(TenantMemberPermission)
+                    .where(TenantMemberPermission.tenant_member_id == member.id)
+                    .order_by(TenantMemberPermission.permission)
+                )
+                permissions = session.execute(query).scalars().all()
+            else:
+                permissions = []
             
             logger.info(
-                "Retrieved principal roles",
-                extra={"tenant_id": tenant_id, "principal_id": principal_id, "role_count": len(roles)}
+                "Retrieved principal permissions",
+                extra={"tenant_id": tenant_id, "principal_id": principal_id, "permission_count": len(permissions)}
             )
             
             return {
                 "tenant_id": tenant_id,
                 "principal_id": principal_id,
-                "roles": [self._role_to_response(role) for role in roles]
+                "permissions": [self._permission_to_response(permission) for permission in permissions]
             }
     
-    def set_principal_role(
+    def set_principal_permission(
         self,
         tenant_id: str,
         principal_id: str,
         principal_type: str,
-        role: str,
+        permission: str,
         user_id: str
     ) -> dict:
         """
-        Add or update a role for a principal on a tenant.
+        Add or update a permission for a principal on a tenant.
         
         Args:
             tenant_id: The ID of the tenant
             principal_id: The ID of the principal
             principal_type: The type of principal (IDENTITY_USER, IDENTITY_GROUP, CUSTOM_GROUP)
-            role: The role to assign
+            permission: The permission to assign
             user_id: The ID of the user making the change
             
         Returns:
@@ -547,8 +572,8 @@ class TenantHandler:
             TenantNotFoundError: If tenant not found
         """
         logger.info(
-            "Setting principal role",
-            extra={"tenant_id": tenant_id, "principal_id": principal_id, "principal_type": principal_type, "role": role, "user_id": user_id}
+            "Setting principal permission",
+            extra={"tenant_id": tenant_id, "principal_id": principal_id, "principal_type": principal_type, "permission": permission, "user_id": user_id}
         )
         
         with self.db_client.get_session() as session:
@@ -558,79 +583,96 @@ class TenantHandler:
                 logger.warning("Tenant not found", extra={"tenant_id": tenant_id})
                 raise TenantNotFoundError(tenant_id)
             
-            # Check if role already exists
+            # Check if member exists
             query = (
-                select(TenantPrincipal)
+                select(TenantMember)
                 .where(
-                    TenantPrincipal.tenant_id == tenant_id,
-                    TenantPrincipal.principal_id == principal_id,
-                    TenantPrincipal.principal_type == principal_type,
-                    TenantPrincipal.role == role
+                    TenantMember.tenant_id == tenant_id,
+                    TenantMember.principal_id == principal_id,
+                    TenantMember.principal_type == principal_type
                 )
             )
-            existing_role = session.execute(query).scalar_one_or_none()
+            member = session.execute(query).scalar_one_or_none()
             
-            if not existing_role:
-                # Create new role
-                role_id = str(uuid.uuid4())
-                new_role = TenantPrincipal(
-                    id=role_id,
+            if not member:
+                # Create new member
+                member_id = str(uuid.uuid4())
+                member = TenantMember(
+                    id=member_id,
                     tenant_id=tenant_id,
                     principal_id=principal_id,
                     principal_type=principal_type,
-                    role=role,
-                    name=f"{role} for {principal_id} ({principal_type}) on {tenant.name}",
-                    description=f"{role} role for {principal_type} principal {principal_id} on tenant {tenant.name}",
+                    name=f"Member: {principal_id} ({principal_type})",
+                    description=f"Tenant member for {principal_type} {principal_id} on tenant {tenant.name}",
                     created_by=user_id,
                     updated_by=user_id
                 )
-                session.add(new_role)
+                session.add(member)
+                session.flush()  # Flush to get member ID
                 logger.info(
-                    "Created new principal role",
-                    extra={"tenant_id": tenant_id, "principal_id": principal_id, "principal_type": principal_type, "role": role, "role_id": role_id}
+                    "Created new tenant member",
+                    extra={"tenant_id": tenant_id, "principal_id": principal_id, "principal_type": principal_type, "member_id": member_id}
                 )
-            else:
-                # Update existing role
-                existing_role.updated_by = user_id
+            
+            # Check if permission already exists
+            query = (
+                select(TenantMemberPermission)
+                .where(
+                    TenantMemberPermission.tenant_member_id == member.id,
+                    TenantMemberPermission.permission == permission
+                )
+            )
+            existing_permission = session.execute(query).scalar_one_or_none()
+            
+            if not existing_permission:
+                # Create new permission
+                permission_id = str(uuid.uuid4())
+                new_permission = TenantMemberPermission(
+                    id=permission_id,
+                    tenant_member_id=member.id,
+                    permission=permission,
+                    name=f"{permission} permission",
+                    description=f"{permission} permission for {principal_type} {principal_id} on tenant {tenant.name}",
+                    created_by=user_id,
+                    updated_by=user_id
+                )
+                session.add(new_permission)
                 logger.info(
-                    "Updated existing principal role",
-                    extra={"tenant_id": tenant_id, "principal_id": principal_id, "role": role}
+                    "Created new permission",
+                    extra={"tenant_id": tenant_id, "principal_id": principal_id, "permission": permission, "permission_id": permission_id}
                 )
             
             session.flush()
             
-            # Get all roles for this principal
+            # Get all permissions for this member
             query = (
-                select(TenantPrincipal)
-                .where(
-                    TenantPrincipal.tenant_id == tenant_id,
-                    TenantPrincipal.principal_id == principal_id
-                )
-                .order_by(TenantPrincipal.role)
+                select(TenantMemberPermission)
+                .where(TenantMemberPermission.tenant_member_id == member.id)
+                .order_by(TenantMemberPermission.permission)
             )
-            roles = session.execute(query).scalars().all()
+            permissions = session.execute(query).scalars().all()
             
             return {
                 "tenant_id": tenant_id,
                 "principal_id": principal_id,
-                "roles": [self._role_to_response(role) for role in roles]
+                "permissions": [self._permission_to_response(permission) for permission in permissions]
             }
     
-    def delete_principal_role(
+    def delete_principal_permission(
         self,
         tenant_id: str,
         principal_id: str,
         principal_type: str,
-        role: str
+        permission: str
     ) -> dict:
         """
-        Remove a specific role from a principal on a tenant.
+        Remove a specific permission from a principal on a tenant.
         
         Args:
             tenant_id: The ID of the tenant
             principal_id: The ID of the principal
             principal_type: The type of principal (IDENTITY_USER, IDENTITY_GROUP, CUSTOM_GROUP)
-            role: The role to remove
+            permission: The permission to remove
             
         Returns:
             Dict with tenant_id, principal_id, and remaining roles list
@@ -639,8 +681,8 @@ class TenantHandler:
             TenantNotFoundError: If tenant not found
         """
         logger.info(
-            "Deleting principal role",
-            extra={"tenant_id": tenant_id, "principal_id": principal_id, "principal_type": principal_type, "role": role}
+            "Deleting principal permission",
+            extra={"tenant_id": tenant_id, "principal_id": principal_id, "principal_type": principal_type, "permission": permission}
         )
         
         with self.db_client.get_session() as session:
@@ -650,66 +692,79 @@ class TenantHandler:
                 logger.warning("Tenant not found", extra={"tenant_id": tenant_id})
                 raise TenantNotFoundError(tenant_id)
             
-            # Find and delete the role
+            # Find the member
             query = (
-                select(TenantPrincipal)
+                select(TenantMember)
                 .where(
-                    TenantPrincipal.tenant_id == tenant_id,
-                    TenantPrincipal.principal_id == principal_id,
-                    TenantPrincipal.principal_type == principal_type,
-                    TenantPrincipal.role == role
+                    TenantMember.tenant_id == tenant_id,
+                    TenantMember.principal_id == principal_id,
+                    TenantMember.principal_type == principal_type
                 )
             )
-            role_to_delete = session.execute(query).scalar_one_or_none()
+            member = session.execute(query).scalar_one_or_none()
             
-            if role_to_delete:
-                session.delete(role_to_delete)
-                logger.info(
-                    "Deleted principal role",
-                    extra={"tenant_id": tenant_id, "principal_id": principal_id, "principal_type": principal_type, "role": role}
+            if member:
+                # Find and delete the permission
+                query = (
+                    select(TenantMemberPermission)
+                    .where(
+                        TenantMemberPermission.tenant_member_id == member.id,
+                        TenantMemberPermission.permission == permission
+                    )
                 )
+                permission_to_delete = session.execute(query).scalar_one_or_none()
+                
+                if permission_to_delete:
+                    session.delete(permission_to_delete)
+                    logger.info(
+                        "Deleted principal permission",
+                        extra={"tenant_id": tenant_id, "principal_id": principal_id, "principal_type": principal_type, "permission": permission}
+                    )
+                else:
+                    logger.info(
+                        "Permission not found, nothing to delete",
+                        extra={"tenant_id": tenant_id, "principal_id": principal_id, "principal_type": principal_type, "permission": permission}
+                    )
+                
+                session.flush()
+                
+                # Get remaining permissions for this member
+                query = (
+                    select(TenantMemberPermission)
+                    .where(TenantMemberPermission.tenant_member_id == member.id)
+                    .order_by(TenantMemberPermission.permission)
+                )
+                remaining_permissions = session.execute(query).scalars().all()
             else:
                 logger.info(
-                    "Role not found, nothing to delete",
-                    extra={"tenant_id": tenant_id, "principal_id": principal_id, "principal_type": principal_type, "role": role}
+                    "Member not found, nothing to delete",
+                    extra={"tenant_id": tenant_id, "principal_id": principal_id, "principal_type": principal_type}
                 )
-            
-            session.flush()
-            
-            # Get remaining roles for this principal
-            query = (
-                select(TenantPrincipal)
-                .where(
-                    TenantPrincipal.tenant_id == tenant_id,
-                    TenantPrincipal.principal_id == principal_id
-                )
-                .order_by(TenantPrincipal.role)
-            )
-            remaining_roles = session.execute(query).scalars().all()
+                remaining_permissions = []
             
             return {
                 "tenant_id": tenant_id,
                 "principal_id": principal_id,
-                "roles": [self._role_to_response(role) for role in remaining_roles]
+                "permissions": [self._permission_to_response(perm) for perm in remaining_permissions]
             }
     
     @staticmethod
-    def _role_to_response(role: TenantPrincipal):
+    def _permission_to_response(permission: TenantMemberPermission):
         """
-        Convert a tenant role model to a response object.
+        Convert a tenant member permission model to a response object.
         
         Args:
-            role: TenantPrincipal SQLAlchemy model
+            permission: TenantMemberPermission SQLAlchemy model
             
         Returns:
-            TenantRoleResponse
+            TenantPermissionResponse
         """
-        from aihub.schema.responses.tenants import TenantRoleResponse
-        return TenantRoleResponse(
-            id=role.id,
-            principal_type=role.principal_type,
-            role=role.role,
-            name=role.name,
-            description=role.description,
-            created_at=role.created_at
+        from aihub.schema.responses.tenants import TenantPermissionResponse
+        return TenantPermissionResponse(
+            id=permission.id,
+            principal_type="",  # Not available at permission level
+            permission=permission.permission,
+            name=permission.name,
+            description=permission.description,
+            created_at=permission.created_at
         )

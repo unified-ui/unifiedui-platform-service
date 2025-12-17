@@ -15,28 +15,28 @@ class TenantResponse(BaseModel):
     updated_by: str | None = Field(None, description="User ID who last updated this tenant")
 
 
-class TenantRoleResponse(BaseModel):
-    id: str = Field(..., description="Unique identifier for the role")
+class TenantPermissionResponse(BaseModel):
+    id: str = Field(..., description="Unique identifier for the permission")
     principal_type: str = Field(..., description="Type of principal (IDENTITY_USER, IDENTITY_GROUP, CUSTOM_GROUP)")
-    role: str = Field(..., description="Role type (e.g., GLOBAL_ADMIN, READER)")
-    name: str = Field(..., description="Name of the role")
-    description: str | None = Field(None, description="Optional description of the role")
-    created_at: datetime = Field(..., description="Timestamp when the role was created")
+    permission: str = Field(..., description="Permission type (e.g., GLOBAL_ADMIN, READER)")
+    name: str = Field(..., description="Name of the permission")
+    description: str | None = Field(None, description="Optional description of the permission")
+    created_at: datetime = Field(..., description="Timestamp when the permission was created")
 
 
-class TenantWithRolesResponse(BaseModel):
+class TenantWithPermissionsResponse(BaseModel):
     tenant: TenantResponse = Field(..., description="Tenant information")
-    roles: List[TenantRoleResponse] = Field(..., description="List of roles the principal has on this tenant")
+    permissions: List[TenantPermissionResponse] = Field(..., description="List of permissions the principal has on this tenant")
 
 
 class PrincipalsResponse(BaseModel):
-    """Response containing all roles for a principal on a specific tenant."""
+    """Response containing all permissions for a principal on a specific tenant."""
     tenant_id: str = Field(..., description="The tenant ID")
     principal_id: str = Field(..., description="The principal ID")
-    roles: List[TenantRoleResponse] = Field(..., description="List of roles the principal has on this tenant")
+    permissions: List[TenantPermissionResponse] = Field(..., description="List of permissions the principal has on this tenant")
 
 
 class TenantPrincipalsResponse(BaseModel):
-    """Response containing all principals and their roles for a tenant."""
+    """Response containing all principals and their permissions for a tenant."""
     tenant_id: str = Field(..., description="The tenant ID")
-    principals: List[dict] = Field(..., description="List of principals with their roles")
+    principals: List[dict] = Field(..., description="List of principals with their permissions")

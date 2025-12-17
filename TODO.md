@@ -29,10 +29,6 @@
     - chacing strategie: tenantid immer in den key -> wenn was an permissions gemacht wird -> einfach alles aus was mit dem tenantid im key ist aus dem cache killen (step 1; später besser!)
 
 - software tests für tenants, inkl cache
-
-## TODO
-
-
 - neuen branch erstellen: feature/change-database-v2
 
 - ppostgres mit einbauen als core für access und list operations
@@ -48,16 +44,30 @@
         - Datenmodell überlegen
 
 - in IdentityUser die tenants und roles reinbringen (aber nur wichtige infos!)
-
-- identity/users/{id}
-
 - refactoring:
     - has_permissions refactoren und auslagern -> am besten in middleware decorator!
     - caching besser implementieren!!! für tenants, groups, permissions!!! und clear
 
+## TODO
+
+
+
 - custom_groups (/api/v1/tenants/{id}/custom/groups)
     - CRUD
-    - Caching
+
+- refactoring
+    - db client wird in users.py noch initialisiert -> sollte injected werden!
+- Caching
+    - tenants in handler rein
+        - und wichtig: users.py wird noch außerhalb ge
+    - cusgroups
+
+
+
+
+
+- identity/users/{id}
+- identity/groups/{id}
 
 - Credentials
     - CRUD

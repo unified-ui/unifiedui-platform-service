@@ -71,37 +71,65 @@ class ContextIdentityUser:
     @property
     def custom_groups(self) -> list[IdentityGroupResponse]:
         """
-        Get all custom groups the user is a member of.
-        Returns groups where user_id is in member_ids.
+        Get all custom groups the user is a member of via custom_group_permissions.
         """
-        return []
         # in-memory cache
         if self._custom_groups is not None:
             return self._custom_groups
         
         self._custom_groups = []
         
-        if not self._database_client:
-            return self._custom_groups
-        
         user_id = self.identity.get_id()
+        cache_key = f"identity:custom_groups:user:{user_id}"
         
-        # Query custom groups where user is a member
-        groups = self._database_client.custom_groups.get_list(
-            filters={"member_ids": user_id},
-            limit=1000
-        )
+        # Check Redis cache
+        if self._use_cache and self._cache:
+            try:
+                cached_data = self._cache.client.get(cache_key)
+                if cached_data is not None:
+                    self._custom_groups = [IdentityGroupResponse(**item) for item in cached_data]
+                    logger.debug(f"Returning cached custom groups for user {user_id}")
+                    return self._custom_groups
+            except Exception as e:
+                logger.warning(f"Failed to get cached custom groups: {e}")
         
-        # Convert to IdentityGroupResponse format
-        self._custom_groups = [
-            IdentityGroupResponse(
-                id=g.id,
-                display_name=g.name
+        # Query custom groups from custom_group_permissions where user is a principal
+        from aihub.core.database.client import SQLAlchemyClient
+        from aihub.core.database.config import DatabaseConfig
+        from aihub.core.database.models import CustomGroup, CustomGroupPermission
+        from sqlalchemy import select
+        
+        db_config = DatabaseConfig.from_env()
+        db_client = SQLAlchemyClient(config=db_config)
+        
+        with db_client.get_session() as session:
+            query = (
+                select(CustomGroup)
+                .join(CustomGroupPermission, CustomGroup.id == CustomGroupPermission.custom_group_id)
+                .where(CustomGroupPermission.principal_id == user_id)
+                .distinct()
             )
-            for g in groups
-        ]
+            groups = session.execute(query).scalars().all()
+            
+            # Convert to IdentityGroupResponse format
+            self._custom_groups = [
+                IdentityGroupResponse(
+                    id=g.id,
+                    display_name=g.name
+                )
+                for g in groups
+            ]
         
         logger.debug(f"Fetched {len(self._custom_groups)} custom groups from database")
+        
+        # Cache the custom groups
+        if self._cache:
+            try:
+                groups_data = [g.model_dump() for g in self._custom_groups]
+                self._cache.client.set(cache_key, groups_data, ttl=300)  # Cache for 5 minutes
+                logger.debug(f"Cached custom groups for user {user_id} (TTL: 300s)")
+            except Exception as e:
+                logger.warning(f"Failed to cache custom groups: {e}")
         
         return self._custom_groups
 
@@ -134,20 +162,20 @@ class ContextIdentityUser:
         db_client = SQLAlchemyClient(config=db_config)
         handler = TenantHandler(db_client, self._cache)
         
-        self._tenants = handler.get_user_tenants_with_roles(
+        self._tenants = handler.get_user_tenants_with_permissions(
             user_id=user_id,
             identity_group_ids=identity_group_ids,
             custom_group_ids=custom_group_ids,
             use_cache=self._use_cache
         )
         
-        logger.debug(f"Fetched {len(self._tenants)} tenants with roles for user {user_id}")
+        logger.debug(f"Fetched {len(self._tenants)} tenants with permissions for user {user_id}")
         
         return self._tenants
 
     def get_me(self) -> IdentityUserResponse:
-        # Tenants are already dicts with 'tenant' and 'roles' keys
-        tenants_with_roles = self.tenants
+        # Tenants are already dicts with 'tenant' and 'permissions' keys
+        tenants_with_permissions = self.tenants
         
         return IdentityUserResponse(
             id=self.identity.get_id(),
@@ -157,7 +185,7 @@ class ContextIdentityUser:
             mail=self.identity.get_mail(),
             firstname=self.identity.get_firstname(),
             lastname=self.identity.get_lastname(),
-            tenants=tenants_with_roles,
+            tenants=tenants_with_permissions,
             groups=self.groups,
             custom_groups=self.custom_groups
         )

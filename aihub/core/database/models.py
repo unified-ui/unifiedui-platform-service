@@ -85,32 +85,53 @@ class TenantScopedMixin:
 class Tenant(Base, IdNameDescriptionMixin):
     __tablename__ = "tenants"
 
-    principals: Mapped[list["TenantPrincipal"]] = relationship(
+    members: Mapped[list["TenantMember"]] = relationship(
         back_populates="tenant", cascade="all, delete-orphan"
     )
 
 
-class TenantPrincipal(Base, IdNameDescriptionMixin):
+class TenantMember(Base, IdNameDescriptionMixin):
     """
-    Special permissions table for tenants: tenant_principals
-    principal_id is a free-form string (max 50).
-    principal_type indicates whether it's a user, identity group, or custom group.
+    Tenant membership table.
+    Tracks which principals (users, identity groups, custom groups) are members of a tenant.
     """
-    __tablename__ = "tenant_principals"
+    __tablename__ = "tenant_members"
 
     tenant_id: Mapped[str] = mapped_column(
         String(36), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False
     )
     principal_id: Mapped[str] = mapped_column(String(50), nullable=False)
     principal_type: Mapped[str] = mapped_column(PrincipalTypeEnum, nullable=False)
-    role: Mapped[str] = mapped_column(TenantRoleEnum, nullable=False)
 
-    tenant: Mapped["Tenant"] = relationship(back_populates="principals")
+    tenant: Mapped["Tenant"] = relationship(back_populates="members")
+    permissions: Mapped[list["TenantMemberPermission"]] = relationship(
+        back_populates="tenant_member", cascade="all, delete-orphan"
+    )
 
     __table_args__ = (
-        UniqueConstraint("tenant_id", "principal_id", "principal_type", "role", name="uq_tenant_principals"),
-        Index("ix_tenant_principals_tenant", "tenant_id"),
-        Index("ix_tenant_principals_principal", "principal_id"),
+        UniqueConstraint("tenant_id", "principal_id", "principal_type", name="uq_tenant_members"),
+        Index("ix_tenant_members_tenant", "tenant_id"),
+        Index("ix_tenant_members_principal", "principal_id"),
+    )
+
+
+class TenantMemberPermission(Base, IdNameDescriptionMixin):
+    """
+    Permissions/roles for tenant members.
+    Defines what roles/permissions a tenant member has.
+    """
+    __tablename__ = "tenant_member_permissions"
+
+    tenant_member_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("tenant_members.id", ondelete="CASCADE"), nullable=False
+    )
+    permission: Mapped[str] = mapped_column(String(100), nullable=False)
+
+    tenant_member: Mapped["TenantMember"] = relationship(back_populates="permissions")
+
+    __table_args__ = (
+        UniqueConstraint("tenant_member_id", "permission", name="uq_tenant_member_permissions"),
+        Index("ix_tmp_tenant_member", "tenant_member_id"),
     )
 
 

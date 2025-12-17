@@ -219,7 +219,7 @@ async def list_tenant_principals(
     description="Get all roles for a specific principal on a tenant"
 )
 @authenticate
-async def get_principal_roles(
+async def get_principal_permissions(
     request: Request,
     tenant_id: str,
     principal_id: str,
@@ -240,7 +240,7 @@ async def get_principal_roles(
     Raises:
         TenantNotFoundError: If tenant not found
     """
-    result = handler.get_principal_roles(tenant_id, principal_id)
+    result = handler.get_principal_permissions(tenant_id, principal_id)
     return PrincipalsResponse(**result)
 
 
@@ -252,7 +252,7 @@ async def get_principal_roles(
     description="Add or update a role for a principal on a tenant"
 )
 @authenticate
-async def set_principal_role(
+async def set_principal_permission(
     request: Request,
     tenant_id: str,
     principal_id: str,
@@ -278,7 +278,7 @@ async def set_principal_role(
     user: ContextIdentityUser = request.state.user
     user_id = user.identity.get_id()
     
-    result = handler.set_principal_role(
+    result = handler.set_principal_permission(
         tenant_id=tenant_id,
         principal_id=principal_id,
         principal_type=role_data.principal_type,
@@ -296,7 +296,7 @@ async def set_principal_role(
     description="Remove a specific role from a principal on a tenant"
 )
 @authenticate
-async def delete_principal_role(
+async def delete_principal_permission(
     request: Request,
     tenant_id: str,
     principal_id: str,
@@ -319,7 +319,7 @@ async def delete_principal_role(
     Raises:
         TenantNotFoundError: If tenant not found
     """
-    result = handler.delete_principal_role(
+    result = handler.delete_principal_permission(
         tenant_id=tenant_id,
         principal_id=principal_id,
         principal_type=role_data.principal_type,

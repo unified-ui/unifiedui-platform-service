@@ -38,41 +38,41 @@ class UpdateTenantRequest(BaseModel):
 
 
 class SetPrincipalRequest(BaseModel):
-    """Schema for setting/adding a role for a principal on a tenant."""
+    """Schema for setting/adding a permission for a principal on a tenant."""
     principal_type: str = Field(
         ...,
         description="Type of principal (IDENTITY_USER, IDENTITY_GROUP, CUSTOM_GROUP)"
     )
-    role: str = Field(
+    permission: str = Field(
         ...,
-        description="Role to assign (READER, GLOBAL_ADMIN, CUSTOM_GROUPS_ADMIN, APPLICATIONS_ADMIN, CREDENTIALS_ADMIN, AUTONOMOUS_AGENTS_ADMIN)"
+        description="Permission to assign (e.g., GLOBAL_ADMIN, READER, APPLICATIONS_ADMIN, etc.)"
     )
 
     model_config = {
         "json_schema_extra": {
             "examples": [
-                {"principal_type": "IDENTITY_USER", "role": "GLOBAL_ADMIN"},
-                {"principal_type": "IDENTITY_GROUP", "role": "READER"}
+                {"principal_type": "IDENTITY_USER", "permission": "GLOBAL_ADMIN"},
+                {"principal_type": "IDENTITY_GROUP", "permission": "READER"}
             ]
         }
     }
 
 
 class DeletePrincipalRequest(BaseModel):
-    """Schema for deleting a role for a principal on a tenant."""
+    """Schema for deleting a permission for a principal on a tenant."""
     principal_type: str = Field(
         ...,
         description="Type of principal (IDENTITY_USER, IDENTITY_GROUP, CUSTOM_GROUP)"
     )
-    role: str = Field(
+    permission: str = Field(
         ...,
-        description="Role to remove (READER, GLOBAL_ADMIN, CUSTOM_GROUPS_ADMIN, APPLICATIONS_ADMIN, CREDENTIALS_ADMIN, AUTONOMOUS_AGENTS_ADMIN)"
+        description="Permission to remove (e.g., GLOBAL_ADMIN, READER, APPLICATIONS_ADMIN, etc.)"
     )
 
     model_config = {
         "json_schema_extra": {
             "examples": [
-                {"principal_type": "IDENTITY_USER", "role": "GLOBAL_ADMIN"}
+                {"principal_type": "IDENTITY_USER", "permission": "GLOBAL_ADMIN"}
             ]
         }
     }
