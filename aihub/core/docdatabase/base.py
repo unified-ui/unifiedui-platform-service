@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import TypeVar, Generic, List, Optional, Any
 
-from aihub.core.database.models.base import BaseDatabaseModel
+from aihub.core.docdatabase.models.base import BaseDatabaseModel
 
 
 TModel = TypeVar('TModel', bound=BaseDatabaseModel)

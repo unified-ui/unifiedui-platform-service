@@ -2,7 +2,7 @@
 from datetime import datetime
 from pydantic import Field
 
-from aihub.core.database.models.base import BaseDatabaseModel
+from aihub.core.docdatabase.models.base import BaseDatabaseModel
 
 
 class CustomGroupModel(BaseDatabaseModel):

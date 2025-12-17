@@ -62,7 +62,7 @@ db_client.disconnect()
 
 
 # Option 2: Explicitly specify database type
-from aihub.database.client import DatabaseClientFactory
+from aihub.docdatabase.client import DatabaseClientFactory
 from aihub.database.enums import DocumentDatabaseTypeEnum
 
 db_client = DatabaseClientFactory.create(

@@ -1,12 +1,12 @@
 import os
 from typing import Optional
 
-from aihub.core.database.base import BaseDatabaseClient
-from aihub.database.enums import DocumentDatabaseTypeEnum
-from aihub.database.mongo.client import MongoDBDatabaseClient
-from aihub.core.database.collections.tenants import TenantsCollection
-from aihub.core.database.collections.permissions import PermissionsCollection
-from aihub.core.database.collections.custom_groups import CustomGroupsCollection
+from aihub.core.docdatabase.base import BaseDatabaseClient
+from aihub.docdatabase.enums import DocumentDatabaseTypeEnum
+from aihub.docdatabase.mongo.client import MongoDBDatabaseClient
+from aihub.core.docdatabase.collections.tenants import TenantsCollection
+from aihub.core.docdatabase.collections.permissions import PermissionsCollection
+from aihub.core.docdatabase.collections.custom_groups import CustomGroupsCollection
 
 
 class DatabaseClient:

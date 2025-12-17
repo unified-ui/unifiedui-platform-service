@@ -3,8 +3,8 @@ from functools import lru_cache
 from fastapi import Depends
 
 from aihub.core.handlers.custom_groups import CustomGroupHandler
-from aihub.database.client import DatabaseClient
-from aihub.database.dependencies import get_db_client
+from aihub.docdatabase.client import DatabaseClient
+from aihub.docdatabase.dependencies import get_db_client
 
 
 @lru_cache()

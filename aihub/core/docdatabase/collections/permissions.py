@@ -2,7 +2,7 @@
 from abc import ABC, abstractmethod
 from typing import Optional, List
 
-from aihub.core.database.models.permissions import PermissionModel, AssignedTo
+from aihub.core.docdatabase.models.permissions import PermissionModel, AssignedTo
 
 
 class PermissionsCollection(ABC):

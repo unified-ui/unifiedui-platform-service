@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from aihub.apis.v1 import healthcheck, identity, tenants
-from aihub.database.dependencies import close_db_client
+from aihub.docdatabase.dependencies import close_db_client
 from aihub.core.config import settings
 from aihub.exc.tenants import TenantNotFoundError, TenantError
 from aihub.exc.permissions import PermissionDeniedError

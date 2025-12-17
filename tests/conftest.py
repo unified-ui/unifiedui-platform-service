@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 import fakeredis
 
 from aihub.app import create_app
-from aihub.database.client import DatabaseClient
+from aihub.docdatabase.client import DatabaseClient
 from aihub.caching.client import CacheClient
 from aihub.core.identity.users import IdentityUser
 

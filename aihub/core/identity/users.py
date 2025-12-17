@@ -1,12 +1,12 @@
 from typing import TYPE_CHECKING, Optional
 
 from aihub.core.handlers.tenants import TenantHandler
-from aihub.core.database.models.permissions import AssignedTo
+from aihub.core.docdatabase.models.permissions import AssignedTo
 from aihub.core.identity.factory import IdentityProviderFactory, IdentityTokenFactory
 from aihub.schema.responses.identity import IdentityGroupResponse, IdentityUserResponse
 from aihub.schema.responses.tenants import TenantResponse
 from aihub.utils.api_query import APIFilterQuery
-from aihub.database.client import DatabaseClient
+from aihub.docdatabase.client import DatabaseClient
 from aihub.caching.client import CacheClient
 from aihub.logger import get_logger
 

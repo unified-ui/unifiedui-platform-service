@@ -3,7 +3,7 @@ from datetime import datetime
 from typing import Literal
 from pydantic import Field
 
-from aihub.core.database.models.base import BaseDatabaseModel
+from aihub.core.docdatabase.models.base import BaseDatabaseModel
 
 
 class AssignedTo(BaseDatabaseModel):

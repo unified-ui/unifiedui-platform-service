@@ -2,7 +2,7 @@
 from functools import lru_cache
 
 from aihub.core.handlers.permissions import PermissionHandler
-from aihub.database.dependencies import get_db_client
+from aihub.docdatabase.dependencies import get_db_client
 
 
 @lru_cache()

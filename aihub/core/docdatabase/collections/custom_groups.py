@@ -1,7 +1,7 @@
 """Abstract interface for custom groups collection."""
 from abc import ABC, abstractmethod
 from typing import Optional
-from aihub.core.database.models.custom_groups import CustomGroupModel
+from aihub.core.docdatabase.models.custom_groups import CustomGroupModel
 
 
 class CustomGroupsCollection(ABC):

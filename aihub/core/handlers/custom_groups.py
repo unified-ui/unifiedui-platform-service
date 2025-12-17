@@ -1,8 +1,8 @@
 """Handler for custom group operations."""
 from typing import Optional
 
-from aihub.database.client import DatabaseClient
-from aihub.core.database.models.custom_groups import CustomGroupModel
+from aihub.docdatabase.client import DatabaseClient
+from aihub.core.docdatabase.models.custom_groups import CustomGroupModel
 from aihub.schema.requests.custom_groups import (
     CreateCustomGroupRequest,
     UpdateCustomGroupRequest,

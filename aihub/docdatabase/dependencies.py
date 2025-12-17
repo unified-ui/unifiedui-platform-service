@@ -5,7 +5,7 @@ Provides a singleton instance of the database client to avoid multiple connectio
 from typing import Optional
 from functools import lru_cache
 
-from aihub.database.client import DatabaseClient, get_database_client
+from aihub.docdatabase.client import DatabaseClient, get_database_client
 
 
 _db_client: Optional[DatabaseClient] = None

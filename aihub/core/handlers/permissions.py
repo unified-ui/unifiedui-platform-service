@@ -2,8 +2,8 @@
 from typing import List
 from collections import defaultdict
 
-from aihub.database.client import DatabaseClient
-from aihub.core.database.models.permissions import PermissionModel, AssignedTo
+from aihub.docdatabase.client import DatabaseClient
+from aihub.core.docdatabase.models.permissions import PermissionModel, AssignedTo
 from aihub.schema.requests.permissions import SetPermissionsRequest, DeletePermissionRequest
 from aihub.schema.responses.permissions import ResourcePermissionsResponse, PermissionAssignmentResponse
 from aihub.utils.default_factory_functions import current_iso_datetime, generate_id

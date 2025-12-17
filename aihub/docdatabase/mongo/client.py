@@ -1,10 +1,10 @@
 from pymongo import MongoClient
 from pymongo.database import Database
 
-from aihub.core.database.base import BaseDatabaseClient
-from aihub.database.mongo.collections.tenants import MongoDBTenantsCollection
-from aihub.database.mongo.collections.permissions import MongoDBPermissionsCollection
-from aihub.database.mongo.collections.custom_groups import MongoDBCustomGroupsCollection
+from aihub.core.docdatabase.base import BaseDatabaseClient
+from aihub.docdatabase.mongo.collections.tenants import MongoDBTenantsCollection
+from aihub.docdatabase.mongo.collections.permissions import MongoDBPermissionsCollection
+from aihub.docdatabase.mongo.collections.custom_groups import MongoDBCustomGroupsCollection
 
 
 class MongoDBDatabaseClient(BaseDatabaseClient):

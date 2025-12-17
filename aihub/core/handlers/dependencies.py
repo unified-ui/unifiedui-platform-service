@@ -1,26 +1,38 @@
 """FastAPI dependencies for handlers."""
-from typing import Optional
 from fastapi import Depends
 
-from aihub.database.client import DatabaseClient
-from aihub.database.dependencies import get_db_client
-from aihub.caching.client import CacheClient
-from aihub.caching.dependencies import get_cache_client
+from aihub.core.database.client import SQLAlchemyClient
+from aihub.core.database.config import DatabaseConfig
 from aihub.core.handlers.tenants import TenantHandler
+
+# Global SQLAlchemy client instance
+_db_client: SQLAlchemyClient | None = None
+
+
+def get_db_client() -> SQLAlchemyClient:
+    """
+    Get the global SQLAlchemy client instance.
+    
+    Returns:
+        SQLAlchemyClient instance
+    """
+    global _db_client
+    if _db_client is None:
+        config = DatabaseConfig.from_env()
+        _db_client = SQLAlchemyClient(config=config)
+    return _db_client
 
 
 def get_tenant_handler(
-    db_client: DatabaseClient = Depends(get_db_client),
-    cache_client: Optional[CacheClient] = Depends(get_cache_client)
+    db_client: SQLAlchemyClient = Depends(get_db_client)
 ) -> TenantHandler:
     """
     Get a TenantHandler instance as a dependency.
     
     Args:
-        db_client: Database client dependency
-        cache_client: Cache client dependency (optional)
+        db_client: SQLAlchemy database client dependency
         
     Returns:
         TenantHandler instance
     """
-    return TenantHandler(db_client, cache_client)
+    return TenantHandler(db_client)

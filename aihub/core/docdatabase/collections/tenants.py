@@ -2,7 +2,7 @@
 from abc import ABC, abstractmethod
 from typing import Optional, List
 
-from aihub.core.database.models.tenants import TenantModel
+from aihub.core.docdatabase.models.tenants import TenantModel
 
 
 class TenantsCollection(ABC):

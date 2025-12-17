@@ -3,8 +3,8 @@ from typing import Optional
 from datetime import datetime, timezone
 from pymongo.collection import Collection
 
-from aihub.core.database.collections.custom_groups import CustomGroupsCollection
-from aihub.core.database.models.custom_groups import CustomGroupModel
+from aihub.core.docdatabase.collections.custom_groups import CustomGroupsCollection
+from aihub.core.docdatabase.models.custom_groups import CustomGroupModel
 from aihub.utils.default_factory_functions import generate_id
 from aihub.logger import get_logger
 
