@@ -85,18 +85,18 @@ class TenantScopedMixin:
 class Tenant(Base, IdNameDescriptionMixin):
     __tablename__ = "tenants"
 
-    roles: Mapped[list["TenantRole"]] = relationship(
+    principals: Mapped[list["TenantPrincipal"]] = relationship(
         back_populates="tenant", cascade="all, delete-orphan"
     )
 
 
-class TenantRole(Base, IdNameDescriptionMixin):
+class TenantPrincipal(Base, IdNameDescriptionMixin):
     """
-    Special permissions table for tenants: tenant_roles
+    Special permissions table for tenants: tenant_principals
     principal_id is a free-form string (max 50).
     principal_type indicates whether it's a user, identity group, or custom group.
     """
-    __tablename__ = "tenant_roles"
+    __tablename__ = "tenant_principals"
 
     tenant_id: Mapped[str] = mapped_column(
         String(36), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False
@@ -105,12 +105,12 @@ class TenantRole(Base, IdNameDescriptionMixin):
     principal_type: Mapped[str] = mapped_column(PrincipalTypeEnum, nullable=False)
     role: Mapped[str] = mapped_column(TenantRoleEnum, nullable=False)
 
-    tenant: Mapped["Tenant"] = relationship(back_populates="roles")
+    tenant: Mapped["Tenant"] = relationship(back_populates="principals")
 
     __table_args__ = (
-        UniqueConstraint("tenant_id", "principal_id", "principal_type", "role", name="uq_tenant_roles"),
-        Index("ix_tenant_roles_tenant", "tenant_id"),
-        Index("ix_tenant_roles_principal", "principal_id"),
+        UniqueConstraint("tenant_id", "principal_id", "principal_type", "role", name="uq_tenant_principals"),
+        Index("ix_tenant_principals_tenant", "tenant_id"),
+        Index("ix_tenant_principals_principal", "principal_id"),
     )
 
 

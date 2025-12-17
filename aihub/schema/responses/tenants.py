@@ -29,7 +29,7 @@ class TenantWithRolesResponse(BaseModel):
     roles: List[TenantRoleResponse] = Field(..., description="List of roles the principal has on this tenant")
 
 
-class PrincipalRolesResponse(BaseModel):
+class PrincipalsResponse(BaseModel):
     """Response containing all roles for a principal on a specific tenant."""
     tenant_id: str = Field(..., description="The tenant ID")
     principal_id: str = Field(..., description="The principal ID")

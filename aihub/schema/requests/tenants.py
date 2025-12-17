@@ -37,7 +37,7 @@ class UpdateTenantRequest(BaseModel):
     }
 
 
-class SetPrincipalRoleRequest(BaseModel):
+class SetPrincipalRequest(BaseModel):
     """Schema for setting/adding a role for a principal on a tenant."""
     principal_type: str = Field(
         ...,
@@ -58,7 +58,7 @@ class SetPrincipalRoleRequest(BaseModel):
     }
 
 
-class DeletePrincipalRoleRequest(BaseModel):
+class DeletePrincipalRequest(BaseModel):
     """Schema for deleting a role for a principal on a tenant."""
     principal_type: str = Field(
         ...,

@@ -9,12 +9,12 @@ from aihub.core.identity.users import IdentityUser
 from aihub.schema.requests.tenants import (
     CreateTenantRequest,
     UpdateTenantRequest,
-    SetPrincipalRoleRequest,
-    DeletePrincipalRoleRequest
+    SetPrincipalRequest,
+    DeletePrincipalRequest
 )
 from aihub.schema.responses.tenants import (
     TenantResponse,
-    PrincipalRolesResponse,
+    PrincipalsResponse,
     TenantPrincipalsResponse
 )
 
@@ -213,7 +213,7 @@ async def list_tenant_principals(
 
 @router.get(
     "/{tenant_id}/principals/{principal_id}",
-    response_model=PrincipalRolesResponse,
+    response_model=PrincipalsResponse,
     status_code=status.HTTP_200_OK,
     summary="Get Principal Roles",
     description="Get all roles for a specific principal on a tenant"
@@ -224,7 +224,7 @@ async def get_principal_roles(
     tenant_id: str,
     principal_id: str,
     handler: TenantHandler = Depends(get_tenant_handler)
-) -> PrincipalRolesResponse:
+) -> PrincipalsResponse:
     """
     Get all roles for a specific principal on a tenant.
     
@@ -235,18 +235,18 @@ async def get_principal_roles(
         handler: Tenant handler dependency
     
     Returns:
-        PrincipalRolesResponse: Principal's roles on the tenant
+        PrincipalsResponse: Principal's roles on the tenant
     
     Raises:
         TenantNotFoundError: If tenant not found
     """
     result = handler.get_principal_roles(tenant_id, principal_id)
-    return PrincipalRolesResponse(**result)
+    return PrincipalsResponse(**result)
 
 
 @router.put(
     "/{tenant_id}/principals/{principal_id}",
-    response_model=PrincipalRolesResponse,
+    response_model=PrincipalsResponse,
     status_code=status.HTTP_200_OK,
     summary="Set Principal Role",
     description="Add or update a role for a principal on a tenant"
@@ -256,9 +256,9 @@ async def set_principal_role(
     request: Request,
     tenant_id: str,
     principal_id: str,
-    role_data: SetPrincipalRoleRequest,
+    role_data: SetPrincipalRequest,
     handler: TenantHandler = Depends(get_tenant_handler)
-) -> PrincipalRolesResponse:
+) -> PrincipalsResponse:
     """
     Add or update a role for a principal on a tenant.
     
@@ -270,7 +270,7 @@ async def set_principal_role(
         handler: Tenant handler dependency
     
     Returns:
-        PrincipalRolesResponse: Updated principal's roles on the tenant
+        PrincipalsResponse: Updated principal's roles on the tenant
     
     Raises:
         TenantNotFoundError: If tenant not found
@@ -285,12 +285,12 @@ async def set_principal_role(
         role=role_data.role,
         user_id=user_id
     )
-    return PrincipalRolesResponse(**result)
+    return PrincipalsResponse(**result)
 
 
 @router.delete(
     "/{tenant_id}/principals/{principal_id}",
-    response_model=PrincipalRolesResponse,
+    response_model=PrincipalsResponse,
     status_code=status.HTTP_200_OK,
     summary="Delete Principal Role",
     description="Remove a specific role from a principal on a tenant"
@@ -300,9 +300,9 @@ async def delete_principal_role(
     request: Request,
     tenant_id: str,
     principal_id: str,
-    role_data: DeletePrincipalRoleRequest,
+    role_data: DeletePrincipalRequest,
     handler: TenantHandler = Depends(get_tenant_handler)
-) -> PrincipalRolesResponse:
+) -> PrincipalsResponse:
     """
     Remove a specific role from a principal on a tenant.
     
@@ -314,7 +314,7 @@ async def delete_principal_role(
         handler: Tenant handler dependency
     
     Returns:
-        PrincipalRolesResponse: Remaining principal's roles on the tenant
+        PrincipalsResponse: Remaining principal's roles on the tenant
     
     Raises:
         TenantNotFoundError: If tenant not found
@@ -325,4 +325,4 @@ async def delete_principal_role(
         principal_type=role_data.principal_type,
         role=role_data.role
     )
-    return PrincipalRolesResponse(**result)
+    return PrincipalsResponse(**result)

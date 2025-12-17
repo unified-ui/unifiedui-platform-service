@@ -7,7 +7,7 @@ from sqlalchemy import select, and_, or_
 from sqlalchemy.orm import Session
 
 from aihub.core.database.client import SQLAlchemyClient
-from aihub.core.database.models import Tenant, TenantRole
+from aihub.core.database.models import Tenant, TenantPrincipal
 from aihub.schema.requests.tenants import CreateTenantRequest, UpdateTenantRequest
 from aihub.schema.responses.tenants import TenantResponse
 from aihub.exc.tenants import TenantNotFoundError
@@ -120,7 +120,7 @@ class TenantHandler:
             
             # Create GLOBAL_ADMIN role for the creator
             role_id = str(uuid.uuid4())
-            tenant_role = TenantRole(
+            tenant_role = TenantPrincipal(
                 id=role_id,
                 tenant_id=tenant_id,
                 principal_id=user_id,
@@ -233,10 +233,10 @@ class TenantHandler:
         with self.db_client.get_session() as session:
             # Query to get all tenant_roles for the given principal_ids
             query = (
-                select(Tenant, TenantRole)
-                .join(TenantRole, Tenant.id == TenantRole.tenant_id)
-                .where(TenantRole.principal_id.in_(principal_ids))
-                .order_by(Tenant.name, TenantRole.role)
+                select(Tenant, TenantPrincipal)
+                .join(TenantPrincipal, Tenant.id == TenantPrincipal.tenant_id)
+                .where(TenantPrincipal.principal_id.in_(principal_ids))
+                .order_by(Tenant.name, TenantPrincipal.role)
             )
             
             results = session.execute(query).all()
@@ -317,9 +317,9 @@ class TenantHandler:
             
             # Query all roles for this tenant
             query = (
-                select(TenantRole)
-                .where(TenantRole.tenant_id == tenant_id)
-                .order_by(TenantRole.principal_id, TenantRole.role)
+                select(TenantPrincipal)
+                .where(TenantPrincipal.tenant_id == tenant_id)
+                .order_by(TenantPrincipal.principal_id, TenantPrincipal.role)
             )
             
             roles = session.execute(query).scalars().all()
@@ -379,12 +379,12 @@ class TenantHandler:
             
             # Query roles for this principal on this tenant
             query = (
-                select(TenantRole)
+                select(TenantPrincipal)
                 .where(
-                    TenantRole.tenant_id == tenant_id,
-                    TenantRole.principal_id == principal_id
+                    TenantPrincipal.tenant_id == tenant_id,
+                    TenantPrincipal.principal_id == principal_id
                 )
-                .order_by(TenantRole.role)
+                .order_by(TenantPrincipal.role)
             )
             
             roles = session.execute(query).scalars().all()
@@ -438,12 +438,12 @@ class TenantHandler:
             
             # Check if role already exists
             query = (
-                select(TenantRole)
+                select(TenantPrincipal)
                 .where(
-                    TenantRole.tenant_id == tenant_id,
-                    TenantRole.principal_id == principal_id,
-                    TenantRole.principal_type == principal_type,
-                    TenantRole.role == role
+                    TenantPrincipal.tenant_id == tenant_id,
+                    TenantPrincipal.principal_id == principal_id,
+                    TenantPrincipal.principal_type == principal_type,
+                    TenantPrincipal.role == role
                 )
             )
             existing_role = session.execute(query).scalar_one_or_none()
@@ -451,7 +451,7 @@ class TenantHandler:
             if not existing_role:
                 # Create new role
                 role_id = str(uuid.uuid4())
-                new_role = TenantRole(
+                new_role = TenantPrincipal(
                     id=role_id,
                     tenant_id=tenant_id,
                     principal_id=principal_id,
@@ -479,12 +479,12 @@ class TenantHandler:
             
             # Get all roles for this principal
             query = (
-                select(TenantRole)
+                select(TenantPrincipal)
                 .where(
-                    TenantRole.tenant_id == tenant_id,
-                    TenantRole.principal_id == principal_id
+                    TenantPrincipal.tenant_id == tenant_id,
+                    TenantPrincipal.principal_id == principal_id
                 )
-                .order_by(TenantRole.role)
+                .order_by(TenantPrincipal.role)
             )
             roles = session.execute(query).scalars().all()
             
@@ -530,12 +530,12 @@ class TenantHandler:
             
             # Find and delete the role
             query = (
-                select(TenantRole)
+                select(TenantPrincipal)
                 .where(
-                    TenantRole.tenant_id == tenant_id,
-                    TenantRole.principal_id == principal_id,
-                    TenantRole.principal_type == principal_type,
-                    TenantRole.role == role
+                    TenantPrincipal.tenant_id == tenant_id,
+                    TenantPrincipal.principal_id == principal_id,
+                    TenantPrincipal.principal_type == principal_type,
+                    TenantPrincipal.role == role
                 )
             )
             role_to_delete = session.execute(query).scalar_one_or_none()
@@ -556,12 +556,12 @@ class TenantHandler:
             
             # Get remaining roles for this principal
             query = (
-                select(TenantRole)
+                select(TenantPrincipal)
                 .where(
-                    TenantRole.tenant_id == tenant_id,
-                    TenantRole.principal_id == principal_id
+                    TenantPrincipal.tenant_id == tenant_id,
+                    TenantPrincipal.principal_id == principal_id
                 )
-                .order_by(TenantRole.role)
+                .order_by(TenantPrincipal.role)
             )
             remaining_roles = session.execute(query).scalars().all()
             
@@ -572,12 +572,12 @@ class TenantHandler:
             }
     
     @staticmethod
-    def _role_to_response(role: TenantRole):
+    def _role_to_response(role: TenantPrincipal):
         """
         Convert a tenant role model to a response object.
         
         Args:
-            role: TenantRole SQLAlchemy model
+            role: TenantPrincipal SQLAlchemy model
             
         Returns:
             TenantRoleResponse
