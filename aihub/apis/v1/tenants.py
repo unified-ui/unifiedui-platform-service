@@ -6,8 +6,17 @@ from aihub.core.handlers.tenants import TenantHandler
 from aihub.core.handlers.dependencies import get_tenant_handler
 from aihub.core.middleware.apis.v1.auth import authenticate
 from aihub.core.identity.users import IdentityUser
-from aihub.schema.requests.tenants import CreateTenantRequest, UpdateTenantRequest
-from aihub.schema.responses.tenants import TenantResponse
+from aihub.schema.requests.tenants import (
+    CreateTenantRequest,
+    UpdateTenantRequest,
+    SetPrincipalRoleRequest,
+    DeletePrincipalRoleRequest
+)
+from aihub.schema.responses.tenants import (
+    TenantResponse,
+    PrincipalRolesResponse,
+    TenantPrincipalsResponse
+)
 
 
 router = APIRouter()
@@ -167,3 +176,153 @@ async def delete_tenant(
         TenantNotFoundError: If tenant not found (handled by global exception handler)
     """
     handler.delete_tenant(tenant_id)
+
+
+# Principal Role Management Routes
+
+@router.get(
+    "/{tenant_id}/principals",
+    response_model=TenantPrincipalsResponse,
+    status_code=status.HTTP_200_OK,
+    summary="List Tenant Principals",
+    description="Get all principals and their roles for a tenant"
+)
+@authenticate
+async def list_tenant_principals(
+    request: Request,
+    tenant_id: str,
+    handler: TenantHandler = Depends(get_tenant_handler)
+) -> TenantPrincipalsResponse:
+    """
+    Get all principals and their roles for a specific tenant.
+    
+    Args:
+        request: FastAPI request object
+        tenant_id: The ID of the tenant
+        handler: Tenant handler dependency
+    
+    Returns:
+        TenantPrincipalsResponse: All principals with their roles on the tenant
+    
+    Raises:
+        TenantNotFoundError: If tenant not found
+    """
+    result = handler.list_tenant_principals(tenant_id)
+    return TenantPrincipalsResponse(**result)
+
+
+@router.get(
+    "/{tenant_id}/principals/{principal_id}",
+    response_model=PrincipalRolesResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Get Principal Roles",
+    description="Get all roles for a specific principal on a tenant"
+)
+@authenticate
+async def get_principal_roles(
+    request: Request,
+    tenant_id: str,
+    principal_id: str,
+    handler: TenantHandler = Depends(get_tenant_handler)
+) -> PrincipalRolesResponse:
+    """
+    Get all roles for a specific principal on a tenant.
+    
+    Args:
+        request: FastAPI request object
+        tenant_id: The ID of the tenant
+        principal_id: The ID of the principal
+        handler: Tenant handler dependency
+    
+    Returns:
+        PrincipalRolesResponse: Principal's roles on the tenant
+    
+    Raises:
+        TenantNotFoundError: If tenant not found
+    """
+    result = handler.get_principal_roles(tenant_id, principal_id)
+    return PrincipalRolesResponse(**result)
+
+
+@router.put(
+    "/{tenant_id}/principals/{principal_id}",
+    response_model=PrincipalRolesResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Set Principal Role",
+    description="Add or update a role for a principal on a tenant"
+)
+@authenticate
+async def set_principal_role(
+    request: Request,
+    tenant_id: str,
+    principal_id: str,
+    role_data: SetPrincipalRoleRequest,
+    handler: TenantHandler = Depends(get_tenant_handler)
+) -> PrincipalRolesResponse:
+    """
+    Add or update a role for a principal on a tenant.
+    
+    Args:
+        request: FastAPI request object
+        tenant_id: The ID of the tenant
+        principal_id: The ID of the principal
+        role_data: Role data to set
+        handler: Tenant handler dependency
+    
+    Returns:
+        PrincipalRolesResponse: Updated principal's roles on the tenant
+    
+    Raises:
+        TenantNotFoundError: If tenant not found
+    """
+    user: IdentityUser = request.state.user
+    user_id = user.identity.get_id()
+    
+    result = handler.set_principal_role(
+        tenant_id=tenant_id,
+        principal_id=principal_id,
+        principal_type=role_data.principal_type,
+        role=role_data.role,
+        user_id=user_id
+    )
+    return PrincipalRolesResponse(**result)
+
+
+@router.delete(
+    "/{tenant_id}/principals/{principal_id}",
+    response_model=PrincipalRolesResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Delete Principal Role",
+    description="Remove a specific role from a principal on a tenant"
+)
+@authenticate
+async def delete_principal_role(
+    request: Request,
+    tenant_id: str,
+    principal_id: str,
+    role_data: DeletePrincipalRoleRequest,
+    handler: TenantHandler = Depends(get_tenant_handler)
+) -> PrincipalRolesResponse:
+    """
+    Remove a specific role from a principal on a tenant.
+    
+    Args:
+        request: FastAPI request object
+        tenant_id: The ID of the tenant
+        principal_id: The ID of the principal
+        role_data: Role data to delete
+        handler: Tenant handler dependency
+    
+    Returns:
+        PrincipalRolesResponse: Remaining principal's roles on the tenant
+    
+    Raises:
+        TenantNotFoundError: If tenant not found
+    """
+    result = handler.delete_principal_role(
+        tenant_id=tenant_id,
+        principal_id=principal_id,
+        principal_type=role_data.principal_type,
+        role=role_data.role
+    )
+    return PrincipalRolesResponse(**result)

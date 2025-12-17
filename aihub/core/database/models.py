@@ -51,6 +51,16 @@ PermissionActionEnum = SAEnum(
     validate_strings=True,
 )
 
+PrincipalTypeEnum = SAEnum(
+    "IDENTITY_USER",
+    "IDENTITY_GROUP",
+    "CUSTOM_GROUP",
+    name="principal_type",
+    native_enum=False,
+    create_constraint=True,
+    validate_strings=True,
+)
+
 
 # ---------- Mixins ----------
 class IdNameDescriptionMixin:
@@ -84,6 +94,7 @@ class TenantRole(Base, IdNameDescriptionMixin):
     """
     Special permissions table for tenants: tenant_roles
     principal_id is a free-form string (max 50).
+    principal_type indicates whether it's a user, identity group, or custom group.
     """
     __tablename__ = "tenant_roles"
 
@@ -91,12 +102,13 @@ class TenantRole(Base, IdNameDescriptionMixin):
         String(36), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False
     )
     principal_id: Mapped[str] = mapped_column(String(50), nullable=False)
+    principal_type: Mapped[str] = mapped_column(PrincipalTypeEnum, nullable=False)
     role: Mapped[str] = mapped_column(TenantRoleEnum, nullable=False)
 
     tenant: Mapped["Tenant"] = relationship(back_populates="roles")
 
     __table_args__ = (
-        UniqueConstraint("tenant_id", "principal_id", "role", name="uq_tenant_roles"),
+        UniqueConstraint("tenant_id", "principal_id", "principal_type", "role", name="uq_tenant_roles"),
         Index("ix_tenant_roles_tenant", "tenant_id"),
         Index("ix_tenant_roles_principal", "principal_id"),
     )

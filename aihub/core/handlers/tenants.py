@@ -124,9 +124,12 @@ class TenantHandler:
                 id=role_id,
                 tenant_id=tenant_id,
                 principal_id=user_id,
+                principal_type="IDENTITY_USER",
                 role="GLOBAL_ADMIN",
                 name=f"Global Admin for {request.name}",
-                description=f"Global administrator role for user {user_id} on tenant {request.name}"
+                description=f"Global administrator role for user {user_id} on tenant {request.name}",
+                created_by=user_id,
+                updated_by=user_id
             )
             session.add(tenant_role)
             
@@ -287,6 +290,287 @@ class TenantHandler:
             updated_by=tenant.updated_by
         )
     
+    def list_tenant_principals(
+        self,
+        tenant_id: str
+    ) -> dict:
+        """
+        Get all principals and their roles for a specific tenant.
+        
+        Args:
+            tenant_id: The ID of the tenant
+            
+        Returns:
+            Dict with tenant_id and list of principals with their roles
+            
+        Raises:
+            TenantNotFoundError: If tenant not found
+        """
+        logger.info("Listing all principals for tenant", extra={"tenant_id": tenant_id})
+        
+        with self.db_client.get_session() as session:
+            # Check if tenant exists
+            tenant = session.get(Tenant, tenant_id)
+            if not tenant:
+                logger.warning("Tenant not found", extra={"tenant_id": tenant_id})
+                raise TenantNotFoundError(tenant_id)
+            
+            # Query all roles for this tenant
+            query = (
+                select(TenantRole)
+                .where(TenantRole.tenant_id == tenant_id)
+                .order_by(TenantRole.principal_id, TenantRole.role)
+            )
+            
+            roles = session.execute(query).scalars().all()
+            
+            # Group roles by principal_id
+            principals_dict = {}
+            for role in roles:
+                if role.principal_id not in principals_dict:
+                    principals_dict[role.principal_id] = {
+                        "principal_id": role.principal_id,
+                        "roles": []
+                    }
+                principals_dict[role.principal_id]["roles"].append(self._role_to_response(role))
+            
+            # Convert to list
+            principals = list(principals_dict.values())
+            
+            logger.info(
+                "Retrieved tenant principals",
+                extra={"tenant_id": tenant_id, "principal_count": len(principals)}
+            )
+            
+            return {
+                "tenant_id": tenant_id,
+                "principals": principals
+            }
+    
+    def get_principal_roles(
+        self,
+        tenant_id: str,
+        principal_id: str
+    ) -> dict:
+        """
+        Get all roles for a specific principal on a tenant.
+        
+        Args:
+            tenant_id: The ID of the tenant
+            principal_id: The ID of the principal
+            
+        Returns:
+            Dict with tenant_id, principal_id, and roles list
+            
+        Raises:
+            TenantNotFoundError: If tenant not found
+        """
+        logger.info(
+            "Getting principal roles",
+            extra={"tenant_id": tenant_id, "principal_id": principal_id}
+        )
+        
+        with self.db_client.get_session() as session:
+            # Check if tenant exists
+            tenant = session.get(Tenant, tenant_id)
+            if not tenant:
+                logger.warning("Tenant not found", extra={"tenant_id": tenant_id})
+                raise TenantNotFoundError(tenant_id)
+            
+            # Query roles for this principal on this tenant
+            query = (
+                select(TenantRole)
+                .where(
+                    TenantRole.tenant_id == tenant_id,
+                    TenantRole.principal_id == principal_id
+                )
+                .order_by(TenantRole.role)
+            )
+            
+            roles = session.execute(query).scalars().all()
+            
+            logger.info(
+                "Retrieved principal roles",
+                extra={"tenant_id": tenant_id, "principal_id": principal_id, "role_count": len(roles)}
+            )
+            
+            return {
+                "tenant_id": tenant_id,
+                "principal_id": principal_id,
+                "roles": [self._role_to_response(role) for role in roles]
+            }
+    
+    def set_principal_role(
+        self,
+        tenant_id: str,
+        principal_id: str,
+        principal_type: str,
+        role: str,
+        user_id: str
+    ) -> dict:
+        """
+        Add or update a role for a principal on a tenant.
+        
+        Args:
+            tenant_id: The ID of the tenant
+            principal_id: The ID of the principal
+            principal_type: The type of principal (IDENTITY_USER, IDENTITY_GROUP, CUSTOM_GROUP)
+            role: The role to assign
+            user_id: The ID of the user making the change
+            
+        Returns:
+            Dict with tenant_id, principal_id, and updated roles list
+            
+        Raises:
+            TenantNotFoundError: If tenant not found
+        """
+        logger.info(
+            "Setting principal role",
+            extra={"tenant_id": tenant_id, "principal_id": principal_id, "principal_type": principal_type, "role": role, "user_id": user_id}
+        )
+        
+        with self.db_client.get_session() as session:
+            # Check if tenant exists
+            tenant = session.get(Tenant, tenant_id)
+            if not tenant:
+                logger.warning("Tenant not found", extra={"tenant_id": tenant_id})
+                raise TenantNotFoundError(tenant_id)
+            
+            # Check if role already exists
+            query = (
+                select(TenantRole)
+                .where(
+                    TenantRole.tenant_id == tenant_id,
+                    TenantRole.principal_id == principal_id,
+                    TenantRole.principal_type == principal_type,
+                    TenantRole.role == role
+                )
+            )
+            existing_role = session.execute(query).scalar_one_or_none()
+            
+            if not existing_role:
+                # Create new role
+                role_id = str(uuid.uuid4())
+                new_role = TenantRole(
+                    id=role_id,
+                    tenant_id=tenant_id,
+                    principal_id=principal_id,
+                    principal_type=principal_type,
+                    role=role,
+                    name=f"{role} for {principal_id} ({principal_type}) on {tenant.name}",
+                    description=f"{role} role for {principal_type} principal {principal_id} on tenant {tenant.name}",
+                    created_by=user_id,
+                    updated_by=user_id
+                )
+                session.add(new_role)
+                logger.info(
+                    "Created new principal role",
+                    extra={"tenant_id": tenant_id, "principal_id": principal_id, "principal_type": principal_type, "role": role, "role_id": role_id}
+                )
+            else:
+                # Update existing role
+                existing_role.updated_by = user_id
+                logger.info(
+                    "Updated existing principal role",
+                    extra={"tenant_id": tenant_id, "principal_id": principal_id, "role": role}
+                )
+            
+            session.flush()
+            
+            # Get all roles for this principal
+            query = (
+                select(TenantRole)
+                .where(
+                    TenantRole.tenant_id == tenant_id,
+                    TenantRole.principal_id == principal_id
+                )
+                .order_by(TenantRole.role)
+            )
+            roles = session.execute(query).scalars().all()
+            
+            return {
+                "tenant_id": tenant_id,
+                "principal_id": principal_id,
+                "roles": [self._role_to_response(role) for role in roles]
+            }
+    
+    def delete_principal_role(
+        self,
+        tenant_id: str,
+        principal_id: str,
+        principal_type: str,
+        role: str
+    ) -> dict:
+        """
+        Remove a specific role from a principal on a tenant.
+        
+        Args:
+            tenant_id: The ID of the tenant
+            principal_id: The ID of the principal
+            principal_type: The type of principal (IDENTITY_USER, IDENTITY_GROUP, CUSTOM_GROUP)
+            role: The role to remove
+            
+        Returns:
+            Dict with tenant_id, principal_id, and remaining roles list
+            
+        Raises:
+            TenantNotFoundError: If tenant not found
+        """
+        logger.info(
+            "Deleting principal role",
+            extra={"tenant_id": tenant_id, "principal_id": principal_id, "principal_type": principal_type, "role": role}
+        )
+        
+        with self.db_client.get_session() as session:
+            # Check if tenant exists
+            tenant = session.get(Tenant, tenant_id)
+            if not tenant:
+                logger.warning("Tenant not found", extra={"tenant_id": tenant_id})
+                raise TenantNotFoundError(tenant_id)
+            
+            # Find and delete the role
+            query = (
+                select(TenantRole)
+                .where(
+                    TenantRole.tenant_id == tenant_id,
+                    TenantRole.principal_id == principal_id,
+                    TenantRole.principal_type == principal_type,
+                    TenantRole.role == role
+                )
+            )
+            role_to_delete = session.execute(query).scalar_one_or_none()
+            
+            if role_to_delete:
+                session.delete(role_to_delete)
+                logger.info(
+                    "Deleted principal role",
+                    extra={"tenant_id": tenant_id, "principal_id": principal_id, "principal_type": principal_type, "role": role}
+                )
+            else:
+                logger.info(
+                    "Role not found, nothing to delete",
+                    extra={"tenant_id": tenant_id, "principal_id": principal_id, "principal_type": principal_type, "role": role}
+                )
+            
+            session.flush()
+            
+            # Get remaining roles for this principal
+            query = (
+                select(TenantRole)
+                .where(
+                    TenantRole.tenant_id == tenant_id,
+                    TenantRole.principal_id == principal_id
+                )
+                .order_by(TenantRole.role)
+            )
+            remaining_roles = session.execute(query).scalars().all()
+            
+            return {
+                "tenant_id": tenant_id,
+                "principal_id": principal_id,
+                "roles": [self._role_to_response(role) for role in remaining_roles]
+            }
+    
     @staticmethod
     def _role_to_response(role: TenantRole):
         """
@@ -301,6 +585,7 @@ class TenantHandler:
         from aihub.schema.responses.tenants import TenantRoleResponse
         return TenantRoleResponse(
             id=role.id,
+            principal_type=role.principal_type,
             role=role.role,
             name=role.name,
             description=role.description,
