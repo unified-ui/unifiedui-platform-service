@@ -48,17 +48,17 @@
     - has_permissions refactoren und auslagern -> am besten in middleware decorator!
     - caching besser implementieren!!! für tenants, groups, permissions!!! und clear
 
-## TODO
-
-
-
 - custom_groups (/api/v1/tenants/{id}/custom/groups)
     - CRUD
 
 - identity/users/{id}
 - identity/groups/{id}
-
 - next_link bei /users testen -> funktioniert das?
+
+## TODO
+
+
+
 
 - refactoring
     - db client wird in users.py noch initialisiert -> sollte injected werden!
@@ -67,11 +67,12 @@
         - und wichtig: users.py wird noch außerhalb ge
     - cusgroups
 
+- Spec-Driven Vibe-Coding machen (in einem Spec projekt etc beschreiben)
+
 - permissions mit zweitem account testen auf
     - tenant
     - custom groups
 
-- Spec-Driven Vibe-Coding machen (in einem Spec projekt etc beschreiben)
 
 
 - Credentials

@@ -1,4 +1,5 @@
 name: aihub-infra
+
 services:
   aihub-postgres:
     image: postgres:16-alpine
@@ -20,9 +21,9 @@ services:
       timeout: 5s
       retries: 5
 
-  mongodb:
+  aihub-mongodb:
     image: mongo:8.2
-    container_name: aihub-document-database
+    container_name: aihub-mongodb
     ports:
       - "27017:27017"
     environment:
@@ -33,9 +34,9 @@ services:
     networks:
       - aihub_network
 
-  redis:
+  aihub-redis:
     image: redis:8.4
-    container_name: aihub-cache
+    container_name: aihub-redis
     environment:
       REDIS_PASSWORD: admin
     command: ["redis-server", "--requirepass", "admin"]
@@ -46,9 +47,9 @@ services:
     networks:
       - aihub_network
 
-  rabbitmq:
+  aihub-rabbitmq:
     image: rabbitmq:4.2-management
-    container_name: aihub-message-broker
+    container_name: aihub-rabbitmq
     ports:
       - "5672:5672"   # AMQP protocol
       - "15672:15672" # Management UI
@@ -60,24 +61,9 @@ services:
     networks:
       - aihub_network
 
-  minio:
-    image: minio/minio
-    container_name: aihub-object-storage
-    ports:
-      - "9000:9000"
-      - "9001:9001"
-    environment:
-      MINIO_ROOT_USER: adminminio
-      MINIO_ROOT_PASSWORD: adminminio
-    command: server /data --console-address ":9001"
-    volumes:
-      - minio_data:/data
-    networks:
-      - aihub_network
-
-  vault:
+  aihub-vault:
     image: hashicorp/vault:1.18
-    container_name: aihub-secrets-vault
+    container_name: aihub-vault
     ports:
       - "8200:8200"
     environment:
