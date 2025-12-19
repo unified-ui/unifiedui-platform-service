@@ -23,6 +23,7 @@ from aihub.handlers.dependencies.tenants import get_tenant_handler
 from aihub.handlers.dependencies.custom_groups import get_custom_group_handler
 from aihub.handlers.dependencies.credentials import get_credential_handler
 from aihub.handlers.dependencies.applications import get_application_handler
+from aihub.handlers.dependencies.conversations import get_conversation_handler
 
 __all__ = [
     # Database
@@ -36,5 +37,6 @@ __all__ = [
     "get_custom_group_handler",
     "get_credential_handler",
     "get_application_handler",
+    "get_conversation_handler",
 ]
 

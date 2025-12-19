@@ -3,7 +3,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from aihub.apis.v1 import health, identity, tenants, custom_groups, credentials, applications
+from aihub.apis.v1 import health, identity, tenants, custom_groups, credentials, applications, conversations
 from aihub.docdatabase.dependencies import close_db_client
 from aihub.core.config import settings
 from aihub.exc.tenants import TenantNotFoundError, TenantError
@@ -138,6 +138,12 @@ def create_app() -> FastAPI:
         applications.router,
         prefix="/api/v1/tenants/{tenant_id}",
         tags=["Applications"]
+    )
+    
+    app.include_router(
+        conversations.router,
+        prefix="/api/v1/tenants/{tenant_id}",
+        tags=["Conversations"]
     )
     
     # Lifecycle events
