@@ -2,16 +2,25 @@
 from abc import ABC, abstractmethod
 from typing import Any, Optional
 
-from aihub.core.caching.collections.tenants import TenantsCacheCollection
+from aihub.core.caching.cache import BaseCache
 
 
 class BaseCacheClient(ABC):
     """
     Abstract base class for cache client.
-    Provides access to collection-specific cache interfaces.
+    Provides low-level cache operations.
     """
 
     @abstractmethod
+    def get_cache(self) -> BaseCache:
+        """
+        Get the underlying cache instance.
+        
+        Returns:
+            BaseCache instance
+        """
+        pass
+
     def get(self, key: str) -> Optional[Any]:
         """
         Get a value from the cache by key.
@@ -21,9 +30,8 @@ class BaseCacheClient(ABC):
         Returns:
             Cached value or None if not found
         """
-        pass
+        return self.get_cache().get(key)
 
-    @abstractmethod
     def set(self, key: str, value: Any, ttl: int | None = None) -> None:
         """
         Set a value in the cache with an optional TTL.
@@ -33,26 +41,36 @@ class BaseCacheClient(ABC):
             value: Value to cache
             ttl: Time-to-live in seconds (optional)
         """
-        pass
+        self.get_cache().set(key, value, ttl)
 
-    @abstractmethod
-    def tenants(self) -> TenantsCacheCollection:
+    def delete(self, key: str) -> bool:
         """
-        Get the tenants cache collection.
+        Delete a key from the cache.
         
+        Args:
+            key: Cache key
         Returns:
-            TenantsCacheCollection instance
+            True if deleted, False otherwise
         """
-        pass
+        return self.get_cache().delete(key)
 
-    @abstractmethod
+    def delete_pattern(self, pattern: str) -> int:
+        """
+        Delete all keys matching a pattern.
+        
+        Args:
+            pattern: Key pattern (e.g., "tenant:*")
+        Returns:
+            Number of keys deleted
+        """
+        return self.get_cache().delete_pattern(pattern)
+
     def close(self) -> None:
         """
         Close the cache client connection.
         """
-        pass
+        self.get_cache().close()
 
-    @abstractmethod
     def ping(self) -> bool:
         """
         Check if cache connection is alive.
@@ -60,4 +78,4 @@ class BaseCacheClient(ABC):
         Returns:
             True if connected, False otherwise
         """
-        pass
+        return self.get_cache().ping()

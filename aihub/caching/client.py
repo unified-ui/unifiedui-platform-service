@@ -22,11 +22,12 @@ class CacheClient:
             cache_client: Underlying cache client implementation (e.g., RedisCacheClient)
         """
         self._client = cache_client
+        self._tenants_cache = TenantsCacheCollection(cache_client)
 
     @property
     def tenants(self) -> TenantsCacheCollection:
         """Get the tenants cache collection."""
-        return self._client.tenants()
+        return self._tenants_cache
 
     @property
     def client(self) -> BaseCacheClient:

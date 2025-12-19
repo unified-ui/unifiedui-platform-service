@@ -1,16 +1,28 @@
-"""Abstract interface for Tenants cache collection."""
-from abc import ABC, abstractmethod
+"""Tenants cache collection implementation."""
 from typing import Optional, List
 from urllib.parse import quote
 
 from aihub.schema.responses.tenants import TenantResponse
+from aihub.logger import get_logger
+from aihub.core.caching.client import BaseCacheClient
+
+logger = get_logger(__name__)
 
 
-class TenantsCacheCollection(ABC):
+class TenantsCacheCollection:
     """
-    Abstract base class for Tenants cache operations.
+    Tenants cache operations.
     Handles caching of tenant data per user and route.
     """
+
+    def __init__(self, cache_client: "BaseCacheClient"):
+        """
+        Initialize Tenants cache collection.
+        
+        Args:
+            cache_client: Cache client instance providing get/set/delete operations
+        """
+        self.cache_client = cache_client
 
     def build_key(
         self,
@@ -29,7 +41,6 @@ class TenantsCacheCollection(ABC):
         else:
             return f"tenant:list:user:{user_id}:route:{encoded_route}"
 
-    @abstractmethod
     def get_tenant(
         self,
         tenant_id: str,
@@ -47,9 +58,17 @@ class TenantsCacheCollection(ABC):
         Returns:
             Cached tenant or None
         """
-        pass
+        key = self.build_key(tenant_id, user_id, route)
+        data = self.cache_client.get(key)
+        
+        if data:
+            try:
+                return TenantResponse(**data)
+            except Exception as e:
+                logger.warning(f"Failed to deserialize cached tenant: {e}")
+                return None
+        return None
 
-    @abstractmethod
     def set_tenant(
         self,
         tenant_id: str,
@@ -68,9 +87,10 @@ class TenantsCacheCollection(ABC):
             tenant: Tenant data to cache
             ttl: Time-to-live in seconds (None = default)
         """
-        pass
+        key = self.build_key(tenant_id, user_id, route)
+        data = tenant.model_dump()
+        self.cache_client.set(key, data, ttl)
 
-    @abstractmethod
     def get_tenant_list(
         self,
         user_id: str,
@@ -86,9 +106,17 @@ class TenantsCacheCollection(ABC):
         Returns:
             Cached tenant list or None
         """
-        pass
+        key = self.build_key(None, user_id, route)
+        data = self.cache_client.get(key)
+        
+        if data:
+            try:
+                return [TenantResponse(**item) for item in data]
+            except Exception as e:
+                logger.warning(f"Failed to deserialize cached tenant list: {e}")
+                return None
+        return None
 
-    @abstractmethod
     def set_tenant_list(
         self,
         user_id: str,
@@ -105,9 +133,10 @@ class TenantsCacheCollection(ABC):
             tenants: Tenant list to cache
             ttl: Time-to-live in seconds (None = default)
         """
-        pass
+        key = self.build_key(None, user_id, route)
+        data = [tenant.model_dump() for tenant in tenants]
+        self.cache_client.set(key, data, ttl)
 
-    @abstractmethod
     def invalidate_tenant(
         self,
         tenant_id: str,
@@ -124,9 +153,17 @@ class TenantsCacheCollection(ABC):
         Returns:
             Number of keys deleted
         """
-        pass
+        if user_id:
+            # Invalidate specific user's cache for this tenant
+            pattern = f"tenant:{tenant_id}:user:{user_id}:*"
+        else:
+            # Invalidate all users' cache for this tenant
+            pattern = f"tenant:{tenant_id}:*"
+        
+        deleted = self.cache_client.delete_pattern(pattern)
+        logger.info(f"Invalidated {deleted} cache entries for tenant {tenant_id}")
+        return deleted
 
-    @abstractmethod
     def invalidate_user(
         self,
         user_id: str
@@ -140,9 +177,11 @@ class TenantsCacheCollection(ABC):
         Returns:
             Number of keys deleted
         """
-        pass
+        pattern = f"tenant:*:user:{user_id}:*"
+        deleted = self.cache_client.delete_pattern(pattern)
+        logger.info(f"Invalidated {deleted} cache entries for user {user_id}")
+        return deleted
 
-    @abstractmethod
     def invalidate_all(self) -> int:
         """
         Invalidate all tenant cache entries.
@@ -150,4 +189,7 @@ class TenantsCacheCollection(ABC):
         Returns:
             Number of keys deleted
         """
-        pass
+        pattern = "tenant:*"
+        deleted = self.cache_client.delete_pattern(pattern)
+        logger.info(f"Invalidated {deleted} tenant cache entries")
+        return deleted

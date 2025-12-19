@@ -28,3 +28,42 @@ class BaseCache(ABC):
 
         """
         pass
+
+    @abstractmethod
+    def delete(self, key: str) -> bool:
+        """Delete a key from the cache.
+
+        Args:
+            key (str): The key to delete.
+        Returns:
+            bool: True if deleted, False otherwise.
+
+        """
+        pass
+
+    @abstractmethod
+    def delete_pattern(self, pattern: str) -> int:
+        """Delete all keys matching a pattern.
+
+        Args:
+            pattern (str): Key pattern (e.g., "tenant:*").
+        Returns:
+            int: Number of keys deleted.
+
+        """
+        pass
+
+    @abstractmethod
+    def ping(self) -> bool:
+        """Check if cache connection is alive.
+
+        Returns:
+            bool: True if connected, False otherwise.
+
+        """
+        pass
+
+    @abstractmethod
+    def close(self) -> None:
+        """Close the cache client connection."""
+        pass
