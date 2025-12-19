@@ -2,8 +2,8 @@
 from typing import Optional
 from fastapi import APIRouter, status, Query, Depends, Request
 
-from aihub.core.handlers.tenants import TenantHandler
-from aihub.core.handlers.dependencies import get_tenant_handler
+from aihub.handlers.tenants import TenantHandler
+from aihub.handlers.dependencies import get_tenant_handler
 from aihub.core.middleware.apis.v1.auth import authenticate, check_permissions
 from aihub.core.identity.users import ContextIdentityUser
 from aihub.core.database.enums import TenantPermissionEnum

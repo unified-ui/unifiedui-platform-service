@@ -3,7 +3,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from aihub.apis.v1 import health, identity, tenants, custom_groups
+from aihub.apis.v1 import health, identity, tenants, custom_groups, credentials
 from aihub.docdatabase.dependencies import close_db_client
 from aihub.core.config import settings
 from aihub.exc.tenants import TenantNotFoundError, TenantError
@@ -83,6 +83,17 @@ def create_app() -> FastAPI:
             content={"detail": str(exc)}
         )
     
+    # Credential exception handlers
+    from aihub.exc.credentials import CredentialNotFoundError
+    
+    @app.exception_handler(CredentialNotFoundError)
+    async def credential_not_found_handler(request: Request, exc: CredentialNotFoundError):
+        """Handle credential not found errors."""
+        return JSONResponse(
+            status_code=404,
+            content={"detail": str(exc)}
+        )
+    
     # Include routers
     app.include_router(
         health.router,
@@ -106,6 +117,12 @@ def create_app() -> FastAPI:
         custom_groups.router,
         prefix="/api/v1/tenants/{tenant_id}/custom/groups",
         tags=["Custom Groups"]
+    )
+    
+    app.include_router(
+        credentials.router,
+        prefix="/api/v1/tenants/{tenant_id}",
+        tags=["Credentials"]
     )
     
     # Lifecycle events

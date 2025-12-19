@@ -39,6 +39,15 @@ class Settings(BaseSettings):
     vault_addr: Optional[str] = None
     vault_token: Optional[str] = None
     
+    # Azure KeyVault Configuration (Optional)
+    azure_keyvault_vault_name: Optional[str] = None
+    
+    # Vault Type Selection
+    vault_type: Optional[str] = None  # AZURE_KEYVAULT or HASHICORP_VAULT
+    
+    # Secret Encryption Key (for caching secrets)
+    secrets_encryption_key: Optional[str] = None
+    
     # API Configuration
     api_title: str = "AIHub API"
     api_description: str = "AIHub - AI Application Management Platform"

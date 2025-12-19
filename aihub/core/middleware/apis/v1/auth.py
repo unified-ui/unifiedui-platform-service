@@ -5,7 +5,7 @@ from fastapi import Request, HTTPException, status
 from sqlalchemy import select
 
 from aihub.core.identity.users import ContextIdentityUser
-from aihub.core.handlers.dependencies import get_db_client
+from aihub.handlers.dependencies import get_db_client
 from aihub.core.database.enums import TenantPermissionEnum, PermissionActionEnum
 from aihub.core.database.models import (
     ApplicationPermission,
