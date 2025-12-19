@@ -7,6 +7,7 @@ from sqlalchemy import select, or_
 from aihub.core.database.client import SQLAlchemyClient
 from aihub.core.database.models import Credential, CredentialMember, CredentialMemberPermission
 from aihub.core.database.enums import PermissionActionEnum, PrincipalTypeEnum
+from aihub.core.identity.users import ContextIdentityUser
 from aihub.core.vault.client import BaseVaultClient
 from aihub.caching.client import CacheClient
 from aihub.schema.requests.credentials import CreateCredentialRequest, UpdateCredentialRequest
@@ -47,10 +48,10 @@ class CredentialHandler:
     def list_credentials(
         self,
         tenant_id: str,
+        user: ContextIdentityUser,
         skip: int = 0,
         limit: int = 100,
         name_filter: Optional[str] = None,
-        user = None,
         use_cache: bool = True
     ) -> List[CredentialResponse]:
         """
@@ -58,10 +59,10 @@ class CredentialHandler:
         
         Args:
             tenant_id: The ID of the tenant
+            user: ContextIdentityUser object for permission checking (required)
             skip: Number of items to skip
             limit: Maximum number of items to return
             name_filter: Optional filter by credential name
-            user: ContextIdentityUser object for permission checking
             use_cache: Whether to use caching
             
         Returns:
@@ -72,36 +73,32 @@ class CredentialHandler:
         logger.info("Listing credentials", extra={"tenant_id": tenant_id, "skip": skip, "limit": limit})
         
         # Check if user is admin (has GLOBAL_ADMIN or CREDENTIALS_ADMIN)
+        user_id = user.identity.get_id()
+        user_tenants = user.tenants
+        matching_tenant = next(
+            (t for t in user_tenants if t["tenant"]["id"] == tenant_id),
+            None
+        )
+        
         is_admin = False
-        user_id = None
+        if matching_tenant:
+            user_permissions = matching_tenant["permissions"]
+            admin_permissions = [
+                TenantPermissionEnum.GLOBAL_ADMIN.value,
+                TenantPermissionEnum.CREDENTIALS_ADMIN.value
+            ]
+            is_admin = any(perm in user_permissions for perm in admin_permissions)
+        
+        # Only get group IDs if not admin
         identity_group_ids = None
         custom_group_ids = None
-        
-        if user:
-            user_id = user.identity.get_id()
-            user_tenants = user.tenants
-            matching_tenant = next(
-                (t for t in user_tenants if t["tenant"]["id"] == tenant_id),
-                None
-            )
-            
-            if matching_tenant:
-                user_permissions = matching_tenant["permissions"]
-                admin_permissions = [
-                    TenantPermissionEnum.GLOBAL_ADMIN.value,
-                    TenantPermissionEnum.CREDENTIALS_ADMIN.value
-                ]
-                is_admin = any(perm in user_permissions for perm in admin_permissions)
-            
-            # Only get group IDs if not admin
-            if not is_admin:
-                identity_group_ids = [g.id for g in user.groups]
-                custom_group_ids = [g.id for g in user.custom_groups]
+        if not is_admin:
+            identity_group_ids = [g.id for g in user.groups]
+            custom_group_ids = [g.id for g in user.custom_groups]
         
         # Build cache key
         filter_key = name_filter or "all"
-        user_key = user_id or "anonymous"
-        cache_key = f"credentials:list:tenant:{tenant_id}:user:{user_key}:skip:{skip}:limit:{limit}:filter:{filter_key}"
+        cache_key = f"credentials:list:tenant:{tenant_id}:user:{user_id}:skip:{skip}:limit:{limit}:filter:{filter_key}"
         
         # Check cache
         if use_cache and self.cache_client:
@@ -117,7 +114,7 @@ class CredentialHandler:
             query = select(Credential).where(Credential.tenant_id == tenant_id)
             
             # Filter by permissions if not admin
-            if not is_admin and user_id:
+            if not is_admin:
                 # Build permission filter
                 principal_ids = [user_id]
                 if identity_group_ids:
