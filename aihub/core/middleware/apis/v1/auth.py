@@ -257,66 +257,53 @@ def check_permissions(
                     user_tenant_permissions = matching_tenant["permissions"]
                     
                     # GLOBAL_ADMIN grants access to all resources
-                    if "GLOBAL_ADMIN" in user_tenant_permissions:
+                    if TenantPermissionEnum.GLOBAL_ADMIN.value in user_tenant_permissions:
                         return await func(*args, **kwargs)
                     
                     # Entity-specific admin permissions
                     entity_admin_map = {
-                        "custom_group": "CUSTOM_GROUPS_ADMIN",
-                        "credential": "CREDENTIALS_ADMIN",
-                        # Add more as needed
+                        "application": TenantPermissionEnum.APPLICATIONS_ADMIN.value,
+                        "credential": TenantPermissionEnum.CREDENTIALS_ADMIN.value,
+                        "autonomous_agent": TenantPermissionEnum.AUTONOMOUS_AGENTS_ADMIN.value,
+                        "custom_group": TenantPermissionEnum.CUSTOM_GROUPS_ADMIN.value,
+                        "conversation": TenantPermissionEnum.CONVERSATIONS_ADMIN.value,
                     }
                     
                     entity_admin = entity_admin_map.get(entity)
                     if entity_admin and entity_admin in user_tenant_permissions:
                         return await func(*args, **kwargs)
                 
-                # Get user's principal IDs
+                # Get user's principal IDs (cache property access)
                 user_id = user.identity.get_id()
-                identity_group_ids = [group.id for group in user.groups]
-                custom_group_ids = [group.id for group in user.custom_groups]
+                user_groups = user.groups  # Cache property
+                user_custom_groups = user.custom_groups  # Cache property
+                identity_group_ids = [group.id for group in user_groups]
+                custom_group_ids = [group.id for group in user_custom_groups]
                 all_principal_ids = [user_id] + identity_group_ids + custom_group_ids
                 
-                # Query member permissions for this entity
+                # Query member permissions for this entity - ONE query with JOIN
                 db_client = get_db_client()
                 required_perms_str = [perm.value if hasattr(perm, 'value') else perm for perm in required_permissions]
                 
                 with db_client.get_session() as session:
-                    # First, find if user is a member
-                    member_query = (
-                        select(member_model)
+                    # Single query: JOIN member with permissions and check everything at once
+                    query = (
+                        select(permission_model)
+                        .join(member_model, getattr(permission_model, f"{entity}_member_id") == member_model.id)
                         .where(
                             getattr(member_model, entity_id_param) == entity_id,
                             member_model.tenant_id == tenant_id,
-                            member_model.principal_id.in_(all_principal_ids)
-                        )
-                    )
-                    
-                    members = session.execute(member_query).scalars().all()
-                    
-                    if not members:
-                        raise HTTPException(
-                            status_code=status.HTTP_403_FORBIDDEN,
-                            detail=f"Access denied: User is not a member of {entity}"
-                        )
-                    
-                    # Check if any member has the required permissions
-                    member_ids = [m.id for m in members]
-                    perm_query = (
-                        select(permission_model)
-                        .where(
-                            getattr(permission_model, f"{entity}_member_id") == member_model.id,
+                            member_model.principal_id.in_(all_principal_ids),
                             permission_model.permission.in_(required_perms_str)
                         )
-                        .where(getattr(permission_model, f"{entity}_member_id").in_(member_ids))
                     )
                     
-                    result = session.execute(perm_query).scalars().first()
+                    result = session.execute(query).scalars().first()
                     
                     if not result:
                         raise HTTPException(
                             status_code=status.HTTP_403_FORBIDDEN,
-                            detail=f"Access denied: User does not have required permissions on {entity}. Required: {required_perms_str}"
+                            detail=f"Access denied: User does not have required permissions on this {entity} (ID: {entity_id}). Required: {required_perms_str}"
                         )
             
             return await func(*args, **kwargs)

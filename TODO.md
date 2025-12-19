@@ -76,14 +76,15 @@
 
 ## TODO 
 
-
-- Routes für credentials checken
     - testen
     - permissions checken
+
+- bei check_permission muss noch irgendwie die "id" mit rein -> dann kann man checken, ob man auf die ID berechtigt ist!
+
+- Routes für credentials checken
     - ganze logik muss in handler!
     - CREDENTIALS_CREATOR
 
-- bei check_permission muss noch irgendwie die "id" mit rein -> dann kann man checken, ob man auf die ID berechtigt ist!
 
 - Spec-Driven Vibe-Coding machen (in einem Spec projekt etc beschreiben)
 
@@ -107,3 +108,4 @@
 - tests für die routes implementieren
     - in memory db
     
+- in check_permissions mit caching arbeiten
