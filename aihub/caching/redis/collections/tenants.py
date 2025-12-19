@@ -1,6 +1,5 @@
 """Redis implementation for Tenants cache collection."""
 from typing import Optional, List
-from urllib.parse import quote
 
 from aihub.core.caching.collections.tenants import TenantsCacheCollection
 from aihub.caching.redis.cache import RedisCache
@@ -21,23 +20,6 @@ class RedisTenantsCacheCollection(TenantsCacheCollection):
             cache: Redis cache instance
         """
         self.cache = cache
-
-    def build_key(
-        self,
-        tenant_id: Optional[str],
-        user_id: str,
-        route: str
-    ) -> str:
-        """
-        Build cache key: tenant:{tenantID}:user:{userID}:route:{route}
-        """
-        # URL-encode route to handle query params
-        encoded_route = quote(route, safe='')
-        
-        if tenant_id:
-            return f"tenant:{tenant_id}:user:{user_id}:route:{encoded_route}"
-        else:
-            return f"tenant:list:user:{user_id}:route:{encoded_route}"
 
     def get_tenant(
         self,

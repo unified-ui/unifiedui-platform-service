@@ -57,5 +57,5 @@ def close_cache_client() -> None:
             logger.error(f"Error closing cache client: {e}")
         finally:
             _cache_client = None
-            # Clear the cache
+            # Clear the lru cache
             get_cache_client.cache_clear()

@@ -67,16 +67,34 @@ class BaseIdentityProvider(ABC):
     def get_security_groups(
         self,
         query: APIFilterQuery | None = None
-    ) -> list[IdentityGroupResponse]:
-        """Get all security groups from the directory."""
+    ) -> tuple[list[IdentityGroupResponse], str | None]:
+        """
+        Get all security groups from the directory.
+        
+        Args:
+            identity_token: User's identity token
+            query: Query parameters (search, top, next_link)
+            
+        Returns:
+            Tuple of (list of security groups, next_link)
+        """
         pass
 
     @abstractmethod
     def get_users(
         self,
         query: APIFilterQuery | None = None
-    ) -> list[IdentityUserResponse]:
-        """Get users from the directory."""
+    ) -> tuple[list[IdentityUserResponse], str | None]:
+        """
+        Get users from the directory.
+        
+        Args:
+            identity_token: User's identity token
+            query: Query parameters (search, top, next_link)
+            
+        Returns:
+            Tuple of (list of users, next_link)
+        """
         pass
 
     @abstractmethod

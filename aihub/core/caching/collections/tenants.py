@@ -1,6 +1,7 @@
 """Abstract interface for Tenants cache collection."""
 from abc import ABC, abstractmethod
 from typing import Optional, List
+from urllib.parse import quote
 
 from aihub.schema.responses.tenants import TenantResponse
 
@@ -11,7 +12,6 @@ class TenantsCacheCollection(ABC):
     Handles caching of tenant data per user and route.
     """
 
-    @abstractmethod
     def build_key(
         self,
         tenant_id: Optional[str],
@@ -19,18 +19,15 @@ class TenantsCacheCollection(ABC):
         route: str
     ) -> str:
         """
-        Build a cache key for tenant data.
-        Format: tenant:{tenantID}:user:{userID}:route:{route}
-        
-        Args:
-            tenant_id: Tenant ID (can be None for list operations)
-            user_id: User ID
-            route: Request route including query params
-            
-        Returns:
-            Cache key string
+        Build cache key: tenant:{tenantID}:user:{userID}:route:{route}
         """
-        pass
+        # URL-encode route to handle query params
+        encoded_route = quote(route, safe='')
+        
+        if tenant_id:
+            return f"tenant:{tenant_id}:user:{user_id}:route:{encoded_route}"
+        else:
+            return f"tenant:list:user:{user_id}:route:{encoded_route}"
 
     @abstractmethod
     def get_tenant(

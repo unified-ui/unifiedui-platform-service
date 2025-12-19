@@ -57,11 +57,11 @@
 
 ## TODO
 
-
-
-
 - refactoring
     - db client wird in users.py noch initialisiert -> sollte injected werden!
+    - cache > dependencies:
+        - wenn type is None -> sollte cache auf None sein und nicht redis initialisiert werden!
+
 - Caching
     - tenants in handler rein
         - und wichtig: users.py wird noch außerhalb ge
@@ -91,7 +91,7 @@
     - invoke -> use n8n chat-model
         - wie macht man es, wenn eine rückfrage gestellt wird? geht ja in einem Workflow
 
----
 
-- /tenants/{id}/principals
-    - noch im identity provider (idp) get_user_by_id und get_group_by_id implementieren um die Namen zu fetchen!
+- tests für die routes implementieren
+    - in memory db
+    
