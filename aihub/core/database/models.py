@@ -217,7 +217,9 @@ class AutonomousAgent(Base, IdNameDescriptionMixin, TenantScopedMixin):
 class Credential(Base, IdNameDescriptionMixin, TenantScopedMixin):
     __tablename__ = "credentials"
 
-    config: Mapped[dict] = mapped_column(PortableJSON, nullable=False, default=dict)
+    type: Mapped[str] = mapped_column(String(50), nullable=False)
+    source: Mapped[str] = mapped_column(String(255), nullable=False)
+    credential_uri: Mapped[str] = mapped_column(String(2000), nullable=False)
 
     permissions: Mapped[list["CredentialPermission"]] = relationship(
         back_populates="credential", cascade="all, delete-orphan"
