@@ -54,9 +54,6 @@
 - identity/users/{id}
 - identity/groups/{id}
 - next_link bei /users testen -> funktioniert das?
-
-## TODO
-
 - refactoring
     - db client wird in users.py noch initialisiert -> sollte injected werden!
     - cache > dependencies:
@@ -71,18 +68,14 @@
         - und wichtig: users.py wird noch außerhalb ge
     - cusgroups
 
-- Spec-Driven Vibe-Coding machen (in einem Spec projekt etc beschreiben)
-
-- permissions mit zweitem account testen auf
-    - tenant
-    - custom groups
-
-
-
 - Credentials
     - CRUD
     - metadaten in db; key in secrets vault
     - key auch cachen, aber mit encryption key (aus env)
+
+
+## TODO 
+
 
 - Routes für credentials checken
     - testen
@@ -91,6 +84,8 @@
     - CREDENTIALS_CREATOR
 
 - bei check_permission muss noch irgendwie die "id" mit rein -> dann kann man checken, ob man auf die ID berechtigt ist!
+
+- Spec-Driven Vibe-Coding machen (in einem Spec projekt etc beschreiben)
 
 - Applications
     - CRUD
@@ -103,6 +98,11 @@
     - invoke -> use n8n chat-model
         - wie macht man es, wenn eine rückfrage gestellt wird? geht ja in einem Workflow
 
+- autonomous agents
+
+- permissions mit zweitem account testen auf
+    - tenant
+    - custom groups
 
 - tests für die routes implementieren
     - in memory db

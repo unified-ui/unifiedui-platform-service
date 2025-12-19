@@ -10,7 +10,11 @@ from aihub.handlers.dependencies import get_credential_handler
 from aihub.schema.requests.credentials import CreateCredentialRequest, UpdateCredentialRequest
 from aihub.schema.requests.credential_permissions import SetCredentialPermissionRequest
 from aihub.schema.responses.credentials import CredentialResponse
-from aihub.schema.responses.credential_permissions import CredentialPermissionResponse, CredentialPermissionsListResponse
+from aihub.schema.responses.credential_permissions import (
+    CredentialPermissionResponse,
+    CredentialPrincipalsResponse,
+    PrincipalPermissionsResponse
+)
 from aihub.exc.credentials import CredentialNotFoundError
 from aihub.core.middleware.apis.v1.auth import authenticate, check_permissions
 from aihub.core.database.enums import TenantPermissionEnum, PermissionActionEnum
@@ -346,7 +350,7 @@ async def delete_credential(
 
 @router.get(
     "/{credential_id}/principals",
-    response_model=CredentialPermissionsListResponse,
+    response_model=CredentialPrincipalsResponse,
     summary="List credential permissions",
     description="Get all principals with permissions for a credential"
 )
@@ -357,7 +361,7 @@ async def list_credential_permissions(
     tenant_id: str,
     credential_id: str,
     handler: CredentialHandler = Depends(get_credential_handler)
-) -> CredentialPermissionsListResponse:
+) -> CredentialPrincipalsResponse:
     """
     List all permissions for a credential.
     
@@ -370,7 +374,7 @@ async def list_credential_permissions(
         handler: Credential handler dependency
         
     Returns:
-        List of credential permissions
+        Grouped principals with their permissions
     """
     try:
         user: ContextIdentityUser = request.state.user
@@ -402,9 +406,9 @@ async def list_credential_permissions(
 
 @router.get(
     "/{credential_id}/principals/{principal_id}",
-    response_model=CredentialPermissionResponse,
-    summary="Get credential permission",
-    description="Get a specific principal's permission for a credential"
+    response_model=PrincipalPermissionsResponse,
+    summary="Get credential permissions for principal",
+    description="Get all permissions for a specific principal on a credential"
 )
 @authenticate
 @check_permissions(entity="credential", required_permissions=[PermissionActionEnum.ADMIN])
@@ -414,9 +418,9 @@ async def get_credential_permission(
     credential_id: str,
     principal_id: str,
     handler: CredentialHandler = Depends(get_credential_handler)
-) -> CredentialPermissionResponse:
+) -> PrincipalPermissionsResponse:
     """
-    Get a specific credential permission.
+    Get all permissions for a specific principal on a credential.
     
     Requires ADMIN permission on the credential or CREDENTIALS_ADMIN on tenant.
     
@@ -428,7 +432,7 @@ async def get_credential_permission(
         handler: Credential handler dependency
         
     Returns:
-        Credential permission
+        Principal with all their permissions
     """
     try:
         user: ContextIdentityUser = request.state.user
@@ -521,7 +525,7 @@ async def set_credential_permission(
 
 
 @router.delete(
-    "/{credential_id}/principals/{principal_id}",
+    "/{credential_id}/principals",
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Delete credential permission",
     description="Remove a principal's permission for a credential"
@@ -532,7 +536,7 @@ async def delete_credential_permission(
     request: Request,
     tenant_id: str,
     credential_id: str,
-    principal_id: str,
+    delete_request: SetCredentialPermissionRequest,
     handler: CredentialHandler = Depends(get_credential_handler)
 ) -> Response:
     """
@@ -544,7 +548,7 @@ async def delete_credential_permission(
         request: FastAPI request with user in state
         tenant_id: Tenant ID from path
         credential_id: Credential ID from path
-        principal_id: Principal ID from path
+        delete_request: Permission deletion data (principal_id, principal_type, permission)
         handler: Credential handler dependency
         
     Returns:
@@ -557,14 +561,16 @@ async def delete_credential_permission(
             extra={
                 "tenant_id": tenant_id,
                 "credential_id": credential_id,
-                "principal_id": principal_id,
+                "principal_id": delete_request.principal_id,
                 "user_id": user.identity.get_id()
             }
         )
         handler.delete_credential_permission(
             tenant_id=tenant_id,
             credential_id=credential_id,
-            principal_id=principal_id
+            principal_id=delete_request.principal_id,
+            principal_type=delete_request.principal_type,
+            permission=delete_request.permission
         )
         return Response(status_code=status.HTTP_204_NO_CONTENT)
     except CredentialNotFoundError as e:

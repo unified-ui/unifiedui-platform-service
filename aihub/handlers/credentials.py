@@ -5,14 +5,18 @@ from typing import Optional, List
 from sqlalchemy import select, or_
 
 from aihub.core.database.client import SQLAlchemyClient
-from aihub.core.database.models import Credential, CredentialPermission
+from aihub.core.database.models import Credential, CredentialMember, CredentialMemberPermission
 from aihub.core.database.enums import PermissionActionEnum, PrincipalTypeEnum
 from aihub.core.vault.client import BaseVaultClient
 from aihub.caching.client import CacheClient
 from aihub.schema.requests.credentials import CreateCredentialRequest, UpdateCredentialRequest
 from aihub.schema.requests.credential_permissions import SetCredentialPermissionRequest
 from aihub.schema.responses.credentials import CredentialResponse
-from aihub.schema.responses.credential_permissions import CredentialPermissionResponse, CredentialPermissionsListResponse
+from aihub.schema.responses.credential_permissions import (
+    CredentialPermissionResponse,
+    CredentialPrincipalsResponse,
+    PrincipalPermissionsResponse
+)
 from aihub.exc.credentials import CredentialNotFoundError
 from aihub.logger import get_logger
 
@@ -97,17 +101,17 @@ class CredentialHandler:
                 if custom_group_ids:
                     principal_ids.extend(custom_group_ids)
                 
-                # Subquery for credentials with permissions
-                permission_subquery = (
-                    select(CredentialPermission.credential_id)
+                # Subquery for credentials where user is a member
+                member_subquery = (
+                    select(CredentialMember.credential_id)
                     .where(
-                        CredentialPermission.tenant_id == tenant_id,
-                        CredentialPermission.principal_id.in_(principal_ids)
+                        CredentialMember.tenant_id == tenant_id,
+                        CredentialMember.principal_id.in_(principal_ids)
                     )
                     .distinct()
                 )
                 
-                query = query.where(Credential.id.in_(permission_subquery))
+                query = query.where(Credential.id.in_(member_subquery))
             
             if name_filter:
                 query = query.where(Credential.name.ilike(f"%{name_filter}%"))
@@ -425,7 +429,7 @@ class CredentialHandler:
         self,
         tenant_id: str,
         credential_id: str
-    ) -> CredentialPermissionsListResponse:
+    ) -> CredentialPrincipalsResponse:
         """
         List all permissions for a credential.
         
@@ -434,7 +438,7 @@ class CredentialHandler:
             credential_id: The ID of the credential
             
         Returns:
-            List of credential permissions
+            Grouped permissions by principal
             
         Raises:
             CredentialNotFoundError: If credential not found
@@ -451,17 +455,45 @@ class CredentialHandler:
             if not credential:
                 raise CredentialNotFoundError(credential_id)
             
-            # Get permissions
-            perm_query = select(CredentialPermission).where(
-                CredentialPermission.credential_id == credential_id,
-                CredentialPermission.tenant_id == tenant_id
+            # Get all members with their permissions
+            member_query = select(CredentialMember).where(
+                CredentialMember.credential_id == credential_id,
+                CredentialMember.tenant_id == tenant_id
             )
-            permissions = session.execute(perm_query).scalars().all()
+            members = session.execute(member_query).scalars().all()
             
-            logger.info("Retrieved credential permissions", extra={"count": len(permissions)})
-            return CredentialPermissionsListResponse(
-                permissions=[self._permission_to_response(perm) for perm in permissions],
-                total=len(permissions)
+            # Group permissions by principal
+            principals_map = {}
+            for member in members:
+                # Get permissions for this member
+                perm_query = select(CredentialMemberPermission).where(
+                    CredentialMemberPermission.credential_member_id == member.id
+                )
+                member_permissions = session.execute(perm_query).scalars().all()
+                
+                # Group by principal
+                if member.principal_id not in principals_map:
+                    principals_map[member.principal_id] = {
+                        "principal_id": member.principal_id,
+                        "principal_type": member.principal_type,
+                        "permissions": []
+                    }
+                
+                # Add permissions
+                for perm in member_permissions:
+                    principals_map[member.principal_id]["permissions"].append(perm.permission.value if hasattr(perm.permission, 'value') else perm.permission)
+            
+            # Convert to list of principals
+            principals = [
+                PrincipalPermissionsResponse(**principal_data)
+                for principal_data in principals_map.values()
+            ]
+            
+            logger.info("Retrieved credential permissions", extra={"count": len(principals)})
+            return CredentialPrincipalsResponse(
+                credential_id=credential_id,
+                tenant_id=tenant_id,
+                principals=principals
             )
 
     def get_credential_permission(
@@ -469,9 +501,9 @@ class CredentialHandler:
         tenant_id: str,
         credential_id: str,
         principal_id: str
-    ) -> CredentialPermissionResponse:
+    ) -> PrincipalPermissionsResponse:
         """
-        Get a specific credential permission.
+        Get all permissions for a specific principal on a credential.
         
         Args:
             tenant_id: The ID of the tenant
@@ -479,12 +511,12 @@ class CredentialHandler:
             principal_id: The ID of the principal
             
         Returns:
-            Credential permission
+            Principal with all their permissions
             
         Raises:
-            CredentialNotFoundError: If credential or permission not found
+            CredentialNotFoundError: If credential or principal not found
         """
-        logger.info("Getting credential permission", extra={
+        logger.info("Getting credential permissions for principal", extra={
             "tenant_id": tenant_id,
             "credential_id": credential_id,
             "principal_id": principal_id
@@ -500,18 +532,39 @@ class CredentialHandler:
             if not credential:
                 raise CredentialNotFoundError(credential_id)
             
-            # Get permission
-            perm_query = select(CredentialPermission).where(
-                CredentialPermission.credential_id == credential_id,
-                CredentialPermission.tenant_id == tenant_id,
-                CredentialPermission.principal_id == principal_id
+            # Get member
+            member_query = select(CredentialMember).where(
+                CredentialMember.credential_id == credential_id,
+                CredentialMember.tenant_id == tenant_id,
+                CredentialMember.principal_id == principal_id
             )
-            permission = session.execute(perm_query).scalar_one_or_none()
+            member = session.execute(member_query).scalar_one_or_none()
             
-            if not permission:
-                raise CredentialNotFoundError(f"Permission for principal {principal_id} not found")
+            if not member:
+                raise CredentialNotFoundError(f"Member with principal {principal_id} not found")
             
-            return self._permission_to_response(permission)
+            # Get all permissions for this member
+            perm_query = select(CredentialMemberPermission).where(
+                CredentialMemberPermission.credential_member_id == member.id
+            )
+            permissions = session.execute(perm_query).scalars().all()
+            
+            if not permissions:
+                raise CredentialNotFoundError(f"No permissions for principal {principal_id}")
+            
+            # Build response with all permissions
+            permission_list = [
+                perm.permission.value if hasattr(perm.permission, 'value') else perm.permission
+                for perm in permissions
+            ]
+            
+            return PrincipalPermissionsResponse(
+                credential_id=credential_id,
+                tenant_id=tenant_id,
+                principal_id=member.principal_id,
+                principal_type=member.principal_type,
+                permissions=permission_list
+            )
 
     def set_credential_permission(
         self,
@@ -549,31 +602,50 @@ class CredentialHandler:
             if not credential:
                 raise CredentialNotFoundError(credential_id)
             
-            # Check if permission already exists
-            perm_query = select(CredentialPermission).where(
-                CredentialPermission.credential_id == credential_id,
-                CredentialPermission.tenant_id == tenant_id,
-                CredentialPermission.principal_id == request.principal_id
+            # Check if member already exists
+            member_query = select(CredentialMember).where(
+                CredentialMember.credential_id == credential_id,
+                CredentialMember.tenant_id == tenant_id,
+                CredentialMember.principal_id == request.principal_id,
+                CredentialMember.principal_type == request.principal_type
             )
-            permission = session.execute(perm_query).scalar_one_or_none()
+            member = session.execute(member_query).scalar_one_or_none()
             
-            if permission:
-                # Update existing permission
-                permission.action = request.permission
-                logger.info("Updated credential permission")
-            else:
-                # Create new permission
-                permission = CredentialPermission(
+            if not member:
+                # Create new member
+                member = CredentialMember(
                     id=str(uuid.uuid4()),
                     tenant_id=tenant_id,
                     credential_id=credential_id,
                     principal_id=request.principal_id,
-                    action=request.permission,
+                    principal_type=request.principal_type,
                     name=f"{request.principal_type.value}_{request.principal_id}",
+                    description=f"Member {request.principal_type.value}"
+                )
+                session.add(member)
+                session.flush()
+                logger.info("Created credential member")
+            
+            # Check if permission already exists for this member
+            perm_query = select(CredentialMemberPermission).where(
+                CredentialMemberPermission.credential_member_id == member.id,
+                CredentialMemberPermission.permission == request.permission
+            )
+            permission = session.execute(perm_query).scalar_one_or_none()
+            
+            if not permission:
+                # Create new permission
+                permission = CredentialMemberPermission(
+                    id=str(uuid.uuid4()),
+                    credential_member_id=member.id,
+                    permission=request.permission,
+                    name=f"{request.permission.value}_permission",
                     description=f"Permission for {request.principal_type.value}"
                 )
                 session.add(permission)
                 logger.info("Created credential permission")
+            
+            session.flush()  # Flush to get auto-generated timestamps
             
             # Invalidate caches
             if self.cache_client:
@@ -583,29 +655,35 @@ class CredentialHandler:
                 except Exception as e:
                     logger.warning(f"Failed to invalidate cache: {e}")
             
-            return self._permission_to_response(permission)
+            return self._permission_to_response(member, permission)
 
     def delete_credential_permission(
         self,
         tenant_id: str,
         credential_id: str,
-        principal_id: str
+        principal_id: str,
+        principal_type: str,
+        permission: str
     ) -> None:
         """
-        Delete a credential permission.
+        Delete a specific credential permission.
         
         Args:
             tenant_id: The ID of the tenant
             credential_id: The ID of the credential
             principal_id: The ID of the principal
+            principal_type: The type of the principal (IDENTITY_USER, IDENTITY_GROUP, CUSTOM_GROUP)
+            permission: The specific permission to delete (READ, WRITE, ADMIN)
             
         Raises:
-            CredentialNotFoundError: If credential or permission not found
+            CredentialNotFoundError: If credential, member, or permission not found
         """
         logger.info("Deleting credential permission", extra={
             "tenant_id": tenant_id,
             "credential_id": credential_id,
-            "principal_id": principal_id
+            "principal_id": principal_id,
+            "principal_type": principal_type,
+            "permission": permission
         })
         
         with self.db_client.get_session() as session:
@@ -618,18 +696,40 @@ class CredentialHandler:
             if not credential:
                 raise CredentialNotFoundError(credential_id)
             
-            # Get and delete permission
-            perm_query = select(CredentialPermission).where(
-                CredentialPermission.credential_id == credential_id,
-                CredentialPermission.tenant_id == tenant_id,
-                CredentialPermission.principal_id == principal_id
+            # Get member
+            member_query = select(CredentialMember).where(
+                CredentialMember.credential_id == credential_id,
+                CredentialMember.tenant_id == tenant_id,
+                CredentialMember.principal_id == principal_id,
+                CredentialMember.principal_type == principal_type
             )
-            permission = session.execute(perm_query).scalar_one_or_none()
+            member = session.execute(member_query).scalar_one_or_none()
             
-            if not permission:
-                raise CredentialNotFoundError(f"Permission for principal {principal_id} not found")
+            if not member:
+                raise CredentialNotFoundError(f"Member with principal {principal_id} not found")
             
-            session.delete(permission)
+            # Get and delete the specific permission
+            perm_query = select(CredentialMemberPermission).where(
+                CredentialMemberPermission.credential_member_id == member.id,
+                CredentialMemberPermission.permission == permission
+            )
+            perm = session.execute(perm_query).scalar_one_or_none()
+            
+            if not perm:
+                raise CredentialNotFoundError(f"Permission {permission} not found for principal {principal_id}")
+            
+            session.delete(perm)
+            
+            # Check if member has any remaining permissions
+            remaining_perms_query = select(CredentialMemberPermission).where(
+                CredentialMemberPermission.credential_member_id == member.id
+            )
+            remaining_perms = session.execute(remaining_perms_query).scalars().all()
+            
+            # If no permissions left, delete the member too
+            if not remaining_perms:
+                session.delete(member)
+                logger.info("Deleted member as no permissions remain")
             
             # Invalidate caches
             if self.cache_client:
@@ -642,15 +742,15 @@ class CredentialHandler:
             logger.info("Deleted credential permission")
 
     @staticmethod
-    def _permission_to_response(permission: CredentialPermission) -> CredentialPermissionResponse:
-        """Convert CredentialPermission model to response."""
+    def _permission_to_response(member: CredentialMember, permission: CredentialMemberPermission) -> CredentialPermissionResponse:
+        """Convert CredentialMember and CredentialMemberPermission to response."""
         return CredentialPermissionResponse(
             id=permission.id,
-            credential_id=permission.credential_id,
-            tenant_id=permission.tenant_id,
-            principal_id=permission.principal_id,
-            principal_type=PrincipalTypeEnum.IDENTITY_USER,  # Default, should be stored in DB
-            action=permission.action,
+            credential_id=member.credential_id,
+            tenant_id=member.tenant_id,
+            principal_id=member.principal_id,
+            principal_type=member.principal_type,
+            action=permission.permission,
             created_at=permission.created_at,
             updated_at=permission.updated_at
         )
