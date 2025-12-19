@@ -50,10 +50,7 @@ class CredentialHandler:
         skip: int = 0,
         limit: int = 100,
         name_filter: Optional[str] = None,
-        user_id: Optional[str] = None,
-        identity_group_ids: Optional[List[str]] = None,
-        custom_group_ids: Optional[List[str]] = None,
-        is_admin: bool = False,
+        user = None,
         use_cache: bool = True
     ) -> List[CredentialResponse]:
         """
@@ -64,20 +61,47 @@ class CredentialHandler:
             skip: Number of items to skip
             limit: Maximum number of items to return
             name_filter: Optional filter by credential name
-            user_id: User ID for permission filtering
-            identity_group_ids: List of identity group IDs for permission filtering
-            custom_group_ids: List of custom group IDs for permission filtering
-            is_admin: If True, skip permission filtering (GLOBAL_ADMIN or CREDENTIALS_ADMIN)
+            user: ContextIdentityUser object for permission checking
             use_cache: Whether to use caching
             
         Returns:
             List of credential responses (without secret values)
         """
+        from aihub.core.database.enums import TenantPermissionEnum
+        
         logger.info("Listing credentials", extra={"tenant_id": tenant_id, "skip": skip, "limit": limit})
+        
+        # Check if user is admin (has GLOBAL_ADMIN or CREDENTIALS_ADMIN)
+        is_admin = False
+        user_id = None
+        identity_group_ids = None
+        custom_group_ids = None
+        
+        if user:
+            user_id = user.identity.get_id()
+            user_tenants = user.tenants
+            matching_tenant = next(
+                (t for t in user_tenants if t["tenant"]["id"] == tenant_id),
+                None
+            )
+            
+            if matching_tenant:
+                user_permissions = matching_tenant["permissions"]
+                admin_permissions = [
+                    TenantPermissionEnum.GLOBAL_ADMIN.value,
+                    TenantPermissionEnum.CREDENTIALS_ADMIN.value
+                ]
+                is_admin = any(perm in user_permissions for perm in admin_permissions)
+            
+            # Only get group IDs if not admin
+            if not is_admin:
+                identity_group_ids = [g.id for g in user.groups]
+                custom_group_ids = [g.id for g in user.custom_groups]
         
         # Build cache key
         filter_key = name_filter or "all"
-        cache_key = f"credentials:list:tenant:{tenant_id}:skip:{skip}:limit:{limit}:filter:{filter_key}"
+        user_key = user_id or "anonymous"
+        cache_key = f"credentials:list:tenant:{tenant_id}:user:{user_key}:skip:{skip}:limit:{limit}:filter:{filter_key}"
         
         # Check cache
         if use_cache and self.cache_client:
@@ -474,6 +498,8 @@ class CredentialHandler:
                 # Group by principal
                 if member.principal_id not in principals_map:
                     principals_map[member.principal_id] = {
+                        "credential_id": credential_id,
+                        "tenant_id": tenant_id,
                         "principal_id": member.principal_id,
                         "principal_type": member.principal_type,
                         "permissions": []

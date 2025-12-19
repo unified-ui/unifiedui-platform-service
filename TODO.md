@@ -84,6 +84,7 @@
 - Routes für credentials checken
     - ganze logik muss in handler!
     - CREDENTIALS_CREATOR
+    - required_permissions updaten!
 
 
 - Spec-Driven Vibe-Coding machen (in einem Spec projekt etc beschreiben)

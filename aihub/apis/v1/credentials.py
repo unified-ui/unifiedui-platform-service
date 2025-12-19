@@ -63,28 +63,11 @@ async def list_credentials(
     try:
         user: ContextIdentityUser = request.state.user
         
-        # Check if user is admin (has GLOBAL_ADMIN or CREDENTIALS_ADMIN)
-        is_admin = False
-        user_tenants = user.tenants
-        matching_tenant = next(
-            (t for t in user_tenants if t["tenant"]["id"] == tenant_id),
-            None
-        )
-        
-        if matching_tenant:
-            user_permissions = matching_tenant["permissions"]
-            admin_permissions = [
-                TenantPermissionEnum.GLOBAL_ADMIN.value,
-                TenantPermissionEnum.CREDENTIALS_ADMIN.value
-            ]
-            is_admin = any(perm in user_permissions for perm in admin_permissions)
-        
         logger.info(
             "API: List credentials",
             extra={
                 "tenant_id": tenant_id,
                 "user_id": user.identity.get_id(),
-                "is_admin": is_admin,
                 "skip": skip,
                 "limit": limit
             }
@@ -95,10 +78,7 @@ async def list_credentials(
             skip=skip,
             limit=limit,
             name_filter=name_filter,
-            user_id=user.identity.get_id() if not is_admin else None,
-            identity_group_ids=[g.id for g in user.groups] if not is_admin else None,
-            custom_group_ids=[g.id for g in user.custom_groups] if not is_admin else None,
-            is_admin=is_admin
+            user=user
         )
     except Exception as e:
         logger.error(f"Failed to list credentials: {e}")
