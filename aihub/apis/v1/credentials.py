@@ -96,7 +96,14 @@ async def list_credentials(
     description="Create a new credential and store secret in vault"
 )
 @authenticate
-@check_permissions(entity="tenant", required_permissions=[TenantPermissionEnum.GLOBAL_ADMIN, TenantPermissionEnum.CREDENTIALS_ADMIN])
+@check_permissions(
+    entity="tenant",
+    required_permissions=[
+        TenantPermissionEnum.GLOBAL_ADMIN,
+        TenantPermissionEnum.CREDENTIALS_ADMIN,
+        TenantPermissionEnum.CREDENTIALS_CREATOR
+    ]
+)
 async def create_credential(
     request: Request,
     tenant_id: str,
@@ -148,7 +155,16 @@ async def create_credential(
     description="Get a specific credential by ID (without secret value)"
 )
 @authenticate
-@check_permissions(entity="credential", required_permissions=[PermissionActionEnum.READ])
+@check_permissions(
+    entity="credential",
+    required_permissions=[
+        TenantPermissionEnum.GLOBAL_ADMIN,
+        TenantPermissionEnum.CREDENTIALS_ADMIN,
+        PermissionActionEnum.ADMIN,
+        PermissionActionEnum.WRITE,
+        PermissionActionEnum.READ
+    ]
+)
 async def get_credential(
     request: Request,
     tenant_id: str,
@@ -208,7 +224,15 @@ async def get_credential(
     description="Update an existing credential and optionally update the secret"
 )
 @authenticate
-@check_permissions(entity="credential", required_permissions=[PermissionActionEnum.WRITE, PermissionActionEnum.ADMIN])
+@check_permissions(
+    entity="credential",
+    required_permissions=[
+        TenantPermissionEnum.GLOBAL_ADMIN,
+        TenantPermissionEnum.CREDENTIALS_ADMIN,
+        PermissionActionEnum.ADMIN,
+        PermissionActionEnum.WRITE
+    ]
+)
 async def update_credential(
     request: Request,
     tenant_id: str,
@@ -272,7 +296,15 @@ async def update_credential(
     description="Delete a credential and its secret from the vault"
 )
 @authenticate
-@check_permissions(entity="credential", required_permissions=[PermissionActionEnum.ADMIN])
+@check_permissions(
+    entity="credential",
+    required_permissions=[
+        TenantPermissionEnum.GLOBAL_ADMIN,
+        TenantPermissionEnum.CREDENTIALS_ADMIN,
+        PermissionActionEnum.ADMIN,
+        PermissionActionEnum.WRITE
+    ]
+)
 async def delete_credential(
     request: Request,
     tenant_id: str,
@@ -335,7 +367,16 @@ async def delete_credential(
     description="Get all principals with permissions for a credential"
 )
 @authenticate
-@check_permissions(entity="credential", required_permissions=[PermissionActionEnum.ADMIN])
+@check_permissions(
+    entity="credential",
+    required_permissions=[
+        TenantPermissionEnum.GLOBAL_ADMIN,
+        TenantPermissionEnum.CREDENTIALS_ADMIN,
+        PermissionActionEnum.ADMIN,
+        PermissionActionEnum.WRITE,
+        PermissionActionEnum.READ
+    ]
+)
 async def list_credential_permissions(
     request: Request,
     tenant_id: str,
@@ -391,7 +432,14 @@ async def list_credential_permissions(
     description="Get all permissions for a specific principal on a credential"
 )
 @authenticate
-@check_permissions(entity="credential", required_permissions=[PermissionActionEnum.ADMIN])
+@check_permissions(
+    entity="credential", required_permissions=[
+        TenantPermissionEnum.GLOBAL_ADMIN,
+        TenantPermissionEnum.CREDENTIALS_ADMIN,
+        PermissionActionEnum.ADMIN,
+        PermissionActionEnum.WRITE,
+        PermissionActionEnum.READ
+    ])
 async def get_credential_permission(
     request: Request,
     tenant_id: str,
@@ -451,7 +499,13 @@ async def get_credential_permission(
     description="Set or update a principal's permission for a credential"
 )
 @authenticate
-@check_permissions(entity="credential", required_permissions=[PermissionActionEnum.ADMIN])
+@check_permissions(
+    entity="credential", required_permissions=[
+        TenantPermissionEnum.GLOBAL_ADMIN,
+        TenantPermissionEnum.CREDENTIALS_ADMIN,
+        PermissionActionEnum.ADMIN
+    ]
+)
 async def set_credential_permission(
     request: Request,
     tenant_id: str,
@@ -488,7 +542,8 @@ async def set_credential_permission(
         return handler.set_credential_permission(
             tenant_id=tenant_id,
             credential_id=credential_id,
-            request=permission_request
+            request=permission_request,
+            user_id=user.identity.get_id()
         )
     except CredentialNotFoundError as e:
         logger.warning(f"Credential not found: {e}")
@@ -511,7 +566,14 @@ async def set_credential_permission(
     description="Remove a principal's permission for a credential"
 )
 @authenticate
-@check_permissions(entity="credential", required_permissions=[PermissionActionEnum.ADMIN])
+@check_permissions(
+    entity="credential",
+    required_permissions=[
+        TenantPermissionEnum.GLOBAL_ADMIN,
+        TenantPermissionEnum.CREDENTIALS_ADMIN,
+        PermissionActionEnum.ADMIN
+    ]
+)
 async def delete_credential_permission(
     request: Request,
     tenant_id: str,

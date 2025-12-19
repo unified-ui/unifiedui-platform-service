@@ -147,8 +147,8 @@ class CredentialHandler:
             if self.cache_client:
                 try:
                     cache_data = [item.model_dump() for item in result]
-                    self.cache_client.client.set(cache_key, cache_data, ttl=300)  # 5 minutes
-                    logger.debug(f"Cached credential list (TTL: 300s)")
+                    self.cache_client.client.set(cache_key, cache_data, ttl=30)  # 30 seconds
+                    logger.debug(f"Cached credential list (TTL: 30s)")
                 except Exception as e:
                     logger.warning(f"Failed to cache credential list: {e}")
             
@@ -206,8 +206,8 @@ class CredentialHandler:
             # Cache the result
             if self.cache_client:
                 try:
-                    self.cache_client.client.set(cache_key, result.model_dump(), ttl=600)  # 10 minutes
-                    logger.debug(f"Cached credential {credential_id} (TTL: 600s)")
+                    self.cache_client.client.set(cache_key, result.model_dump(), ttl=60)  # 1 minute
+                    logger.debug(f"Cached credential {credential_id} (TTL: 60s)")
                 except Exception as e:
                     logger.warning(f"Failed to cache credential: {e}")
             
@@ -298,14 +298,46 @@ class CredentialHandler:
             session.add(credential)
             session.flush()  # Flush to get auto-generated timestamps
             
-            # Invalidate caches
+            # Add creator as member with ADMIN permission
+            member = CredentialMember(
+                id=str(uuid.uuid4()),
+                tenant_id=tenant_id,
+                credential_id=credential_id,
+                principal_id=user_id,
+                principal_type=PrincipalTypeEnum.IDENTITY_USER,
+                name=f"creator_{user_id}",
+                description="Credential creator",
+                created_by=user_id,
+                updated_by=user_id
+            )
+            session.add(member)
+            session.flush()
+            
+            # Add ADMIN permission for creator
+            permission = CredentialMemberPermission(
+                id=str(uuid.uuid4()),
+                credential_member_id=member.id,
+                permission=PermissionActionEnum.ADMIN,
+                name="admin_permission",
+                description="Admin permission for creator",
+                created_by=user_id,
+                updated_by=user_id
+            )
+            session.add(permission)
+            
+            # Invalidate caches BEFORE flush to ensure consistency
             if self.cache_client:
                 try:
                     self._invalidate_list_cache(tenant_id)
-                    logger.debug(f"Invalidated credential list cache")
+                    self._invalidate_permissions_cache(tenant_id, credential_id)
+                    logger.debug(f"Invalidated credential list and permissions cache")
                 except Exception as e:
                     logger.warning(f"Failed to invalidate cache: {e}")
             
+            session.flush()
+            session.commit()  # Explicit commit to ensure data is visible
+            
+            logger.info("Added creator as admin member", extra={"user_id": user_id, "credential_id": credential_id})
             logger.info("Credential created", extra={"credential_id": credential_id})
             return self._model_to_response(credential)
 
@@ -369,7 +401,7 @@ class CredentialHandler:
             
             credential.updated_by = user_id
             
-            # Invalidate caches
+            # Invalidate caches BEFORE commit to ensure consistency
             if self.cache_client:
                 try:
                     self._invalidate_list_cache(tenant_id)
@@ -377,6 +409,8 @@ class CredentialHandler:
                     logger.debug(f"Invalidated caches for credential {credential_id}")
                 except Exception as e:
                     logger.warning(f"Failed to invalidate cache: {e}")
+            
+            session.flush()
             
             logger.info("Credential updated", extra={"credential_id": credential_id})
             return self._model_to_response(credential)
@@ -410,8 +444,19 @@ class CredentialHandler:
             
             vault_uri = credential.credential_uri
             
-            # Delete from database first
+            # Invalidate caches BEFORE delete to ensure consistency
+            if self.cache_client:
+                try:
+                    self._invalidate_list_cache(tenant_id)
+                    self._invalidate_detail_cache(tenant_id, credential_id)
+                    self._invalidate_permissions_cache(tenant_id, credential_id)
+                    logger.debug(f"Invalidated caches for credential {credential_id}")
+                except Exception as e:
+                    logger.warning(f"Failed to invalidate cache: {e}")
+            
+            # Delete from database
             session.delete(credential)
+            session.flush()
             
             # Delete from vault
             try:
@@ -420,15 +465,6 @@ class CredentialHandler:
             except Exception as e:
                 logger.warning(f"Failed to delete secret from vault: {e}")
                 # Continue even if vault deletion fails
-            
-            # Invalidate caches
-            if self.cache_client:
-                try:
-                    self._invalidate_list_cache(tenant_id)
-                    self._invalidate_detail_cache(tenant_id, credential_id)
-                    logger.debug(f"Invalidated caches for credential {credential_id}")
-                except Exception as e:
-                    logger.warning(f"Failed to invalidate cache: {e}")
             
             logger.info("Credential deleted", extra={"credential_id": credential_id})
 
@@ -444,12 +480,19 @@ class CredentialHandler:
             cache_key = f"credentials:detail:tenant:{tenant_id}:cred:{credential_id}"
             self.cache_client.client.delete(cache_key)
 
+    def _invalidate_permissions_cache(self, tenant_id: str, credential_id: str) -> None:
+        """Invalidate permissions cache for a specific credential."""
+        if self.cache_client:
+            cache_key = f"credentials:permissions:tenant:{tenant_id}:cred:{credential_id}"
+            self.cache_client.client.delete(cache_key)
+
     # ========== Permission Management Methods ==========
 
     def list_credential_permissions(
         self,
         tenant_id: str,
-        credential_id: str
+        credential_id: str,
+        use_cache: bool = True
     ) -> CredentialPrincipalsResponse:
         """
         List all permissions for a credential.
@@ -457,6 +500,7 @@ class CredentialHandler:
         Args:
             tenant_id: The ID of the tenant
             credential_id: The ID of the credential
+            use_cache: Whether to use caching
             
         Returns:
             Grouped permissions by principal
@@ -465,6 +509,19 @@ class CredentialHandler:
             CredentialNotFoundError: If credential not found
         """
         logger.info("Listing credential permissions", extra={"tenant_id": tenant_id, "credential_id": credential_id})
+        
+        # Build cache key
+        cache_key = f"credentials:permissions:tenant:{tenant_id}:cred:{credential_id}"
+        
+        # Check cache
+        if use_cache and self.cache_client:
+            try:
+                cached_data = self.cache_client.client.get(cache_key)
+                if cached_data is not None:
+                    logger.debug(f"Returning cached credential permissions")
+                    return CredentialPrincipalsResponse(**cached_data)
+            except Exception as e:
+                logger.warning(f"Failed to get cached credential permissions: {e}")
         
         with self.db_client.get_session() as session:
             # Verify credential exists
@@ -483,6 +540,8 @@ class CredentialHandler:
             )
             members = session.execute(member_query).scalars().all()
             
+            logger.debug(f"Found {len(members)} members for credential {credential_id}")
+            
             # Group permissions by principal
             principals_map = {}
             for member in members:
@@ -492,7 +551,9 @@ class CredentialHandler:
                 )
                 member_permissions = session.execute(perm_query).scalars().all()
                 
-                # Group by principal
+                logger.debug(f"Member {member.id} (principal {member.principal_id}): {len(member_permissions)} permissions")
+                
+                # Initialize principal entry if not exists
                 if member.principal_id not in principals_map:
                     principals_map[member.principal_id] = {
                         "credential_id": credential_id,
@@ -502,9 +563,13 @@ class CredentialHandler:
                         "permissions": []
                     }
                 
-                # Add permissions
+                # Add all permissions for this member to the principal
                 for perm in member_permissions:
-                    principals_map[member.principal_id]["permissions"].append(perm.permission.value if hasattr(perm.permission, 'value') else perm.permission)
+                    perm_value = perm.permission.value if hasattr(perm.permission, 'value') else perm.permission
+                    # Avoid duplicates
+                    if perm_value not in principals_map[member.principal_id]["permissions"]:
+                        principals_map[member.principal_id]["permissions"].append(perm_value)
+                        logger.debug(f"Added permission {perm_value} for principal {member.principal_id}")
             
             # Convert to list of principals
             principals = [
@@ -513,11 +578,21 @@ class CredentialHandler:
             ]
             
             logger.info("Retrieved credential permissions", extra={"count": len(principals)})
-            return CredentialPrincipalsResponse(
+            result = CredentialPrincipalsResponse(
                 credential_id=credential_id,
                 tenant_id=tenant_id,
                 principals=principals
             )
+            
+            # Cache the result
+            if self.cache_client:
+                try:
+                    self.cache_client.client.set(cache_key, result.model_dump(), ttl=30)  # 30 seconds
+                    logger.debug(f"Cached credential permissions (TTL: 30s)")
+                except Exception as e:
+                    logger.warning(f"Failed to cache credential permissions: {e}")
+            
+            return result
 
     def get_credential_permission(
         self,
@@ -593,7 +668,8 @@ class CredentialHandler:
         self,
         tenant_id: str,
         credential_id: str,
-        request: SetCredentialPermissionRequest
+        request: SetCredentialPermissionRequest,
+        user_id: str
     ) -> CredentialPermissionResponse:
         """
         Set or update a credential permission.
@@ -602,6 +678,7 @@ class CredentialHandler:
             tenant_id: The ID of the tenant
             credential_id: The ID of the credential
             request: Permission data
+            user_id: ID of the user performing the operation
             
         Returns:
             Created or updated permission
@@ -643,11 +720,16 @@ class CredentialHandler:
                     principal_id=request.principal_id,
                     principal_type=request.principal_type,
                     name=f"{request.principal_type.value}_{request.principal_id}",
-                    description=f"Member {request.principal_type.value}"
+                    description=f"Member {request.principal_type.value}",
+                    created_by=user_id,
+                    updated_by=user_id
                 )
                 session.add(member)
                 session.flush()
                 logger.info("Created credential member")
+            else:
+                # Update existing member
+                member.updated_by = user_id
             
             # Check if permission already exists for this member
             perm_query = select(CredentialMemberPermission).where(
@@ -663,20 +745,26 @@ class CredentialHandler:
                     credential_member_id=member.id,
                     permission=request.permission,
                     name=f"{request.permission.value}_permission",
-                    description=f"Permission for {request.principal_type.value}"
+                    description=f"Permission for {request.principal_type.value}",
+                    created_by=user_id,
+                    updated_by=user_id
                 )
                 session.add(permission)
                 logger.info("Created credential permission")
+            else:
+                # Update existing permission
+                permission.updated_by = user_id
             
-            session.flush()  # Flush to get auto-generated timestamps
-            
-            # Invalidate caches
+            # Invalidate caches BEFORE flush to ensure consistency
             if self.cache_client:
                 try:
                     self._invalidate_list_cache(tenant_id)
-                    logger.debug("Invalidated credential list cache")
+                    self._invalidate_permissions_cache(tenant_id, credential_id)
+                    logger.debug("Invalidated credential list and permissions cache")
                 except Exception as e:
                     logger.warning(f"Failed to invalidate cache: {e}")
+            
+            session.flush()  # Flush to get auto-generated timestamps
             
             return self._permission_to_response(member, permission)
 
@@ -741,6 +829,15 @@ class CredentialHandler:
             if not perm:
                 raise CredentialNotFoundError(f"Permission {permission} not found for principal {principal_id}")
             
+            # Invalidate caches BEFORE delete to ensure consistency
+            if self.cache_client:
+                try:
+                    self._invalidate_list_cache(tenant_id)
+                    self._invalidate_permissions_cache(tenant_id, credential_id)
+                    logger.debug("Invalidated credential list and permissions cache")
+                except Exception as e:
+                    logger.warning(f"Failed to invalidate cache: {e}")
+            
             session.delete(perm)
             
             # Check if member has any remaining permissions
@@ -754,13 +851,7 @@ class CredentialHandler:
                 session.delete(member)
                 logger.info("Deleted member as no permissions remain")
             
-            # Invalidate caches
-            if self.cache_client:
-                try:
-                    self._invalidate_list_cache(tenant_id)
-                    logger.debug("Invalidated credential list cache")
-                except Exception as e:
-                    logger.warning(f"Failed to invalidate cache: {e}")
+            session.flush()
             
             logger.info("Deleted credential permission")
 
