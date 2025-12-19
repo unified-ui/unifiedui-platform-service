@@ -47,6 +47,60 @@ class CacheClient:
         pattern = f"*user:{user_id}:*"
         deleted_count = self._client.delete_pattern(pattern)
         return deleted_count
+    
+    def invalidate_tenant_list_cache(self) -> int:
+        """
+        Invalidate all tenant list caches.
+        
+        Returns:
+            Number of deleted cache entries
+        """
+        pattern = "tenants:list:*"
+        deleted_count = self._client.delete_pattern(pattern)
+        return deleted_count
+    
+    def invalidate_tenant_cache(self, tenant_id: str) -> int:
+        """
+        Invalidate cache for a specific tenant.
+        
+        Args:
+            tenant_id: Tenant ID
+            
+        Returns:
+            Number of deleted cache entries
+        """
+        pattern = f"tenants:detail:{tenant_id}:*"
+        deleted_count = self._client.delete_pattern(pattern)
+        return deleted_count
+    
+    def invalidate_custom_group_list_cache(self, tenant_id: str) -> int:
+        """
+        Invalidate all custom group list caches for a tenant.
+        
+        Args:
+            tenant_id: Tenant ID
+            
+        Returns:
+            Number of deleted cache entries
+        """
+        pattern = f"custom_groups:list:tenant:{tenant_id}:*"
+        deleted_count = self._client.delete_pattern(pattern)
+        return deleted_count
+    
+    def invalidate_custom_group_cache(self, tenant_id: str, custom_group_id: str) -> int:
+        """
+        Invalidate cache for a specific custom group.
+        
+        Args:
+            tenant_id: Tenant ID
+            custom_group_id: Custom Group ID
+            
+        Returns:
+            Number of deleted cache entries
+        """
+        pattern = f"custom_groups:detail:tenant:{tenant_id}:group:{custom_group_id}"
+        deleted_count = self._client.delete_pattern(pattern)
+        return deleted_count
 
     def close(self) -> None:
         """Close cache client connection."""

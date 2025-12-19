@@ -35,7 +35,8 @@ class TenantHandler:
         self,
         skip: int = 0,
         limit: int = 100,
-        name_filter: Optional[str] = None
+        name_filter: Optional[str] = None,
+        use_cache: bool = True
     ) -> List[TenantResponse]:
         """
         Get a list of tenants.
@@ -44,11 +45,26 @@ class TenantHandler:
             skip: Number of items to skip
             limit: Maximum number of items to return
             name_filter: Optional filter by tenant name (case-insensitive partial match)
+            use_cache: Whether to use caching (default: True)
             
         Returns:
             List of tenant responses
         """
         logger.info("Listing tenants", extra={"skip": skip, "limit": limit, "name_filter": name_filter})
+        
+        # Build cache key
+        filter_key = name_filter or "all"
+        cache_key = f"tenants:list:skip:{skip}:limit:{limit}:filter:{filter_key}"
+        
+        # Check cache
+        if use_cache and self.cache_client:
+            try:
+                cached_data = self.cache_client.client.get(cache_key)
+                if cached_data is not None:
+                    logger.debug(f"Returning cached tenant list (skip={skip}, limit={limit}, filter={filter_key})")
+                    return [TenantResponse(**item) for item in cached_data]
+            except Exception as e:
+                logger.warning(f"Failed to get cached tenant list: {e}")
         
         with self.db_client.get_session() as session:
             query = select(Tenant)
@@ -63,14 +79,26 @@ class TenantHandler:
             tenants = session.execute(query).scalars().all()
             
             logger.info("Retrieved tenants", extra={"count": len(tenants)})
-            return [self._model_to_response(tenant) for tenant in tenants]
+            result = [self._model_to_response(tenant) for tenant in tenants]
+            
+            # Cache the result
+            if self.cache_client:
+                try:
+                    cache_data = [item.model_dump() for item in result]
+                    self.cache_client.client.set(cache_key, cache_data, ttl=300)  # Cache for 5 minutes
+                    logger.debug(f"Cached tenant list (TTL: 300s)")
+                except Exception as e:
+                    logger.warning(f"Failed to cache tenant list: {e}")
+            
+            return result
 
-    def get_tenant(self, tenant_id: str) -> TenantResponse:
+    def get_tenant(self, tenant_id: str, use_cache: bool = True) -> TenantResponse:
         """
         Get a specific tenant by ID.
         
         Args:
             tenant_id: The ID of the tenant
+            use_cache: Whether to use caching (default: True)
             
         Returns:
             Tenant response
@@ -80,6 +108,19 @@ class TenantHandler:
         """
         logger.info("Fetching tenant", extra={"tenant_id": tenant_id})
         
+        # Build cache key
+        cache_key = f"tenants:detail:{tenant_id}"
+        
+        # Check cache
+        if use_cache and self.cache_client:
+            try:
+                cached_data = self.cache_client.client.get(cache_key)
+                if cached_data is not None:
+                    logger.debug(f"Returning cached tenant {tenant_id}")
+                    return TenantResponse(**cached_data)
+            except Exception as e:
+                logger.warning(f"Failed to get cached tenant: {e}")
+        
         with self.db_client.get_session() as session:
             tenant = session.get(Tenant, tenant_id)
             
@@ -88,7 +129,17 @@ class TenantHandler:
                 raise TenantNotFoundError(tenant_id)
             
             logger.info("Tenant retrieved", extra={"tenant_id": tenant_id})
-            return self._model_to_response(tenant)
+            result = self._model_to_response(tenant)
+            
+            # Cache the result
+            if self.cache_client:
+                try:
+                    self.cache_client.client.set(cache_key, result.model_dump(), ttl=600)  # Cache for 10 minutes
+                    logger.debug(f"Cached tenant {tenant_id} (TTL: 600s)")
+                except Exception as e:
+                    logger.warning(f"Failed to cache tenant: {e}")
+            
+            return result
 
     def create_tenant(
         self,
@@ -155,6 +206,17 @@ class TenantHandler:
                 extra={"tenant_id": tenant_id, "user_id": user_id, "member_id": member_id, "permission_id": permission_id}
             )
             
+            # Invalidate caches
+            if self.cache_client:
+                try:
+                    # Invalidate list caches
+                    self.cache_client.invalidate_tenant_list_cache()
+                    # Clear user cache since permissions changed
+                    self.cache_client.clear_cache_for_user(user_id)
+                    logger.debug(f"Invalidated tenant list cache and user cache for {user_id}")
+                except Exception as e:
+                    logger.warning(f"Failed to invalidate cache: {e}")
+            
             return self._model_to_response(tenant)
 
     def update_tenant(
@@ -198,6 +260,17 @@ class TenantHandler:
             # Commit happens automatically in context manager
             logger.info("Tenant updated", extra={"tenant_id": tenant_id, "user_id": user_id})
             
+            # Invalidate caches
+            if self.cache_client:
+                try:
+                    # Invalidate list caches
+                    self.cache_client.invalidate_tenant_list_cache()
+                    # Invalidate specific tenant cache
+                    self.cache_client.invalidate_tenant_cache(tenant_id)
+                    logger.debug(f"Invalidated caches for tenant {tenant_id}")
+                except Exception as e:
+                    logger.warning(f"Failed to invalidate cache: {e}")
+            
             return self._model_to_response(tenant)
 
     def delete_tenant(self, tenant_id: str) -> None:
@@ -221,6 +294,20 @@ class TenantHandler:
             
             session.delete(tenant)
             # Commit happens automatically in context manager
+            
+            # Invalidate caches
+            if self.cache_client:
+                try:
+                    # Invalidate list caches
+                    self.cache_client.invalidate_tenant_list_cache()
+                    # Invalidate specific tenant cache
+                    self.cache_client.invalidate_tenant_cache(tenant_id)
+                    # Clear all user caches (all users who had access to this tenant)
+                    pattern = "tenants:user:*:with_permissions"
+                    self.cache_client.client.delete_pattern(pattern)
+                    logger.debug(f"Invalidated caches for deleted tenant {tenant_id}")
+                except Exception as e:
+                    logger.warning(f"Failed to invalidate cache: {e}")
             
             logger.info("Tenant deleted", extra={"tenant_id": tenant_id})
     
@@ -583,6 +670,17 @@ class TenantHandler:
             
             session.flush()
             
+            # Invalidate user cache if this is a user principal
+            if self.cache_client:
+                try:
+                    if principal_type == "IDENTITY_USER":
+                        self.cache_client.clear_cache_for_user(principal_id)
+                        logger.debug(f"Cleared cache for user {principal_id} after permission change")
+                    # Also clear cache for the user making the change
+                    self.cache_client.clear_cache_for_user(user_id)
+                except Exception as e:
+                    logger.warning(f"Failed to clear user cache: {e}")
+            
             # Get all permissions for this member
             query = (
                 select(TenantMemberPermission)
@@ -680,6 +778,15 @@ class TenantHandler:
                     extra={"tenant_id": tenant_id, "principal_id": principal_id, "principal_type": principal_type}
                 )
                 remaining_permissions = []
+            
+            # Invalidate user cache if this is a user principal
+            if self.cache_client:
+                try:
+                    if principal_type == "IDENTITY_USER":
+                        self.cache_client.clear_cache_for_user(principal_id)
+                        logger.debug(f"Cleared cache for user {principal_id} after permission removal")
+                except Exception as e:
+                    logger.warning(f"Failed to clear user cache: {e}")
             
             return {
                 "tenant_id": tenant_id,
