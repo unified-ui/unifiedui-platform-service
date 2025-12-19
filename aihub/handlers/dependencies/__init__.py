@@ -19,11 +19,9 @@ from aihub.handlers.dependencies.cache import get_cache_client
 from aihub.handlers.dependencies.vault import get_vault_client
 
 # Handler dependencies
-from aihub.handlers.dependencies.handlers import (
-    get_tenant_handler,
-    get_custom_group_handler,
-    get_credential_handler,
-)
+from aihub.handlers.dependencies.tenants import get_tenant_handler
+from aihub.handlers.dependencies.custom_groups import get_custom_group_handler
+from aihub.handlers.dependencies.credentials import get_credential_handler
 
 __all__ = [
     # Database

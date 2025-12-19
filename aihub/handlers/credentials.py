@@ -1,15 +1,19 @@
 """Business logic handlers for credential operations."""
+from __future__ import annotations
+
 import uuid
-from typing import Optional, List
+from typing import TYPE_CHECKING, Optional, List
 
 from sqlalchemy import select, or_
 
 from aihub.core.database.client import SQLAlchemyClient
 from aihub.core.database.models import Credential, CredentialMember, CredentialMemberPermission
 from aihub.core.database.enums import PermissionActionEnum, PrincipalTypeEnum
-from aihub.core.identity.users import ContextIdentityUser
 from aihub.core.vault.client import BaseVaultClient
 from aihub.caching.client import CacheClient
+
+if TYPE_CHECKING:
+    from aihub.core.identity.users import ContextIdentityUser
 from aihub.schema.requests.credentials import CreateCredentialRequest, UpdateCredentialRequest
 from aihub.schema.requests.credential_permissions import SetCredentialPermissionRequest
 from aihub.schema.responses.credentials import CredentialResponse
