@@ -10,6 +10,7 @@ class CreateCredentialRequest(BaseModel):
     description: Optional[str] = Field(None, max_length=2000, description="Credential description")
     credential_type: str = Field(..., description="Type of credential (API_KEY, PASSWORD, TOKEN, etc.)")
     secret_value: str = Field(..., min_length=1, description="Secret value to store in vault")
+    source: Optional[str] = Field(None, description="Source or origin of the credential")
     metadata: Optional[dict] = Field(None, description="Additional metadata")
 
 

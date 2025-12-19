@@ -241,7 +241,7 @@ class CredentialHandler:
         Returns:
             Created credential response
         """
-        logger.info("Creating credential", extra={"tenant_id": tenant_id, "name": request.name, "user_id": user_id})
+        logger.info("Creating credential", extra={"tenant_id": tenant_id, "credential_name": request.name, "user_id": user_id})
         
         credential_id = str(uuid.uuid4())
         
@@ -265,12 +265,13 @@ class CredentialHandler:
                 name=request.name,
                 description=request.description,
                 type=request.credential_type,
-                source="vault",  # Source is always vault
+                source=request.source,
                 credential_uri=vault_uri,
                 created_by=user_id,
                 updated_by=user_id
             )
             session.add(credential)
+            session.flush()  # Flush to get auto-generated timestamps
             
             # Invalidate caches
             if self.cache_client:

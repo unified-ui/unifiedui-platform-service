@@ -84,6 +84,14 @@
     - metadaten in db; key in secrets vault
     - key auch cachen, aber mit encryption key (aus env)
 
+- Routes für credentials checken
+    - testen
+    - permissions checken
+    - ganze logik muss in handler!
+    - CREDENTIALS_CREATOR
+
+- bei check_permission muss noch irgendwie die "id" mit rein -> dann kann man checken, ob man auf die ID berechtigt ist!
+
 - Applications
     - CRUD
     - Config

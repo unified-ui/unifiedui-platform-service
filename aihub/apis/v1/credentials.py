@@ -4,6 +4,7 @@ from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.responses import Response
 
+from aihub.core.identity.users import ContextIdentityUser
 from aihub.handlers.credentials import CredentialHandler
 from aihub.handlers.dependencies import get_credential_handler
 from aihub.schema.requests.credentials import CreateCredentialRequest, UpdateCredentialRequest
@@ -56,19 +57,29 @@ async def list_credentials(
         List of credentials (without secret values)
     """
     try:
-        user = request.state.user
+        user: ContextIdentityUser = request.state.user
         
-        # Check if user is admin
-        is_admin = user.has_tenant_permission(
-            tenant_id,
-            [TenantPermissionEnum.GLOBAL_ADMIN, TenantPermissionEnum.CREDENTIALS_ADMIN]
+        # Check if user is admin (has GLOBAL_ADMIN or CREDENTIALS_ADMIN)
+        is_admin = False
+        user_tenants = user.tenants
+        matching_tenant = next(
+            (t for t in user_tenants if t["tenant"]["id"] == tenant_id),
+            None
         )
+        
+        if matching_tenant:
+            user_permissions = matching_tenant["permissions"]
+            admin_permissions = [
+                TenantPermissionEnum.GLOBAL_ADMIN.value,
+                TenantPermissionEnum.CREDENTIALS_ADMIN.value
+            ]
+            is_admin = any(perm in user_permissions for perm in admin_permissions)
         
         logger.info(
             "API: List credentials",
             extra={
                 "tenant_id": tenant_id,
-                "user_id": user.user_id,
+                "user_id": user.identity.get_id(),
                 "is_admin": is_admin,
                 "skip": skip,
                 "limit": limit
@@ -80,9 +91,9 @@ async def list_credentials(
             skip=skip,
             limit=limit,
             name_filter=name_filter,
-            user_id=user.user_id if not is_admin else None,
-            identity_group_ids=user.get_identity_group_ids() if not is_admin else None,
-            custom_group_ids=user.get_custom_group_ids(tenant_id) if not is_admin else None,
+            user_id=user.identity.get_id() if not is_admin else None,
+            identity_group_ids=[g.id for g in user.groups] if not is_admin else None,
+            custom_group_ids=[g.id for g in user.custom_groups] if not is_admin else None,
             is_admin=is_admin
         )
     except Exception as e:
@@ -124,19 +135,19 @@ async def create_credential(
         Created credential (without secret value)
     """
     try:
-        user = request.state.user
+        user: ContextIdentityUser = request.state.user
         logger.info(
             "API: Create credential",
             extra={
                 "tenant_id": tenant_id,
-                "user_id": user.user_id,
+                "user_id": user.identity.get_id(),
                 "credential_name": create_request.name
             }
         )
         return handler.create_credential(
             tenant_id=tenant_id,
             request=create_request,
-            user_id=user.user_id
+            user_id=user.identity.get_id()
         )
     except Exception as e:
         logger.error(f"Failed to create credential: {e}")
@@ -179,13 +190,13 @@ async def get_credential(
         HTTPException: If credential not found or access denied
     """
     try:
-        user = request.state.user
+        user: ContextIdentityUser = request.state.user
         logger.info(
             "API: Get credential",
             extra={
                 "tenant_id": tenant_id,
                 "credential_id": credential_id,
-                "user_id": user.user_id
+                "user_id": user.identity.get_id()
             }
         )
         return handler.get_credential(
@@ -241,20 +252,20 @@ async def update_credential(
         HTTPException: If credential not found or update fails
     """
     try:
-        user = request.state.user
+        user: ContextIdentityUser = request.state.user
         logger.info(
             "API: Update credential",
             extra={
                 "tenant_id": tenant_id,
                 "credential_id": credential_id,
-                "user_id": user.user_id
+                "user_id": user.identity.get_id()
             }
         )
         return handler.update_credential(
             tenant_id=tenant_id,
             credential_id=credential_id,
             request=update_request,
-            user_id=user.user_id
+            user_id=user.identity.get_id()
         )
     except CredentialNotFoundError as e:
         logger.warning(f"Credential not found: {e}")
@@ -303,13 +314,13 @@ async def delete_credential(
         HTTPException: If credential not found or deletion fails
     """
     try:
-        user = request.state.user
+        user: ContextIdentityUser = request.state.user
         logger.info(
             "API: Delete credential",
             extra={
                 "tenant_id": tenant_id,
                 "credential_id": credential_id,
-                "user_id": user.user_id
+                "user_id": user.identity.get_id()
             }
         )
         handler.delete_credential(
@@ -362,13 +373,13 @@ async def list_credential_permissions(
         List of credential permissions
     """
     try:
-        user = request.state.user
+        user: ContextIdentityUser = request.state.user
         logger.info(
             "API: List credential permissions",
             extra={
                 "tenant_id": tenant_id,
                 "credential_id": credential_id,
-                "user_id": user.user_id
+                "user_id": user.identity.get_id()
             }
         )
         return handler.list_credential_permissions(
@@ -420,14 +431,14 @@ async def get_credential_permission(
         Credential permission
     """
     try:
-        user = request.state.user
+        user: ContextIdentityUser = request.state.user
         logger.info(
             "API: Get credential permission",
             extra={
                 "tenant_id": tenant_id,
                 "credential_id": credential_id,
                 "principal_id": principal_id,
-                "user_id": user.user_id
+                "user_id": user.identity.get_id()
             }
         )
         return handler.get_credential_permission(
@@ -480,14 +491,14 @@ async def set_credential_permission(
         Created or updated permission
     """
     try:
-        user = request.state.user
+        user: ContextIdentityUser = request.state.user
         logger.info(
             "API: Set credential permission",
             extra={
                 "tenant_id": tenant_id,
                 "credential_id": credential_id,
                 "principal_id": permission_request.principal_id,
-                "user_id": user.user_id
+                "user_id": user.identity.get_id()
             }
         )
         return handler.set_credential_permission(
@@ -540,14 +551,14 @@ async def delete_credential_permission(
         No content (204)
     """
     try:
-        user = request.state.user
+        user: ContextIdentityUser = request.state.user
         logger.info(
             "API: Delete credential permission",
             extra={
                 "tenant_id": tenant_id,
                 "credential_id": credential_id,
                 "principal_id": principal_id,
-                "user_id": user.user_id
+                "user_id": user.identity.get_id()
             }
         )
         handler.delete_credential_permission(
