@@ -223,67 +223,6 @@ class TenantHandler:
             # Commit happens automatically in context manager
             
             logger.info("Tenant deleted", extra={"tenant_id": tenant_id})
-
-    def list_tenants_by_principal_id(
-        self,
-        principal_ids: List[str]
-    ) -> List[dict]:
-        """
-        Get all tenants where the given principals have roles, including their roles.
-        
-        Args:
-            principal_ids: List of principal IDs to search for
-            
-        Returns:
-            List of dicts with 'tenant' and 'roles' keys
-        """
-        logger.info(
-            "Listing tenants by principal IDs",
-            extra={"principal_ids": principal_ids, "count": len(principal_ids)}
-        )
-        
-        if not principal_ids:
-            logger.info("No principal IDs provided, returning empty list")
-            return []
-        
-        with self.db_client.get_session() as session:
-            # Query to get all tenant_roles for the given principal_ids
-            query = (
-                select(Tenant, TenantMember)
-                .join(TenantMember, Tenant.id == TenantMember.tenant_id)
-                .where(TenantMember.principal_id.in_(principal_ids))
-                .order_by(Tenant.name, TenantMember.role)
-            )
-            
-            results = session.execute(query).all()
-            
-            # Group roles by tenant
-            tenants_dict = {}
-            for tenant, role in results:
-                if tenant.id not in tenants_dict:
-                    tenants_dict[tenant.id] = {
-                        "tenant": tenant,
-                        "permissions": []
-                    }
-                tenants_dict[tenant.id]["roles"].append(role)
-            
-            # Convert to response format
-            response = []
-            for tenant_data in tenants_dict.values():
-                tenant_response = self._model_to_response(tenant_data["tenant"])
-                roles_response = [
-                    self._role_to_response(role) for role in tenant_data["roles"]
-                ]
-                response.append({
-                    "tenant": tenant_response,
-                    "permissions": roles_response
-                })
-            
-            logger.info(
-                "Retrieved tenants by principal IDs",
-                extra={"tenant_count": len(response)}
-            )
-            return response
     
     def get_user_tenants_with_permissions(
         self,

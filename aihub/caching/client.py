@@ -34,6 +34,20 @@ class CacheClient:
         """Get the underlying cache client."""
         return self._client
 
+    def clear_cache_for_user(self, user_id: str) -> int:
+        """
+        Clear all cache entries related to a specific user.
+        
+        Args:
+            user_id: User ID whose cache entries should be cleared
+            
+        Returns:
+            Number of deleted cache entries
+        """
+        pattern = f"*user:{user_id}:*"
+        deleted_count = self._client.delete_pattern(pattern)
+        return deleted_count
+
     def close(self) -> None:
         """Close cache client connection."""
         self._client.close()

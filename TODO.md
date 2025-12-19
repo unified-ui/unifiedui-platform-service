@@ -61,6 +61,10 @@
     - db client wird in users.py noch initialisiert -> sollte injected werden!
     - cache > dependencies:
         - wenn type is None -> sollte cache auf None sein und nicht redis initialisiert werden!
+    - db > 
+
+- immer wenn was auf permissions PUT PATCH POST DELETE gemahct wird:
+    - clear cache: "*user:{user_id}"
 
 - Caching
     - tenants in handler rein
