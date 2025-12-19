@@ -3,7 +3,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from aihub.apis.v1 import health, identity, tenants, custom_groups, credentials, applications, conversations
+from aihub.apis.v1 import health, identity, tenants, custom_groups, credentials, applications, conversations, autonomous_agents
 from aihub.docdatabase.dependencies import close_db_client
 from aihub.core.config import settings
 from aihub.exc.tenants import TenantNotFoundError, TenantError
@@ -103,6 +103,28 @@ def create_app() -> FastAPI:
             content={"detail": str(exc)}
         )
     
+    # Conversation exception handlers
+    from aihub.exc.conversations import ConversationNotFoundError
+    
+    @app.exception_handler(ConversationNotFoundError)
+    async def conversation_not_found_handler(request: Request, exc: ConversationNotFoundError):
+        """Handle conversation not found errors."""
+        return JSONResponse(
+            status_code=404,
+            content={"detail": str(exc)}
+        )
+    
+    # Autonomous Agent exception handlers
+    from aihub.exc.autonomous_agents import AutonomousAgentNotFoundError
+    
+    @app.exception_handler(AutonomousAgentNotFoundError)
+    async def autonomous_agent_not_found_handler(request: Request, exc: AutonomousAgentNotFoundError):
+        """Handle autonomous agent not found errors."""
+        return JSONResponse(
+            status_code=404,
+            content={"detail": str(exc)}
+        )
+    
     # Include routers
     app.include_router(
         health.router,
@@ -144,6 +166,12 @@ def create_app() -> FastAPI:
         conversations.router,
         prefix="/api/v1/tenants/{tenant_id}",
         tags=["Conversations"]
+    )
+    
+    app.include_router(
+        autonomous_agents.router,
+        prefix="/api/v1/tenants/{tenant_id}",
+        tags=["Autonomous Agents"]
     )
     
     # Lifecycle events

@@ -13,6 +13,7 @@ class TenantPermissionEnum(str, Enum):
     CONVERSATIONS_ADMIN = "CONVERSATIONS_ADMIN"
     CONVERSATIONS_CREATOR = "CONVERSATIONS_CREATOR"
     AUTONOMOUS_AGENTS_ADMIN = "AUTONOMOUS_AGENTS_ADMIN"
+    AUTONOMOUS_AGENTS_CREATOR = "AUTONOMOUS_AGENTS_CREATOR"
 
     def all() -> list[str]:
         return [permission.value for permission in TenantPermissionEnum]
