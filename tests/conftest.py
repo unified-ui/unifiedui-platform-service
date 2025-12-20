@@ -4,6 +4,7 @@ import pytest
 import logging
 import tempfile
 from typing import Generator
+from unittest.mock import patch
 from fastapi.testclient import TestClient
 import fakeredis
 from sqlalchemy import create_engine
@@ -39,9 +40,23 @@ def get_test_db_url():
     return f"sqlite:///{_test_db_file}"
 
 
+def cleanup_test_db():
+    """Clean up test database file."""
+    global _test_db_file
+    if _test_db_file and os.path.exists(_test_db_file):
+        try:
+            os.unlink(_test_db_file)
+        except Exception:
+            pass  # Ignore cleanup errors
+        _test_db_file = None
+
+
 @pytest.fixture(scope="function")
 def test_db_engine():
     """Create a test database engine with SQLite file."""
+    # Clean up any previous test database
+    cleanup_test_db()
+    
     TEST_DATABASE_URL = get_test_db_url()
     
     engine = create_engine(
@@ -62,15 +77,16 @@ def test_db_engine():
     
     yield engine
     
-    # Drop all tables after test
-    Base.metadata.drop_all(bind=engine)
+    # Clean up - truncate all tables and dispose engine
+    with engine.connect() as conn:
+        for table in reversed(Base.metadata.sorted_tables):
+            conn.execute(table.delete())
+        conn.commit()
+    
     engine.dispose()
     
     # Clean up the temporary file
-    global _test_db_file
-    if _test_db_file and os.path.exists(_test_db_file):
-        os.unlink(_test_db_file)
-        _test_db_file = None
+    cleanup_test_db()
 
 
 @pytest.fixture(scope="function")
@@ -153,32 +169,26 @@ def create_test_user(user_id: str = "test-user-123", name: str = "Test User", ma
 
 
 @pytest.fixture(scope="function")
-def test_client(test_db_client, test_cache_client):
+def test_client(test_db_client, test_cache_client, fake_redis_client):
     """Create a FastAPI test client with test database and cache."""
     logger.info("Creating FastAPI test client")
     logger.info(f"Test DB Engine: {test_db_client.engine}")
     logger.info(f"Test DB URL: {test_db_client.config.database_url}")
     
-    # Reset global singletons before creating app
+    # Set test clients as global singletons BEFORE app creation
     import aihub.handlers.dependencies.database as db_dep
-    import aihub.handlers.dependencies.cache as cache_dep
-    db_dep._db_client = None
-    cache_dep._cache_client = None
+    import aihub.caching.dependencies as cache_dep
+    
+    # Clear cache before test
+    fake_redis_client.client.flushdb()
+    logger.info("Cache cleared before test")
+    
+    db_dep._db_client = test_db_client
+    cache_dep._cache_client = test_cache_client
+    logger.info("Set test clients as global singletons")
     
     app = create_app()
-    logger.info(f"App created, routes: {[route.path for route in app.routes if hasattr(route, 'path')]}")
-    
-    # Override dependencies
-    from aihub.handlers.dependencies import get_db_client
-    from aihub.caching.dependencies import get_cache_client
-    
-    def get_test_db_client():
-        logger.info(f"get_db_client override called, returning test client: {test_db_client.engine}")
-        return test_db_client
-    
-    app.dependency_overrides[get_db_client] = get_test_db_client
-    app.dependency_overrides[get_cache_client] = lambda: test_cache_client
-    logger.info("Dependency overrides set")
+    logger.info(f"App created")
     
     client = TestClient(app)
     
@@ -189,10 +199,16 @@ def test_client(test_db_client, test_cache_client):
     
     yield client
     
-    # Clean up
-    app.dependency_overrides.clear()
+    # Clean up - clear cache, reset singletons, and dispose connections
+    try:
+        fake_redis_client.client.flushdb()
+        logger.info("Cache cleared after test")
+    except Exception as e:
+        logger.warning(f"Failed to clear cache: {e}")
+    
     db_dep._db_client = None
     cache_dep._cache_client = None
+    logger.info("Singletons reset")
 
 
 @pytest.fixture
@@ -210,7 +226,8 @@ def auth_headers(test_user_token):
     logger.info("Generating auth headers")
     headers = {
         "Authorization": f"Bearer {test_user_token.get_token()}",
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
+        "X-Use-Cache": "false"  # Disable caching in tests for consistency
     }
     logger.info(f"Auth headers: Authorization=Bearer {test_user_token.get_token()[:30]}...")
     return headers

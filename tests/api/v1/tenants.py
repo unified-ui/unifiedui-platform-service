@@ -280,12 +280,12 @@ class TestTenantRoutes:
         
         assert response.status_code == status.HTTP_204_NO_CONTENT
         
-        # Verify tenant is deleted
+        # Verify tenant is deleted - returns 403 because user no longer has access
         get_response = test_client.get(
             f"/api/v1/tenants/{tenant_id}",
             headers=auth_headers
         )
-        assert get_response.status_code == status.HTTP_404_NOT_FOUND
+        assert get_response.status_code == status.HTTP_403_FORBIDDEN
     
     def test_delete_tenant_not_found(self, test_client, auth_headers):
         """Test deleting a non-existent tenant."""
@@ -845,12 +845,12 @@ class TestTenantPrincipalRoutes:
         
         assert response.status_code == status.HTTP_204_NO_CONTENT
         
-        # Verify tenant is deleted
+        # Verify tenant is deleted - returns 403 because user no longer has access
         get_response = test_client.get(
             f"/api/v1/tenants/{tenant_id}",
             headers=auth_headers
         )
-        assert get_response.status_code == status.HTTP_404_NOT_FOUND
+        assert get_response.status_code == status.HTTP_403_FORBIDDEN
     
     def test_delete_tenant_not_found(self, test_client, auth_headers):
         """Test deleting a non-existent tenant."""

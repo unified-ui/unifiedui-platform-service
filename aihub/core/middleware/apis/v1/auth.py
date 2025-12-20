@@ -71,13 +71,8 @@ def authenticate(func: Callable) -> Callable:
         from aihub.handlers.dependencies.database import get_db_client
         from aihub.caching.dependencies import get_cache_client
         
-        # Check if FastAPI app has dependency overrides (for testing)
-        app = request.app
-        get_db_func = app.dependency_overrides.get(get_db_client, get_db_client)
-        get_cache_func = app.dependency_overrides.get(get_cache_client, get_cache_client)
-        
-        db_client = get_db_func() if callable(get_db_func) else get_db_client()
-        cache_client = get_cache_func() if callable(get_cache_func) else get_cache_client()
+        db_client = get_db_client()
+        cache_client = get_cache_client()
         
         # Create User object
         try:
