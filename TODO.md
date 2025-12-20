@@ -97,7 +97,11 @@
 - autonomous agents
 ## TODO
 
-- nur: entity_members -> dort rolle mit enum
+- nur: entity_members -> dort role mit enum
+- Die Routes mit Postman testen und refactoren
+    - permissions zu rollen ändern
+    - name auf permisison raus (nur role als name)
+    - ...
 
 - Spec-Driven Vibe-Coding machen (in einem Spec projekt etc beschreiben)
 

@@ -285,7 +285,7 @@ async def set_principal_permission(
         tenant_id=tenant_id,
         principal_id=role_data.principal_id,
         principal_type=role_data.principal_type,
-        permission=role_data.permission,
+        permission=role_data.role,
         user_id=user_id
     )
     return PrincipalsResponse(**result)
@@ -326,6 +326,6 @@ async def delete_principal_permission(
         tenant_id=tenant_id,
         principal_id=role_data.principal_id,
         principal_type=role_data.principal_type,
-        permission=role_data.permission
+        permission=role_data.role
     )
     return PrincipalsResponse(**result)

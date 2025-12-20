@@ -179,8 +179,6 @@ class TenantHandler:
                 tenant_id=tenant_id,
                 principal_id=user_id,
                 principal_type="IDENTITY_USER",
-                name=f"Member: {user_id}",
-                description=f"Tenant member for user {user_id} on tenant {request.name}",
                 created_by=user_id,
                 updated_by=user_id
             )
@@ -193,8 +191,6 @@ class TenantHandler:
                 id=role_id,
                 tenant_member_id=member_id,
                 role="GLOBAL_ADMIN",
-                name=f"GLOBAL_ADMIN role",
-                description=f"Global administrator role for user {user_id} on tenant {request.name}",
                 created_by=user_id,
                 updated_by=user_id
             )
@@ -620,8 +616,6 @@ class TenantHandler:
                     tenant_id=tenant_id,
                     principal_id=principal_id,
                     principal_type=principal_type,
-                    name=f"Member: {principal_id} ({principal_type})",
-                    description=f"Tenant member for {principal_type} {principal_id} on tenant {tenant.name}",
                     created_by=user_id,
                     updated_by=user_id
                 )
@@ -649,8 +643,6 @@ class TenantHandler:
                     id=role_id,
                     tenant_member_id=member.id,
                     role=permission,
-                    name=f"{permission} role",
-                    description=f"{permission} role for {principal_type} {principal_id} on tenant {tenant.name}",
                     created_by=user_id,
                     updated_by=user_id
                 )

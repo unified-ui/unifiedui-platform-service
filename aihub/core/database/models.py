@@ -56,10 +56,13 @@ PrincipalTypeSAEnum = SAEnum(
 
 
 # ---------- Mixins ----------
-class IdNameDescriptionMixin:
-    id: Mapped[str] = mapped_column(String(36), primary_key=True)
-    name: Mapped[str] = mapped_column(String(255), nullable=False)
-    description: Mapped[Optional[str]] = mapped_column(String(2000))
+class IdMixin:
+    """Mixin for ID field."""
+    id: Mapped[str] = mapped_column(String(100), primary_key=True)
+
+
+class AuditMixin:
+    """Mixin for audit fields (timestamps and user tracking)."""
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
@@ -68,6 +71,12 @@ class IdNameDescriptionMixin:
     )
     created_by: Mapped[Optional[str]] = mapped_column(String(50))
     updated_by: Mapped[Optional[str]] = mapped_column(String(50))
+
+
+class IdNameDescriptionMixin(IdMixin, AuditMixin):
+    """Mixin for entities with ID, name, description and audit fields."""
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(String(2000))
 
 
 class TenantScopedMixin:
@@ -83,7 +92,7 @@ class Tenant(Base, IdNameDescriptionMixin):
     )
 
 
-class TenantMember(Base, IdNameDescriptionMixin):
+class TenantMember(Base, IdMixin, AuditMixin):
     """
     Tenant membership table.
     Tracks which principals (users, identity groups, custom groups) are members of a tenant.
@@ -108,7 +117,7 @@ class TenantMember(Base, IdNameDescriptionMixin):
     )
 
 
-class TenantMemberRole(Base, IdNameDescriptionMixin):
+class TenantMemberRole(Base, IdMixin, AuditMixin):
     """
     Roles for tenant members.
     Defines what roles a tenant member has.
@@ -140,7 +149,7 @@ class CustomGroup(Base, IdNameDescriptionMixin, TenantScopedMixin):
     __table_args__ = (Index("ix_custom_groups_tenant", "tenant_id"),)
 
 
-class CustomGroupMember(Base, IdNameDescriptionMixin):
+class CustomGroupMember(Base, IdMixin, AuditMixin):
     """Custom group membership table."""
     __tablename__ = "custom_group_members"
 
@@ -211,7 +220,7 @@ class Credential(Base, IdNameDescriptionMixin, TenantScopedMixin):
 
 
 # ---------- Permission tables ----------
-class ApplicationMember(Base, IdNameDescriptionMixin):
+class ApplicationMember(Base, IdMixin, AuditMixin):
     """Application membership table."""
     __tablename__ = "application_members"
 
@@ -233,7 +242,7 @@ class ApplicationMember(Base, IdNameDescriptionMixin):
     )
 
 
-class ConversationMember(Base, IdNameDescriptionMixin):
+class ConversationMember(Base, IdMixin, AuditMixin):
     """Conversation membership table."""
     __tablename__ = "conversation_members"
 
@@ -255,7 +264,7 @@ class ConversationMember(Base, IdNameDescriptionMixin):
     )
 
 
-class AutonomousAgentMember(Base, IdNameDescriptionMixin):
+class AutonomousAgentMember(Base, IdMixin, AuditMixin):
     """Autonomous agent membership table."""
     __tablename__ = "autonomous_agent_members"
 
@@ -277,7 +286,7 @@ class AutonomousAgentMember(Base, IdNameDescriptionMixin):
     )
 
 
-class CredentialMember(Base, IdNameDescriptionMixin):
+class CredentialMember(Base, IdMixin, AuditMixin):
     """Credential membership table."""
     __tablename__ = "credential_members"
 
