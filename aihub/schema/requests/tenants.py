@@ -38,7 +38,7 @@ class UpdateTenantRequest(BaseModel):
 
 
 class SetPrincipalRequest(BaseModel):
-    """Schema for setting/adding a permission for a principal on a tenant."""
+    """Schema for setting/adding a role for a principal on a tenant."""
     principal_id: str = Field(
         ...,
         description="ID of the principal (user or group)"
@@ -47,23 +47,23 @@ class SetPrincipalRequest(BaseModel):
         ...,
         description="Type of principal (IDENTITY_USER, IDENTITY_GROUP, CUSTOM_GROUP)"
     )
-    permission: str = Field(
+    role: str = Field(
         ...,
-        description="Permission to assign (e.g., GLOBAL_ADMIN, READER, APPLICATIONS_ADMIN, etc.)"
+        description="Role to assign (e.g., GLOBAL_ADMIN, READER, APPLICATIONS_ADMIN, etc.)"
     )
 
     model_config = {
         "json_schema_extra": {
             "examples": [
-                {"principal_id": "id", "principal_type": "IDENTITY_USER", "permission": "GLOBAL_ADMIN"},
-                {"principal_id": "id", "principal_type": "IDENTITY_GROUP", "permission": "READER"}
+                {"principal_id": "id", "principal_type": "IDENTITY_USER", "role": "GLOBAL_ADMIN"},
+                {"principal_id": "id", "principal_type": "IDENTITY_GROUP", "role": "READER"}
             ]
         }
     }
 
 
 class DeletePrincipalRequest(BaseModel):
-    """Schema for deleting a permission for a principal on a tenant."""
+    """Schema for deleting a role for a principal on a tenant."""
     principal_id: str = Field(
         ...,
         description="ID of the principal (user or group)"
@@ -72,15 +72,15 @@ class DeletePrincipalRequest(BaseModel):
         ...,
         description="Type of principal (IDENTITY_USER, IDENTITY_GROUP, CUSTOM_GROUP)"
     )
-    permission: str = Field(
+    role: str = Field(
         ...,
-        description="Permission to remove (e.g., GLOBAL_ADMIN, READER, APPLICATIONS_ADMIN, etc.)"
+        description="Role to remove (e.g., GLOBAL_ADMIN, READER, APPLICATIONS_ADMIN, etc.)"
     )
 
     model_config = {
         "json_schema_extra": {
             "examples": [
-                {"principal_id": "id", "principal_type": "IDENTITY_USER", "permission": "GLOBAL_ADMIN"}
+                {"principal_id": "id", "principal_type": "IDENTITY_USER", "role": "GLOBAL_ADMIN"}
             ]
         }
     }

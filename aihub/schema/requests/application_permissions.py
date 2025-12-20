@@ -9,4 +9,4 @@ class SetApplicationPermissionRequest(BaseModel):
     
     principal_id: str = Field(..., description="ID of the principal (user, group, or custom group)")
     principal_type: PrincipalTypeEnum = Field(..., description="Type of principal")
-    permission: PermissionActionEnum = Field(..., description="Permission level (READ, WRITE, ADMIN)")
+    role: PermissionActionEnum = Field(..., description="Role level (READ, WRITE, ADMIN)")

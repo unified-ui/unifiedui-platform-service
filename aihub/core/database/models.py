@@ -97,7 +97,7 @@ class TenantMember(Base, IdNameDescriptionMixin):
     principal_type: Mapped[str] = mapped_column(PrincipalTypeSAEnum, nullable=False)
 
     tenant: Mapped["Tenant"] = relationship(back_populates="members")
-    permissions: Mapped[list["TenantMemberPermission"]] = relationship(
+    roles: Mapped[list["TenantMemberRole"]] = relationship(
         back_populates="tenant_member", cascade="all, delete-orphan"
     )
 
@@ -108,23 +108,23 @@ class TenantMember(Base, IdNameDescriptionMixin):
     )
 
 
-class TenantMemberPermission(Base, IdNameDescriptionMixin):
+class TenantMemberRole(Base, IdNameDescriptionMixin):
     """
-    Permissions/roles for tenant members.
-    Defines what roles/permissions a tenant member has.
+    Roles for tenant members.
+    Defines what roles a tenant member has.
     """
-    __tablename__ = "tenant_member_permissions"
+    __tablename__ = "tenant_member_roles"
 
     tenant_member_id: Mapped[str] = mapped_column(
         String(36), ForeignKey("tenant_members.id", ondelete="CASCADE"), nullable=False
     )
-    permission: Mapped[str] = mapped_column(TenantPermissionSAEnum, nullable=False)
+    role: Mapped[str] = mapped_column(TenantPermissionSAEnum, nullable=False)
 
-    tenant_member: Mapped["TenantMember"] = relationship(back_populates="permissions")
+    tenant_member: Mapped["TenantMember"] = relationship(back_populates="roles")
 
     __table_args__ = (
-        UniqueConstraint("tenant_member_id", "permission", name="uq_tenant_member_permissions"),
-        Index("ix_tmp_tenant_member", "tenant_member_id"),
+        UniqueConstraint("tenant_member_id", "role", name="uq_tenant_member_roles"),
+        Index("ix_tmr_tenant_member", "tenant_member_id"),
     )
 
 
@@ -151,32 +151,14 @@ class CustomGroupMember(Base, IdNameDescriptionMixin):
     principal_id: Mapped[str] = mapped_column(String(50), nullable=False)
     principal_type: Mapped[str] = mapped_column(PrincipalTypeSAEnum, nullable=False)
 
+    role: Mapped[str] = mapped_column(PermissionActionSAEnum, nullable=False)
+
     custom_group: Mapped["CustomGroup"] = relationship(back_populates="members")
-    permissions: Mapped[list["CustomGroupMemberPermission"]] = relationship(
-        back_populates="custom_group_member", cascade="all, delete-orphan"
-    )
 
     __table_args__ = (
         UniqueConstraint("custom_group_id", "principal_id", "principal_type", name="uq_custom_group_members"),
         Index("ix_cgm_custom_group", "custom_group_id"),
         Index("ix_cgm_principal", "principal_id"),
-    )
-
-
-class CustomGroupMemberPermission(Base, IdNameDescriptionMixin):
-    """Permissions for custom group members."""
-    __tablename__ = "custom_group_member_permissions"
-
-    custom_group_member_id: Mapped[str] = mapped_column(
-        String(36), ForeignKey("custom_group_members.id", ondelete="CASCADE"), nullable=False
-    )
-    permission: Mapped[str] = mapped_column(PermissionActionSAEnum, nullable=False)
-
-    custom_group_member: Mapped["CustomGroupMember"] = relationship(back_populates="permissions")
-
-    __table_args__ = (
-        UniqueConstraint("custom_group_member_id", "permission", name="uq_custom_group_member_permissions"),
-        Index("ix_cgmp_member", "custom_group_member_id"),
     )
 
 
@@ -240,32 +222,14 @@ class ApplicationMember(Base, IdNameDescriptionMixin):
     principal_id: Mapped[str] = mapped_column(String(50), nullable=False)
     principal_type: Mapped[str] = mapped_column(PrincipalTypeSAEnum, nullable=False)
 
+    role: Mapped[str] = mapped_column(PermissionActionSAEnum, nullable=False)
+
     application: Mapped["Application"] = relationship(back_populates="members")
-    permissions: Mapped[list["ApplicationMemberPermission"]] = relationship(
-        back_populates="application_member", cascade="all, delete-orphan"
-    )
 
     __table_args__ = (
         UniqueConstraint("application_id", "principal_id", "principal_type", name="uq_application_members"),
         Index("ix_am_application", "application_id"),
         Index("ix_am_principal", "principal_id"),
-    )
-
-
-class ApplicationMemberPermission(Base, IdNameDescriptionMixin):
-    """Permissions for application members."""
-    __tablename__ = "application_member_permissions"
-
-    application_member_id: Mapped[str] = mapped_column(
-        String(36), ForeignKey("application_members.id", ondelete="CASCADE"), nullable=False
-    )
-    permission: Mapped[str] = mapped_column(PermissionActionSAEnum, nullable=False)
-
-    application_member: Mapped["ApplicationMember"] = relationship(back_populates="permissions")
-
-    __table_args__ = (
-        UniqueConstraint("application_member_id", "permission", name="uq_application_member_permissions"),
-        Index("ix_amp_member", "application_member_id"),
     )
 
 
@@ -280,32 +244,14 @@ class ConversationMember(Base, IdNameDescriptionMixin):
     principal_id: Mapped[str] = mapped_column(String(50), nullable=False)
     principal_type: Mapped[str] = mapped_column(PrincipalTypeSAEnum, nullable=False)
 
+    role: Mapped[str] = mapped_column(PermissionActionSAEnum, nullable=False)
+
     conversation: Mapped["Conversation"] = relationship(back_populates="members")
-    permissions: Mapped[list["ConversationMemberPermission"]] = relationship(
-        back_populates="conversation_member", cascade="all, delete-orphan"
-    )
 
     __table_args__ = (
         UniqueConstraint("conversation_id", "principal_id", "principal_type", name="uq_conversation_members"),
         Index("ix_cm_conversation", "conversation_id"),
         Index("ix_cm_principal", "principal_id"),
-    )
-
-
-class ConversationMemberPermission(Base, IdNameDescriptionMixin):
-    """Permissions for conversation members."""
-    __tablename__ = "conversation_member_permissions"
-
-    conversation_member_id: Mapped[str] = mapped_column(
-        String(36), ForeignKey("conversation_members.id", ondelete="CASCADE"), nullable=False
-    )
-    permission: Mapped[str] = mapped_column(PermissionActionSAEnum, nullable=False)
-
-    conversation_member: Mapped["ConversationMember"] = relationship(back_populates="permissions")
-
-    __table_args__ = (
-        UniqueConstraint("conversation_member_id", "permission", name="uq_conversation_member_permissions"),
-        Index("ix_cmp_member", "conversation_member_id"),
     )
 
 
@@ -320,32 +266,14 @@ class AutonomousAgentMember(Base, IdNameDescriptionMixin):
     principal_id: Mapped[str] = mapped_column(String(50), nullable=False)
     principal_type: Mapped[str] = mapped_column(PrincipalTypeSAEnum, nullable=False)
 
+    role: Mapped[str] = mapped_column(PermissionActionSAEnum, nullable=False)
+
     autonomous_agent: Mapped["AutonomousAgent"] = relationship(back_populates="members")
-    permissions: Mapped[list["AutonomousAgentMemberPermission"]] = relationship(
-        back_populates="autonomous_agent_member", cascade="all, delete-orphan"
-    )
 
     __table_args__ = (
         UniqueConstraint("autonomous_agent_id", "principal_id", "principal_type", name="uq_autonomous_agent_members"),
         Index("ix_aam_autonomous_agent", "autonomous_agent_id"),
         Index("ix_aam_principal", "principal_id"),
-    )
-
-
-class AutonomousAgentMemberPermission(Base, IdNameDescriptionMixin):
-    """Permissions for autonomous agent members."""
-    __tablename__ = "autonomous_agent_member_permissions"
-
-    autonomous_agent_member_id: Mapped[str] = mapped_column(
-        String(36), ForeignKey("autonomous_agent_members.id", ondelete="CASCADE"), nullable=False
-    )
-    permission: Mapped[str] = mapped_column(PermissionActionSAEnum, nullable=False)
-
-    autonomous_agent_member: Mapped["AutonomousAgentMember"] = relationship(back_populates="permissions")
-
-    __table_args__ = (
-        UniqueConstraint("autonomous_agent_member_id", "permission", name="uq_autonomous_agent_member_permissions"),
-        Index("ix_aamp_member", "autonomous_agent_member_id"),
     )
 
 
@@ -360,10 +288,9 @@ class CredentialMember(Base, IdNameDescriptionMixin):
     principal_id: Mapped[str] = mapped_column(String(50), nullable=False)
     principal_type: Mapped[str] = mapped_column(PrincipalTypeSAEnum, nullable=False)
 
+    role: Mapped[str] = mapped_column(PermissionActionSAEnum, nullable=False)
+
     credential: Mapped["Credential"] = relationship(back_populates="members")
-    permissions: Mapped[list["CredentialMemberPermission"]] = relationship(
-        back_populates="credential_member", cascade="all, delete-orphan"
-    )
 
     __table_args__ = (
         UniqueConstraint("credential_id", "principal_id", "principal_type", name="uq_credential_members"),
@@ -372,18 +299,4 @@ class CredentialMember(Base, IdNameDescriptionMixin):
     )
 
 
-class CredentialMemberPermission(Base, IdNameDescriptionMixin):
-    """Permissions for credential members."""
-    __tablename__ = "credential_member_permissions"
 
-    credential_member_id: Mapped[str] = mapped_column(
-        String(36), ForeignKey("credential_members.id", ondelete="CASCADE"), nullable=False
-    )
-    permission: Mapped[str] = mapped_column(PermissionActionSAEnum, nullable=False)
-
-    credential_member: Mapped["CredentialMember"] = relationship(back_populates="permissions")
-
-    __table_args__ = (
-        UniqueConstraint("credential_member_id", "permission", name="uq_credential_member_permissions"),
-        Index("ix_crmp_member", "credential_member_id"),
-    )

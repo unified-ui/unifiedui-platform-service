@@ -7,7 +7,7 @@ from sqlalchemy import select, and_, or_
 from sqlalchemy.orm import Session
 
 from aihub.core.database.client import SQLAlchemyClient
-from aihub.core.database.models import CustomGroup, CustomGroupMember, CustomGroupMemberPermission
+from aihub.core.database.models import CustomGroup, CustomGroupMember
 from aihub.caching.client import CacheClient
 from aihub.schema.requests.custom_groups import (
     CreateCustomGroupRequest,
@@ -188,7 +188,7 @@ class CustomGroupHandler:
             session.add(group)
             session.flush()
             
-            # Create group member for the creator
+            # Create group member for the creator with ADMIN role
             member_id = str(uuid.uuid4())
             group_member = CustomGroupMember(
                 id=member_id,
@@ -196,6 +196,7 @@ class CustomGroupHandler:
                 custom_group_id=group_id,
                 principal_id=user_id,
                 principal_type="IDENTITY_USER",
+                role="ADMIN",
                 name=f"Member: {user_id}",
                 description=f"Custom group member for user {user_id} on group {request.name}",
                 created_by=user_id,
@@ -203,19 +204,6 @@ class CustomGroupHandler:
             )
             session.add(group_member)
             session.flush()
-            
-            # Create ADMIN permission for the member
-            permission_id = str(uuid.uuid4())
-            group_permission = CustomGroupMemberPermission(
-                id=permission_id,
-                custom_group_member_id=member_id,
-                permission="ADMIN",
-                name=f"ADMIN permission",
-                description=f"Administrator permission for user {user_id} on group {request.name}",
-                created_by=user_id,
-                updated_by=user_id
-            )
-            session.add(group_permission)
             
             session.commit()
             session.refresh(group)
@@ -363,26 +351,25 @@ class CustomGroupHandler:
             if not group or group.tenant_id != tenant_id:
                 raise CustomGroupNotFoundError(custom_group_id)
             
-            # Get all members and their permissions
+            # Get all members and their roles
             query = (
-                select(CustomGroupMember, CustomGroupMemberPermission)
-                .join(CustomGroupMemberPermission, CustomGroupMember.id == CustomGroupMemberPermission.custom_group_member_id)
+                select(CustomGroupMember)
                 .where(CustomGroupMember.custom_group_id == custom_group_id)
-                .order_by(CustomGroupMember.principal_id, CustomGroupMemberPermission.permission)
+                .order_by(CustomGroupMember.principal_id, CustomGroupMember.role)
             )
             
-            results = session.execute(query).all()
+            members = session.execute(query).scalars().all()
             
             # Group by principal
             principals_dict = {}
-            for member, permission in results:
+            for member in members:
                 if member.principal_id not in principals_dict:
                     principals_dict[member.principal_id] = {
                         "principal_id": member.principal_id,
                         "principal_type": member.principal_type,
                         "permissions": []
                     }
-                principals_dict[member.principal_id]["permissions"].append(permission.permission)
+                principals_dict[member.principal_id]["permissions"].append(member.role)
             
             principals = list(principals_dict.values())
             
@@ -425,19 +412,18 @@ class CustomGroupHandler:
             if not group or group.tenant_id != tenant_id:
                 raise CustomGroupNotFoundError(custom_group_id)
             
-            # Get member and permissions
+            # Get members and permissions
             query = (
-                select(CustomGroupMember, CustomGroupMemberPermission)
-                .join(CustomGroupMemberPermission, CustomGroupMember.id == CustomGroupMemberPermission.custom_group_member_id)
+                select(CustomGroupMember)
                 .where(
                     CustomGroupMember.custom_group_id == custom_group_id,
                     CustomGroupMember.principal_id == principal_id
                 )
             )
             
-            results = session.execute(query).all()
+            members = session.execute(query).scalars().all()
             
-            if not results:
+            if not members:
                 # Principal has no permissions on this group
                 return {
                     "custom_group_id": custom_group_id,
@@ -447,8 +433,8 @@ class CustomGroupHandler:
                     "permissions": []
                 }
             
-            member = results[0][0]
-            permissions = [perm.permission for _, perm in results]
+            principal_type = members[0].principal_type
+            permissions = [member.role for member in members]
             
             return {
                 "custom_group_id": custom_group_id,
@@ -495,16 +481,17 @@ class CustomGroupHandler:
             if not group or group.tenant_id != tenant_id:
                 raise CustomGroupNotFoundError(custom_group_id)
             
-            # Find or create member
+            # Find or create member with this role
             query = select(CustomGroupMember).where(
                 CustomGroupMember.custom_group_id == custom_group_id,
                 CustomGroupMember.principal_id == principal_id,
-                CustomGroupMember.principal_type == principal_type
+                CustomGroupMember.principal_type == principal_type,
+                CustomGroupMember.role == permission
             )
             member = session.execute(query).scalar_one_or_none()
             
             if not member:
-                # Create new member
+                # Create new member with role
                 member_id = str(uuid.uuid4())
                 member = CustomGroupMember(
                     id=member_id,
@@ -512,34 +499,15 @@ class CustomGroupHandler:
                     custom_group_id=custom_group_id,
                     principal_id=principal_id,
                     principal_type=principal_type,
+                    role=permission,
                     name=f"Member: {principal_id}",
                     description=f"Custom group member for principal {principal_id}",
                     created_by=user_id,
                     updated_by=user_id
                 )
                 session.add(member)
-                session.flush()
-            
-            # Check if permission already exists
-            query = select(CustomGroupMemberPermission).where(
-                CustomGroupMemberPermission.custom_group_member_id == member.id,
-                CustomGroupMemberPermission.permission == permission
-            )
-            existing_permission = session.execute(query).scalar_one_or_none()
-            
-            if not existing_permission:
-                # Create new permission
-                permission_id = str(uuid.uuid4())
-                new_permission = CustomGroupMemberPermission(
-                    id=permission_id,
-                    custom_group_member_id=member.id,
-                    permission=permission,
-                    name=f"{permission} permission",
-                    description=f"Permission granted by {user_id}",
-                    created_by=user_id,
-                    updated_by=user_id
-                )
-                session.add(new_permission)
+            else:
+                logger.info(f"Member with role {permission} already exists for {principal_id}")
             
             session.commit()
             
@@ -593,47 +561,30 @@ class CustomGroupHandler:
             if not group or group.tenant_id != tenant_id:
                 raise CustomGroupNotFoundError(custom_group_id)
             
-            # Find member
+            # Find member with this specific role
             query = select(CustomGroupMember).where(
                 CustomGroupMember.custom_group_id == custom_group_id,
                 CustomGroupMember.principal_id == principal_id,
-                CustomGroupMember.principal_type == principal_type
+                CustomGroupMember.principal_type == principal_type,
+                CustomGroupMember.role == permission
             )
             member = session.execute(query).scalar_one_or_none()
             
             if member:
-                # Find and delete permission
-                query = select(CustomGroupMemberPermission).where(
-                    CustomGroupMemberPermission.custom_group_member_id == member.id,
-                    CustomGroupMemberPermission.permission == permission
-                )
-                permission_obj = session.execute(query).scalar_one_or_none()
+                # Delete the member
+                session.delete(member)
+                session.commit()
                 
-                if permission_obj:
-                    session.delete(permission_obj)
-                    
-                    # Check if member has any remaining permissions
-                    query = select(CustomGroupMemberPermission).where(
-                        CustomGroupMemberPermission.custom_group_member_id == member.id
-                    )
-                    remaining_permissions = session.execute(query).scalars().all()
-                    
-                    # If no permissions left, delete the member
-                    if not remaining_permissions:
-                        session.delete(member)
-                    
-                    session.commit()
-                    
-                    # Invalidate user cache if this is a user principal
-                    if self.cache_client:
-                        try:
-                            if principal_type == "IDENTITY_USER":
-                                self.cache_client.clear_cache_for_user(principal_id)
-                                logger.debug(f"Cleared cache for user {principal_id} after permission removal")
-                        except Exception as e:
-                            logger.warning(f"Failed to clear user cache: {e}")
-                    
-                    logger.info(f"Deleted {permission} permission for {principal_id} on custom group {custom_group_id}")
+                # Invalidate user cache if this is a user principal
+                if self.cache_client:
+                    try:
+                        if principal_type == "IDENTITY_USER":
+                            self.cache_client.clear_cache_for_user(principal_id)
+                            logger.debug(f"Cleared cache for user {principal_id} after permission removal")
+                    except Exception as e:
+                        logger.warning(f"Failed to clear user cache: {e}")
+                
+                logger.info(f"Deleted {permission} permission for {principal_id} on custom group {custom_group_id}")
             
             return self.get_principal_permissions(tenant_id, custom_group_id, principal_id)
     

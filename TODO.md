@@ -97,6 +97,8 @@
 - autonomous agents
 ## TODO
 
+- nur: entity_members -> dort rolle mit enum
+
 - Spec-Driven Vibe-Coding machen (in einem Spec projekt etc beschreiben)
 
 - tests bauen
@@ -121,3 +123,8 @@
 **Integrations**
 
 - invoke N8N etc
+
+**Optimizations**
+
+- chat service als microservice in selber struktur (nur app-core und app-chat) auslagern
+    - besser skalierbar

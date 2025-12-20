@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Optional, List
 from sqlalchemy import select, or_
 
 from aihub.core.database.client import SQLAlchemyClient
-from aihub.core.database.models import AutonomousAgent, AutonomousAgentMember, AutonomousAgentMemberPermission
+from aihub.core.database.models import AutonomousAgent, AutonomousAgentMember
 from aihub.core.database.enums import PermissionActionEnum, PrincipalTypeEnum
 from aihub.caching.client import CacheClient
 
@@ -123,7 +123,6 @@ class AutonomousAgentHandler:
                 query = (
                     select(AutonomousAgent)
                     .join(AutonomousAgentMember, AutonomousAgent.id == AutonomousAgentMember.autonomous_agent_id)
-                    .join(AutonomousAgentMemberPermission, AutonomousAgentMember.id == AutonomousAgentMemberPermission.autonomous_agent_member_id)
                     .where(AutonomousAgent.tenant_id == tenant_id)
                 )
                 
@@ -272,22 +271,12 @@ class AutonomousAgentHandler:
                 autonomous_agent_id=autonomous_agent_id,
                 principal_id=user_id,
                 principal_type=PrincipalTypeEnum.IDENTITY_USER.value,
+                role=PermissionActionEnum.ADMIN.value,
                 name=f"Member-{user_id}",
                 created_by=user_id,
                 updated_by=user_id
             )
             session.add(member)
-            
-            # Add ADMIN permission
-            permission = AutonomousAgentMemberPermission(
-                id=permission_id,
-                autonomous_agent_member_id=member_id,
-                permission=PermissionActionEnum.ADMIN.value,
-                name=f"Permission-{PermissionActionEnum.ADMIN.value}",
-                created_by=user_id,
-                updated_by=user_id
-            )
-            session.add(permission)
             
             session.commit()
             session.refresh(autonomous_agent)
@@ -456,17 +445,16 @@ class AutonomousAgentHandler:
             if not autonomous_agent:
                 raise AutonomousAgentNotFoundError(autonomous_agent_id)
             
-            # Get all members and their permissions
+            # Get all members and their roles
             query = (
-                select(AutonomousAgentMember, AutonomousAgentMemberPermission)
-                .join(AutonomousAgentMemberPermission, AutonomousAgentMember.id == AutonomousAgentMemberPermission.autonomous_agent_member_id)
+                select(AutonomousAgentMember)
                 .where(AutonomousAgentMember.autonomous_agent_id == autonomous_agent_id)
             )
-            results = session.execute(query).all()
+            members = session.execute(query).scalars().all()
             
-            # Group permissions by principal
+            # Group roles by principal
             principals_dict = {}
-            for member, permission in results:
+            for member in members:
                 key = (member.principal_id, member.principal_type)
                 if key not in principals_dict:
                     principals_dict[key] = {
@@ -476,7 +464,7 @@ class AutonomousAgentHandler:
                         "principal_type": member.principal_type,
                         "permissions": []
                     }
-                principals_dict[key]["permissions"].append(permission.permission)
+                principals_dict[key]["permissions"].append(member.role)
             
             # Convert to response models
             principals = [PrincipalPermissionsResponse(**data) for data in principals_dict.values()]
@@ -534,18 +522,17 @@ class AutonomousAgentHandler:
             if not autonomous_agent:
                 raise AutonomousAgentNotFoundError(autonomous_agent_id)
             
-            # Get member and permissions for the principal
+            # Get members and roles for the principal
             query = (
-                select(AutonomousAgentMember, AutonomousAgentMemberPermission)
-                .join(AutonomousAgentMemberPermission, AutonomousAgentMember.id == AutonomousAgentMemberPermission.autonomous_agent_member_id)
+                select(AutonomousAgentMember)
                 .where(
                     AutonomousAgentMember.autonomous_agent_id == autonomous_agent_id,
                     AutonomousAgentMember.principal_id == principal_id
                 )
             )
-            results = session.execute(query).all()
+            members = session.execute(query).scalars().all()
             
-            if not results:
+            if not members:
                 return PrincipalPermissionsResponse(
                     autonomous_agent_id=autonomous_agent_id,
                     tenant_id=tenant_id,
@@ -554,15 +541,15 @@ class AutonomousAgentHandler:
                     permissions=[]
                 )
             
-            # Get principal type from first result
-            member = results[0][0]
-            permissions = [perm.permission for _, perm in results]
+            # Get principal type from first member
+            principal_type = members[0].principal_type
+            permissions = [member.role for member in members]
             
             return PrincipalPermissionsResponse(
                 autonomous_agent_id=autonomous_agent_id,
                 tenant_id=tenant_id,
                 principal_id=principal_id,
-                principal_type=member.principal_type,
+                principal_type=principal_type,
                 permissions=permissions
             )
 
@@ -607,11 +594,12 @@ class AutonomousAgentHandler:
             if not autonomous_agent:
                 raise AutonomousAgentNotFoundError(autonomous_agent_id)
             
-            # Check if member exists
+            # Check if member exists with this role
             query = select(AutonomousAgentMember).where(
                 AutonomousAgentMember.autonomous_agent_id == autonomous_agent_id,
                 AutonomousAgentMember.principal_id == request.principal_id,
-                AutonomousAgentMember.principal_type == request.principal_type.value
+                AutonomousAgentMember.principal_type == request.principal_type.value,
+                AutonomousAgentMember.role == request.permission.value
             )
             member = session.execute(query).scalar_one_or_none()
             
@@ -624,49 +612,30 @@ class AutonomousAgentHandler:
                     autonomous_agent_id=autonomous_agent_id,
                     principal_id=request.principal_id,
                     principal_type=request.principal_type.value,
+                    role=request.permission.value,
                     name=f"Member-{request.principal_id}",
                     created_by=user_id,
                     updated_by=user_id
                 )
                 session.add(member)
                 session.flush()  # Get the member ID
-            
-            # Check if permission exists
-            query = select(AutonomousAgentMemberPermission).where(
-                AutonomousAgentMemberPermission.autonomous_agent_member_id == member.id,
-                AutonomousAgentMemberPermission.permission == request.permission.value
-            )
-            permission = session.execute(query).scalar_one_or_none()
-            
-            if permission:
-                # Permission already exists
-                logger.debug(f"Permission already exists for principal {request.principal_id}")
             else:
-                # Create new permission
-                permission_id = str(uuid.uuid4())
-                permission = AutonomousAgentMemberPermission(
-                    id=permission_id,
-                    autonomous_agent_member_id=member.id,
-                    permission=request.permission.value,
-                    name=f"Permission-{request.permission.value}",
-                    created_by=user_id,
-                    updated_by=user_id
-                )
-                session.add(permission)
+                # Member with role already exists
+                logger.debug(f"Member with role already exists for principal {request.principal_id}")
             
             session.commit()
-            session.refresh(permission)
+            session.refresh(member)
             
             # Build response
             response = AutonomousAgentPermissionResponse(
-                id=permission.id,
+                id=member.id,
                 autonomous_agent_id=autonomous_agent_id,
                 tenant_id=tenant_id,
                 principal_id=request.principal_id,
                 principal_type=request.principal_type,
                 action=request.permission,
-                created_at=permission.created_at,
-                updated_at=permission.updated_at
+                created_at=member.created_at,
+                updated_at=member.updated_at
             )
             
             # Invalidate caches
@@ -715,48 +684,28 @@ class AutonomousAgentHandler:
             if not autonomous_agent:
                 raise AutonomousAgentNotFoundError(autonomous_agent_id)
             
-            # Get member
+            # Get member with specific role
             query = select(AutonomousAgentMember).where(
                 AutonomousAgentMember.autonomous_agent_id == autonomous_agent_id,
                 AutonomousAgentMember.principal_id == principal_id,
-                AutonomousAgentMember.principal_type == principal_type
+                AutonomousAgentMember.principal_type == principal_type,
+                AutonomousAgentMember.role == permission
             )
             member = session.execute(query).scalar_one_or_none()
             
             if not member:
-                logger.debug(f"No member found for principal {principal_id}, nothing to delete")
+                logger.debug(f"No member with role {permission} found for principal {principal_id}, nothing to delete")
                 return
             
-            # Get and delete permission
-            query = select(AutonomousAgentMemberPermission).where(
-                AutonomousAgentMemberPermission.autonomous_agent_member_id == member.id,
-                AutonomousAgentMemberPermission.permission == permission
-            )
-            permission_obj = session.execute(query).scalar_one_or_none()
+            # Delete the member
+            session.delete(member)
+            session.commit()
             
-            if permission_obj:
-                session.delete(permission_obj)
-                
-                # Check if member has any remaining permissions
-                query = select(AutonomousAgentMemberPermission).where(
-                    AutonomousAgentMemberPermission.autonomous_agent_member_id == member.id
-                )
-                remaining_permissions = session.execute(query).scalars().all()
-                
-                # If no permissions left, delete the member
-                if not remaining_permissions:
-                    session.delete(member)
-                    logger.debug(f"Deleted member {member.id} as it has no remaining permissions")
-                
-                session.commit()
-                
-                # Invalidate caches
-                self._invalidate_permissions_cache(tenant_id, autonomous_agent_id)
-                self._invalidate_list_cache(tenant_id)
-                
-                logger.info(f"Deleted permission {permission} for principal {principal_id} on autonomous agent {autonomous_agent_id}")
-            else:
-                logger.debug(f"Permission {permission} not found for principal {principal_id}, nothing to delete")
+            # Invalidate caches
+            self._invalidate_permissions_cache(tenant_id, autonomous_agent_id)
+            self._invalidate_list_cache(tenant_id)
+            
+            logger.info(f"Deleted permission {permission} for principal {principal_id} on autonomous agent {autonomous_agent_id}")
 
     @staticmethod
     def _group_permissions_by_principal(results) -> list[dict]:

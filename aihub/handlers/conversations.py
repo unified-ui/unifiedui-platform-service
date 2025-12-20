@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Optional, List
 from sqlalchemy import select
 
 from aihub.core.database.client import SQLAlchemyClient
-from aihub.core.database.models import Conversation, ConversationMember, ConversationMemberPermission
+from aihub.core.database.models import Conversation, ConversationMember
 from aihub.core.database.enums import PermissionActionEnum, PrincipalTypeEnum
 from aihub.caching.client import CacheClient
 
@@ -253,23 +253,12 @@ class ConversationHandler:
                 conversation_id=conversation_id,
                 principal_id=user_id,
                 principal_type=PrincipalTypeEnum.IDENTITY_USER.value,
+                role=PermissionActionEnum.ADMIN.value,
                 name=f"Member: {user_id}",
                 created_by=user_id,
                 updated_by=user_id
             )
             session.add(member)
-            
-            # Add ADMIN permission for creator
-            permission_id = str(uuid.uuid4())
-            permission = ConversationMemberPermission(
-                id=permission_id,
-                conversation_member_id=member_id,
-                permission=PermissionActionEnum.ADMIN.value,
-                name=f"Permission: {PermissionActionEnum.ADMIN.value}",
-                created_by=user_id,
-                updated_by=user_id
-            )
-            session.add(permission)
             
             session.commit()
             session.refresh(conversation)
@@ -437,14 +426,14 @@ class ConversationHandler:
             if not conversation:
                 raise ConversationNotFoundError(conversation_id)
             
-            # Get all members and their permissions
+            # Get all members and their roles
             members_query = (
                 select(ConversationMember)
                 .where(ConversationMember.conversation_id == conversation_id)
             )
             members = session.execute(members_query).scalars().all()
             
-            # Group permissions by principal
+            # Group roles by principal
             principals_dict = {}
             for member in members:
                 key = (member.principal_id, member.principal_type)
@@ -455,9 +444,8 @@ class ConversationHandler:
                         "permissions": []
                     }
                 
-                # Get permissions for this member
-                for perm in member.permissions:
-                    principals_dict[key]["permissions"].append(perm.permission)
+                # Get role from member
+                principals_dict[key]["permissions"].append(member.role)
             
             principals = [
                 PrincipalPermissionsResponse(
@@ -520,7 +508,7 @@ class ConversationHandler:
             if not conversation:
                 raise ConversationNotFoundError(conversation_id)
             
-            # Get member for this principal
+            # Get members for this principal
             member_query = (
                 select(ConversationMember)
                 .where(
@@ -533,13 +521,12 @@ class ConversationHandler:
             if not members:
                 raise ConversationNotFoundError(f"No permissions found for principal {principal_id}")
             
-            # Collect all permissions and get principal_type from first member
+            # Collect all roles and get principal_type from first member
             permissions = []
             principal_type = members[0].principal_type
             for member in members:
-                for perm in member.permissions:
-                    if perm.permission not in permissions:
-                        permissions.append(perm.permission)
+                if member.role not in permissions:
+                    permissions.append(member.role)
             
             return PrincipalPermissionsResponse(
                 conversation_id=conversation_id,
@@ -591,19 +578,20 @@ class ConversationHandler:
             if not conversation:
                 raise ConversationNotFoundError(conversation_id)
             
-            # Find or create member
+            # Find or create member with this role
             member_query = (
                 select(ConversationMember)
                 .where(
                     ConversationMember.conversation_id == conversation_id,
                     ConversationMember.principal_id == request.principal_id,
-                    ConversationMember.principal_type == request.principal_type.value
+                    ConversationMember.principal_type == request.principal_type.value,
+                    ConversationMember.role == request.permission.value
                 )
             )
             member = session.execute(member_query).scalar_one_or_none()
             
             if not member:
-                # Create new member
+                # Create new member with role
                 member_id = str(uuid.uuid4())
                 member = ConversationMember(
                     id=member_id,
@@ -611,62 +599,39 @@ class ConversationHandler:
                     conversation_id=conversation_id,
                     principal_id=request.principal_id,
                     principal_type=request.principal_type.value,
+                    role=request.permission.value,
                     name=f"Member: {request.principal_id}",
                     created_by=user_id,
                     updated_by=user_id
                 )
                 session.add(member)
-                session.flush()
-            
-            # Check if permission already exists
-            perm_query = (
-                select(ConversationMemberPermission)
-                .where(
-                    ConversationMemberPermission.conversation_member_id == member.id,
-                    ConversationMemberPermission.permission == request.permission.value
-                )
-            )
-            existing_perm = session.execute(perm_query).scalar_one_or_none()
-            
-            if existing_perm:
-                # Permission already exists
-                logger.info("Permission already exists", extra={"permission_id": existing_perm.id})
+                session.commit()
+                session.refresh(member)
+                
+                logger.info("Member with role created", extra={"member_id": member_id})
+                
                 result = ConversationPermissionResponse(
-                    id=existing_perm.id,
+                    id=member.id,
                     conversation_id=conversation_id,
                     tenant_id=tenant_id,
                     principal_id=request.principal_id,
                     principal_type=request.principal_type,
                     action=request.permission,
-                    created_at=existing_perm.created_at,
-                    updated_at=existing_perm.updated_at
+                    created_at=member.created_at,
+                    updated_at=member.updated_at
                 )
             else:
-                # Create new permission
-                permission_id = str(uuid.uuid4())
-                permission = ConversationMemberPermission(
-                    id=permission_id,
-                    conversation_member_id=member.id,
-                    permission=request.permission.value,
-                    name=f"Permission: {request.permission.value}",
-                    created_by=user_id,
-                    updated_by=user_id
-                )
-                session.add(permission)
-                session.commit()
-                session.refresh(permission)
-                
-                logger.info("Permission created", extra={"permission_id": permission_id})
-                
+                # Member with role already exists
+                logger.info("Member with role already exists", extra={"member_id": member.id})
                 result = ConversationPermissionResponse(
-                    id=permission.id,
+                    id=member.id,
                     conversation_id=conversation_id,
                     tenant_id=tenant_id,
                     principal_id=request.principal_id,
                     principal_type=request.principal_type,
                     action=request.permission,
-                    created_at=permission.created_at,
-                    updated_at=permission.updated_at
+                    created_at=member.created_at,
+                    updated_at=member.updated_at
                 )
             
             # Invalidate cache
@@ -716,49 +681,25 @@ class ConversationHandler:
             if not conversation:
                 raise ConversationNotFoundError(conversation_id)
             
-            # Find member
+            # Find member with this role
             member_query = (
                 select(ConversationMember)
                 .where(
                     ConversationMember.conversation_id == conversation_id,
                     ConversationMember.principal_id == principal_id,
-                    ConversationMember.principal_type == principal_type
+                    ConversationMember.principal_type == principal_type,
+                    ConversationMember.role == permission
                 )
             )
             member = session.execute(member_query).scalar_one_or_none()
             
             if not member:
-                raise ConversationNotFoundError(f"Member not found for principal {principal_id}")
+                raise ConversationNotFoundError(f"Member with role {permission} not found for principal {principal_id}")
             
-            # Find and delete permission
-            perm_query = (
-                select(ConversationMemberPermission)
-                .where(
-                    ConversationMemberPermission.conversation_member_id == member.id,
-                    ConversationMemberPermission.permission == permission
-                )
-            )
-            perm = session.execute(perm_query).scalar_one_or_none()
-            
-            if not perm:
-                raise ConversationNotFoundError(f"Permission {permission} not found for principal {principal_id}")
-            
-            session.delete(perm)
-            
-            # Check if member has any other permissions
-            remaining_perms = (
-                select(ConversationMemberPermission)
-                .where(ConversationMemberPermission.conversation_member_id == member.id)
-            ).scalars().all()
-            
-            # If no remaining permissions, delete the member too
-            if len(remaining_perms) == 0:
-                session.delete(member)
-                logger.info("Deleted member with no remaining permissions", extra={"member_id": member.id})
-            
+            session.delete(member)
             session.commit()
             
-            logger.info("Permission deleted")
+            logger.info("Member with role deleted")
             
             # Invalidate cache
             self._invalidate_permissions_cache(tenant_id, conversation_id)

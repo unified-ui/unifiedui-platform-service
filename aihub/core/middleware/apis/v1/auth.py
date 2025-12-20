@@ -9,15 +9,10 @@ from aihub.handlers.dependencies import get_db_client
 from aihub.core.database.enums import TenantPermissionEnum, PermissionActionEnum
 from aihub.core.database.models import (
     ApplicationMember,
-    ApplicationMemberPermission,
     CredentialMember,
-    CredentialMemberPermission,
     AutonomousAgentMember,
-    AutonomousAgentMemberPermission,
     CustomGroupMember,
-    CustomGroupMemberPermission,
-    ConversationMember,
-    ConversationMemberPermission
+    ConversationMember
 )
 
 
@@ -210,15 +205,15 @@ def check_permissions(
             
             else:
                 # Handle resource entities (application, credential, autonomous_agent, custom_group, conversation)
-                # All entities now use member + member_permissions structure
+                # Now role is directly in member table - no need for JOIN
                 
                 # Map entity type to member model and ID parameter name
                 entity_config = {
-                    "application": (ApplicationMember, ApplicationMemberPermission, "application_id"),
-                    "credential": (CredentialMember, CredentialMemberPermission, "credential_id"),
-                    "autonomous_agent": (AutonomousAgentMember, AutonomousAgentMemberPermission, "autonomous_agent_id"),
-                    "custom_group": (CustomGroupMember, CustomGroupMemberPermission, "custom_group_id"),
-                    "conversation": (ConversationMember, ConversationMemberPermission, "conversation_id")
+                    "application": (ApplicationMember, "application_id"),
+                    "credential": (CredentialMember, "credential_id"),
+                    "autonomous_agent": (AutonomousAgentMember, "autonomous_agent_id"),
+                    "custom_group": (CustomGroupMember, "custom_group_id"),
+                    "conversation": (ConversationMember, "conversation_id")
                 }
                 
                 if entity not in entity_config:
@@ -227,7 +222,7 @@ def check_permissions(
                         detail=f"Unsupported entity type: {entity}"
                     )
                 
-                member_model, permission_model, entity_id_param = entity_config[entity]
+                member_model, entity_id_param = entity_config[entity]
                 
                 # Get entity_id from path parameters
                 entity_id = request.path_params.get(entity_id_param)
@@ -281,20 +276,19 @@ def check_permissions(
                 custom_group_ids = [group.id for group in user_custom_groups]
                 all_principal_ids = [user_id] + identity_group_ids + custom_group_ids
                 
-                # Query member permissions for this entity - ONE query with JOIN
+                # Query member with role directly - NO JOIN needed anymore
                 db_client = get_db_client()
                 required_perms_str = [perm.value if hasattr(perm, 'value') else perm for perm in required_permissions]
                 
                 with db_client.get_session() as session:
-                    # Single query: JOIN member with permissions and check everything at once
+                    # Single query: Check member table directly for role
                     query = (
-                        select(permission_model)
-                        .join(member_model, getattr(permission_model, f"{entity}_member_id") == member_model.id)
+                        select(member_model)
                         .where(
                             getattr(member_model, entity_id_param) == entity_id,
                             member_model.tenant_id == tenant_id,
                             member_model.principal_id.in_(all_principal_ids),
-                            permission_model.permission.in_(required_perms_str)
+                            member_model.role.in_(required_perms_str)
                         )
                     )
                     
