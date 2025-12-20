@@ -101,6 +101,7 @@ class ContextIdentityUser:
         
         with db_client.get_session() as session:
             from aihub.core.database.models import CustomGroupMember
+            
             query = (
                 select(CustomGroup)
                 .join(CustomGroupMember, CustomGroup.id == CustomGroupMember.custom_group_id)

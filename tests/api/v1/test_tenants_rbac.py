@@ -461,7 +461,7 @@ class TestTenantRBAC:
         assert "CREDENTIALS_ADMIN" in roles
         assert len(roles) == 3
     
-    def test_removing_global_admin_role(self, test_client):
+    def test_removing_global_admin_role(self, test_client, fake_redis_client):
         """Test that GLOBAL_ADMIN role can be removed (user loses admin access)."""
         # Admin creates tenant
         admin_token = test_client.create_test_user("demote-admin", "Demote Admin")
@@ -532,3 +532,341 @@ class TestTenantRBAC:
         # assert update_response2.status_code == status.HTTP_403_FORBIDDEN
         # For now we document that the role was removed from database
         assert len(roles_after) == 0, "User should have no roles after GLOBAL_ADMIN removal"
+        
+        # IMPORTANT: Clear cache to avoid polluting subsequent tests
+        fake_redis_client.client.flushall()
+    
+    def test_custom_group_grants_permissions_to_members(self, test_client, fake_redis_client):
+        """Test that users in a custom group inherit the group's permissions."""
+        from aihub.core.database.models import CustomGroup, CustomGroupMember
+        import uuid
+        
+        # Clear cache at the beginning to avoid pollution from previous tests
+        fake_redis_client.client.flushall()
+        
+        # Admin creates tenant (use unique user ID to avoid conflicts)
+        admin_token = test_client.create_test_user(None, "CG Admin")  # Let it generate unique ID
+        admin_headers = {"Authorization": f"Bearer {admin_token.get_token()}"}
+        
+        create_response = test_client.post(
+            "/api/v1/tenants",
+            json={"name": "Custom Group Test", "description": "Test"},
+            headers=admin_headers
+        )
+        tenant_id = create_response.json()["id"]
+        
+        # Create a custom group directly in DB (not via API)
+        custom_group_id = str(uuid.uuid4())
+        
+        # Use test_client.db_client to write to the SAME DB that the API reads from!
+        with test_client.db_client.get_session() as session:
+            custom_group = CustomGroup(
+                id=custom_group_id,
+                tenant_id=tenant_id,
+                name="Admins Group",
+                description="Group of administrators",
+                created_by=admin_token.get_id(),
+                updated_by=admin_token.get_id()
+            )
+            session.add(custom_group)
+            session.commit()
+        
+        # Create a regular user (not admin yet) - use unique ID
+        regular_user_token = test_client.create_test_user(None, "CG User")  # Let it generate unique ID
+        regular_user_headers = {"Authorization": f"Bearer {regular_user_token.get_token()}"}
+        regular_user_id = regular_user_token.get_id()  # Get actual user ID from token
+        
+        # User CANNOT access tenant yet
+        access_before = test_client.get(
+            f"/api/v1/tenants/{tenant_id}",
+            headers=regular_user_headers
+        )
+        assert access_before.status_code == status.HTTP_403_FORBIDDEN
+        
+        # Add user to custom group directly in DB (not via API)
+        # Grant GLOBAL_ADMIN role to the custom group directly in DB (not via API)
+        from aihub.core.database.models import TenantMember, TenantMemberRole
+        
+        # Use test_client.db_client to write to the SAME DB that the API reads from!
+        with test_client.db_client.get_session() as session:
+            member = CustomGroupMember(
+                id=str(uuid.uuid4()),
+                tenant_id=tenant_id,
+                custom_group_id=custom_group_id,
+                principal_id=regular_user_id,  # Use actual user ID
+                principal_type="IDENTITY_USER",
+                role="READ",
+                created_by=admin_token.get_id(),
+                updated_by=admin_token.get_id()
+            )
+            session.add(member)
+            session.commit()
+            
+            tenant_member = TenantMember(
+                id=str(uuid.uuid4()),
+                tenant_id=tenant_id,
+                principal_id=custom_group_id,
+                principal_type="CUSTOM_GROUP",
+                created_by=admin_token.get_id(),
+                updated_by=admin_token.get_id()
+            )
+            session.add(tenant_member)
+            session.commit()
+            
+            tenant_member_role = TenantMemberRole(
+                id=str(uuid.uuid4()),
+                tenant_member_id=tenant_member.id,
+                role="GLOBAL_ADMIN",
+                created_by=admin_token.get_id(),
+                updated_by=admin_token.get_id()
+            )
+            session.add(tenant_member_role)
+            session.commit()
+        
+        # Clear ALL cache databases to ensure fresh data is loaded
+        fake_redis_client.client.flushall()  # Clear all DBs, not just one
+        
+        # Now user CAN access tenant (through custom group membership)
+        access_after = test_client.get(
+            f"/api/v1/tenants/{tenant_id}",
+            headers=regular_user_headers
+        )
+        assert access_after.status_code == status.HTTP_200_OK
+        
+        # User CAN update tenant (has GLOBAL_ADMIN via custom group)
+        update_response = test_client.patch(
+            f"/api/v1/tenants/{tenant_id}",
+            json={"name": "Updated by Group Member"},
+            headers=regular_user_headers
+        )
+        assert update_response.status_code == status.HTTP_200_OK
+        assert update_response.json()["name"] == "Updated by Group Member"
+        
+        # User CAN manage principals (has GLOBAL_ADMIN via custom group)
+        add_principal_response = test_client.put(
+            f"/api/v1/tenants/{tenant_id}/principals",
+            json={
+                "principal_id": "another-user",
+                "principal_type": "IDENTITY_USER",
+                "role": "READER"
+            },
+            headers=regular_user_headers
+        )
+        assert add_principal_response.status_code == status.HTTP_200_OK
+        
+        # User CAN delete tenant (has GLOBAL_ADMIN via custom group)
+        delete_response = test_client.request(
+            "DELETE",
+            f"/api/v1/tenants/{tenant_id}",
+            headers=regular_user_headers
+        )
+        assert delete_response.status_code == status.HTTP_204_NO_CONTENT
+    
+    def test_custom_group_with_reader_role_limits_members(self, test_client, fake_redis_client):
+        """Test that custom group with READER role limits member capabilities."""
+        from aihub.core.database.models import CustomGroup, CustomGroupMember
+        import uuid
+        
+        # Admin creates tenant
+        admin_token = test_client.create_test_user("cg-reader-admin", "CG Reader Admin")
+        admin_headers = {"Authorization": f"Bearer {admin_token.get_token()}"}
+        
+        create_response = test_client.post(
+            "/api/v1/tenants",
+            json={"name": "Reader Group Test", "description": "Test"},
+            headers=admin_headers
+        )
+        tenant_id = create_response.json()["id"]
+        
+        # Create a custom group directly in DB (not via API)
+        custom_group_id = str(uuid.uuid4())
+        
+        # Use test_client.db_client to write to the SAME DB that the API reads from!
+        with test_client.db_client.get_session() as session:
+            custom_group = CustomGroup(
+                id=custom_group_id,
+                tenant_id=tenant_id,
+                name="Readers Group",
+                description="Read-only users",
+                created_by="cg-reader-admin",
+                updated_by="cg-reader-admin"
+            )
+            session.add(custom_group)
+            session.commit()
+        
+        # Create a regular user
+        reader_user_token = test_client.create_test_user("cg-reader-user", "CG Reader User")
+        reader_user_headers = {"Authorization": f"Bearer {reader_user_token.get_token()}"}
+        reader_user_id = reader_user_token.get_id()  # Get actual user ID from token
+        
+        # Add user to custom group and grant permissions directly in DB (not via API)
+        from aihub.core.database.models import TenantMember, TenantMemberRole
+        
+        # Use test_client.db_client to write to the SAME DB that the API reads from!
+        with test_client.db_client.get_session() as session:
+            member = CustomGroupMember(
+                id=str(uuid.uuid4()),
+                tenant_id=tenant_id,
+                custom_group_id=custom_group_id,
+                principal_id=reader_user_id,  # Use actual user ID
+                principal_type="IDENTITY_USER",
+                role="READ",
+                created_by="cg-reader-admin",
+                updated_by="cg-reader-admin"
+            )
+            session.add(member)
+            session.commit()
+            
+            tenant_member = TenantMember(
+                id=str(uuid.uuid4()),
+                tenant_id=tenant_id,
+                principal_id=custom_group_id,
+                principal_type="CUSTOM_GROUP",
+                created_by="cg-reader-admin",
+                updated_by="cg-reader-admin"
+            )
+            session.add(tenant_member)
+            session.commit()
+            
+            tenant_member_role = TenantMemberRole(
+                id=str(uuid.uuid4()),
+                tenant_member_id=tenant_member.id,
+                role="READER",
+                created_by="cg-reader-admin",
+                updated_by="cg-reader-admin"
+            )
+            session.add(tenant_member_role)
+            session.commit()  # Detach all objects from session
+        
+        # Clear ALL cache databases to ensure fresh data is loaded
+        fake_redis_client.client.flushall()  # Clear all DBs, not just one
+        
+        # User CAN read tenant (has READER via custom group)
+        get_response = test_client.get(
+            f"/api/v1/tenants/{tenant_id}",
+            headers=reader_user_headers
+        )
+        assert get_response.status_code == status.HTTP_200_OK
+        
+        # User CANNOT update tenant (only READER, needs GLOBAL_ADMIN)
+        update_response = test_client.patch(
+            f"/api/v1/tenants/{tenant_id}",
+            json={"name": "Should Fail"},
+            headers=reader_user_headers
+        )
+        assert update_response.status_code == status.HTTP_403_FORBIDDEN
+        
+        # User CANNOT delete tenant (only READER, needs GLOBAL_ADMIN)
+        delete_response = test_client.request(
+            "DELETE",
+            f"/api/v1/tenants/{tenant_id}",
+            headers=reader_user_headers
+        )
+        assert delete_response.status_code == status.HTTP_403_FORBIDDEN
+        
+        # User CANNOT manage principals (only READER, needs GLOBAL_ADMIN)
+        add_principal_response = test_client.put(
+            f"/api/v1/tenants/{tenant_id}/principals",
+            json={
+                "principal_id": "another-user",
+                "principal_type": "IDENTITY_USER",
+                "role": "READER"
+            },
+            headers=reader_user_headers
+        )
+        assert add_principal_response.status_code == status.HTTP_403_FORBIDDEN
+    
+    def test_user_not_in_custom_group_has_no_group_permissions(self, test_client, fake_redis_client):
+        """Test that users who are NOT in a custom group do not get the group's permissions."""
+        from aihub.core.database.models import CustomGroup, CustomGroupMember
+        import uuid
+        
+        # Admin creates tenant
+        admin_token = test_client.create_test_user("cg-isolation-admin", "CG Isolation Admin")
+        admin_headers = {"Authorization": f"Bearer {admin_token.get_token()}"}
+        
+        create_response = test_client.post(
+            "/api/v1/tenants",
+            json={"name": "Isolation Test", "description": "Test"},
+            headers=admin_headers
+        )
+        tenant_id = create_response.json()["id"]
+        
+        # Create a custom group directly in DB (not via API)
+        custom_group_id = str(uuid.uuid4())
+        
+        # Use test_client.db_client to write to the SAME DB that the API reads from!
+        with test_client.db_client.get_session() as session:
+            custom_group = CustomGroup(
+                id=custom_group_id,
+                tenant_id=tenant_id,
+                name="Privileged Group",
+                description="Only for select users",
+                created_by="cg-isolation-admin",
+                updated_by="cg-isolation-admin"
+            )
+            session.add(custom_group)
+            session.commit()
+        
+        # Create two users
+        member_token = test_client.create_test_user("cg-member", "CG Member")
+        non_member_token = test_client.create_test_user("cg-non-member", "CG Non-Member")
+        member_user_id = member_token.get_id()  # Get actual user ID from token
+        non_member_headers = {"Authorization": f"Bearer {non_member_token.get_token()}"}
+        
+        # Add only first user to custom group and grant permissions directly in DB (not via API)
+        from aihub.core.database.models import TenantMember, TenantMemberRole
+        
+        # Use test_client.db_client to write to the SAME DB that the API reads from!
+        with test_client.db_client.get_session() as session:
+            member = CustomGroupMember(
+                id=str(uuid.uuid4()),
+                tenant_id=tenant_id,
+                custom_group_id=custom_group_id,
+                principal_id=member_user_id,  # Use actual user ID
+                principal_type="IDENTITY_USER",
+                role="READ",
+                created_by="cg-isolation-admin",
+                updated_by="cg-isolation-admin"
+            )
+            session.add(member)
+            session.commit()
+            
+            tenant_member = TenantMember(
+                id=str(uuid.uuid4()),
+                tenant_id=tenant_id,
+                principal_id=custom_group_id,
+                principal_type="CUSTOM_GROUP",
+                created_by="cg-isolation-admin",
+                updated_by="cg-isolation-admin"
+            )
+            session.add(tenant_member)
+            session.commit()
+            
+            tenant_member_role = TenantMemberRole(
+                id=str(uuid.uuid4()),
+                tenant_member_id=tenant_member.id,
+                role="GLOBAL_ADMIN",
+                created_by="cg-isolation-admin",
+                updated_by="cg-isolation-admin"
+            )
+            session.add(tenant_member_role)
+            session.commit()
+        
+        # Clear ALL cache databases to ensure fresh data is loaded
+        fake_redis_client.client.flushall()  # Clear all DBs, not just one
+        
+        # Non-member CANNOT access tenant (not in the privileged group)
+        access_response = test_client.get(
+            f"/api/v1/tenants/{tenant_id}",
+            headers=non_member_headers
+        )
+        assert access_response.status_code == status.HTTP_403_FORBIDDEN
+        
+        # Non-member CANNOT update tenant
+        update_response = test_client.patch(
+            f"/api/v1/tenants/{tenant_id}",
+            json={"name": "Should Fail"},
+            headers=non_member_headers
+        )
+        assert update_response.status_code == status.HTTP_403_FORBIDDEN

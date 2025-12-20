@@ -3,6 +3,7 @@ import os
 import pytest
 import logging
 import tempfile
+import uuid
 from typing import Generator
 from unittest.mock import patch
 from fastapi.testclient import TestClient
@@ -144,24 +145,28 @@ def test_cache_client(fake_redis_client):
     
     cache_client = CacheClient(redis_client)
     
-    # Clear cache before each test
-    fake_redis_client.client.flushdb()
+    # Clear ALL cache databases before each test
+    fake_redis_client.client.flushall()
     
     return cache_client
 
 
-def create_test_user(user_id: str = "test-user-123", name: str = "Test User", mail: str = None):
+def create_test_user(user_id: str = None, name: str = "Test User", mail: str = None):
     """
     Create a test user with JWT token.
     
     Args:
-        user_id: User ID
+        user_id: User ID (if None, auto-generated from name + UUID)
         name: User's display name
         mail: User's email
         
     Returns:
         MockIdentityToken instance
     """
+    # Generate unique user_id if not provided
+    if user_id is None:
+        user_id = f"test-{name.lower().replace(' ', '-')}-{str(uuid.uuid4())[:8]}"
+    
     logger.info(f"Creating test user: user_id={user_id}, name={name}, mail={mail}")
     token = MockIdentityToken(user_id=user_id, name=name, mail=mail)
     logger.info(f"Generated JWT token: {token.get_token()[:50]}...")
@@ -179,8 +184,8 @@ def test_client(test_db_client, test_cache_client, fake_redis_client):
     import aihub.handlers.dependencies.database as db_dep
     import aihub.caching.dependencies as cache_dep
     
-    # Clear cache before test
-    fake_redis_client.client.flushdb()
+    # Clear ALL cache databases before test to avoid pollution from previous tests
+    fake_redis_client.client.flushall()
     logger.info("Cache cleared before test")
     
     db_dep._db_client = test_db_client
@@ -201,7 +206,7 @@ def test_client(test_db_client, test_cache_client, fake_redis_client):
     
     # Clean up - clear cache, reset singletons, and dispose connections
     try:
-        fake_redis_client.client.flushdb()
+        fake_redis_client.client.flushall()  # Clear ALL DBs to avoid test pollution
         logger.info("Cache cleared after test")
     except Exception as e:
         logger.warning(f"Failed to clear cache: {e}")

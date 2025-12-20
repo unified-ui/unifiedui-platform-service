@@ -197,8 +197,6 @@ class CustomGroupHandler:
                 principal_id=user_id,
                 principal_type="IDENTITY_USER",
                 role="ADMIN",
-                name=f"Member: {user_id}",
-                description=f"Custom group member for user {user_id} on group {request.name}",
                 created_by=user_id,
                 updated_by=user_id
             )
