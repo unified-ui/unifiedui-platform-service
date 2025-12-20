@@ -1027,6 +1027,122 @@ class TestTenantPrincipalRoutes:
         # Should still have only one READER role
         assert data["roles"].count("READER") == 1
     
+    def test_set_principal_permission_invalid_role(self, test_client, auth_headers, sample_tenant_data):
+        """Test that invalid role values return 422 with proper error message."""
+        # Create a tenant
+        create_response = test_client.post(
+            "/api/v1/tenants",
+            json=sample_tenant_data,
+            headers=auth_headers
+        )
+        tenant_id = create_response.json()["id"]
+        
+        # Try to add an invalid role
+        role_data = {
+            "principal_id": "user-invalid-role",
+            "principal_type": "IDENTITY_USER",
+            "role": "INVALID_ROLE_XYZ"
+        }
+        
+        response = test_client.put(
+            f"/api/v1/tenants/{tenant_id}/principals",
+            json=role_data,
+            headers=auth_headers
+        )
+        
+        # Should return 422 Unprocessable Entity, not 500
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
+        data = response.json()
+        
+        # Check that error message mentions valid values
+        assert "detail" in data
+        error_msg = str(data["detail"])
+        assert "READER" in error_msg or "GLOBAL_ADMIN" in error_msg
+    
+    def test_set_principal_permission_invalid_principal_type(self, test_client, auth_headers, sample_tenant_data):
+        """Test that invalid principal_type values return 422 with proper error message."""
+        # Create a tenant
+        create_response = test_client.post(
+            "/api/v1/tenants",
+            json=sample_tenant_data,
+            headers=auth_headers
+        )
+        tenant_id = create_response.json()["id"]
+        
+        # Try to add with invalid principal_type
+        role_data = {
+            "principal_id": "user-invalid-type",
+            "principal_type": "INVALID_TYPE_XYZ",
+            "role": "READER"
+        }
+        
+        response = test_client.put(
+            f"/api/v1/tenants/{tenant_id}/principals",
+            json=role_data,
+            headers=auth_headers
+        )
+        
+        # Should return 422 Unprocessable Entity, not 500
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
+        data = response.json()
+        
+        # Check that error message mentions valid values
+        assert "detail" in data
+        error_msg = str(data["detail"])
+        assert "IDENTITY_USER" in error_msg or "IDENTITY_GROUP" in error_msg
+    
+    def test_delete_principal_permission_invalid_role(self, test_client, auth_headers, sample_tenant_data):
+        """Test that deleting with invalid role returns 422."""
+        # Create a tenant
+        create_response = test_client.post(
+            "/api/v1/tenants",
+            json=sample_tenant_data,
+            headers=auth_headers
+        )
+        tenant_id = create_response.json()["id"]
+        
+        # Try to delete with invalid role
+        delete_data = {
+            "principal_id": "user-delete-invalid",
+            "principal_type": "IDENTITY_USER",
+            "role": "INVALID_ROLE"
+        }
+        
+        response = test_client.request("DELETE", 
+            f"/api/v1/tenants/{tenant_id}/principals",
+            json=delete_data,
+            headers=auth_headers
+        )
+        
+        # Should return 422 Unprocessable Entity
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
+    
+    def test_delete_principal_permission_invalid_principal_type(self, test_client, auth_headers, sample_tenant_data):
+        """Test that deleting with invalid principal_type returns 422."""
+        # Create a tenant
+        create_response = test_client.post(
+            "/api/v1/tenants",
+            json=sample_tenant_data,
+            headers=auth_headers
+        )
+        tenant_id = create_response.json()["id"]
+        
+        # Try to delete with invalid principal_type
+        delete_data = {
+            "principal_id": "user-delete-invalid-type",
+            "principal_type": "INVALID_TYPE",
+            "role": "READER"
+        }
+        
+        response = test_client.request("DELETE", 
+            f"/api/v1/tenants/{tenant_id}/principals",
+            json=delete_data,
+            headers=auth_headers
+        )
+        
+        # Should return 422 Unprocessable Entity
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
+    
     def test_delete_principal_permission(self, test_client, auth_headers, sample_tenant_data):
         """Test removing a role from a principal."""
         # Create a tenant
