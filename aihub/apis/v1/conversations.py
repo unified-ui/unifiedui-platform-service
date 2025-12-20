@@ -23,8 +23,7 @@ from aihub.logger import get_logger
 logger = get_logger(__name__)
 
 router = APIRouter(
-    prefix="/conversations",
-    tags=["conversations"]
+    prefix="/conversations"
 )
 
 
