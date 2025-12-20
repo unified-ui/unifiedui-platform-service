@@ -1,9 +1,16 @@
+from contextlib import asynccontextmanager
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from aihub.apis.v1 import health, identity, tenants, custom_groups, credentials, applications, conversations, autonomous_agents
+from aihub.exc.autonomous_agents import AutonomousAgentNotFoundError
+from aihub.exc.custom_groups import CustomGroupNotFoundError, CustomGroupError
+from aihub.exc.applications import ApplicationNotFoundError
+from aihub.exc.credentials import CredentialNotFoundError
+from aihub.exc.conversations import ConversationNotFoundError
+
 from aihub.docdatabase.dependencies import close_db_client
 from aihub.core.config import settings
 from aihub.exc.tenants import TenantNotFoundError, TenantError
@@ -18,6 +25,15 @@ logger = get_logger(__name__)
 load_dotenv()
 
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Lifespan context manager for startup and shutdown events."""
+    # Startup
+    yield
+    # Shutdown
+    close_db_client()
+
+
 def create_app() -> FastAPI:
     """Create and configure FastAPI application following best practices."""
     
@@ -27,7 +43,8 @@ def create_app() -> FastAPI:
         version=settings.api_version,
         docs_url="/docs",
         redoc_url="/redoc",
-        openapi_url="/openapi.json"
+        openapi_url="/openapi.json",
+        lifespan=lifespan
     )
     
     # CORS Middleware
@@ -65,7 +82,6 @@ def create_app() -> FastAPI:
         )
     
     # Custom Group exception handlers
-    from aihub.exc.custom_groups import CustomGroupNotFoundError, CustomGroupError
     
     @app.exception_handler(CustomGroupNotFoundError)
     async def custom_group_not_found_handler(request: Request, exc: CustomGroupNotFoundError):
@@ -83,7 +99,6 @@ def create_app() -> FastAPI:
             content={"detail": str(exc)}
         )
         # Application exception handlers
-    from aihub.exc.applications import ApplicationNotFoundError
     
     @app.exception_handler(ApplicationNotFoundError)
     async def application_not_found_handler(request: Request, exc: ApplicationNotFoundError):
@@ -93,7 +108,6 @@ def create_app() -> FastAPI:
             content={"detail": str(exc)}
         )
         # Credential exception handlers
-    from aihub.exc.credentials import CredentialNotFoundError
     
     @app.exception_handler(CredentialNotFoundError)
     async def credential_not_found_handler(request: Request, exc: CredentialNotFoundError):
@@ -104,7 +118,6 @@ def create_app() -> FastAPI:
         )
     
     # Conversation exception handlers
-    from aihub.exc.conversations import ConversationNotFoundError
     
     @app.exception_handler(ConversationNotFoundError)
     async def conversation_not_found_handler(request: Request, exc: ConversationNotFoundError):
@@ -115,7 +128,6 @@ def create_app() -> FastAPI:
         )
     
     # Autonomous Agent exception handlers
-    from aihub.exc.autonomous_agents import AutonomousAgentNotFoundError
     
     @app.exception_handler(AutonomousAgentNotFoundError)
     async def autonomous_agent_not_found_handler(request: Request, exc: AutonomousAgentNotFoundError):
@@ -164,12 +176,6 @@ def create_app() -> FastAPI:
     
     app.include_router(
         conversations.router,
-        prefix="/api/v1/tenants/{tenant_id}",
-        tags=["Conversations"]
-    )
-    
-    app.include_router(
-        autonomous_agents.router,
         prefix="/api/v1/tenants/{tenant_id}",
         tags=["Autonomous Agents"]
     )

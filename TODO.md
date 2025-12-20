@@ -74,8 +74,6 @@
     - key auch cachen, aber mit encryption key (aus env)
 
 
-## TODO 
-
     - testen
     - permissions checken
 
@@ -85,10 +83,6 @@
     - ganze logik muss in handler!
     - CREDENTIALS_CREATOR
     - required_permissions updaten!
-
-
-- Spec-Driven Vibe-Coding machen (in einem Spec projekt etc beschreiben)
-
 - Applications
     - CRUD
     - Config
@@ -101,12 +95,29 @@
         - wie macht man es, wenn eine rückfrage gestellt wird? geht ja in einem Workflow
 
 - autonomous agents
+## TODO
 
-- permissions mit zweitem account testen auf
+- Spec-Driven Vibe-Coding machen (in einem Spec projekt etc beschreiben)
+
+- tests bauen
+    - in memory db konfigurieren für tests
+    - die routes testen
+    - insbesondere permissions testen!
+        - principal IDs kann man "erfinden" (einfach string)
+        - IdentityUser können wir über JWT "mocken" bzw wir könnten
+    - caching testen! cache-invalidierung
+    - wir fahren infrastruktur hoch für On-Prem Komponenten
+    - und es wird auf Azure Test-Komponenten für Integration tests geben
+        - integration testen
+
+- permissions mit mehreren account testen auf
     - tenant
     - custom groups
 
-- tests für die routes implementieren
-    - in memory db
-    
-- in check_permissions mit caching arbeiten
+- in check_permissions mit caching arbeiten; wenn user berechtigt -> super; wenn nicht wird nochmal in DB geschaut (vielleicht...)
+
+---
+
+**Integrations**
+
+- invoke N8N etc
