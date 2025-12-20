@@ -36,29 +36,29 @@ class UpdateCustomGroupRequest(BaseModel):
     )
 
 
-class SetPrincipalPermissionRequest(BaseModel):
-    """Request model for setting a principal permission on a custom group."""
+class SetPrincipalRoleRequest(BaseModel):
+    """Request model for setting a principal role on a custom group."""
     
     principal_id: str = Field(..., description="Principal ID")
     principal_type: str = Field(..., description="Principal type (IDENTITY_USER, IDENTITY_GROUP, CUSTOM_GROUP)")
-    permission: str = Field(..., description="Permission to grant (READ, WRITE, ADMIN)")
+    role: str = Field(..., description="Role to grant (READ, WRITE, ADMIN)")
 
 
-class DeletePrincipalPermissionRequest(BaseModel):
-    """Request model for deleting a principal permission from a custom group."""
+class DeletePrincipalRoleRequest(BaseModel):
+    """Request model for deleting a principal role from a custom group."""
     
     principal_id: str = Field(..., description="Principal ID")
     principal_type: str = Field(..., description="Principal type (IDENTITY_USER, IDENTITY_GROUP, CUSTOM_GROUP)")
-    permission: str = Field(..., description="Permission to remove (READ, WRITE, ADMIN)")
+    role: str = Field(..., description="Role to remove (READ, WRITE, ADMIN)")
 
 
-class SetCustomGroupPermissionRequest(BaseModel):
-    """Request model for setting a permission on a custom group."""
+class SetCustomGroupRoleRequest(BaseModel):
+    """Request model for setting a role on a custom group."""
     principal_id: str = Field(..., description="ID of the principal (user or group)")
-    action: str = Field(..., description="Permission action (READ, WRITE, ADMIN)")
+    role: str = Field(..., description="Role action (READ, WRITE, ADMIN)")
 
 
-class DeleteCustomGroupPermissionRequest(BaseModel):
-    """Request model for deleting a permission from a custom group."""
+class DeleteCustomGroupRoleRequest(BaseModel):
+    """Request model for deleting a role from a custom group."""
     principal_id: str = Field(..., description="ID of the principal (user or group)")
-    action: str = Field(..., description="Permission action (READ, WRITE, ADMIN)")
+    role: str = Field(..., description="Role action (READ, WRITE, ADMIN)")

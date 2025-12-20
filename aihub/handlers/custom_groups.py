@@ -12,8 +12,8 @@ from aihub.caching.client import CacheClient
 from aihub.schema.requests.custom_groups import (
     CreateCustomGroupRequest,
     UpdateCustomGroupRequest,
-    SetPrincipalPermissionRequest,
-    DeletePrincipalPermissionRequest
+    SetPrincipalRoleRequest,
+    DeletePrincipalRoleRequest
 )
 from aihub.schema.responses.custom_groups import (
     CustomGroupResponse,
@@ -367,9 +367,9 @@ class CustomGroupHandler:
                     principals_dict[member.principal_id] = {
                         "principal_id": member.principal_id,
                         "principal_type": member.principal_type,
-                        "permissions": []
+                        "roles": []
                     }
-                principals_dict[member.principal_id]["permissions"].append(member.role)
+                principals_dict[member.principal_id]["roles"].append(member.role)
             
             principals = list(principals_dict.values())
             
@@ -430,18 +430,18 @@ class CustomGroupHandler:
                     "tenant_id": tenant_id,
                     "principal_id": principal_id,
                     "principal_type": None,
-                    "permissions": []
+                    "roles": []
                 }
             
             principal_type = members[0].principal_type
-            permissions = [member.role for member in members]
+            roles = [member.role for member in members]
             
             return {
                 "custom_group_id": custom_group_id,
                 "tenant_id": tenant_id,
                 "principal_id": principal_id,
                 "principal_type": member.principal_type,
-                "permissions": permissions
+                "roles": roles
             }
     
     def set_principal_permission(
@@ -450,7 +450,7 @@ class CustomGroupHandler:
         custom_group_id: str,
         principal_id: str,
         principal_type: str,
-        permission: str,
+        role: str,
         user_id: str
     ) -> dict:
         """
@@ -532,7 +532,7 @@ class CustomGroupHandler:
         custom_group_id: str,
         principal_id: str,
         principal_type: str,
-        permission: str
+        role: str
     ) -> dict:
         """
         Remove a specific permission from a principal on a custom group.

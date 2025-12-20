@@ -397,20 +397,20 @@ class TenantHandler:
                 if tenant.id not in tenants_dict:
                     tenants_dict[tenant.id] = {
                         "tenant": tenant,
-                        "permissions": set()  # Use set for deduplication
+                        "roles": set()  # Use set for deduplication
                     }
                 # Add role to set (automatically deduplicates)
-                tenants_dict[tenant.id]["permissions"].add(role.role)
+                tenants_dict[tenant.id]["roles"].add(role.role)
             
             # Convert to response format
             response = []
             for tenant_data in tenants_dict.values():
                 tenant_response = self._model_to_response(tenant_data["tenant"])
                 # Convert set of permissions to sorted list
-                permissions_list = sorted(list(tenant_data["permissions"]))
+                roles_list = sorted(list(tenant_data["roles"]))
                 response.append({
                     "tenant": tenant_response.model_dump(),
-                    "permissions": permissions_list
+                    "roles": roles_list
                 })
             
             logger.info(

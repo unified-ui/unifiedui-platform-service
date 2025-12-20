@@ -10,8 +10,8 @@ from aihub.core.database.enums import TenantPermissionEnum, PermissionActionEnum
 from aihub.schema.requests.custom_groups import (
     CreateCustomGroupRequest,
     UpdateCustomGroupRequest,
-    SetPrincipalPermissionRequest,
-    DeletePrincipalPermissionRequest
+    SetPrincipalRoleRequest,
+    DeletePrincipalRoleRequest
 )
 from aihub.schema.responses.custom_groups import (
     CustomGroupResponse,
@@ -270,7 +270,7 @@ async def set_principal_permission(
     request: Request,
     tenant_id: str,
     custom_group_id: str,
-    permission_data: SetPrincipalPermissionRequest,
+    role_data: SetPrincipalRoleRequest,
     handler: CustomGroupHandler = Depends(get_custom_group_handler)
 ) -> PrincipalsResponse:
     """
@@ -294,9 +294,9 @@ async def set_principal_permission(
     result = handler.set_principal_permission(
         tenant_id=tenant_id,
         custom_group_id=custom_group_id,
-        principal_id=permission_data.principal_id,
-        principal_type=permission_data.principal_type,
-        permission=permission_data.permission,
+        principal_id=role_data.principal_id,
+        principal_type=role_data.principal_type,
+        permission=role_data.permission,
         user_id=user_id
     )
     return PrincipalsResponse(**result)
@@ -315,7 +315,7 @@ async def delete_principal_permission(
     request: Request,
     tenant_id: str,
     custom_group_id: str,
-    permission_data: DeletePrincipalPermissionRequest,
+    role_data: DeletePrincipalRoleRequest,
     handler: CustomGroupHandler = Depends(get_custom_group_handler)
 ) -> PrincipalsResponse:
     """
@@ -336,8 +336,8 @@ async def delete_principal_permission(
     result = handler.delete_principal_permission(
         tenant_id=tenant_id,
         custom_group_id=custom_group_id,
-        principal_id=permission_data.principal_id,
-        principal_type=permission_data.principal_type,
-        permission=permission_data.permission
+        principal_id=role_data.principal_id,
+        principal_type=role_data.principal_type,
+        permission=role_data.permission
     )
     return PrincipalsResponse(**result)

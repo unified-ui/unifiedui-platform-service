@@ -14,6 +14,8 @@ from aihub.core.database.models import (
     CustomGroupMember,
     ConversationMember
 )
+from aihub.handlers.dependencies.database import get_db_client
+from aihub.caching.dependencies import get_cache_client
 
 
 def authenticate(func: Callable) -> Callable:
@@ -68,8 +70,6 @@ def authenticate(func: Callable) -> Callable:
         use_cache = use_cache_header.lower() in ("true", "1", "yes")
         
         # Get database and cache clients for user
-        from aihub.handlers.dependencies.database import get_db_client
-        from aihub.caching.dependencies import get_cache_client
         
         db_client = get_db_client()
         cache_client = get_cache_client()
@@ -193,15 +193,15 @@ def check_permissions(
                     )
                 
                 # Check if user has any of the required permissions
-                # matching_tenant["permissions"] is already a list of permission strings
-                user_permissions = matching_tenant["permissions"]
+                # matching_tenant["roles"] is already a list of permission strings
+                user_roles = matching_tenant["roles"]
                 required_perms_str = [perm.value if hasattr(perm, 'value') else perm for perm in required_permissions]
-                has_permission = any(perm in user_permissions for perm in required_perms_str)
+                has_permission = any(perm in user_roles for perm in required_perms_str)
                 
                 if not has_permission:
                     raise HTTPException(
                         status_code=status.HTTP_403_FORBIDDEN,
-                        detail=f"Access denied: User does not have required permissions. Required: {required_perms_str}, Has: {user_permissions}"
+                        detail=f"Access denied: User does not have required permissions. Required: {required_perms_str}, Has: {user_roles}"
                     )
             
             else:
@@ -249,8 +249,8 @@ def check_permissions(
                 )
                 
                 if matching_tenant:
-                    # matching_tenant["permissions"] is already a list of permission strings
-                    user_tenant_permissions = matching_tenant["permissions"]
+                    # matching_tenant["roles"] is already a list of permission strings
+                    user_tenant_permissions = matching_tenant["roles"]
                     
                     # GLOBAL_ADMIN grants access to all resources
                     if TenantPermissionEnum.GLOBAL_ADMIN.value in user_tenant_permissions:

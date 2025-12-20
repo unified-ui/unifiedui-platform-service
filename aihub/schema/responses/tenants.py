@@ -24,9 +24,9 @@ class TenantRoleResponse(BaseModel):
     created_at: datetime = Field(..., description="Timestamp when the role was created")
 
 
-class TenantWithPermissionsResponse(BaseModel):
+class TenantWithRolesResponse(BaseModel):
     tenant: TenantResponse = Field(..., description="Tenant information")
-    permissions: List[TenantRoleResponse] = Field(..., description="List of roles the principal has on this tenant")
+    roles: List[TenantRoleResponse] = Field(..., description="List of roles the principal has on this tenant")
 
 
 class PrincipalsResponse(BaseModel):
