@@ -16,6 +16,9 @@ dependencies = [
     "azure-keyvault>=4.2.0",
 ]
 
+[tool.setuptools]
+packages = ["aihub"]
+
 [project.optional-dependencies]
 test = [
     "pytest>=8.0.0",
@@ -31,4 +34,5 @@ testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
+pythonpath = "."
 addopts = "-v --cov=aihub --cov-report=html --cov-report=term-missing"

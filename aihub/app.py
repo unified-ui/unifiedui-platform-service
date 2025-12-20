@@ -180,12 +180,6 @@ def create_app() -> FastAPI:
         tags=["Autonomous Agents"]
     )
     
-    # Lifecycle events
-    @app.on_event("shutdown")
-    async def shutdown_event():
-        """Close database connection on shutdown."""
-        close_db_client()
-    
     return app
 
 

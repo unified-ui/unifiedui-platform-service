@@ -19,7 +19,7 @@ class TenantRoleResponse(BaseModel):
     id: str = Field(..., description="Unique identifier for the role")
     principal_type: str = Field(..., description="Type of principal (IDENTITY_USER, IDENTITY_GROUP, CUSTOM_GROUP)")
     role: str = Field(..., description="Role type (e.g., GLOBAL_ADMIN, READER)")
-    name: str = Field(..., description="Name of the role")
+    name: str | None = Field(None, description="Name of the role (derived from role value)")
     description: str | None = Field(None, description="Optional description of the role")
     created_at: datetime = Field(..., description="Timestamp when the role was created")
 
@@ -33,7 +33,8 @@ class PrincipalsResponse(BaseModel):
     """Response containing all roles for a principal on a specific tenant."""
     tenant_id: str = Field(..., description="The tenant ID")
     principal_id: str = Field(..., description="The principal ID")
-    permissions: List[TenantRoleResponse] = Field(..., description="List of roles the principal has on this tenant")
+    principal_type: str | None = Field(None, description="The type of principal (IDENTITY_USER, IDENTITY_GROUP, CUSTOM_GROUP)")
+    roles: List[str] = Field(..., description="List of roles the principal has on this tenant")
 
 
 class TenantPrincipalsResponse(BaseModel):

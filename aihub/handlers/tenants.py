@@ -490,9 +490,11 @@ class TenantHandler:
                 if member.principal_id not in principals_dict:
                     principals_dict[member.principal_id] = {
                         "principal_id": member.principal_id,
-                        "permissions": []
+                        "principal_type": member.principal_type,
+                        "roles": []
                     }
-                principals_dict[member.principal_id]["permissions"].append(self._role_to_response(role, member))
+                # Just append the role string, not the full response object
+                principals_dict[member.principal_id]["roles"].append(role.role)
             
             # Convert to list
             principals = list(principals_dict.values())
@@ -548,17 +550,22 @@ class TenantHandler:
             )
             
             results = session.execute(query).all()
-            permissions = [self._role_to_response(role, member) for member, role in results]
+            
+            # Extract principal_type from first result (all should have same type)
+            principal_type = results[0][0].principal_type if results else None
+            # Extract just the role strings
+            roles = [role.role for member, role in results]
             
             logger.info(
                 "Retrieved principal permissions",
-                extra={"tenant_id": tenant_id, "principal_id": principal_id, "permission_count": len(permissions)}
+                extra={"tenant_id": tenant_id, "principal_id": principal_id, "permission_count": len(roles)}
             )
             
             return {
                 "tenant_id": tenant_id,
                 "principal_id": principal_id,
-                "permissions": permissions
+                "principal_type": principal_type,
+                "roles": roles
             }
     
     def set_principal_permission(
@@ -682,10 +689,14 @@ class TenantHandler:
             )
             results = session.execute(query).all()
             
+            # Extract just the role strings and principal_type
+            roles = [role.role for member, role in results]
+            
             return {
                 "tenant_id": tenant_id,
                 "principal_id": principal_id,
-                "permissions": [self._role_to_response(role, member) for member, role in results]
+                "principal_type": principal_type,
+                "roles": roles
             }
     
     def delete_principal_permission(
@@ -785,10 +796,14 @@ class TenantHandler:
                 except Exception as e:
                     logger.warning(f"Failed to clear user cache: {e}")
             
+            # Extract just the role strings
+            roles = [role.role for member, role in remaining_results]
+            
             return {
                 "tenant_id": tenant_id,
                 "principal_id": principal_id,
-                "permissions": [self._role_to_response(role, member) for member, role in remaining_results]
+                "principal_type": principal_type,
+                "roles": roles
             }
     
     @staticmethod
@@ -804,11 +819,13 @@ class TenantHandler:
             TenantRoleResponse
         """
         from aihub.schema.responses.tenants import TenantRoleResponse
+        # Generate a human-readable name from the role value
+        role_name = role.role.replace("_", " ").title() if role.role else None
         return TenantRoleResponse(
             id=role.id,
             principal_type=member.principal_type,
             role=role.role,
-            name=role.name,
-            description=role.description,
+            name=role_name,
+            description=None,
             created_at=role.created_at
         )

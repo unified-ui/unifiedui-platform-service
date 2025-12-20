@@ -12,6 +12,8 @@ $ uv sync
 $ uv remove flask
 
 $ uvicorn aihub.app:app --reload --host 0.0.0.0 --port 8000
+
+$ pytest tests/api/v1/tenants.py -v
 ```
 
 [OpenAPI Docs](http://localhost:8000/docs)

@@ -1,10 +1,11 @@
 """Response schemas for credentials."""
 from datetime import datetime
 from typing import Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 
 class CredentialResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
     """Response model for a credential (without secret value)."""
     
     id: str = Field(..., description="Credential ID")
@@ -18,7 +19,4 @@ class CredentialResponse(BaseModel):
     updated_at: datetime = Field(..., description="Last update timestamp")
     created_by: Optional[str] = Field(None, description="Creator user ID")
     updated_by: Optional[str] = Field(None, description="Last updater user ID")
-    
-    class Config:
-        from_attributes = True
 

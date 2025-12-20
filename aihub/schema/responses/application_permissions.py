@@ -1,7 +1,7 @@
 """Response schemas for application permissions."""
 from typing import List
 from datetime import datetime
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 from aihub.core.database.enums import PermissionActionEnum, PrincipalTypeEnum
 
@@ -18,8 +18,7 @@ class ApplicationPermissionResponse(BaseModel):
     created_at: datetime = Field(..., description="Creation timestamp")
     updated_at: datetime = Field(..., description="Last update timestamp")
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class PrincipalPermissionsResponse(BaseModel):

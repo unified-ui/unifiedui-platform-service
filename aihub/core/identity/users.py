@@ -7,7 +7,7 @@ from aihub.core.identity.factory import IdentityProviderFactory, IdentityTokenFa
 from aihub.schema.responses.identity import IdentityGroupResponse, IdentityUserResponse
 from aihub.schema.responses.tenants import TenantResponse
 from aihub.utils.api_query import APIFilterQuery
-from aihub.docdatabase.client import DatabaseClient
+from aihub.core.database.client import SQLAlchemyClient
 from aihub.caching.client import CacheClient
 from aihub.handlers.dependencies import get_db_client
 from aihub.core.database.models import CustomGroup, CustomGroupMember
@@ -20,7 +20,7 @@ class ContextIdentityUser:
     def __init__(
         self,
         token: str,
-        database_client: Optional["DatabaseClient"] = None,
+        database_client: Optional[SQLAlchemyClient] = None,
         cache_client: Optional[CacheClient] = None,
         use_cache: bool = True
     ):
@@ -97,7 +97,7 @@ class ContextIdentityUser:
                 logger.warning(f"Failed to get cached custom groups: {e}")
         
         # Query custom groups from custom_group_permissions where user is a principal
-        db_client = get_db_client()
+        db_client = self._database_client or get_db_client()
         
         with db_client.get_session() as session:
             from aihub.core.database.models import CustomGroupMember
@@ -153,8 +153,10 @@ class ContextIdentityUser:
         custom_group_ids = [group.id for group in self.custom_groups]
         
         # Use TenantHandler to get tenants with roles (caching is handled in the handler)
-        from aihub.handlers.dependencies import get_db_client
-        db_client = get_db_client()
+        db_client = self._database_client
+        if not db_client:
+            from aihub.handlers.dependencies import get_db_client
+            db_client = get_db_client()
         handler = TenantHandler(db_client, self._cache)
         
         self._tenants = handler.get_user_tenants_with_permissions(

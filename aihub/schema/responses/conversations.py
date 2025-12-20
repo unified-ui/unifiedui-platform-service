@@ -1,7 +1,7 @@
 """Response schemas for conversations."""
 from datetime import datetime
 from typing import Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 
 class ConversationResponse(BaseModel):
@@ -16,5 +16,4 @@ class ConversationResponse(BaseModel):
     created_by: Optional[str] = Field(None, description="Creator user ID")
     updated_by: Optional[str] = Field(None, description="Last updater user ID")
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
