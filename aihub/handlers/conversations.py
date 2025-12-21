@@ -83,12 +83,11 @@ class ConversationHandler:
         
         is_admin = False
         if matching_tenant:
-            user_permissions = matching_tenant["permissions"]
-            admin_permissions = [
-                TenantPermissionEnum.GLOBAL_ADMIN.value,
-                TenantPermissionEnum.CONVERSATIONS_ADMIN.value
-            ]
-            is_admin = any(perm in user_permissions for perm in admin_permissions)
+            tenant_permissions = matching_tenant.get("permissions", matching_tenant.get("roles", []))
+            is_admin = any(
+                p in tenant_permissions 
+                for p in [TenantPermissionEnum.GLOBAL_ADMIN.value, TenantPermissionEnum.CONVERSATIONS_ADMIN.value]
+            )
         
         # Only get group IDs if not admin
         identity_group_ids = None
@@ -229,7 +228,7 @@ class ConversationHandler:
         Returns:
             Created conversation response
         """
-        logger.info("Creating conversation", extra={"tenant_id": tenant_id, "name": request.name})
+        logger.info("Creating conversation", extra={"tenant_id": tenant_id, "conversation_name": request.name})
         
         conversation_id = str(uuid.uuid4())
         
@@ -254,7 +253,6 @@ class ConversationHandler:
                 principal_id=user_id,
                 principal_type=PrincipalTypeEnum.IDENTITY_USER.value,
                 role=PermissionActionEnum.ADMIN.value,
-                name=f"Member: {user_id}",
                 created_by=user_id,
                 updated_by=user_id
             )
@@ -363,8 +361,7 @@ class ConversationHandler:
     def _invalidate_list_cache(self, tenant_id: str) -> None:
         """Invalidate list cache for a tenant."""
         if self.cache_client:
-            pattern = f"conversations:list:tenant:{tenant_id}:*"
-            self.cache_client.delete_pattern(pattern)
+            self.cache_client.client.delete_pattern(f"conversations:list:tenant:{tenant_id}:*")
 
     def _invalidate_detail_cache(self, tenant_id: str, conversation_id: str) -> None:
         """Invalidate detail cache for a conversation."""
@@ -375,8 +372,7 @@ class ConversationHandler:
     def _invalidate_permissions_cache(self, tenant_id: str, conversation_id: str) -> None:
         """Invalidate permissions cache for a conversation."""
         if self.cache_client:
-            pattern = f"conversations:permissions:tenant:{tenant_id}:conv:{conversation_id}:*"
-            self.cache_client.delete_pattern(pattern)
+            self.cache_client.client.delete_pattern(f"conversations:permissions:tenant:{tenant_id}:conv:{conversation_id}:*")
 
     # ========== Permission Management Methods ==========
 
@@ -441,11 +437,11 @@ class ConversationHandler:
                     principals_dict[key] = {
                         "principal_id": member.principal_id,
                         "principal_type": member.principal_type,
-                        "permissions": []
+                        "roles": []
                     }
                 
                 # Get role from member
-                principals_dict[key]["permissions"].append(member.role)
+                principals_dict[key]["roles"].append(member.role)
             
             principals = [
                 PrincipalPermissionsResponse(
@@ -522,18 +518,18 @@ class ConversationHandler:
                 raise ConversationNotFoundError(f"No permissions found for principal {principal_id}")
             
             # Collect all roles and get principal_type from first member
-            permissions = []
+            roles = []
             principal_type = members[0].principal_type
             for member in members:
-                if member.role not in permissions:
-                    permissions.append(member.role)
+                if member.role not in roles:
+                    roles.append(member.role)
             
             return PrincipalPermissionsResponse(
                 conversation_id=conversation_id,
                 tenant_id=tenant_id,
                 principal_id=principal_id,
                 principal_type=principal_type,
-                permissions=permissions
+                roles=roles
             )
 
     def set_conversation_permission(
@@ -578,18 +574,18 @@ class ConversationHandler:
             if not conversation:
                 raise ConversationNotFoundError(conversation_id)
             
-            # Find or create member with this role
+            # Check if member exists (without role filter)
             member_query = (
                 select(ConversationMember)
                 .where(
                     ConversationMember.conversation_id == conversation_id,
                     ConversationMember.principal_id == request.principal_id,
-                    ConversationMember.principal_type == request.principal_type.value,
-                    ConversationMember.role == request.permission.value
+                    ConversationMember.principal_type == request.principal_type.value
                 )
             )
             member = session.execute(member_query).scalar_one_or_none()
             
+            # Create or update member
             if not member:
                 # Create new member with role
                 member_id = str(uuid.uuid4())
@@ -599,43 +595,49 @@ class ConversationHandler:
                     conversation_id=conversation_id,
                     principal_id=request.principal_id,
                     principal_type=request.principal_type.value,
-                    role=request.permission.value,
-                    name=f"Member: {request.principal_id}",
+                    role=request.role.value,
                     created_by=user_id,
                     updated_by=user_id
                 )
                 session.add(member)
-                session.commit()
-                session.refresh(member)
-                
+                session.flush()  # Get the member ID
                 logger.info("Member with role created", extra={"member_id": member_id})
-                
-                result = ConversationPermissionResponse(
-                    id=member.id,
-                    conversation_id=conversation_id,
-                    tenant_id=tenant_id,
-                    principal_id=request.principal_id,
-                    principal_type=request.principal_type,
-                    action=request.permission,
-                    created_at=member.created_at,
-                    updated_at=member.updated_at
-                )
             else:
-                # Member with role already exists
-                logger.info("Member with role already exists", extra={"member_id": member.id})
-                result = ConversationPermissionResponse(
-                    id=member.id,
-                    conversation_id=conversation_id,
-                    tenant_id=tenant_id,
-                    principal_id=request.principal_id,
-                    principal_type=request.principal_type,
-                    action=request.permission,
-                    created_at=member.created_at,
-                    updated_at=member.updated_at
-                )
+                # Update existing member's role
+                member.role = request.role.value
+                member.updated_by = user_id
+                session.flush()
+                logger.info("Member role updated", extra={"member_id": member.id})
+            
+            session.commit()
+            session.refresh(member)
+            
+            # Build response
+            result = ConversationPermissionResponse(
+                id=member.id,
+                conversation_id=conversation_id,
+                tenant_id=tenant_id,
+                principal_id=request.principal_id,
+                principal_type=request.principal_type,
+                role=request.role,
+                created_at=member.created_at,
+                updated_at=member.updated_at
+            )
             
             # Invalidate cache
             self._invalidate_permissions_cache(tenant_id, conversation_id)
+            self._invalidate_list_cache(tenant_id)
+            
+            # Invalidate user cache so list operations reflect new permissions
+            if self.cache_client:
+                try:
+                    if request.principal_type.value == "IDENTITY_USER":
+                        self.cache_client.clear_cache_for_user(request.principal_id)
+                        logger.debug(f"Cleared cache for user {request.principal_id} after permission change")
+                    # Also clear cache for the user making the change
+                    self.cache_client.clear_cache_for_user(user_id)
+                except Exception as e:
+                    logger.warning(f"Failed to clear user cache: {e}")
             
             return result
 
@@ -645,17 +647,17 @@ class ConversationHandler:
         conversation_id: str,
         principal_id: str,
         principal_type: str,
-        permission: str
+        role: str
     ) -> None:
         """
-        Delete a specific permission for a principal on a conversation.
+        Delete the permission for a principal on a conversation.
         
         Args:
             tenant_id: The ID of the tenant
             conversation_id: The ID of the conversation
             principal_id: The ID of the principal
             principal_type: The type of principal
-            permission: The permission to delete
+            role: The role to delete (must match)
             
         Raises:
             ConversationNotFoundError: If conversation or permission not found
@@ -666,7 +668,7 @@ class ConversationHandler:
                 "tenant_id": tenant_id,
                 "conversation_id": conversation_id,
                 "principal_id": principal_id,
-                "permission": permission
+                "role": role
             }
         )
         
@@ -688,13 +690,13 @@ class ConversationHandler:
                     ConversationMember.conversation_id == conversation_id,
                     ConversationMember.principal_id == principal_id,
                     ConversationMember.principal_type == principal_type,
-                    ConversationMember.role == permission
+                    ConversationMember.role == role
                 )
             )
             member = session.execute(member_query).scalar_one_or_none()
             
             if not member:
-                raise ConversationNotFoundError(f"Member with role {permission} not found for principal {principal_id}")
+                raise ConversationNotFoundError(f"Member with role {role} not found for principal {principal_id}")
             
             session.delete(member)
             session.commit()
@@ -703,6 +705,16 @@ class ConversationHandler:
             
             # Invalidate cache
             self._invalidate_permissions_cache(tenant_id, conversation_id)
+            self._invalidate_list_cache(tenant_id)
+            
+            # Invalidate user cache so list operations reflect new permissions
+            if self.cache_client:
+                try:
+                    if principal_type == "IDENTITY_USER":
+                        self.cache_client.clear_cache_for_user(principal_id)
+                        logger.debug(f"Cleared cache for user {principal_id} after permission deletion")
+                except Exception as e:
+                    logger.warning(f"Failed to clear user cache: {e}")
 
     @staticmethod
     def _model_to_response(conversation: Conversation) -> ConversationResponse:

@@ -291,8 +291,7 @@ async def update_conversation(
     required_permissions=[
         TenantPermissionEnum.GLOBAL_ADMIN,
         TenantPermissionEnum.CONVERSATIONS_ADMIN,
-        PermissionActionEnum.ADMIN,
-        PermissionActionEnum.WRITE
+        PermissionActionEnum.ADMIN
     ]
 )
 async def delete_conversation(
@@ -602,7 +601,7 @@ async def delete_conversation_permission(
             conversation_id=conversation_id,
             principal_id=delete_request.principal_id,
             principal_type=delete_request.principal_type.value,
-            permission=delete_request.permission.value
+            role=delete_request.role.value
         )
         return Response(status_code=status.HTTP_204_NO_CONTENT)
     except ConversationNotFoundError as e:
