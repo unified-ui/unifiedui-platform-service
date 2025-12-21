@@ -183,14 +183,23 @@ def test_client(test_db_client, test_cache_client, fake_redis_client):
     
     # Set test clients as global singletons BEFORE app creation
     import aihub.handlers.dependencies.database as db_dep
-    import aihub.caching.dependencies as cache_dep
+    import aihub.caching.dependencies as old_cache_dep
+    import aihub.handlers.dependencies.cache as new_cache_dep
     
     # Clear ALL cache databases before test to avoid pollution from previous tests
     fake_redis_client.client.flushall()
     logger.info("Cache cleared before test")
     
     db_dep._db_client = test_db_client
-    cache_dep._cache_client = test_cache_client
+    
+    # Set BOTH cache client globals (old and new)
+    old_cache_dep._cache_client = test_cache_client
+    new_cache_dep._cache_client = test_cache_client
+    new_cache_dep._cache_initialized = True
+    
+    # CRITICAL: Clear the LRU cache to force get_cache_client() to use our test client
+    old_cache_dep.get_cache_client.cache_clear()
+    
     logger.info("Set test clients as global singletons")
     
     app = create_app()
@@ -213,7 +222,9 @@ def test_client(test_db_client, test_cache_client, fake_redis_client):
         logger.warning(f"Failed to clear cache: {e}")
     
     db_dep._db_client = None
-    cache_dep._cache_client = None
+    old_cache_dep._cache_client = None
+    new_cache_dep._cache_client = None
+    new_cache_dep._cache_initialized = False
     logger.info("Singletons reset")
 
 

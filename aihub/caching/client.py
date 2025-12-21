@@ -44,9 +44,17 @@ class CacheClient:
         Returns:
             Number of deleted cache entries
         """
-        pattern = f"*user:{user_id}:*"
-        deleted_count = self._client.delete_pattern(pattern)
-        return deleted_count
+        # Clear multiple patterns for user-related caches
+        patterns = [
+            f"*:user:{user_id}:*",  # Matches tenants:user:X:with_permissions
+            f"*:groups:user:{user_id}",  # Matches identity:groups:user:X
+            f"*:custom_groups:user:{user_id}",  # Matches identity:custom_groups:user:X
+        ]
+        total_deleted = 0
+        for pattern in patterns:
+            deleted_count = self._client.delete_pattern(pattern)
+            total_deleted += deleted_count
+        return total_deleted
     
     def invalidate_tenant_list_cache(self) -> int:
         """

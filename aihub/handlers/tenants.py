@@ -7,7 +7,7 @@ from sqlalchemy import select, and_, or_
 from sqlalchemy.orm import Session
 
 from aihub.core.database.client import SQLAlchemyClient
-from aihub.core.database.models import Tenant, TenantMember, TenantMemberRole
+from aihub.core.database.models import Tenant, TenantMember, TenantMemberRole, CustomGroupMember
 from aihub.schema.requests.tenants import CreateTenantRequest, UpdateTenantRequest
 from aihub.schema.responses.tenants import TenantResponse
 from aihub.exc.tenants import TenantNotFoundError
@@ -665,14 +665,50 @@ class TenantHandler:
                     extra={"tenant_id": tenant_id, "principal_id": principal_id, "role": permission}
                 )
             
-            # Invalidate user cache if this is a user principal
+            # Commit the changes before invalidating cache
+            session.commit()
+            
+            # Invalidate cache for affected users
             if self.cache_client:
                 try:
+                    users_to_invalidate = []
+                    
                     if principal_type == "IDENTITY_USER":
-                        self.cache_client.clear_cache_for_user(principal_id)
-                        logger.debug(f"Cleared cache for user {principal_id} after permission change")
+                        # Direct user - invalidate their cache
+                        users_to_invalidate.append(principal_id)
+                    elif principal_type == "CUSTOM_GROUP":
+                        # Custom group - invalidate cache for all group members
+                        member_query = (
+                            select(CustomGroupMember.principal_id)
+                            .where(
+                                CustomGroupMember.custom_group_id == principal_id,
+                                CustomGroupMember.principal_type == "IDENTITY_USER"
+                            )
+                        )
+                        members = session.execute(member_query).scalars().all()
+                        users_to_invalidate.extend(members)
+                        logger.debug(f"Found {len(members)} users in custom group {principal_id} to invalidate")
+                    elif principal_type == "IDENTITY_GROUP":
+                        # Identity group - we need to invalidate all users who might be in this group
+                        # Since we don't know all users in an identity group from DB, we use a pattern
+                        # This is less efficient but necessary for identity groups
+                        pattern = "identity:groups:user:*"
+                        self.cache_client.client.delete_pattern(pattern)
+                        # Also clear tenant permissions cache for all users
+                        pattern = "tenants:user:*:with_permissions"
+                        self.cache_client.client.delete_pattern(pattern)
+                        logger.debug(f"Cleared identity group cache patterns for group {principal_id}")
+                    
+                    # Invalidate cache for each affected user
+                    for user_id_to_clear in users_to_invalidate:
+                        deleted_count = self.cache_client.clear_cache_for_user(user_id_to_clear)
+                        logger.debug(f"Cleared {deleted_count} cache entries for user {user_id_to_clear}")
+                    
                     # Also clear cache for the user making the change
                     self.cache_client.clear_cache_for_user(user_id)
+                    
+                    # Invalidate tenant list caches
+                    self.cache_client.invalidate_tenant_list_cache()
                 except Exception as e:
                     logger.warning(f"Failed to clear user cache: {e}")
             
@@ -773,8 +809,44 @@ class TenantHandler:
                 )
             
             session.flush()
-            
-            # Get remaining roles for this principal
+                        # Invalidate cache for affected users
+            if self.cache_client:
+                try:
+                    users_to_invalidate = []
+                    
+                    if principal_type == "IDENTITY_USER":
+                        # Direct user - invalidate their cache
+                        users_to_invalidate.append(principal_id)
+                    elif principal_type == "CUSTOM_GROUP":
+                        # Custom group - invalidate cache for all group members
+                        member_query = (
+                            select(CustomGroupMember.principal_id)
+                            .where(
+                                CustomGroupMember.custom_group_id == principal_id,
+                                CustomGroupMember.principal_type == "IDENTITY_USER"
+                            )
+                        )
+                        members = session.execute(member_query).scalars().all()
+                        users_to_invalidate.extend(members)
+                        logger.debug(f"Found {len(members)} users in custom group {principal_id} to invalidate")
+                    elif principal_type == "IDENTITY_GROUP":
+                        # Identity group - invalidate all group and permission caches
+                        pattern = "identity:groups:user:*"
+                        self.cache_client.client.delete_pattern(pattern)
+                        pattern = "tenants:user:*:with_permissions"
+                        self.cache_client.client.delete_pattern(pattern)
+                        logger.debug(f"Cleared identity group cache patterns for group {principal_id}")
+                    
+                    # Invalidate cache for each affected user
+                    for user_id_to_clear in users_to_invalidate:
+                        self.cache_client.clear_cache_for_user(user_id_to_clear)
+                        logger.debug(f"Cleared cache for user {user_id_to_clear} after permission revocation")
+                    
+                    # Invalidate tenant list caches
+                    self.cache_client.invalidate_tenant_list_cache()
+                except Exception as e:
+                    logger.warning(f"Failed to clear user cache: {e}")
+                        # Get remaining roles for this principal
             query = (
                 select(TenantMember, TenantMemberRole)
                 .join(TenantMemberRole, TenantMember.id == TenantMemberRole.tenant_member_id)
