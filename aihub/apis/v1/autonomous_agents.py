@@ -258,8 +258,7 @@ async def update_autonomous_agent(
     required_permissions=[
         TenantPermissionEnum.GLOBAL_ADMIN,
         TenantPermissionEnum.AUTONOMOUS_AGENTS_ADMIN,
-        PermissionActionEnum.ADMIN,
-        PermissionActionEnum.WRITE
+        PermissionActionEnum.ADMIN
     ]
 )
 async def delete_autonomous_agent(

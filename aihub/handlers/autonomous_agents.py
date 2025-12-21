@@ -601,7 +601,7 @@ class AutonomousAgentHandler:
             )
             member = session.execute(query).scalar_one_or_none()
             
-            # Create member if not exists
+            # Create or update member
             if not member:
                 member_id = str(uuid.uuid4())
                 member = AutonomousAgentMember(
@@ -617,8 +617,10 @@ class AutonomousAgentHandler:
                 session.add(member)
                 session.flush()  # Get the member ID
             else:
-                # Member with role already exists
-                logger.debug(f"Member with role already exists for principal {request.principal_id}")
+                # Update existing member's role
+                member.role = request.role
+                member.updated_by = user_id
+                session.flush()
             
             session.commit()
             session.refresh(member)
@@ -638,6 +640,17 @@ class AutonomousAgentHandler:
             # Invalidate caches
             self._invalidate_permissions_cache(tenant_id, autonomous_agent_id)
             self._invalidate_list_cache(tenant_id)
+            
+            # Invalidate user cache so list operations reflect new permissions
+            if self.cache_client:
+                try:
+                    if request.principal_type.value == "IDENTITY_USER":
+                        self.cache_client.clear_cache_for_user(request.principal_id)
+                        logger.debug(f"Cleared cache for user {request.principal_id} after permission change")
+                    # Also clear cache for the user making the change
+                    self.cache_client.clear_cache_for_user(user_id)
+                except Exception as e:
+                    logger.warning(f"Failed to clear user cache: {e}")
             
             logger.info(f"Set permission for principal {request.principal_id} on autonomous agent {autonomous_agent_id}")
             return response
@@ -700,6 +713,15 @@ class AutonomousAgentHandler:
             # Invalidate caches
             self._invalidate_permissions_cache(tenant_id, autonomous_agent_id)
             self._invalidate_list_cache(tenant_id)
+            
+            # Invalidate user cache so list operations reflect new permissions
+            if self.cache_client:
+                try:
+                    if principal_type == "IDENTITY_USER":
+                        self.cache_client.clear_cache_for_user(principal_id)
+                        logger.debug(f"Cleared cache for user {principal_id} after permission deletion")
+                except Exception as e:
+                    logger.warning(f"Failed to clear user cache: {e}")
             
             logger.info(f"Deleted role {role} for principal {principal_id} on autonomous agent {autonomous_agent_id}")
 

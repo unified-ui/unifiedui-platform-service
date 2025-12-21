@@ -130,6 +130,8 @@
 
 - alle test datein checken
     - ist in list resource getestet, ob man nur seine frigegebenen resourcen sieht?
+    - checken, dass in den handler kein authoritation (außer bei lsit) durchgeführt wird!
+    - in den apis definitionen nochmal alle rollenzugriffe checken (admin darf löschen; write nicht!)
     - ob wirklich alle tests implementiert sind und wie
     - ggf refactoren
 
