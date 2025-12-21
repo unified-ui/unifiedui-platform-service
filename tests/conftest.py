@@ -151,7 +151,7 @@ def test_cache_client(fake_redis_client):
     return cache_client
 
 
-def create_test_user(user_id: str = None, name: str = "Test User", mail: str = None, idp_groups: list[str] = None):
+def create_test_user(user_id: str = None, name: str = "Test User", mail: str = None, idp_groups: list[str] = None) -> MockIdentityToken:
     """
     Create a test user with JWT token.
     
@@ -172,6 +172,29 @@ def create_test_user(user_id: str = None, name: str = "Test User", mail: str = N
     token = MockIdentityToken(user_id=user_id, name=name, mail=mail, idp_groups=idp_groups)
     logger.info(f"Generated JWT token: {token.get_token()[:50]}...")
     return token
+
+
+def create_auth_headers(token: MockIdentityToken, use_cache: bool = True, **kwargs) -> dict[str, str]:
+    """
+    Create authentication headers for API requests.
+    
+    Args:
+        token: MockIdentityToken instance
+        use_cache: Whether to enable caching (default: True)
+        **kwargs: Additional headers to include
+        
+    Returns:
+        Dictionary with Authorization and optionally X-Use-Cache headers
+    """
+    headers = {
+        "Authorization": f"Bearer {token.get_token()}",
+        **kwargs
+    }
+    
+    if not use_cache:
+        headers["X-Use-Cache"] = "false"
+    
+    return headers
 
 
 @pytest.fixture(scope="function")
