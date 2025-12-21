@@ -57,14 +57,9 @@ class TenantHandler:
         cache_key = f"tenants:list:skip:{skip}:limit:{limit}:filter:{filter_key}"
         
         # Check cache
-        if use_cache and self.cache_client:
-            try:
-                cached_data = self.cache_client.client.get(cache_key)
-                if cached_data is not None:
-                    logger.debug(f"Returning cached tenant list (skip={skip}, limit={limit}, filter={filter_key})")
-                    return [TenantResponse(**item) for item in cached_data]
-            except Exception as e:
-                logger.warning(f"Failed to get cached tenant list: {e}")
+        cached_data = self._get_from_cache(cache_key, use_cache)
+        if cached_data is not None:
+            return [TenantResponse(**item) for item in cached_data]
         
         with self.db_client.get_session() as session:
             query = select(Tenant)
@@ -82,13 +77,8 @@ class TenantHandler:
             result = [self._model_to_response(tenant) for tenant in tenants]
             
             # Cache the result
-            if self.cache_client:
-                try:
-                    cache_data = [item.model_dump() for item in result]
-                    self.cache_client.client.set(cache_key, cache_data, ttl=300)  # Cache for 5 minutes
-                    logger.debug(f"Cached tenant list (TTL: 300s)")
-                except Exception as e:
-                    logger.warning(f"Failed to cache tenant list: {e}")
+            cache_data = [item.model_dump() for item in result]
+            self._set_to_cache(cache_key, cache_data, ttl=300)
             
             return result
 
@@ -112,32 +102,18 @@ class TenantHandler:
         cache_key = f"tenants:detail:{tenant_id}"
         
         # Check cache
-        if use_cache and self.cache_client:
-            try:
-                cached_data = self.cache_client.client.get(cache_key)
-                if cached_data is not None:
-                    logger.debug(f"Returning cached tenant {tenant_id}")
-                    return TenantResponse(**cached_data)
-            except Exception as e:
-                logger.warning(f"Failed to get cached tenant: {e}")
+        cached_data = self._get_from_cache(cache_key, use_cache)
+        if cached_data is not None:
+            return TenantResponse(**cached_data)
         
         with self.db_client.get_session() as session:
-            tenant = session.get(Tenant, tenant_id)
-            
-            if not tenant:
-                logger.warning("Tenant not found", extra={"tenant_id": tenant_id})
-                raise TenantNotFoundError(tenant_id)
+            tenant = self._validate_tenant_exists(session, tenant_id)
             
             logger.info("Tenant retrieved", extra={"tenant_id": tenant_id})
             result = self._model_to_response(tenant)
             
             # Cache the result
-            if self.cache_client:
-                try:
-                    self.cache_client.client.set(cache_key, result.model_dump(), ttl=600)  # Cache for 10 minutes
-                    logger.debug(f"Cached tenant {tenant_id} (TTL: 600s)")
-                except Exception as e:
-                    logger.warning(f"Failed to cache tenant: {e}")
+            self._set_to_cache(cache_key, result.model_dump(), ttl=600)
             
             return result
 
@@ -339,14 +315,9 @@ class TenantHandler:
         cache_key = f"tenants:user:{user_id}:with_permissions"
         
         # Check cache
-        if use_cache and self.cache_client:
-            try:
-                cached_data = self.cache_client.client.get(cache_key)
-                if cached_data is not None:
-                    logger.debug(f"Returning cached tenants with permissions for user {user_id}")
-                    return cached_data
-            except Exception as e:
-                logger.warning(f"Failed to get cached user tenants: {e}")
+        cached_data = self._get_from_cache(cache_key, use_cache)
+        if cached_data is not None:
+            return cached_data
         
         with self.db_client.get_session() as session:
             # Build conditions for all principal types
@@ -419,12 +390,7 @@ class TenantHandler:
             )
             
             # Cache the result
-            if self.cache_client:
-                try:
-                    self.cache_client.client.set(cache_key, response, ttl=300)  # Cache for 5 minutes
-                    logger.debug(f"Cached user tenants with permissions for {user_id} (TTL: 300s)")
-                except Exception as e:
-                    logger.warning(f"Failed to cache user tenants: {e}")
+            self._set_to_cache(cache_key, response, ttl=300)
             
             return response
     
@@ -599,10 +565,7 @@ class TenantHandler:
         
         with self.db_client.get_session() as session:
             # Check if tenant exists
-            tenant = session.get(Tenant, tenant_id)
-            if not tenant:
-                logger.warning("Tenant not found", extra={"tenant_id": tenant_id})
-                raise TenantNotFoundError(tenant_id)
+            self._validate_tenant_exists(session, tenant_id)
             
             # Check if member exists
             member_query = (
@@ -669,48 +632,7 @@ class TenantHandler:
             session.commit()
             
             # Invalidate cache for affected users
-            if self.cache_client:
-                try:
-                    users_to_invalidate = []
-                    
-                    if principal_type == "IDENTITY_USER":
-                        # Direct user - invalidate their cache
-                        users_to_invalidate.append(principal_id)
-                    elif principal_type == "CUSTOM_GROUP":
-                        # Custom group - invalidate cache for all group members
-                        member_query = (
-                            select(CustomGroupMember.principal_id)
-                            .where(
-                                CustomGroupMember.custom_group_id == principal_id,
-                                CustomGroupMember.principal_type == "IDENTITY_USER"
-                            )
-                        )
-                        members = session.execute(member_query).scalars().all()
-                        users_to_invalidate.extend(members)
-                        logger.debug(f"Found {len(members)} users in custom group {principal_id} to invalidate")
-                    elif principal_type == "IDENTITY_GROUP":
-                        # Identity group - we need to invalidate all users who might be in this group
-                        # Since we don't know all users in an identity group from DB, we use a pattern
-                        # This is less efficient but necessary for identity groups
-                        pattern = "identity:groups:user:*"
-                        self.cache_client.client.delete_pattern(pattern)
-                        # Also clear tenant permissions cache for all users
-                        pattern = "tenants:user:*:with_permissions"
-                        self.cache_client.client.delete_pattern(pattern)
-                        logger.debug(f"Cleared identity group cache patterns for group {principal_id}")
-                    
-                    # Invalidate cache for each affected user
-                    for user_id_to_clear in users_to_invalidate:
-                        deleted_count = self.cache_client.clear_cache_for_user(user_id_to_clear)
-                        logger.debug(f"Cleared {deleted_count} cache entries for user {user_id_to_clear}")
-                    
-                    # Also clear cache for the user making the change
-                    self.cache_client.clear_cache_for_user(user_id)
-                    
-                    # Invalidate tenant list caches
-                    self.cache_client.invalidate_tenant_list_cache()
-                except Exception as e:
-                    logger.warning(f"Failed to clear user cache: {e}")
+            self._invalidate_cache_for_principal(session, principal_id, principal_type, user_id)
             
             # Get all roles for this principal
             query = (
@@ -764,10 +686,7 @@ class TenantHandler:
         
         with self.db_client.get_session() as session:
             # Check if tenant exists
-            tenant = session.get(Tenant, tenant_id)
-            if not tenant:
-                logger.warning("Tenant not found", extra={"tenant_id": tenant_id})
-                raise TenantNotFoundError(tenant_id)
+            self._validate_tenant_exists(session, tenant_id)
             
             # Find the member
             member_query = (
@@ -809,44 +728,11 @@ class TenantHandler:
                 )
             
             session.flush()
-                        # Invalidate cache for affected users
-            if self.cache_client:
-                try:
-                    users_to_invalidate = []
-                    
-                    if principal_type == "IDENTITY_USER":
-                        # Direct user - invalidate their cache
-                        users_to_invalidate.append(principal_id)
-                    elif principal_type == "CUSTOM_GROUP":
-                        # Custom group - invalidate cache for all group members
-                        member_query = (
-                            select(CustomGroupMember.principal_id)
-                            .where(
-                                CustomGroupMember.custom_group_id == principal_id,
-                                CustomGroupMember.principal_type == "IDENTITY_USER"
-                            )
-                        )
-                        members = session.execute(member_query).scalars().all()
-                        users_to_invalidate.extend(members)
-                        logger.debug(f"Found {len(members)} users in custom group {principal_id} to invalidate")
-                    elif principal_type == "IDENTITY_GROUP":
-                        # Identity group - invalidate all group and permission caches
-                        pattern = "identity:groups:user:*"
-                        self.cache_client.client.delete_pattern(pattern)
-                        pattern = "tenants:user:*:with_permissions"
-                        self.cache_client.client.delete_pattern(pattern)
-                        logger.debug(f"Cleared identity group cache patterns for group {principal_id}")
-                    
-                    # Invalidate cache for each affected user
-                    for user_id_to_clear in users_to_invalidate:
-                        self.cache_client.clear_cache_for_user(user_id_to_clear)
-                        logger.debug(f"Cleared cache for user {user_id_to_clear} after permission revocation")
-                    
-                    # Invalidate tenant list caches
-                    self.cache_client.invalidate_tenant_list_cache()
-                except Exception as e:
-                    logger.warning(f"Failed to clear user cache: {e}")
-                        # Get remaining roles for this principal
+            
+            # Invalidate cache for affected users (uses admin user_id=None for tracking)
+            self._invalidate_cache_for_principal(session, principal_id, principal_type, "")
+            
+            # Get remaining roles for this principal
             query = (
                 select(TenantMember, TenantMemberRole)
                 .join(TenantMemberRole, TenantMember.id == TenantMemberRole.tenant_member_id)
@@ -859,15 +745,6 @@ class TenantHandler:
             )
             remaining_results = session.execute(query).all()
             
-            # Invalidate user cache if this is a user principal
-            if self.cache_client:
-                try:
-                    if principal_type == "IDENTITY_USER":
-                        self.cache_client.clear_cache_for_user(principal_id)
-                        logger.debug(f"Cleared cache for user {principal_id} after permission removal")
-                except Exception as e:
-                    logger.warning(f"Failed to clear user cache: {e}")
-            
             # Extract just the role strings
             roles = [role.role for member, role in remaining_results]
             
@@ -877,6 +754,115 @@ class TenantHandler:
                 "principal_type": principal_type,
                 "roles": roles
             }
+    
+    def _get_from_cache(self, cache_key: str, use_cache: bool = True):
+        """
+        Get data from cache if available.
+        
+        Args:
+            cache_key: Cache key to retrieve
+            use_cache: Whether to use cache
+            
+        Returns:
+            Cached data or None
+        """
+        if use_cache and self.cache_client:
+            try:
+                cached_data = self.cache_client.client.get(cache_key)
+                if cached_data is not None:
+                    logger.debug(f"Cache hit: {cache_key}")
+                    return cached_data
+            except Exception as e:
+                logger.warning(f"Failed to get from cache {cache_key}: {e}")
+        return None
+    
+    def _set_to_cache(self, cache_key: str, data, ttl: int = 300):
+        """
+        Set data to cache.
+        
+        Args:
+            cache_key: Cache key to set
+            data: Data to cache
+            ttl: Time to live in seconds
+        """
+        if self.cache_client:
+            try:
+                self.cache_client.client.set(cache_key, data, ttl=ttl)
+                logger.debug(f"Cached: {cache_key} (TTL: {ttl}s)")
+            except Exception as e:
+                logger.warning(f"Failed to cache {cache_key}: {e}")
+    
+    def _validate_tenant_exists(self, session: Session, tenant_id: str) -> Tenant:
+        """
+        Validate that a tenant exists.
+        
+        Args:
+            session: Database session
+            tenant_id: ID of the tenant
+            
+        Returns:
+            Tenant model
+            
+        Raises:
+            TenantNotFoundError: If tenant not found
+        """
+        tenant = session.get(Tenant, tenant_id)
+        if not tenant:
+            logger.warning("Tenant not found", extra={"tenant_id": tenant_id})
+            raise TenantNotFoundError(tenant_id)
+        return tenant
+    
+    def _invalidate_cache_for_principal(self, session: Session, principal_id: str, principal_type: str, user_id: str):
+        """
+        Invalidate cache for affected users based on principal type.
+        
+        Args:
+            session: Database session
+            principal_id: ID of the principal
+            principal_type: Type of principal (IDENTITY_USER, CUSTOM_GROUP, IDENTITY_GROUP)
+            user_id: ID of the user making the change
+        """
+        if not self.cache_client:
+            return
+        
+        try:
+            users_to_invalidate = []
+            
+            if principal_type == "IDENTITY_USER":
+                # Direct user - invalidate their cache
+                users_to_invalidate.append(principal_id)
+            elif principal_type == "CUSTOM_GROUP":
+                # Custom group - invalidate cache for all group members
+                member_query = (
+                    select(CustomGroupMember.principal_id)
+                    .where(
+                        CustomGroupMember.custom_group_id == principal_id,
+                        CustomGroupMember.principal_type == "IDENTITY_USER"
+                    )
+                )
+                members = session.execute(member_query).scalars().all()
+                users_to_invalidate.extend(members)
+                logger.debug(f"Found {len(members)} users in custom group {principal_id} to invalidate")
+            elif principal_type == "IDENTITY_GROUP":
+                # Identity group - invalidate all group and permission caches
+                pattern = "identity:groups:user:*"
+                self.cache_client.client.delete_pattern(pattern)
+                pattern = "tenants:user:*:with_permissions"
+                self.cache_client.client.delete_pattern(pattern)
+                logger.debug(f"Cleared identity group cache patterns for group {principal_id}")
+            
+            # Invalidate cache for each affected user
+            for user_id_to_clear in users_to_invalidate:
+                deleted_count = self.cache_client.clear_cache_for_user(user_id_to_clear)
+                logger.debug(f"Cleared {deleted_count} cache entries for user {user_id_to_clear}")
+            
+            # Also clear cache for the user making the change
+            self.cache_client.clear_cache_for_user(user_id)
+            
+            # Invalidate tenant list caches
+            self.cache_client.invalidate_tenant_list_cache()
+        except Exception as e:
+            logger.warning(f"Failed to clear user cache: {e}")
     
     @staticmethod
     def _role_to_response(role: TenantMemberRole, member: TenantMember):
