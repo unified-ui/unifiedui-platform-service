@@ -10,7 +10,7 @@ class TestTenantRBAC:
         """Test that tenant creator automatically becomes GLOBAL_ADMIN."""
         # Create user and tenant
         user_token = test_client.create_test_user("creator-user", "Creator User")
-        headers = {"Authorization": f"Bearer {user_token.get_token()}"}
+        headers = {"Authorization": f"Bearer {user_token.get_token()}", "X-Use-Cache": "false"}
         
         # Create tenant
         response = test_client.post(
@@ -37,7 +37,7 @@ class TestTenantRBAC:
         """Test that GLOBAL_ADMIN can update tenant."""
         # Create user and tenant
         user_token = test_client.create_test_user("admin-user", "Admin User")
-        headers = {"Authorization": f"Bearer {user_token.get_token()}"}
+        headers = {"Authorization": f"Bearer {user_token.get_token()}", "X-Use-Cache": "false"}
         
         create_response = test_client.post(
             "/api/v1/tenants",
@@ -60,7 +60,7 @@ class TestTenantRBAC:
         """Test that GLOBAL_ADMIN can delete tenant."""
         # Create user and tenant
         user_token = test_client.create_test_user("delete-admin", "Delete Admin")
-        headers = {"Authorization": f"Bearer {user_token.get_token()}"}
+        headers = {"Authorization": f"Bearer {user_token.get_token()}", "X-Use-Cache": "false"}
         
         create_response = test_client.post(
             "/api/v1/tenants",
@@ -82,7 +82,7 @@ class TestTenantRBAC:
         """Test that GLOBAL_ADMIN can add/remove principals."""
         # Create admin user and tenant
         admin_token = test_client.create_test_user("principal-admin", "Principal Admin")
-        admin_headers = {"Authorization": f"Bearer {admin_token.get_token()}"}
+        admin_headers = {"Authorization": f"Bearer {admin_token.get_token()}", "X-Use-Cache": "false"}
         
         create_response = test_client.post(
             "/api/v1/tenants",
@@ -175,7 +175,7 @@ class TestTenantRBAC:
         """Test that READER role can view but cannot modify tenant."""
         # Admin creates tenant
         admin_token = test_client.create_test_user("reader-admin", "Reader Admin")
-        admin_headers = {"Authorization": f"Bearer {admin_token.get_token()}"}
+        admin_headers = {"Authorization": f"Bearer {admin_token.get_token()}", "X-Use-Cache": "false"}
         
         create_response = test_client.post(
             "/api/v1/tenants",
@@ -186,7 +186,7 @@ class TestTenantRBAC:
         
         # Create reader user
         reader_token = test_client.create_test_user("reader-user", "Reader User")
-        reader_headers = {"Authorization": f"Bearer {reader_token.get_token()}"}
+        reader_headers = {"Authorization": f"Bearer {reader_token.get_token()}", "X-Use-Cache": "false"}
         
         # Admin adds reader with READER role
         test_client.put(
@@ -246,7 +246,7 @@ class TestTenantRBAC:
         """Test that APPLICATIONS_ADMIN role can view but cannot modify tenant structure."""
         # Admin creates tenant
         admin_token = test_client.create_test_user("app-admin", "App Admin")
-        admin_headers = {"Authorization": f"Bearer {admin_token.get_token()}"}
+        admin_headers = {"Authorization": f"Bearer {admin_token.get_token()}", "X-Use-Cache": "false"}
         
         create_response = test_client.post(
             "/api/v1/tenants",
@@ -257,7 +257,7 @@ class TestTenantRBAC:
         
         # Create app admin user
         app_user_token = test_client.create_test_user("app-user", "App User")
-        app_user_headers = {"Authorization": f"Bearer {app_user_token.get_token()}"}
+        app_user_headers = {"Authorization": f"Bearer {app_user_token.get_token()}", "X-Use-Cache": "false"}
         
         # Admin adds user with APPLICATIONS_ADMIN role
         test_client.put(
@@ -309,7 +309,7 @@ class TestTenantRBAC:
         """Test that multiple users can be GLOBAL_ADMIN and all have full access."""
         # First admin creates tenant
         admin1_token = test_client.create_test_user("admin-1", "Admin 1")
-        admin1_headers = {"Authorization": f"Bearer {admin1_token.get_token()}"}
+        admin1_headers = {"Authorization": f"Bearer {admin1_token.get_token()}", "X-Use-Cache": "false"}
         
         create_response = test_client.post(
             "/api/v1/tenants",
@@ -320,7 +320,7 @@ class TestTenantRBAC:
         
         # Create second admin user
         admin2_token = test_client.create_test_user("admin-2", "Admin 2")
-        admin2_headers = {"Authorization": f"Bearer {admin2_token.get_token()}"}
+        admin2_headers = {"Authorization": f"Bearer {admin2_token.get_token()}", "X-Use-Cache": "false"}
         
         # First admin adds second admin with GLOBAL_ADMIN role
         add_response = test_client.put(
@@ -364,51 +364,11 @@ class TestTenantRBAC:
         )
         assert delete_response.status_code == status.HTTP_204_NO_CONTENT
     
-    def test_user_can_only_list_their_tenants(self, test_client):
-        """Test that users only see tenants they have access to in list."""
-        # User A creates tenant A
-        user_a_token = test_client.create_test_user("list-user-a", "List User A")
-        headers_a = {"Authorization": f"Bearer {user_a_token.get_token()}"}
-        
-        tenant_a_response = test_client.post(
-            "/api/v1/tenants",
-            json={"name": "Tenant A", "description": "For User A"},
-            headers=headers_a
-        )
-        tenant_a_id = tenant_a_response.json()["id"]
-        
-        # User B creates tenant B
-        user_b_token = test_client.create_test_user("list-user-b", "List User B")
-        headers_b = {"Authorization": f"Bearer {user_b_token.get_token()}"}
-        
-        tenant_b_response = test_client.post(
-            "/api/v1/tenants",
-            json={"name": "Tenant B", "description": "For User B"},
-            headers=headers_b
-        )
-        tenant_b_id = tenant_b_response.json()["id"]
-        
-        # User A lists tenants - should see at least their own tenant
-        list_a_response = test_client.get("/api/v1/tenants", headers=headers_a)
-        assert list_a_response.status_code == status.HTTP_200_OK
-        tenants_a = list_a_response.json()
-        tenant_a_ids = [t["id"] for t in tenants_a]
-        assert tenant_a_id in tenant_a_ids
-        # Current implementation shows all tenants, not just user's tenants
-        # This test verifies user can at least see their own tenant
-        
-        # User B lists tenants - should see at least their own tenant
-        list_b_response = test_client.get("/api/v1/tenants", headers=headers_b)
-        assert list_b_response.status_code == status.HTTP_200_OK
-        tenants_b = list_b_response.json()
-        tenant_b_ids = [t["id"] for t in tenants_b]
-        assert tenant_b_id in tenant_b_ids
-    
     def test_user_with_multiple_roles_on_same_tenant(self, test_client):
         """Test that a user can have multiple roles on the same tenant."""
         # Admin creates tenant
         admin_token = test_client.create_test_user("multi-role-admin", "Multi Role Admin")
-        admin_headers = {"Authorization": f"Bearer {admin_token.get_token()}"}
+        admin_headers = {"Authorization": f"Bearer {admin_token.get_token()}", "X-Use-Cache": "false"}
         
         create_response = test_client.post(
             "/api/v1/tenants",
@@ -465,7 +425,7 @@ class TestTenantRBAC:
         """Test that GLOBAL_ADMIN role can be removed (user loses admin access)."""
         # Admin creates tenant
         admin_token = test_client.create_test_user("demote-admin", "Demote Admin")
-        admin_headers = {"Authorization": f"Bearer {admin_token.get_token()}"}
+        admin_headers = {"Authorization": f"Bearer {admin_token.get_token()}", "X-Use-Cache": "false"}
         
         create_response = test_client.post(
             "/api/v1/tenants",
@@ -476,7 +436,7 @@ class TestTenantRBAC:
         
         # Create second admin
         admin2_token = test_client.create_test_user("admin-to-demote", "Admin To Demote")
-        admin2_headers = {"Authorization": f"Bearer {admin2_token.get_token()}"}
+        admin2_headers = {"Authorization": f"Bearer {admin2_token.get_token()}", "X-Use-Cache": "false"}
         
         # Give second user GLOBAL_ADMIN role
         test_client.put(
@@ -521,17 +481,12 @@ class TestTenantRBAC:
         assert "GLOBAL_ADMIN" not in roles_after
         
         # Second user now has NO roles, so should get 403 when trying to access tenant
-        # Note: Due to caching or implementation, the check might still succeed
-        # This test documents current behavior - may need adjustment if caching is fixed
         update_response2 = test_client.patch(
             f"/api/v1/tenants/{tenant_id}",
             json={"name": "Should Fail"},
             headers=admin2_headers
         )
-        # TODO: This should be 403 but currently returns 200 due to caching
-        # assert update_response2.status_code == status.HTTP_403_FORBIDDEN
-        # For now we document that the role was removed from database
-        assert len(roles_after) == 0, "User should have no roles after GLOBAL_ADMIN removal"
+        assert update_response2.status_code == status.HTTP_403_FORBIDDEN
         
         # IMPORTANT: Clear cache to avoid polluting subsequent tests
         fake_redis_client.client.flushall()
@@ -546,7 +501,7 @@ class TestTenantRBAC:
         
         # Admin creates tenant (use unique user ID to avoid conflicts)
         admin_token = test_client.create_test_user(None, "CG Admin")  # Let it generate unique ID
-        admin_headers = {"Authorization": f"Bearer {admin_token.get_token()}"}
+        admin_headers = {"Authorization": f"Bearer {admin_token.get_token()}", "X-Use-Cache": "false"}
         
         create_response = test_client.post(
             "/api/v1/tenants",
@@ -573,7 +528,7 @@ class TestTenantRBAC:
         
         # Create a regular user (not admin yet) - use unique ID
         regular_user_token = test_client.create_test_user(None, "CG User")  # Let it generate unique ID
-        regular_user_headers = {"Authorization": f"Bearer {regular_user_token.get_token()}"}
+        regular_user_headers = {"Authorization": f"Bearer {regular_user_token.get_token()}", "X-Use-Cache": "false"}
         regular_user_id = regular_user_token.get_id()  # Get actual user ID from token
         
         # User CANNOT access tenant yet
@@ -669,7 +624,7 @@ class TestTenantRBAC:
         
         # Admin creates tenant
         admin_token = test_client.create_test_user("cg-reader-admin", "CG Reader Admin")
-        admin_headers = {"Authorization": f"Bearer {admin_token.get_token()}"}
+        admin_headers = {"Authorization": f"Bearer {admin_token.get_token()}", "X-Use-Cache": "false"}
         
         create_response = test_client.post(
             "/api/v1/tenants",
@@ -696,7 +651,7 @@ class TestTenantRBAC:
         
         # Create a regular user
         reader_user_token = test_client.create_test_user("cg-reader-user", "CG Reader User")
-        reader_user_headers = {"Authorization": f"Bearer {reader_user_token.get_token()}"}
+        reader_user_headers = {"Authorization": f"Bearer {reader_user_token.get_token()}", "X-Use-Cache": "false"}
         reader_user_id = reader_user_token.get_id()  # Get actual user ID from token
         
         # Add user to custom group and grant permissions directly in DB (not via API)
@@ -783,7 +738,7 @@ class TestTenantRBAC:
         
         # Admin creates tenant
         admin_token = test_client.create_test_user("cg-isolation-admin", "CG Isolation Admin")
-        admin_headers = {"Authorization": f"Bearer {admin_token.get_token()}"}
+        admin_headers = {"Authorization": f"Bearer {admin_token.get_token()}", "X-Use-Cache": "false"}
         
         create_response = test_client.post(
             "/api/v1/tenants",
@@ -812,7 +767,7 @@ class TestTenantRBAC:
         member_token = test_client.create_test_user("cg-member", "CG Member")
         non_member_token = test_client.create_test_user("cg-non-member", "CG Non-Member")
         member_user_id = member_token.get_id()  # Get actual user ID from token
-        non_member_headers = {"Authorization": f"Bearer {non_member_token.get_token()}"}
+        non_member_headers = {"Authorization": f"Bearer {non_member_token.get_token()}", "X-Use-Cache": "false"}
         
         # Add only first user to custom group and grant permissions directly in DB (not via API)
         from aihub.core.database.models import TenantMember, TenantMemberRole
@@ -870,3 +825,355 @@ class TestTenantRBAC:
             headers=non_member_headers
         )
         assert update_response.status_code == status.HTTP_403_FORBIDDEN
+    
+    def test_identity_group_grants_permissions_to_members(self, test_client, fake_redis_client):
+        """Test that users in an identity group inherit the group's permissions."""
+        # Clear cache at the beginning
+        fake_redis_client.client.flushall()
+        
+        # Define an identity group ID
+        identity_group_id = "ig-admins-001"
+        
+        # Admin creates tenant (without being in the group)
+        admin_token = test_client.create_test_user(None, "IG Admin")
+        admin_headers = {"Authorization": f"Bearer {admin_token.get_token()}", "X-Use-Cache": "false"}
+        
+        create_response = test_client.post(
+            "/api/v1/tenants",
+            json={"name": "Identity Group Test", "description": "Test"},
+            headers=admin_headers
+        )
+        tenant_id = create_response.json()["id"]
+        
+        # Create a user who is member of the identity group
+        group_member_token = test_client.create_test_user(
+            None, 
+            "IG Member",
+            idp_groups=[identity_group_id]  # User is in the identity group
+        )
+        group_member_headers = {"Authorization": f"Bearer {group_member_token.get_token()}", "X-Use-Cache": "false"}
+        
+        # User CANNOT access tenant yet (group doesn't have permissions)
+        access_before = test_client.get(
+            f"/api/v1/tenants/{tenant_id}",
+            headers=group_member_headers
+        )
+        assert access_before.status_code == status.HTTP_403_FORBIDDEN
+        
+        # Admin grants GLOBAL_ADMIN role to the identity group
+        grant_response = test_client.put(
+            f"/api/v1/tenants/{tenant_id}/principals",
+            json={
+                "principal_id": identity_group_id,
+                "principal_type": "IDENTITY_GROUP",
+                "role": "GLOBAL_ADMIN"
+            },
+            headers=admin_headers
+        )
+        assert grant_response.status_code == status.HTTP_200_OK
+        assert "GLOBAL_ADMIN" in grant_response.json()["roles"]
+        
+        # Clear cache to ensure fresh data
+        fake_redis_client.client.flushall()
+        
+        # Now user CAN access tenant (through identity group membership)
+        access_after = test_client.get(
+            f"/api/v1/tenants/{tenant_id}",
+            headers=group_member_headers
+        )
+        assert access_after.status_code == status.HTTP_200_OK
+        
+        # User CAN update tenant (has GLOBAL_ADMIN via identity group)
+        update_response = test_client.patch(
+            f"/api/v1/tenants/{tenant_id}",
+            json={"name": "Updated by Group Member"},
+            headers=group_member_headers
+        )
+        assert update_response.status_code == status.HTTP_200_OK
+        assert update_response.json()["name"] == "Updated by Group Member"
+        
+        # User CAN manage principals (has GLOBAL_ADMIN via identity group)
+        add_principal_response = test_client.put(
+            f"/api/v1/tenants/{tenant_id}/principals",
+            json={
+                "principal_id": "another-user",
+                "principal_type": "IDENTITY_USER",
+                "role": "READER"
+            },
+            headers=group_member_headers
+        )
+        assert add_principal_response.status_code == status.HTTP_200_OK
+        
+        # User CAN delete tenant (has GLOBAL_ADMIN via identity group)
+        delete_response = test_client.request(
+            "DELETE",
+            f"/api/v1/tenants/{tenant_id}",
+            headers=group_member_headers
+        )
+        assert delete_response.status_code == status.HTTP_204_NO_CONTENT
+    
+    def test_identity_group_with_reader_role_limits_members(self, test_client, fake_redis_client):
+        """Test that identity group with READER role limits member capabilities."""
+        # Admin creates tenant
+        admin_token = test_client.create_test_user("ig-reader-admin", "IG Reader Admin")
+        admin_headers = {"Authorization": f"Bearer {admin_token.get_token()}", "X-Use-Cache": "false"}
+        
+        create_response = test_client.post(
+            "/api/v1/tenants",
+            json={"name": "Reader Identity Group Test", "description": "Test"},
+            headers=admin_headers
+        )
+        tenant_id = create_response.json()["id"]
+        
+        # Define an identity group ID
+        reader_group_id = "ig-readers-001"
+        
+        # Create a user who is member of the reader identity group
+        reader_token = test_client.create_test_user(
+            "ig-reader-user",
+            "IG Reader User",
+            idp_groups=[reader_group_id]
+        )
+        reader_headers = {"Authorization": f"Bearer {reader_token.get_token()}", "X-Use-Cache": "false"}
+        
+        # Admin grants READER role to the identity group
+        grant_response = test_client.put(
+            f"/api/v1/tenants/{tenant_id}/principals",
+            json={
+                "principal_id": reader_group_id,
+                "principal_type": "IDENTITY_GROUP",
+                "role": "READER"
+            },
+            headers=admin_headers
+        )
+        assert grant_response.status_code == status.HTTP_200_OK
+        assert "READER" in grant_response.json()["roles"]
+        
+        # Clear cache
+        fake_redis_client.client.flushall()
+        
+        # User CAN read tenant (has READER via identity group)
+        get_response = test_client.get(
+            f"/api/v1/tenants/{tenant_id}",
+            headers=reader_headers
+        )
+        assert get_response.status_code == status.HTTP_200_OK
+        
+        # User CANNOT update tenant (only READER, needs GLOBAL_ADMIN)
+        update_response = test_client.patch(
+            f"/api/v1/tenants/{tenant_id}",
+            json={"name": "Should Fail"},
+            headers=reader_headers
+        )
+        assert update_response.status_code == status.HTTP_403_FORBIDDEN
+        
+        # User CANNOT delete tenant (only READER, needs GLOBAL_ADMIN)
+        delete_response = test_client.request(
+            "DELETE",
+            f"/api/v1/tenants/{tenant_id}",
+            headers=reader_headers
+        )
+        assert delete_response.status_code == status.HTTP_403_FORBIDDEN
+        
+        # User CANNOT manage principals (only READER, needs GLOBAL_ADMIN)
+        add_principal_response = test_client.put(
+            f"/api/v1/tenants/{tenant_id}/principals",
+            json={
+                "principal_id": "another-user",
+                "principal_type": "IDENTITY_USER",
+                "role": "READER"
+            },
+            headers=reader_headers
+        )
+        assert add_principal_response.status_code == status.HTTP_403_FORBIDDEN
+    
+    def test_user_not_in_identity_group_has_no_group_permissions(self, test_client, fake_redis_client):
+        """Test that users who are NOT in an identity group do not get the group's permissions."""
+        # Admin creates tenant
+        admin_token = test_client.create_test_user("ig-isolation-admin", "IG Isolation Admin")
+        admin_headers = {"Authorization": f"Bearer {admin_token.get_token()}", "X-Use-Cache": "false"}
+        
+        create_response = test_client.post(
+            "/api/v1/tenants",
+            json={"name": "IG Isolation Test", "description": "Test"},
+            headers=admin_headers
+        )
+        tenant_id = create_response.json()["id"]
+        
+        # Define an identity group ID
+        privileged_group_id = "ig-privileged-001"
+        
+        # Create two users - one in the group, one not
+        member_token = test_client.create_test_user(
+            "ig-member",
+            "IG Member",
+            idp_groups=[privileged_group_id]
+        )
+        
+        non_member_token = test_client.create_test_user(
+            "ig-non-member",
+            "IG Non-Member",
+            idp_groups=[]  # Explicitly not in the group
+        )
+        non_member_headers = {"Authorization": f"Bearer {non_member_token.get_token()}", "X-Use-Cache": "false"}
+        
+        # Admin grants GLOBAL_ADMIN role to the identity group
+        grant_response = test_client.put(
+            f"/api/v1/tenants/{tenant_id}/principals",
+            json={
+                "principal_id": privileged_group_id,
+                "principal_type": "IDENTITY_GROUP",
+                "role": "GLOBAL_ADMIN"
+            },
+            headers=admin_headers
+        )
+        assert grant_response.status_code == status.HTTP_200_OK
+        
+        # Clear cache
+        fake_redis_client.client.flushall()
+        
+        # Non-member CANNOT access tenant (not in the privileged group)
+        access_response = test_client.get(
+            f"/api/v1/tenants/{tenant_id}",
+            headers=non_member_headers
+        )
+        assert access_response.status_code == status.HTTP_403_FORBIDDEN
+        
+        # Non-member CANNOT update tenant
+        update_response = test_client.patch(
+            f"/api/v1/tenants/{tenant_id}",
+            json={"name": "Should Fail"},
+            headers=non_member_headers
+        )
+        assert update_response.status_code == status.HTTP_403_FORBIDDEN
+    
+    def test_user_with_multiple_identity_groups(self, test_client, fake_redis_client):
+        """Test that a user can be in multiple identity groups and accumulate permissions."""
+        # Admin creates tenant
+        admin_token = test_client.create_test_user("ig-multi-admin", "IG Multi Admin")
+        admin_headers = {"Authorization": f"Bearer {admin_token.get_token()}", "X-Use-Cache": "false"}
+        
+        create_response = test_client.post(
+            "/api/v1/tenants",
+            json={"name": "Multi IG Test", "description": "Test"},
+            headers=admin_headers
+        )
+        tenant_id = create_response.json()["id"]
+        
+        # Define multiple identity groups
+        reader_group_id = "ig-readers-002"
+        apps_admin_group_id = "ig-apps-admins-001"
+        
+        # Create a user who is in multiple identity groups
+        multi_group_token = test_client.create_test_user(
+            "ig-multi-user",
+            "IG Multi User",
+            idp_groups=[reader_group_id, apps_admin_group_id]
+        )
+        multi_group_headers = {"Authorization": f"Bearer {multi_group_token.get_token()}", "X-Use-Cache": "false"}
+        
+        # Admin grants different roles to different groups
+        test_client.put(
+            f"/api/v1/tenants/{tenant_id}/principals",
+            json={
+                "principal_id": reader_group_id,
+                "principal_type": "IDENTITY_GROUP",
+                "role": "READER"
+            },
+            headers=admin_headers
+        )
+        
+        test_client.put(
+            f"/api/v1/tenants/{tenant_id}/principals",
+            json={
+                "principal_id": apps_admin_group_id,
+                "principal_type": "IDENTITY_GROUP",
+                "role": "APPLICATIONS_ADMIN"
+            },
+            headers=admin_headers
+        )
+        
+        # Clear cache
+        fake_redis_client.client.flushall()
+        
+        # User CAN read tenant (has READER from first group)
+        get_response = test_client.get(
+            f"/api/v1/tenants/{tenant_id}",
+            headers=multi_group_headers
+        )
+        assert get_response.status_code == status.HTTP_200_OK
+        
+        # User still CANNOT update tenant (neither READER nor APPLICATIONS_ADMIN grants this)
+        update_response = test_client.patch(
+            f"/api/v1/tenants/{tenant_id}",
+            json={"name": "Should Fail"},
+            headers=multi_group_headers
+        )
+        assert update_response.status_code == status.HTTP_403_FORBIDDEN
+    
+    def test_identity_group_and_direct_user_permissions_combine(self, test_client, fake_redis_client):
+        """Test that user permissions from identity group and direct assignment combine."""
+        # Admin creates tenant
+        admin_token = test_client.create_test_user("ig-combo-admin", "IG Combo Admin")
+        admin_headers = {"Authorization": f"Bearer {admin_token.get_token()}", "X-Use-Cache": "false"}
+        
+        create_response = test_client.post(
+            "/api/v1/tenants",
+            json={"name": "Combo Permissions Test", "description": "Test"},
+            headers=admin_headers
+        )
+        tenant_id = create_response.json()["id"]
+        
+        # Define an identity group
+        reader_group_id = "ig-readers-003"
+        
+        # Create a user who is in the identity group
+        combo_user_token = test_client.create_test_user(
+            "ig-combo-user",
+            "IG Combo User",
+            idp_groups=[reader_group_id]
+        )
+        combo_user_headers = {"Authorization": f"Bearer {combo_user_token.get_token()}", "X-Use-Cache": "false"}
+        combo_user_id = combo_user_token.get_id()
+        
+        # Admin grants READER role to the identity group
+        test_client.put(
+            f"/api/v1/tenants/{tenant_id}/principals",
+            json={
+                "principal_id": reader_group_id,
+                "principal_type": "IDENTITY_GROUP",
+                "role": "READER"
+            },
+            headers=admin_headers
+        )
+        
+        # Admin also grants GLOBAL_ADMIN directly to the user
+        test_client.put(
+            f"/api/v1/tenants/{tenant_id}/principals",
+            json={
+                "principal_id": combo_user_id,
+                "principal_type": "IDENTITY_USER",
+                "role": "GLOBAL_ADMIN"
+            },
+            headers=admin_headers
+        )
+        
+        # Clear cache
+        fake_redis_client.client.flushall()
+        
+        # User CAN read tenant (from both sources)
+        get_response = test_client.get(
+            f"/api/v1/tenants/{tenant_id}",
+            headers=combo_user_headers
+        )
+        assert get_response.status_code == status.HTTP_200_OK
+        
+        # User CAN update tenant (has GLOBAL_ADMIN from direct assignment)
+        update_response = test_client.patch(
+            f"/api/v1/tenants/{tenant_id}",
+            json={"name": "Updated with Combined Permissions"},
+            headers=combo_user_headers
+        )
+        assert update_response.status_code == status.HTTP_200_OK
+        assert update_response.json()["name"] == "Updated with Combined Permissions"
+

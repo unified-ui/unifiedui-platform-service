@@ -151,7 +151,7 @@ def test_cache_client(fake_redis_client):
     return cache_client
 
 
-def create_test_user(user_id: str = None, name: str = "Test User", mail: str = None):
+def create_test_user(user_id: str = None, name: str = "Test User", mail: str = None, idp_groups: list[str] = None):
     """
     Create a test user with JWT token.
     
@@ -159,6 +159,7 @@ def create_test_user(user_id: str = None, name: str = "Test User", mail: str = N
         user_id: User ID (if None, auto-generated from name + UUID)
         name: User's display name
         mail: User's email
+        groups: List of group IDs the user belongs to
         
     Returns:
         MockIdentityToken instance
@@ -167,8 +168,8 @@ def create_test_user(user_id: str = None, name: str = "Test User", mail: str = N
     if user_id is None:
         user_id = f"test-{name.lower().replace(' ', '-')}-{str(uuid.uuid4())[:8]}"
     
-    logger.info(f"Creating test user: user_id={user_id}, name={name}, mail={mail}")
-    token = MockIdentityToken(user_id=user_id, name=name, mail=mail)
+    logger.info(f"Creating test user: user_id={user_id}, name={name}, mail={mail}, groups={idp_groups}")
+    token = MockIdentityToken(user_id=user_id, name=name, mail=mail, idp_groups=idp_groups)
     logger.info(f"Generated JWT token: {token.get_token()[:50]}...")
     return token
 

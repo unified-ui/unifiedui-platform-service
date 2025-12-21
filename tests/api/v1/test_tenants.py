@@ -64,7 +64,7 @@ class TestTenantRoutes:
         """Test that different users can create their own tenants."""
         # Create first user and tenant
         user1_token = test_client.create_test_user("user-1", "User One")
-        headers1 = {"Authorization": f"Bearer {user1_token.get_token()}"}
+        headers1 = {"Authorization": f"Bearer {user1_token.get_token()}", "X-Use-Cache": "false"}
         
         response1 = test_client.post(
             "/api/v1/tenants",
@@ -77,7 +77,7 @@ class TestTenantRoutes:
         
         # Create second user and tenant
         user2_token = test_client.create_test_user("user-2", "User Two")
-        headers2 = {"Authorization": f"Bearer {user2_token.get_token()}"}
+        headers2 = {"Authorization": f"Bearer {user2_token.get_token()}", "X-Use-Cache": "false"}
         
         response2 = test_client.post(
             "/api/v1/tenants",
@@ -466,7 +466,7 @@ class TestTenantPrincipalRoutes:
         """Test adding roles with multiple different users."""
         # Create admin user and tenant
         admin_token = test_client.create_test_user("admin-user", "Admin User")
-        admin_headers = {"Authorization": f"Bearer {admin_token.get_token()}"}
+        admin_headers = {"Authorization": f"Bearer {admin_token.get_token()}", "X-Use-Cache": "false"}
         
         create_response = test_client.post(
             "/api/v1/tenants",
@@ -587,8 +587,8 @@ class TestTenantPrincipalRoutes:
         user1_token = test_client.create_test_user("isolated-user-1", "Isolated User One")
         user2_token = test_client.create_test_user("isolated-user-2", "Isolated User Two")
         
-        headers1 = {"Authorization": f"Bearer {user1_token.get_token()}"}
-        headers2 = {"Authorization": f"Bearer {user2_token.get_token()}"}
+        headers1 = {"Authorization": f"Bearer {user1_token.get_token()}", "X-Use-Cache": "false"}
+        headers2 = {"Authorization": f"Bearer {user2_token.get_token()}", "X-Use-Cache": "false"}
         
         # User 1 creates a tenant
         tenant1_response = test_client.post(
@@ -862,9 +862,6 @@ class TestTenantPrincipalRoutes:
         assert response.status_code == status.HTTP_403_FORBIDDEN  # 403 instead of 404 for security
 
 
-class TestTenantPrincipalRoutes:
-    """Test suite for tenant principal/role management routes."""
-    
     def test_list_tenant_principals_empty(self, test_client, auth_headers, sample_tenant_data, test_user_token):
         """Test listing principals for a tenant with only the creator."""
         # Create a tenant

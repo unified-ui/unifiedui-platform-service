@@ -8,7 +8,7 @@ from aihub.core.identity.enums import IdenityProviderEnum
 class MockIdentityToken(BaseIdentityToken):
     """Mock identity token for testing."""
     
-    def __init__(self, user_id: str, name: str = "Test User", mail: str = None):
+    def __init__(self, user_id: str, name: str = "Test User", mail: str = None, idp_groups: list[str] = None):
         # Create a mock JWT token
         now = int(time.time())
         exp_time = now + 36000
@@ -21,6 +21,7 @@ class MockIdentityToken(BaseIdentityToken):
             "given_name": name.split()[0] if " " in name else name,
             "family_name": name.split()[1] if " " in name and len(name.split()) > 1 else "",
             "mail": mail or f"{user_id}@test.com",
+            "groups": idp_groups or [],  # Add groups to token payload
             "iat": now,
             "exp": exp_time
         }
@@ -57,3 +58,7 @@ class MockIdentityToken(BaseIdentityToken):
     
     def get_identity_provider(self) -> str:
         return self._identity_provider
+    
+    def get_groups(self) -> list[str]:
+        """Get user's group memberships."""
+        return self.deserialized_token.get("groups", [])
