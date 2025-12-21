@@ -51,6 +51,20 @@ def create_custom_group(test_client: TestClient, tenant_id: str, headers: dict, 
     return response.json()["id"]
 
 
+def add_user_to_tenant(test_client: TestClient, tenant_id: str, admin_headers: dict, user_id: str, role: str = "READER") -> None:
+    """Helper function to add a user to a tenant."""
+    response = test_client.put(
+        f"/api/v1/tenants/{tenant_id}/principals",
+        json={
+            "principal_id": user_id,
+            "principal_type": PRINCIPAL_TYPE_USER,
+            "role": role
+        },
+        headers=admin_headers
+    )
+    assert response.status_code == status.HTTP_200_OK
+
+
 class TestCustomGroupRBAC:
     """Test suite for custom group role-based access control."""
     
@@ -157,7 +171,7 @@ class TestCustomGroupRBAC:
         assert delete_response.status_code == status.HTTP_200_OK
     
     def test_non_member_cannot_access_custom_group(self, test_client: TestClient) -> None:
-        """Test that users without access cannot see/modify custom group."""
+        """Test that users without access cannot modify custom group (but can view if tenant member)."""
         # User A creates tenant and custom group
         user_a_token = test_client.create_test_user("user-a", "User A")
         headers_a = create_auth_headers(user_a_token, use_cache=False)
@@ -169,22 +183,14 @@ class TestCustomGroupRBAC:
         headers_b = create_auth_headers(user_b_token, use_cache=False)
         
         # Add User B to tenant with READER role
-        test_client.put(
-            f"/api/v1/tenants/{tenant_id}/principals",
-            json={
-                "principal_id": "user-b",
-                "principal_type": PRINCIPAL_TYPE_USER,
-                "role": "READER"
-            },
-            headers=headers_a
-        )
+        add_user_to_tenant(test_client, tenant_id, headers_a, "user-b", "READER")
         
-        # User B cannot get custom group
+        # User B CAN view custom group (any tenant member can view)
         get_response = test_client.get(
             ENDPOINT_CUSTOM_GROUP_DETAIL.format(tenant_id=tenant_id, custom_group_id=group_id),
             headers=headers_b
         )
-        assert get_response.status_code == status.HTTP_403_FORBIDDEN
+        assert get_response.status_code == status.HTTP_200_OK
         
         # User B cannot update custom group
         update_response = test_client.patch(
@@ -226,7 +232,10 @@ class TestCustomGroupRBAC:
         reader_token = test_client.create_test_user("reader-user", "Reader User")
         reader_headers = create_auth_headers(reader_token, use_cache=False)
         
-        # Admin adds reader with READ role
+        # Add reader to tenant first
+        add_user_to_tenant(test_client, tenant_id, admin_headers, "reader-user", "READER")
+        
+        # Admin adds reader with READ role to custom group
         test_client.put(
             ENDPOINT_CUSTOM_GROUP_PRINCIPALS.format(tenant_id=tenant_id, custom_group_id=group_id),
             json={
@@ -292,7 +301,10 @@ class TestCustomGroupRBAC:
         writer_token = test_client.create_test_user("writer-user", "Writer User")
         writer_headers = create_auth_headers(writer_token, use_cache=False)
         
-        # Admin adds writer with WRITE role
+        # Add writer to tenant first
+        add_user_to_tenant(test_client, tenant_id, admin_headers, "writer-user", "READER")
+        
+        # Admin adds writer with WRITE role to custom group
         test_client.put(
             ENDPOINT_CUSTOM_GROUP_PRINCIPALS.format(tenant_id=tenant_id, custom_group_id=group_id),
             json={
@@ -358,7 +370,10 @@ class TestCustomGroupRBAC:
         admin2_token = test_client.create_test_user("admin-2", "Admin 2")
         admin2_headers = create_auth_headers(admin2_token, use_cache=False)
         
-        # First admin adds second admin with ADMIN role
+        # Add admin2 to tenant first
+        add_user_to_tenant(test_client, tenant_id, admin1_headers, "admin-2", "READER")
+        
+        # First admin adds second admin with ADMIN role to custom group
         add_response = test_client.put(
             ENDPOINT_CUSTOM_GROUP_PRINCIPALS.format(tenant_id=tenant_id, custom_group_id=group_id),
             json={
@@ -452,7 +467,10 @@ class TestCustomGroupRBAC:
         admin2_token = test_client.create_test_user("admin-to-demote", "Admin To Demote")
         admin2_headers = create_auth_headers(admin2_token, use_cache=False)
         
-        # Give second user ADMIN role
+        # Add admin2 to tenant first
+        add_user_to_tenant(test_client, tenant_id, admin_headers, "admin-to-demote", "READER")
+        
+        # Give second user ADMIN role on custom group
         test_client.put(
             ENDPOINT_CUSTOM_GROUP_PRINCIPALS.format(tenant_id=tenant_id, custom_group_id=group_id),
             json={

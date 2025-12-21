@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, UTC
 from fastapi import APIRouter, status
 
 from aihub.schema.responses.healthcheck import HealthCheckResponse
@@ -23,6 +23,6 @@ async def healthcheck() -> HealthCheckResponse:
     """
     return HealthCheckResponse(
         status="healthy",
-        timestamp=datetime.utcnow().isoformat(),
+        timestamp=datetime.now(UTC).isoformat(),
         version="1.0.0"
     )

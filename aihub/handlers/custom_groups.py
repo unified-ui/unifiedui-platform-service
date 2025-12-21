@@ -1,7 +1,7 @@
 """Business logic handlers for custom group operations using SQLAlchemy."""
 import uuid
 from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, UTC
 
 from sqlalchemy import select, and_, or_
 from sqlalchemy.orm import Session
@@ -261,7 +261,7 @@ class CustomGroupHandler:
                 group.description = request.description
             
             group.updated_by = user_id
-            group.updated_at = datetime.utcnow()
+            group.updated_at = datetime.now(UTC)
             
             session.commit()
             session.refresh(group)
