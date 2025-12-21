@@ -8,6 +8,7 @@ from aihub.app import create_app
 from aihub.core.database.client import SQLAlchemyClient
 from aihub.caching.client import CacheClient
 from aihub.caching.redis.cache import RedisCache
+from tests.fixtures.auth import create_test_user, create_auth_headers
 
 logger = logging.getLogger(__name__)
 
@@ -52,6 +53,10 @@ def test_client(
     # Store references for access in tests
     client.db_client = test_db_client
     client.cache_client = test_cache_client
+    
+    # Add helper methods to the client for easier test usage
+    client.create_test_user = create_test_user
+    client.create_auth_headers = create_auth_headers
     
     yield client
     

@@ -158,7 +158,7 @@ def create_app() -> FastAPI:
     
     app.include_router(
         custom_groups.router,
-        prefix="/api/v1/tenants/{tenant_id}/custom/groups",
+        prefix="/api/v1/tenants/{tenant_id}/custom-groups",
         tags=["Custom Groups"]
     )
     

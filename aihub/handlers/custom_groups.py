@@ -438,7 +438,7 @@ class CustomGroupHandler:
                 "custom_group_id": custom_group_id,
                 "tenant_id": tenant_id,
                 "principal_id": principal_id,
-                "principal_type": member.principal_type,
+                "principal_type": principal_type,
                 "roles": roles
             }
     
@@ -459,7 +459,7 @@ class CustomGroupHandler:
             custom_group_id: The ID of the custom group
             principal_id: The ID of the principal
             principal_type: The type of principal (IDENTITY_USER, IDENTITY_GROUP, CUSTOM_GROUP)
-            permission: The permission to assign
+            role: The role to assign
             user_id: The ID of the user making the change
             
         Returns:
@@ -470,7 +470,7 @@ class CustomGroupHandler:
         """
         logger.info(
             "Setting principal permission",
-            extra={"tenant_id": tenant_id, "custom_group_id": custom_group_id, "principal_id": principal_id, "permission": permission}
+            extra={"tenant_id": tenant_id, "custom_group_id": custom_group_id, "principal_id": principal_id, "role": role}
         )
         
         with self.db_client.get_session() as session:
@@ -480,11 +480,12 @@ class CustomGroupHandler:
                 raise CustomGroupNotFoundError(custom_group_id)
             
             # Find or create member with this role
+            # Note: A principal can only have ONE role per group (enforced by unique constraint)
+            # So we need to update or insert
             query = select(CustomGroupMember).where(
                 CustomGroupMember.custom_group_id == custom_group_id,
                 CustomGroupMember.principal_id == principal_id,
-                CustomGroupMember.principal_type == principal_type,
-                CustomGroupMember.role == permission
+                CustomGroupMember.principal_type == principal_type
             )
             member = session.execute(query).scalar_one_or_none()
             
@@ -497,15 +498,19 @@ class CustomGroupHandler:
                     custom_group_id=custom_group_id,
                     principal_id=principal_id,
                     principal_type=principal_type,
-                    role=permission,
-                    name=f"Member: {principal_id}",
-                    description=f"Custom group member for principal {principal_id}",
+                    role=role,
                     created_by=user_id,
                     updated_by=user_id
                 )
                 session.add(member)
+                logger.info(f"Created new member with role {role} for {principal_id}")
+            elif member.role != role:
+                # Update existing member's role
+                member.role = role
+                member.updated_by = user_id
+                logger.info(f"Updated member role from {member.role} to {role} for {principal_id}")
             else:
-                logger.info(f"Member with role {permission} already exists for {principal_id}")
+                logger.info(f"Member with role {role} already exists for {principal_id}")
             
             session.commit()
             
@@ -520,7 +525,7 @@ class CustomGroupHandler:
                 except Exception as e:
                     logger.warning(f"Failed to clear user cache: {e}")
             
-            logger.info(f"Set {permission} permission for {principal_id} on custom group {custom_group_id}")
+            logger.info(f"Set {role} permission for {principal_id} on custom group {custom_group_id}")
             
             return self.get_principal_permissions(tenant_id, custom_group_id, principal_id)
     
@@ -540,7 +545,7 @@ class CustomGroupHandler:
             custom_group_id: The ID of the custom group
             principal_id: The ID of the principal
             principal_type: The type of principal
-            permission: The permission to remove
+            role: The role to remove
             
         Returns:
             Dict with custom_group_id, principal_id, and remaining permissions list
@@ -550,7 +555,7 @@ class CustomGroupHandler:
         """
         logger.info(
             "Deleting principal permission",
-            extra={"tenant_id": tenant_id, "custom_group_id": custom_group_id, "principal_id": principal_id, "permission": permission}
+            extra={"tenant_id": tenant_id, "custom_group_id": custom_group_id, "principal_id": principal_id, "role": role}
         )
         
         with self.db_client.get_session() as session:
@@ -564,7 +569,7 @@ class CustomGroupHandler:
                 CustomGroupMember.custom_group_id == custom_group_id,
                 CustomGroupMember.principal_id == principal_id,
                 CustomGroupMember.principal_type == principal_type,
-                CustomGroupMember.role == permission
+                CustomGroupMember.role == role
             )
             member = session.execute(query).scalar_one_or_none()
             
@@ -582,7 +587,7 @@ class CustomGroupHandler:
                     except Exception as e:
                         logger.warning(f"Failed to clear user cache: {e}")
                 
-                logger.info(f"Deleted {permission} permission for {principal_id} on custom group {custom_group_id}")
+                logger.info(f"Deleted {role} permission for {principal_id} on custom group {custom_group_id}")
             
             return self.get_principal_permissions(tenant_id, custom_group_id, principal_id)
     
