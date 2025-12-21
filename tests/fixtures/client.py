@@ -17,7 +17,8 @@ logger = logging.getLogger(__name__)
 def test_client(
     test_db_client: SQLAlchemyClient,
     test_cache_client: CacheClient,
-    fake_redis_client: RedisCache
+    fake_redis_client: RedisCache,
+    mock_vault_client
 ) -> Generator[TestClient, None, None]:
     """Create a FastAPI test client with test database and cache."""
     logger.info("Creating FastAPI test client")
@@ -28,6 +29,7 @@ def test_client(
     import aihub.handlers.dependencies.database as db_dep
     import aihub.caching.dependencies as old_cache_dep
     import aihub.handlers.dependencies.cache as new_cache_dep
+    import aihub.handlers.dependencies.vault as vault_dep
     
     # Clear ALL cache databases before test to avoid pollution from previous tests
     fake_redis_client.client.flushall()
@@ -40,8 +42,12 @@ def test_client(
     new_cache_dep._cache_client = test_cache_client
     new_cache_dep._cache_initialized = True
     
+    # Set vault client global
+    vault_dep._vault_client = mock_vault_client
+    
     # CRITICAL: Clear the LRU cache to force get_cache_client() to use our test client
     old_cache_dep.get_cache_client.cache_clear()
+    vault_dep.get_vault_client.cache_clear()
     
     logger.info("Set test clients as global singletons")
     
@@ -53,6 +59,7 @@ def test_client(
     # Store references for access in tests
     client.db_client = test_db_client
     client.cache_client = test_cache_client
+    client.vault_client = mock_vault_client
     
     # Add helper methods to the client for easier test usage
     client.create_test_user = create_test_user
@@ -71,4 +78,5 @@ def test_client(
     old_cache_dep._cache_client = None
     new_cache_dep._cache_client = None
     new_cache_dep._cache_initialized = False
+    vault_dep._vault_client = None
     logger.info("Singletons reset")

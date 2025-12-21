@@ -281,6 +281,21 @@ def check_permissions(
                 db_client = get_db_client()
                 required_perms_str = [perm.value if hasattr(perm, 'value') else perm for perm in required_permissions]
                 
+                # Build role hierarchy: ADMIN >= WRITE >= READ
+                # If user requires READ, accept ADMIN, WRITE, or READ
+                # If user requires WRITE, accept ADMIN or WRITE
+                # If user requires ADMIN, accept only ADMIN
+                allowed_roles = set()
+                if any(perm in [PermissionActionEnum.READ.value, PermissionActionEnum.READ] for perm in required_permissions):
+                    # READ required -> allow ADMIN, WRITE, READ
+                    allowed_roles.update([PermissionActionEnum.READ.value, PermissionActionEnum.WRITE.value, PermissionActionEnum.ADMIN.value])
+                elif any(perm in [PermissionActionEnum.WRITE.value, PermissionActionEnum.WRITE] for perm in required_permissions):
+                    # WRITE required -> allow ADMIN, WRITE
+                    allowed_roles.update([PermissionActionEnum.WRITE.value, PermissionActionEnum.ADMIN.value])
+                elif any(perm in [PermissionActionEnum.ADMIN.value, PermissionActionEnum.ADMIN] for perm in required_permissions):
+                    # ADMIN required -> allow only ADMIN
+                    allowed_roles.add(PermissionActionEnum.ADMIN.value)
+                
                 with db_client.get_session() as session:
                     # Single query: Check member table directly for role
                     query = (
@@ -289,7 +304,7 @@ def check_permissions(
                             getattr(member_model, entity_id_param) == entity_id,
                             member_model.tenant_id == tenant_id,
                             member_model.principal_id.in_(all_principal_ids),
-                            member_model.role.in_(required_perms_str)
+                            member_model.role.in_(list(allowed_roles))
                         )
                     )
                     
@@ -298,7 +313,7 @@ def check_permissions(
                     if not result:
                         raise HTTPException(
                             status_code=status.HTTP_403_FORBIDDEN,
-                            detail=f"Access denied: User does not have required permissions on this {entity} (ID: {entity_id}). Required: {required_perms_str}"
+                            detail=f"Access denied: User does not have required permissions on this {entity} (ID: {entity_id}). Required one of: {required_perms_str}, Allowed roles: {list(allowed_roles)}"
                         )
             
             return await func(*args, **kwargs)

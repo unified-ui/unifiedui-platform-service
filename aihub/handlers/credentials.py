@@ -86,12 +86,12 @@ class CredentialHandler:
         
         is_admin = False
         if matching_tenant:
-            user_permissions = matching_tenant["permissions"]
+            user_roles = matching_tenant["roles"]  # Changed from "permissions" to "roles"
             admin_permissions = [
                 TenantPermissionEnum.GLOBAL_ADMIN.value,
                 TenantPermissionEnum.CREDENTIALS_ADMIN.value
             ]
-            is_admin = any(perm in user_permissions for perm in admin_permissions)
+            is_admin = any(perm in user_roles for perm in admin_permissions)
         
         # Only get group IDs if not admin
         identity_group_ids = None
@@ -294,7 +294,7 @@ class CredentialHandler:
                 name=request.name,
                 description=request.description,
                 type=request.credential_type,
-                source=request.source,
+                source=request.source or "manual",  # Default to "manual" if not provided
                 credential_uri=vault_uri,
                 created_by=user_id,
                 updated_by=user_id
@@ -310,8 +310,6 @@ class CredentialHandler:
                 principal_id=user_id,
                 principal_type=PrincipalTypeEnum.IDENTITY_USER,
                 role=PermissionActionEnum.ADMIN,
-                name=f"creator_{user_id}",
-                description="Credential creator",
                 created_by=user_id,
                 updated_by=user_id
             )
@@ -545,13 +543,13 @@ class CredentialHandler:
                         "tenant_id": tenant_id,
                         "principal_id": member.principal_id,
                         "principal_type": member.principal_type,
-                        "permissions": []
+                        "roles": []  # Changed from "permissions" to "roles"
                     }
                 
                 # Add role from member
                 role_value = member.role.value if hasattr(member.role, 'value') else member.role
-                if role_value not in principals_map[member.principal_id]["permissions"]:
-                    principals_map[member.principal_id]["permissions"].append(role_value)
+                if role_value not in principals_map[member.principal_id]["roles"]:  # Changed from "permissions" to "roles"
+                    principals_map[member.principal_id]["roles"].append(role_value)
                     logger.debug(f"Added role {role_value} for principal {member.principal_id}")
             
             # Convert to list of principals
@@ -635,7 +633,7 @@ class CredentialHandler:
                 tenant_id=tenant_id,
                 principal_id=members[0].principal_id,
                 principal_type=members[0].principal_type,
-                permissions=permission_list
+                roles=permission_list  # Changed from "permissions" to "roles"
             )
 
     def set_credential_permission(
@@ -676,13 +674,12 @@ class CredentialHandler:
             if not credential:
                 raise CredentialNotFoundError(credential_id)
             
-            # Check if member already exists with this role
+            # Check if member already exists (without filtering by role)
             member_query = select(CredentialMember).where(
                 CredentialMember.credential_id == credential_id,
                 CredentialMember.tenant_id == tenant_id,
                 CredentialMember.principal_id == request.principal_id,
-                CredentialMember.principal_type == request.principal_type,
-                CredentialMember.role == request.permission
+                CredentialMember.principal_type == request.principal_type
             )
             member = session.execute(member_query).scalar_one_or_none()
             
@@ -694,18 +691,17 @@ class CredentialHandler:
                     credential_id=credential_id,
                     principal_id=request.principal_id,
                     principal_type=request.principal_type,
-                    role=request.permission,
-                    name=f"{request.principal_type.value}_{request.principal_id}",
-                    description=f"Member {request.principal_type.value}",
+                    role=request.role,  # Changed from request.permission
                     created_by=user_id,
                     updated_by=user_id
                 )
                 session.add(member)
                 logger.info("Created credential member with role")
             else:
-                # Update existing member
+                # Update existing member's role
+                member.role = request.role
                 member.updated_by = user_id
-                logger.info("Member with role already exists")
+                logger.info("Updated existing member role")
             
             # Invalidate caches BEFORE flush to ensure consistency
             if self.cache_client:
@@ -787,7 +783,7 @@ class CredentialHandler:
             tenant_id=member.tenant_id,
             principal_id=member.principal_id,
             principal_type=member.principal_type,
-            action=member.role,
+            role=member.role,  # Changed from action to role
             created_at=member.created_at,
             updated_at=member.updated_at
         )

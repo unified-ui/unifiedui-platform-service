@@ -39,6 +39,9 @@ from tests.fixtures.data import (
     sample_tenant_data,
     sample_update_tenant_data,
 )
+from tests.fixtures.vault import (
+    mock_vault_client,
+)
 
 __all__ = [
     # Database fixtures
@@ -58,4 +61,6 @@ __all__ = [
     # Data fixtures
     "sample_tenant_data",
     "sample_update_tenant_data",
+    # Vault fixtures
+    "mock_vault_client",
 ]

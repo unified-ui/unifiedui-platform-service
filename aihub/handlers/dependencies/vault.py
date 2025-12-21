@@ -11,6 +11,9 @@ from aihub.logger import get_logger
 
 logger = get_logger(__name__)
 
+# Global vault client for testing
+_vault_client: Optional[BaseVaultClient] = None
+
 
 @lru_cache
 def get_vault_client() -> Optional[BaseVaultClient]:
@@ -23,6 +26,10 @@ def get_vault_client() -> Optional[BaseVaultClient]:
     Raises:
         RuntimeError: If vault type is not supported
     """
+    # Return test vault client if set
+    if _vault_client is not None:
+        return _vault_client
+    
     vault_type = settings.vault_type
     
     if not vault_type:

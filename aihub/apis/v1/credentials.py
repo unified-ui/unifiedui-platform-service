@@ -157,10 +157,6 @@ async def create_credential(
 @check_permissions(
     entity="credential",
     required_permissions=[
-        TenantPermissionEnum.GLOBAL_ADMIN,
-        TenantPermissionEnum.CREDENTIALS_ADMIN,
-        PermissionActionEnum.ADMIN,
-        PermissionActionEnum.WRITE,
         PermissionActionEnum.READ
     ]
 )
@@ -226,9 +222,6 @@ async def get_credential(
 @check_permissions(
     entity="credential",
     required_permissions=[
-        TenantPermissionEnum.GLOBAL_ADMIN,
-        TenantPermissionEnum.CREDENTIALS_ADMIN,
-        PermissionActionEnum.ADMIN,
         PermissionActionEnum.WRITE
     ]
 )
@@ -298,10 +291,7 @@ async def update_credential(
 @check_permissions(
     entity="credential",
     required_permissions=[
-        TenantPermissionEnum.GLOBAL_ADMIN,
-        TenantPermissionEnum.CREDENTIALS_ADMIN,
-        PermissionActionEnum.ADMIN,
-        PermissionActionEnum.WRITE
+        PermissionActionEnum.ADMIN
     ]
 )
 async def delete_credential(
@@ -369,10 +359,6 @@ async def delete_credential(
 @check_permissions(
     entity="credential",
     required_permissions=[
-        TenantPermissionEnum.GLOBAL_ADMIN,
-        TenantPermissionEnum.CREDENTIALS_ADMIN,
-        PermissionActionEnum.ADMIN,
-        PermissionActionEnum.WRITE,
         PermissionActionEnum.READ
     ]
 )
@@ -433,10 +419,6 @@ async def list_credential_permissions(
 @authenticate
 @check_permissions(
     entity="credential", required_permissions=[
-        TenantPermissionEnum.GLOBAL_ADMIN,
-        TenantPermissionEnum.CREDENTIALS_ADMIN,
-        PermissionActionEnum.ADMIN,
-        PermissionActionEnum.WRITE,
         PermissionActionEnum.READ
     ])
 async def get_credential_permission(
@@ -500,8 +482,6 @@ async def get_credential_permission(
 @authenticate
 @check_permissions(
     entity="credential", required_permissions=[
-        TenantPermissionEnum.GLOBAL_ADMIN,
-        TenantPermissionEnum.CREDENTIALS_ADMIN,
         PermissionActionEnum.ADMIN
     ]
 )
@@ -568,8 +548,6 @@ async def set_credential_permission(
 @check_permissions(
     entity="credential",
     required_permissions=[
-        TenantPermissionEnum.GLOBAL_ADMIN,
-        TenantPermissionEnum.CREDENTIALS_ADMIN,
         PermissionActionEnum.ADMIN
     ]
 )
@@ -611,7 +589,7 @@ async def delete_credential_permission(
             credential_id=credential_id,
             principal_id=delete_request.principal_id,
             principal_type=delete_request.principal_type,
-            permission=delete_request.permission
+            permission=delete_request.role  # Changed from .permission to .role
         )
         return Response(status_code=status.HTTP_204_NO_CONTENT)
     except CredentialNotFoundError as e:
