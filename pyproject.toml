@@ -19,6 +19,7 @@ dependencies = [
     "pydantic-settings>=2.0.0",
     "fakeredis>=2.33.0",
     "pyjwt>=2.8.0",
+    "azure-identity>=1.25.1",
 ]
 
 [tool.setuptools]
