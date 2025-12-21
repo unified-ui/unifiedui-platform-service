@@ -1,3 +1,4 @@
+'''
 import os
 from typing import Optional
 
@@ -176,3 +177,4 @@ def get_database_client(
         db_client = get_database_client(DocumentDatabaseTypeEnum.MONGO_DB)
     """
     return DatabaseClientFactory.create(db_type=db_type)
+'''

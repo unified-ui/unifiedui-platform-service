@@ -1,3 +1,4 @@
+'''
 from abc import ABC, abstractmethod
 from typing import TypeVar, Generic, List, Optional, Any
 
@@ -84,3 +85,4 @@ class BaseDatabaseClient(ABC):
             PermissionsCollection: The permissions collection interface
         """
         pass
+'''

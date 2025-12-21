@@ -103,9 +103,9 @@
 - tests bauen
     - in memory db konfigurieren für tests
     - die routes testen
+- Spec-Driven Vibe-Coding machen (in einem Spec projekt etc beschreiben)
 ## TODO
 
-- Spec-Driven Vibe-Coding machen (in einem Spec projekt etc beschreiben)
 
 - tests bauen
     - insbesondere permissions testen!
@@ -117,16 +117,26 @@
         - integration testen
 
 - alle tests bauen
+- bauen tests für /aihub/utils/*
+- bauen factory tests für (nur initialisierung und ob interface functions vorhanden sind)
+    - /aihub/core/caching
+        - + /aihub/caching
+    - /aihub/core/identity
+        - + /aihub/identity
+    - /aihub/core/middleware
+        - + /aihub/middleware
+    - /aihub/core/vault
+        - + /aihub/vault
+
 - alle test datein checken
+    - ist in list resource getestet, ob man nur seine frigegebenen resourcen sieht?
     - ob wirklich alle tests implementiert sind und wie
     - ggf refactoren
 
-
-- permissions mit mehreren account testen auf
-    - tenant
-    - custom groups
-
-- in check_permissions mit caching arbeiten; wenn user berechtigt -> super; wenn nicht wird nochmal in DB geschaut (vielleicht...)
+- check_permissions optimieren
+    - bei /{id} immer nur filtern und count ausgeben -> wenn count > 0, dann ja, sonst nein
+        - also so schnell wie möglich
+    - in check_permissions mit caching arbeiten; wenn user berechtigt -> super; wenn nicht wird nochmal in DB geschaut (vielleicht...)
 
 ---
 

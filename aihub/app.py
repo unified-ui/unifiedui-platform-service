@@ -11,7 +11,6 @@ from aihub.exc.applications import ApplicationNotFoundError
 from aihub.exc.credentials import CredentialNotFoundError
 from aihub.exc.conversations import ConversationNotFoundError
 
-from aihub.docdatabase.dependencies import close_db_client
 from aihub.core.config import settings
 from aihub.exc.tenants import TenantNotFoundError, TenantError
 from aihub.exc.permissions import PermissionDeniedError
@@ -25,15 +24,6 @@ logger = get_logger(__name__)
 load_dotenv()
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    """Lifespan context manager for startup and shutdown events."""
-    # Startup
-    yield
-    # Shutdown
-    close_db_client()
-
-
 def create_app() -> FastAPI:
     """Create and configure FastAPI application following best practices."""
     
@@ -43,8 +33,7 @@ def create_app() -> FastAPI:
         version=settings.api_version,
         docs_url="/docs",
         redoc_url="/redoc",
-        openapi_url="/openapi.json",
-        lifespan=lifespan
+        openapi_url="/openapi.json"
     )
     
     # CORS Middleware
@@ -176,6 +165,12 @@ def create_app() -> FastAPI:
     
     app.include_router(
         conversations.router,
+        prefix="/api/v1/tenants/{tenant_id}",
+        tags=["Conversations"]
+    )
+    
+    app.include_router(
+        autonomous_agents.router,
         prefix="/api/v1/tenants/{tenant_id}",
         tags=["Autonomous Agents"]
     )

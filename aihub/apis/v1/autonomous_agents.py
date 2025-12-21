@@ -15,7 +15,7 @@ from aihub.schema.responses.autonomous_agent_permissions import (
     AutonomousAgentPrincipalsResponse,
     PrincipalPermissionsResponse
 )
-from aihub.exc.autonomous_agents import AutonomousAgentNotFoundError
+from aihub.exc.autonomous_agents import AutonomousAgentNotFoundError, AutonomousAgentPermissionNotFoundError
 from aihub.core.middleware.apis.v1.auth import authenticate, check_permissions
 from aihub.core.database.enums import TenantPermissionEnum, PermissionActionEnum
 from aihub.logger import get_logger
@@ -518,11 +518,16 @@ async def delete_autonomous_agent_permission(
             tenant_id=tenant_id,
             autonomous_agent_id=autonomous_agent_id,
             principal_id=delete_request.principal_id,
-            principal_type=delete_request.principal_type.value,
-            permission=delete_request.permission.value
+            principal_type=delete_request.principal_type,
+            role=delete_request.role
         )
         return Response(status_code=status.HTTP_204_NO_CONTENT)
     except AutonomousAgentNotFoundError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e)
+        )
+    except AutonomousAgentPermissionNotFoundError as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=str(e)

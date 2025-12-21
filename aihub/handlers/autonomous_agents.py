@@ -22,7 +22,7 @@ from aihub.schema.responses.autonomous_agent_permissions import (
     AutonomousAgentPrincipalsResponse,
     PrincipalPermissionsResponse
 )
-from aihub.exc.autonomous_agents import AutonomousAgentNotFoundError
+from aihub.exc.autonomous_agents import AutonomousAgentNotFoundError, AutonomousAgentPermissionNotFoundError
 from aihub.logger import get_logger
 
 logger = get_logger(__name__)
@@ -245,7 +245,7 @@ class AutonomousAgentHandler:
         Returns:
             Created autonomous agent response
         """
-        logger.info("Creating autonomous agent", extra={"tenant_id": tenant_id, "name": request.name, "user_id": user_id})
+        logger.info("Creating autonomous agent", extra={"tenant_id": tenant_id, "agent_name": request.name, "user_id": user_id})
         
         autonomous_agent_id = str(uuid.uuid4())
         member_id = str(uuid.uuid4())
@@ -270,9 +270,8 @@ class AutonomousAgentHandler:
                 tenant_id=tenant_id,
                 autonomous_agent_id=autonomous_agent_id,
                 principal_id=user_id,
-                principal_type=PrincipalTypeEnum.IDENTITY_USER.value,
-                role=PermissionActionEnum.ADMIN.value,
-                name=f"Member-{user_id}",
+                principal_type=PrincipalTypeEnum.IDENTITY_USER,
+                role=PermissionActionEnum.ADMIN,
                 created_by=user_id,
                 updated_by=user_id
             )
@@ -462,9 +461,9 @@ class AutonomousAgentHandler:
                         "tenant_id": tenant_id,
                         "principal_id": member.principal_id,
                         "principal_type": member.principal_type,
-                        "permissions": []
+                        "roles": []
                     }
-                principals_dict[key]["permissions"].append(member.role)
+                principals_dict[key]["roles"].append(member.role)
             
             # Convert to response models
             principals = [PrincipalPermissionsResponse(**data) for data in principals_dict.values()]
@@ -538,19 +537,19 @@ class AutonomousAgentHandler:
                     tenant_id=tenant_id,
                     principal_id=principal_id,
                     principal_type="",
-                    permissions=[]
+                    roles=[]
                 )
             
             # Get principal type from first member
             principal_type = members[0].principal_type
-            permissions = [member.role for member in members]
+            roles = [member.role for member in members]
             
             return PrincipalPermissionsResponse(
                 autonomous_agent_id=autonomous_agent_id,
                 tenant_id=tenant_id,
                 principal_id=principal_id,
                 principal_type=principal_type,
-                permissions=permissions
+                roles=roles
             )
 
     def set_autonomous_agent_permission(
@@ -579,7 +578,7 @@ class AutonomousAgentHandler:
             "tenant_id": tenant_id,
             "autonomous_agent_id": autonomous_agent_id,
             "principal_id": request.principal_id,
-            "permission": request.permission,
+            "agent_role": request.role,
             "user_id": user_id
         })
         
@@ -594,12 +593,11 @@ class AutonomousAgentHandler:
             if not autonomous_agent:
                 raise AutonomousAgentNotFoundError(autonomous_agent_id)
             
-            # Check if member exists with this role
+            # Check if member exists
             query = select(AutonomousAgentMember).where(
                 AutonomousAgentMember.autonomous_agent_id == autonomous_agent_id,
                 AutonomousAgentMember.principal_id == request.principal_id,
-                AutonomousAgentMember.principal_type == request.principal_type.value,
-                AutonomousAgentMember.role == request.permission.value
+                AutonomousAgentMember.principal_type == request.principal_type
             )
             member = session.execute(query).scalar_one_or_none()
             
@@ -612,8 +610,7 @@ class AutonomousAgentHandler:
                     autonomous_agent_id=autonomous_agent_id,
                     principal_id=request.principal_id,
                     principal_type=request.principal_type.value,
-                    role=request.permission.value,
-                    name=f"Member-{request.principal_id}",
+                    role=request.role,
                     created_by=user_id,
                     updated_by=user_id
                 )
@@ -633,7 +630,7 @@ class AutonomousAgentHandler:
                 tenant_id=tenant_id,
                 principal_id=request.principal_id,
                 principal_type=request.principal_type,
-                action=request.permission,
+                role=request.role,
                 created_at=member.created_at,
                 updated_at=member.updated_at
             )
@@ -651,7 +648,7 @@ class AutonomousAgentHandler:
         autonomous_agent_id: str,
         principal_id: str,
         principal_type: str,
-        permission: str
+        role: str
     ) -> None:
         """
         Delete a permission for a principal on an autonomous agent.
@@ -661,7 +658,7 @@ class AutonomousAgentHandler:
             autonomous_agent_id: The ID of the autonomous agent
             principal_id: The ID of the principal
             principal_type: The type of principal
-            permission: The permission to delete
+            role: The role to delete
             
         Raises:
             AutonomousAgentNotFoundError: If autonomous agent not found
@@ -670,7 +667,7 @@ class AutonomousAgentHandler:
             "tenant_id": tenant_id,
             "autonomous_agent_id": autonomous_agent_id,
             "principal_id": principal_id,
-            "permission": permission
+            "agent_role": role
         })
         
         with self.db_client.get_session() as session:
@@ -689,13 +686,12 @@ class AutonomousAgentHandler:
                 AutonomousAgentMember.autonomous_agent_id == autonomous_agent_id,
                 AutonomousAgentMember.principal_id == principal_id,
                 AutonomousAgentMember.principal_type == principal_type,
-                AutonomousAgentMember.role == permission
+                AutonomousAgentMember.role == role
             )
             member = session.execute(query).scalar_one_or_none()
             
             if not member:
-                logger.debug(f"No member with role {permission} found for principal {principal_id}, nothing to delete")
-                return
+                raise AutonomousAgentPermissionNotFoundError(principal_id)
             
             # Delete the member
             session.delete(member)
@@ -705,7 +701,7 @@ class AutonomousAgentHandler:
             self._invalidate_permissions_cache(tenant_id, autonomous_agent_id)
             self._invalidate_list_cache(tenant_id)
             
-            logger.info(f"Deleted permission {permission} for principal {principal_id} on autonomous agent {autonomous_agent_id}")
+            logger.info(f"Deleted role {role} for principal {principal_id} on autonomous agent {autonomous_agent_id}")
 
     @staticmethod
     def _group_permissions_by_principal(results) -> list[dict]:
@@ -717,9 +713,9 @@ class AutonomousAgentHandler:
                 principals_dict[key] = {
                     "principal_id": member.principal_id,
                     "principal_type": member.principal_type,
-                    "permissions": []
+                    "roles": []
                 }
-            principals_dict[key]["permissions"].append(permission.permission)
+            principals_dict[key]["roles"].append(permission.permission)
         return list(principals_dict.values())
 
     @staticmethod

@@ -1,3 +1,4 @@
+'''
 """
 Database client dependencies for FastAPI.
 Provides a singleton instance of the database client to avoid multiple connections.
@@ -42,3 +43,4 @@ def close_db_client() -> None:
         _db_client = None
         # Clear the cache
         get_db_client.cache_clear()
+'''

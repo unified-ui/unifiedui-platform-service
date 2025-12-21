@@ -2,7 +2,6 @@ from typing import TYPE_CHECKING, Optional
 from sqlalchemy import select
 
 from aihub.handlers.tenants import TenantHandler
-from aihub.core.docdatabase.models.permissions import AssignedTo
 from aihub.core.identity.factory import IdentityProviderFactory, IdentityTokenFactory
 from aihub.schema.responses.identity import IdentityGroupResponse, IdentityUserResponse
 from aihub.schema.responses.tenants import TenantResponse

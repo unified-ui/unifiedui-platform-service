@@ -1,3 +1,4 @@
+'''
 from abc import ABC, abstractmethod
 from typing import Any, Optional
 
@@ -15,3 +16,4 @@ class BaseDatabaseClient(ABC):
             BaseApplicationsCollectionClient: The applications collection client.
         """
         pass
+'''
