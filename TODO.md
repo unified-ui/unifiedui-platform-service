@@ -128,6 +128,9 @@
     - /aihub/core/vault
         - + /aihub/vault
 
+- schreibe mir eine CI GitHub Action pipeline, welche die tests auf github ausführt
+    - wichtig: das projekt nutzt uv -> also install, tests etc mit uv (pytest) ausführen
+
 - alle test datein checken
     - ist in list resource getestet, ob man nur seine frigegebenen resourcen sieht?
     - checken, dass in den handler kein authoritation (außer bei lsit) durchgeführt wird!

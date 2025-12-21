@@ -6,7 +6,7 @@ applyTo: 'tests/**'
 
 ## Testing Philosophy
 - Write tests BEFORE or alongside production code
-- Aim for 80%+ code coverage
+- Aim for 90%+ code coverage
 - Test behavior, not implementation
 - Keep tests isolated and independent
 
