@@ -135,7 +135,7 @@ class TestTenantRoutes:
     def test_get_tenant_not_found(self, test_client: TestClient, auth_headers: dict[str, str]) -> None:
         """Test tenant retrieval with non-existent ID."""
         response = test_client.get(
-            "/api/v1/tenants/non-existent-id",
+            ENDPOINT_TENANT_DETAIL.format(tenant_id=NON_EXISTENT_ID),
             headers=auth_headers
         )
         
@@ -188,7 +188,7 @@ class TestTenantRoutes:
         
         # Test with limit
         response = test_client.get(
-            "/api/v1/tenants?limit=3",
+            f"{ENDPOINT_TENANTS}?limit=3",
             headers=auth_headers
         )
         
@@ -198,7 +198,7 @@ class TestTenantRoutes:
         
         # Test with skip
         response = test_client.get(
-            "/api/v1/tenants?skip=2&limit=2",
+            f"{ENDPOINT_TENANTS}?skip=2&limit=2",
             headers=auth_headers
         )
         
@@ -215,7 +215,7 @@ class TestTenantRoutes:
         
         # Filter by name
         response = test_client.get(
-            "/api/v1/tenants?name=Development",
+            f"{ENDPOINT_TENANTS}?name=Development",
             headers=auth_headers
         )
         
@@ -253,7 +253,7 @@ class TestTenantRoutes:
     def test_update_tenant_not_found(self, test_client: TestClient, auth_headers: dict[str, str], sample_update_tenant_data: dict[str, Any], test_user_token: Any) -> None:
         """Test updating a non-existent tenant."""
         response = test_client.patch(
-            "/api/v1/tenants/non-existent-id",
+            ENDPOINT_TENANT_DETAIL.format(tenant_id=NON_EXISTENT_ID),
             json=sample_update_tenant_data,
             headers=auth_headers
         )
@@ -311,7 +311,7 @@ class TestTenantRoutes:
     def test_delete_tenant_not_found(self, test_client: TestClient, auth_headers: dict[str, str], test_user_token: Any) -> None:
         """Test deleting a non-existent tenant."""
         response = test_client.request("DELETE", 
-            "/api/v1/tenants/non-existent-id",
+            ENDPOINT_TENANT_DETAIL.format(tenant_id=NON_EXISTENT_ID),
             headers=auth_headers
         )
         
@@ -364,7 +364,7 @@ class TestTenantPrincipalRoutes:
         
         # Get creator's permissions
         response = test_client.get(
-            f"/api/v1/tenants/{tenant_id}/principals/test-user-123",
+            ENDPOINT_PRINCIPAL_DETAIL.format(tenant_id=tenant_id, principal_id="test-user-123"),
             headers=auth_headers
         )
         
@@ -631,14 +631,14 @@ class TestTenantPrincipalRoutes:
         
         # Each user should be admin of their own tenant
         principals1 = test_client.get(
-            f"/api/v1/tenants/{tenant1_id}/principals/isolated-user-1",
+            ENDPOINT_PRINCIPAL_DETAIL.format(tenant_id=tenant1_id, principal_id="isolated-user-1"),
             headers=headers1
         )
         assert principals1.status_code == status.HTTP_200_OK
         assert ROLE_GLOBAL_ADMIN in principals1.json()["roles"]
         
         principals2 = test_client.get(
-            f"/api/v1/tenants/{tenant2_id}/principals/isolated-user-2",
+            ENDPOINT_PRINCIPAL_DETAIL.format(tenant_id=tenant2_id, principal_id="isolated-user-2"),
             headers=headers2
         )
         assert principals2.status_code == status.HTTP_200_OK
@@ -700,7 +700,7 @@ class TestTenantPrincipalRoutes:
     def test_get_tenant_not_found(self, test_client: TestClient, auth_headers: dict[str, str]) -> None:
         """Test tenant retrieval with non-existent ID."""
         response = test_client.get(
-            "/api/v1/tenants/non-existent-id",
+            ENDPOINT_TENANT_DETAIL.format(tenant_id=NON_EXISTENT_ID),
             headers=auth_headers
         )
         
@@ -753,7 +753,7 @@ class TestTenantPrincipalRoutes:
         
         # Test with limit
         response = test_client.get(
-            "/api/v1/tenants?limit=3",
+            f"{ENDPOINT_TENANTS}?limit=3",
             headers=auth_headers
         )
         
@@ -763,7 +763,7 @@ class TestTenantPrincipalRoutes:
         
         # Test with skip
         response = test_client.get(
-            "/api/v1/tenants?skip=2&limit=2",
+            f"{ENDPOINT_TENANTS}?skip=2&limit=2",
             headers=auth_headers
         )
         
@@ -780,7 +780,7 @@ class TestTenantPrincipalRoutes:
         
         # Filter by name
         response = test_client.get(
-            "/api/v1/tenants?name=Development",
+            f"{ENDPOINT_TENANTS}?name=Development",
             headers=auth_headers
         )
         
@@ -818,7 +818,7 @@ class TestTenantPrincipalRoutes:
     def test_update_tenant_not_found(self, test_client: TestClient, auth_headers: dict[str, str], sample_update_tenant_data: dict[str, Any], test_user_token: Any) -> None:
         """Test updating a non-existent tenant."""
         response = test_client.patch(
-            "/api/v1/tenants/non-existent-id",
+            ENDPOINT_TENANT_DETAIL.format(tenant_id=NON_EXISTENT_ID),
             json=sample_update_tenant_data,
             headers=auth_headers
         )
@@ -876,7 +876,7 @@ class TestTenantPrincipalRoutes:
     def test_delete_tenant_not_found(self, test_client: TestClient, auth_headers: dict[str, str], test_user_token: Any) -> None:
         """Test deleting a non-existent tenant."""
         response = test_client.request("DELETE", 
-            "/api/v1/tenants/non-existent-id",
+            ENDPOINT_TENANT_DETAIL.format(tenant_id=NON_EXISTENT_ID),
             headers=auth_headers
         )
         
@@ -926,7 +926,7 @@ class TestTenantPrincipalRoutes:
         
         # Get creator's permissions
         response = test_client.get(
-            f"/api/v1/tenants/{tenant_id}/principals/test-user-123",
+            ENDPOINT_PRINCIPAL_DETAIL.format(tenant_id=tenant_id, principal_id="test-user-123"),
             headers=auth_headers
         )
         

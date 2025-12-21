@@ -47,7 +47,7 @@ class TestTenantRBAC:
         
         # Verify creator has GLOBAL_ADMIN role
         principals_response = test_client.get(
-            f"/api/v1/tenants/{tenant_id}/principals/creator-user",
+            ENDPOINT_PRINCIPAL_DETAIL.format(tenant_id=tenant_id, principal_id="creator-user"),
             headers=headers
         )
         
@@ -496,7 +496,7 @@ class TestTenantRBAC:
         
         # Verify role was actually removed
         check_response = test_client.get(
-            f"/api/v1/tenants/{tenant_id}/principals/admin-to-demote",
+            ENDPOINT_PRINCIPAL_DETAIL.format(tenant_id=tenant_id, principal_id="admin-to-demote"),
             headers=admin_headers
         )
         assert check_response.status_code == status.HTTP_200_OK

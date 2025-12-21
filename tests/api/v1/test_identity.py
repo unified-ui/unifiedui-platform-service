@@ -10,7 +10,9 @@ from tests.conftest import create_auth_headers
 # API Endpoints
 ENDPOINT_IDENTITY_ME = "/api/v1/identity/me"
 ENDPOINT_IDENTITY_USERS = "/api/v1/identity/users"
+ENDPOINT_IDENTITY_USER_DETAIL = "/api/v1/identity/users/{user_id}"
 ENDPOINT_IDENTITY_GROUPS = "/api/v1/identity/groups"
+ENDPOINT_IDENTITY_GROUP_DETAIL = "/api/v1/identity/groups/{group_id}"
 
 # Common Test IDs
 NON_EXISTENT_ID = "non-existent-id"
@@ -80,7 +82,7 @@ class TestIdentityRoutes:
     def test_get_users_with_search(self, test_client: TestClient, auth_headers: dict[str, str]) -> None:
         """Test users retrieval with search parameter."""
         response = test_client.get(
-            "/api/v1/identity/users?search=test",
+            f"{ENDPOINT_IDENTITY_USERS}?search=test",
             headers=auth_headers
         )
         
@@ -91,7 +93,7 @@ class TestIdentityRoutes:
     def test_get_users_with_pagination(self, test_client: TestClient, auth_headers: dict[str, str]) -> None:
         """Test users retrieval with top parameter."""
         response = test_client.get(
-            "/api/v1/identity/users?top=10",
+            f"{ENDPOINT_IDENTITY_USERS}?top=10",
             headers=auth_headers
         )
         
@@ -103,14 +105,14 @@ class TestIdentityRoutes:
         """Test that top parameter is validated."""
         # Too low
         response = test_client.get(
-            "/api/v1/identity/users?top=0",
+            f"{ENDPOINT_IDENTITY_USERS}?top=0",
             headers=auth_headers
         )
         assert response.status_code == 422
         
         # Too high
         response = test_client.get(
-            "/api/v1/identity/users?top=1000",
+            f"{ENDPOINT_IDENTITY_USERS}?top=1000",
             headers=auth_headers
         )
         assert response.status_code == 422
@@ -139,7 +141,7 @@ class TestIdentityRoutes:
     def test_get_groups_with_search(self, test_client: TestClient, auth_headers: dict[str, str]) -> None:
         """Test groups retrieval with search parameter."""
         response = test_client.get(
-            "/api/v1/identity/groups?search=admin",
+            f"{ENDPOINT_IDENTITY_GROUPS}?search=admin",
             headers=auth_headers
         )
         
@@ -150,7 +152,7 @@ class TestIdentityRoutes:
     def test_get_groups_with_pagination(self, test_client: TestClient, auth_headers: dict[str, str]) -> None:
         """Test groups retrieval with top parameter."""
         response = test_client.get(
-            "/api/v1/identity/groups?top=50",
+            f"{ENDPOINT_IDENTITY_GROUPS}?top=50",
             headers=auth_headers
         )
         
@@ -162,14 +164,14 @@ class TestIdentityRoutes:
         """Test that top parameter is validated."""
         # Too low
         response = test_client.get(
-            "/api/v1/identity/groups?top=0",
+            f"{ENDPOINT_IDENTITY_GROUPS}?top=0",
             headers=auth_headers
         )
         assert response.status_code == 422
         
         # Too high
         response = test_client.get(
-            "/api/v1/identity/groups?top=1000",
+            f"{ENDPOINT_IDENTITY_GROUPS}?top=1000",
             headers=auth_headers
         )
         assert response.status_code == 422
@@ -184,7 +186,7 @@ class TestIdentityRoutes:
         """Test successful retrieval of user by ID."""
         user_id = "test-user-123"
         response = test_client.get(
-            f"/api/v1/identity/users/{user_id}",
+            ENDPOINT_IDENTITY_USER_DETAIL.format(user_id=user_id),
             headers=auth_headers
         )
         
@@ -202,7 +204,7 @@ class TestIdentityRoutes:
     
     def test_get_user_by_id_unauthenticated(self, test_client: TestClient) -> None:
         """Test that unauthenticated request fails."""
-        response = test_client.get("/api/v1/identity/users/test-user-123")
+        response = test_client.get(ENDPOINT_IDENTITY_USER_DETAIL.format(user_id="test-user-123"))
         
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
     
@@ -210,7 +212,7 @@ class TestIdentityRoutes:
         """Test successful retrieval of group by ID."""
         group_id = "test-group-123"
         response = test_client.get(
-            f"/api/v1/identity/groups/{group_id}",
+            ENDPOINT_IDENTITY_GROUP_DETAIL.format(group_id=group_id),
             headers=auth_headers
         )
         
@@ -223,7 +225,7 @@ class TestIdentityRoutes:
     
     def test_get_group_by_id_unauthenticated(self, test_client: TestClient) -> None:
         """Test that unauthenticated request fails."""
-        response = test_client.get("/api/v1/identity/groups/test-group-123")
+        response = test_client.get(ENDPOINT_IDENTITY_GROUP_DETAIL.format(group_id="test-group-123"))
         
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
     
@@ -283,8 +285,8 @@ class TestIdentityRoutes:
             ENDPOINT_IDENTITY_ME,
             ENDPOINT_IDENTITY_USERS,
             ENDPOINT_IDENTITY_GROUPS,
-            "/api/v1/identity/users/test-id",
-            "/api/v1/identity/groups/test-id"
+            ENDPOINT_IDENTITY_USER_DETAIL.format(user_id="test-id"),
+            ENDPOINT_IDENTITY_GROUP_DETAIL.format(group_id="test-id")
         ]
         
         for endpoint in endpoints:
@@ -295,7 +297,7 @@ class TestIdentityRoutes:
     def test_get_users_with_all_parameters(self, test_client: TestClient, auth_headers: dict[str, str]) -> None:
         """Test users retrieval with all query parameters."""
         response = test_client.get(
-            "/api/v1/identity/users?search=test&top=20&next_link=",
+            f"{ENDPOINT_IDENTITY_USERS}?search=test&top=20&next_link=",
             headers=auth_headers
         )
         
@@ -307,7 +309,7 @@ class TestIdentityRoutes:
     def test_get_groups_with_all_parameters(self, test_client: TestClient, auth_headers: dict[str, str]) -> None:
         """Test groups retrieval with all query parameters."""
         response = test_client.get(
-            "/api/v1/identity/groups?search=admin&top=30&next_link=",
+            f"{ENDPOINT_IDENTITY_GROUPS}?search=admin&top=30&next_link=",
             headers=auth_headers
         )
         
@@ -323,7 +325,7 @@ class TestIdentityRoutes:
         
         for search_term in search_terms:
             response = test_client.get(
-                f"/api/v1/identity/users?search={search_term}",
+                f"{ENDPOINT_IDENTITY_USERS}?search={search_term}",
                 headers=auth_headers
             )
             assert response.status_code == status.HTTP_200_OK
@@ -338,7 +340,7 @@ class TestIdentityRoutes:
         
         for user_id in user_ids:
             response = test_client.get(
-                f"/api/v1/identity/users/{user_id}",
+                ENDPOINT_IDENTITY_USER_DETAIL.format(user_id=user_id),
                 headers=auth_headers
             )
             # Should succeed or handle gracefully
@@ -354,7 +356,7 @@ class TestIdentityRoutes:
         
         for group_id in group_ids:
             response = test_client.get(
-                f"/api/v1/identity/groups/{group_id}",
+                ENDPOINT_IDENTITY_GROUP_DETAIL.format(group_id=group_id),
                 headers=auth_headers
             )
             # Should succeed or handle gracefully

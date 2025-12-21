@@ -10,7 +10,9 @@ from tests.conftest import create_auth_headers
 # API Endpoints
 ENDPOINT_IDENTITY_ME = "/api/v1/identity/me"
 ENDPOINT_IDENTITY_USERS = "/api/v1/identity/users"
+ENDPOINT_IDENTITY_USER_DETAIL = "/api/v1/identity/users/{user_id}"
 ENDPOINT_IDENTITY_GROUPS = "/api/v1/identity/groups"
+ENDPOINT_IDENTITY_GROUP_DETAIL = "/api/v1/identity/groups/{group_id}"
 ENDPOINT_TENANTS = "/api/v1/tenants"
 ENDPOINT_TENANT_DETAIL = "/api/v1/tenants/{tenant_id}"
 ENDPOINT_TENANT_PRINCIPALS = "/api/v1/tenants/{tenant_id}/principals"
@@ -149,7 +151,7 @@ class TestIdentityCaching:
         
         # First request
         response1 = test_client.get(
-            f"/api/v1/identity/users/{user_id}",
+            ENDPOINT_IDENTITY_USER_DETAIL.format(user_id=user_id),
             headers=headers
         )
         assert response1.status_code == status.HTTP_200_OK
@@ -157,7 +159,7 @@ class TestIdentityCaching:
         
         # Second request
         response2 = test_client.get(
-            f"/api/v1/identity/users/{user_id}",
+            ENDPOINT_IDENTITY_USER_DETAIL.format(user_id=user_id),
             headers=headers
         )
         assert response2.status_code == status.HTTP_200_OK
@@ -175,7 +177,7 @@ class TestIdentityCaching:
         
         # First request
         response1 = test_client.get(
-            f"/api/v1/identity/groups/{group_id}",
+            ENDPOINT_IDENTITY_GROUP_DETAIL.format(group_id=group_id),
             headers=headers
         )
         assert response1.status_code == status.HTTP_200_OK
@@ -183,7 +185,7 @@ class TestIdentityCaching:
         
         # Second request
         response2 = test_client.get(
-            f"/api/v1/identity/groups/{group_id}",
+            ENDPOINT_IDENTITY_GROUP_DETAIL.format(group_id=group_id),
             headers=headers
         )
         assert response2.status_code == status.HTTP_200_OK
@@ -353,7 +355,7 @@ class TestIdentityCaching:
         tenant1_id = tenant1_response.json()["id"]
         
         test_client.put(
-            f"/api/v1/tenants/{tenant1_id}/principals",
+            ENDPOINT_TENANT_PRINCIPALS.format(tenant_id=tenant1_id),
             json={
                 "principal_id": "group-alpha",
                 "principal_type": PRINCIPAL_TYPE_GROUP,
@@ -371,7 +373,7 @@ class TestIdentityCaching:
         tenant2_id = tenant2_response.json()["id"]
         
         test_client.put(
-            f"/api/v1/tenants/{tenant2_id}/principals",
+            ENDPOINT_TENANT_PRINCIPALS.format(tenant_id=tenant2_id),
             json={
                 "principal_id": "group-beta",
                 "principal_type": PRINCIPAL_TYPE_GROUP,
@@ -381,17 +383,17 @@ class TestIdentityCaching:
         )
         
         # User 1 can access tenant 1 but not tenant 2
-        user1_tenant1 = test_client.get(f"/api/v1/tenants/{tenant1_id}", headers=headers1)
+        user1_tenant1 = test_client.get(ENDPOINT_TENANT_DETAIL.format(tenant_id=tenant1_id), headers=headers1)
         assert user1_tenant1.status_code == status.HTTP_200_OK
         
-        user1_tenant2 = test_client.get(f"/api/v1/tenants/{tenant2_id}", headers=headers1)
+        user1_tenant2 = test_client.get(ENDPOINT_TENANT_DETAIL.format(tenant_id=tenant2_id), headers=headers1)
         assert user1_tenant2.status_code == status.HTTP_403_FORBIDDEN
         
         # User 2 can access tenant 2 but not tenant 1
-        user2_tenant1 = test_client.get(f"/api/v1/tenants/{tenant1_id}", headers=headers2)
+        user2_tenant1 = test_client.get(ENDPOINT_TENANT_DETAIL.format(tenant_id=tenant1_id), headers=headers2)
         assert user2_tenant1.status_code == status.HTTP_403_FORBIDDEN
         
-        user2_tenant2 = test_client.get(f"/api/v1/tenants/{tenant2_id}", headers=headers2)
+        user2_tenant2 = test_client.get(ENDPOINT_TENANT_DETAIL.format(tenant_id=tenant2_id), headers=headers2)
         assert user2_tenant2.status_code == status.HTTP_200_OK
     
     def test_pagination_parameters_dont_affect_cache_isolation(self, test_client: TestClient, fake_redis_client: Any) -> None:
@@ -400,10 +402,10 @@ class TestIdentityCaching:
         headers = create_auth_headers(user_token)
         
         # Request with different pagination
-        response1 = test_client.get("/api/v1/identity/users?top=10", headers=headers)
+        response1 = test_client.get(f"{ENDPOINT_IDENTITY_USERS}?top=10", headers=headers)
         assert response1.status_code == status.HTTP_200_OK
         
-        response2 = test_client.get("/api/v1/identity/users?top=20", headers=headers)
+        response2 = test_client.get(f"{ENDPOINT_IDENTITY_USERS}?top=20", headers=headers)
         assert response2.status_code == status.HTTP_200_OK
         
         # Both should work independently
@@ -416,10 +418,10 @@ class TestIdentityCaching:
         headers = create_auth_headers(user_token)
         
         # Request with different search terms
-        response1 = test_client.get("/api/v1/identity/groups?search=admin", headers=headers)
+        response1 = test_client.get(f"{ENDPOINT_IDENTITY_GROUPS}?search=admin", headers=headers)
         assert response1.status_code == status.HTTP_200_OK
         
-        response2 = test_client.get("/api/v1/identity/groups?search=user", headers=headers)
+        response2 = test_client.get(f"{ENDPOINT_IDENTITY_GROUPS}?search=user", headers=headers)
         assert response2.status_code == status.HTTP_200_OK
         
         # Both should work independently
