@@ -3,6 +3,7 @@ from typing import Any
 from fastapi import status
 from starlette.testclient import TestClient
 
+from aihub.core.database.enums import PermissionActionEnum, PrincipalTypeEnum
 from tests.conftest import create_auth_headers
 
 
@@ -14,13 +15,13 @@ ENDPOINT_CREDENTIAL_PRINCIPALS = "/api/v1/tenants/{tenant_id}/credentials/{crede
 ENDPOINT_PRINCIPAL_DETAIL = "/api/v1/tenants/{tenant_id}/credentials/{credential_id}/principals/{principal_id}"
 
 # Roles
-ROLE_READ = "READ"
-ROLE_WRITE = "WRITE"
-ROLE_ADMIN = "ADMIN"
+ROLE_READ = PermissionActionEnum.READ.value
+ROLE_WRITE = PermissionActionEnum.WRITE.value
+ROLE_ADMIN = PermissionActionEnum.ADMIN.value
 
 # Principal Types
-PRINCIPAL_TYPE_USER = "IDENTITY_USER"
-PRINCIPAL_TYPE_GROUP = "IDENTITY_GROUP"
+PRINCIPAL_TYPE_USER = PrincipalTypeEnum.IDENTITY_USER.value
+PRINCIPAL_TYPE_GROUP = PrincipalTypeEnum.IDENTITY_GROUP.value
 
 
 def create_tenant_for_user(test_client: TestClient, user_token: Any, tenant_name: str = "Test Tenant") -> str:

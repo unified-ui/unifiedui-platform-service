@@ -4,6 +4,7 @@ from typing import Any
 from fastapi import status
 from starlette.testclient import TestClient
 
+from aihub.core.database.enums import TenantPermissionEnum, PrincipalTypeEnum
 from tests.conftest import create_auth_headers
 
 
@@ -22,13 +23,13 @@ ENDPOINT_PRINCIPAL_DETAIL = "/api/v1/tenants/{tenant_id}/principals/{principal_i
 NON_EXISTENT_ID = "non-existent-id"
 
 # Roles
-ROLE_GLOBAL_ADMIN = "GLOBAL_ADMIN"
-ROLE_READER = "READER"
-ROLE_APPLICATIONS_ADMIN = "APPLICATIONS_ADMIN"
+ROLE_GLOBAL_ADMIN = TenantPermissionEnum.GLOBAL_ADMIN.value
+ROLE_READER = TenantPermissionEnum.READER.value
+ROLE_APPLICATIONS_ADMIN = TenantPermissionEnum.APPLICATIONS_ADMIN.value
 
 # Principal Types
-PRINCIPAL_TYPE_USER = "IDENTITY_USER"
-PRINCIPAL_TYPE_GROUP = "IDENTITY_GROUP"
+PRINCIPAL_TYPE_USER = PrincipalTypeEnum.IDENTITY_USER.value
+PRINCIPAL_TYPE_GROUP = PrincipalTypeEnum.IDENTITY_GROUP.value
 
 
 class TestIdentityCaching:

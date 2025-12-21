@@ -116,6 +116,12 @@
     - und es wird auf Azure Test-Komponenten für Integration tests geben
         - integration testen
 
+- alle tests bauen
+- alle test datein checken
+    - ob wirklich alle tests implementiert sind und wie
+    - ggf refactoren
+
+
 - permissions mit mehreren account testen auf
     - tenant
     - custom groups
