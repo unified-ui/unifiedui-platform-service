@@ -71,6 +71,46 @@ class TestTenantRoutes:
         
         assert response.status_code == 422
     
+    def test_create_tenant_invalid_name_type(self, test_client: TestClient, auth_headers: dict[str, str]) -> None:
+        """Test tenant creation with invalid name type."""
+        response = test_client.post(
+            ENDPOINT_TENANTS,
+            json={"name": 123, "description": "Test"},
+            headers=auth_headers
+        )
+        
+        assert response.status_code == 422
+    
+    def test_create_tenant_empty_name(self, test_client: TestClient, auth_headers: dict[str, str]) -> None:
+        """Test tenant creation with empty name."""
+        response = test_client.post(
+            ENDPOINT_TENANTS,
+            json={"name": "", "description": "Test"},
+            headers=auth_headers
+        )
+        
+        assert response.status_code == 422
+    
+    def test_create_tenant_invalid_description_type(self, test_client: TestClient, auth_headers: dict[str, str]) -> None:
+        """Test tenant creation with invalid description type."""
+        response = test_client.post(
+            ENDPOINT_TENANTS,
+            json={"name": "Test Tenant", "description": 123},
+            headers=auth_headers
+        )
+        
+        assert response.status_code == 422
+    
+    def test_create_tenant_empty_body(self, test_client: TestClient, auth_headers: dict[str, str]) -> None:
+        """Test tenant creation with empty JSON body."""
+        response = test_client.post(
+            ENDPOINT_TENANTS,
+            json={},
+            headers=auth_headers
+        )
+        
+        assert response.status_code == 422
+    
     def test_create_tenant_multiple_users(self, test_client: TestClient, sample_tenant_data: dict[str, Any]) -> None:
         """Test that different users can create their own tenants."""
         # Create first user and tenant
@@ -533,6 +573,91 @@ class TestTenantPrincipalRoutes:
         assert "user-001" in principal_ids
         assert "user-002" in principal_ids
     
+    def test_set_principal_permission_missing_principal_id(self, test_client: TestClient, auth_headers: dict[str, str], sample_tenant_data: dict[str, Any]) -> None:
+        """Test setting principal permission with missing principal_id."""
+        # Create tenant
+        create_response = test_client.post(
+            ENDPOINT_TENANTS,
+            json=sample_tenant_data,
+            headers=auth_headers
+        )
+        tenant_id = create_response.json()["id"]
+        
+        # Try to add permission without principal_id
+        response = test_client.put(
+            ENDPOINT_TENANT_PRINCIPALS.format(tenant_id=tenant_id),
+            json={
+                "principal_type": PRINCIPAL_TYPE_USER,
+                "role": ROLE_READER
+            },
+            headers=auth_headers
+        )
+        
+        assert response.status_code == 422
+    
+    def test_set_principal_permission_missing_role(self, test_client: TestClient, auth_headers: dict[str, str], sample_tenant_data: dict[str, Any]) -> None:
+        """Test setting principal permission with missing role."""
+        # Create tenant
+        create_response = test_client.post(
+            ENDPOINT_TENANTS,
+            json=sample_tenant_data,
+            headers=auth_headers
+        )
+        tenant_id = create_response.json()["id"]
+        
+        # Try to add permission without role
+        response = test_client.put(
+            ENDPOINT_TENANT_PRINCIPALS.format(tenant_id=tenant_id),
+            json={
+                "principal_id": "test-user",
+                "principal_type": PRINCIPAL_TYPE_USER
+            },
+            headers=auth_headers
+        )
+        
+        assert response.status_code == 422
+    
+    def test_set_principal_permission_missing_principal_type(self, test_client: TestClient, auth_headers: dict[str, str], sample_tenant_data: dict[str, Any]) -> None:
+        """Test setting principal permission with missing principal_type."""
+        # Create tenant
+        create_response = test_client.post(
+            ENDPOINT_TENANTS,
+            json=sample_tenant_data,
+            headers=auth_headers
+        )
+        tenant_id = create_response.json()["id"]
+        
+        # Try to add permission without principal_type
+        response = test_client.put(
+            ENDPOINT_TENANT_PRINCIPALS.format(tenant_id=tenant_id),
+            json={
+                "principal_id": "test-user",
+                "role": ROLE_READER
+            },
+            headers=auth_headers
+        )
+        
+        assert response.status_code == 422
+    
+    def test_set_principal_permission_empty_body(self, test_client: TestClient, auth_headers: dict[str, str], sample_tenant_data: dict[str, Any]) -> None:
+        """Test setting principal permission with empty body."""
+        # Create tenant
+        create_response = test_client.post(
+            ENDPOINT_TENANTS,
+            json=sample_tenant_data,
+            headers=auth_headers
+        )
+        tenant_id = create_response.json()["id"]
+        
+        # Try to add permission with empty body
+        response = test_client.put(
+            ENDPOINT_TENANT_PRINCIPALS.format(tenant_id=tenant_id),
+            json={},
+            headers=auth_headers
+        )
+        
+        assert response.status_code == 422
+    
     def test_delete_principal_permission(self, test_client: TestClient, auth_headers: dict[str, str], sample_tenant_data: dict[str, Any]) -> None:
         """Test removing a role from a principal."""
         # Create a tenant
@@ -602,6 +727,95 @@ class TestTenantPrincipalRoutes:
         # Should return 404 or handle gracefully
         assert response.status_code in [status.HTTP_404_NOT_FOUND, status.HTTP_200_OK]
     
+    def test_delete_principal_permission_missing_principal_id(self, test_client: TestClient, auth_headers: dict[str, str], sample_tenant_data: dict[str, Any]) -> None:
+        """Test deleting principal permission with missing principal_id."""
+        # Create tenant
+        create_response = test_client.post(
+            ENDPOINT_TENANTS,
+            json=sample_tenant_data,
+            headers=auth_headers
+        )
+        tenant_id = create_response.json()["id"]
+        
+        # Try to delete permission without principal_id
+        response = test_client.request(
+            "DELETE",
+            ENDPOINT_TENANT_PRINCIPALS.format(tenant_id=tenant_id),
+            json={
+                "principal_type": PRINCIPAL_TYPE_USER,
+                "role": ROLE_READER
+            },
+            headers=auth_headers
+        )
+        
+        assert response.status_code == 422
+    
+    def test_delete_principal_permission_missing_role(self, test_client: TestClient, auth_headers: dict[str, str], sample_tenant_data: dict[str, Any]) -> None:
+        """Test deleting principal permission with missing role."""
+        # Create tenant
+        create_response = test_client.post(
+            ENDPOINT_TENANTS,
+            json=sample_tenant_data,
+            headers=auth_headers
+        )
+        tenant_id = create_response.json()["id"]
+        
+        # Try to delete permission without role
+        response = test_client.request(
+            "DELETE",
+            ENDPOINT_TENANT_PRINCIPALS.format(tenant_id=tenant_id),
+            json={
+                "principal_id": "test-user",
+                "principal_type": PRINCIPAL_TYPE_USER
+            },
+            headers=auth_headers
+        )
+        
+        assert response.status_code == 422
+    
+    def test_delete_principal_permission_missing_principal_type(self, test_client: TestClient, auth_headers: dict[str, str], sample_tenant_data: dict[str, Any]) -> None:
+        """Test deleting principal permission with missing principal_type."""
+        # Create tenant
+        create_response = test_client.post(
+            ENDPOINT_TENANTS,
+            json=sample_tenant_data,
+            headers=auth_headers
+        )
+        tenant_id = create_response.json()["id"]
+        
+        # Try to delete permission without principal_type
+        response = test_client.request(
+            "DELETE",
+            ENDPOINT_TENANT_PRINCIPALS.format(tenant_id=tenant_id),
+            json={
+                "principal_id": "test-user",
+                "role": ROLE_READER
+            },
+            headers=auth_headers
+        )
+        
+        assert response.status_code == 422
+    
+    def test_delete_principal_permission_empty_body(self, test_client: TestClient, auth_headers: dict[str, str], sample_tenant_data: dict[str, Any]) -> None:
+        """Test deleting principal permission with empty body."""
+        # Create tenant
+        create_response = test_client.post(
+            ENDPOINT_TENANTS,
+            json=sample_tenant_data,
+            headers=auth_headers
+        )
+        tenant_id = create_response.json()["id"]
+        
+        # Try to delete permission with empty body
+        response = test_client.request(
+            "DELETE",
+            ENDPOINT_TENANT_PRINCIPALS.format(tenant_id=tenant_id),
+            json={},
+            headers=auth_headers
+        )
+        
+        assert response.status_code == 422
+
     def test_multi_user_access_control(self, test_client: TestClient, test_user_token: Any) -> None:
         """Test that users can only see/manage tenants they have access to."""
         # Create two separate users

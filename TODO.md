@@ -95,19 +95,19 @@
         - wie macht man es, wenn eine rückfrage gestellt wird? geht ja in einem Workflow
 
 - autonomous agents
-## TODO
-
 - nur: entity_members -> dort role mit enum
 - Die Routes mit Postman testen und refactoren
     - permissions zu rollen ändern
     - name auf permisison raus (nur role als name)
     - ...
+- tests bauen
+    - in memory db konfigurieren für tests
+    - die routes testen
+## TODO
 
 - Spec-Driven Vibe-Coding machen (in einem Spec projekt etc beschreiben)
 
 - tests bauen
-    - in memory db konfigurieren für tests
-    - die routes testen
     - insbesondere permissions testen!
         - principal IDs kann man "erfinden" (einfach string)
         - IdentityUser können wir über JWT "mocken" bzw wir könnten
