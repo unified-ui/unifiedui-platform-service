@@ -1,14 +1,5 @@
 """Tests for tenant API endpoints."""
-import pytest
-import logging
 from fastapi import status
-
-# Configure logging for tests
-logging.basicConfig(
-    level=logging.DEBUG,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
 
 
 class TestTenantRoutes:
@@ -16,29 +7,11 @@ class TestTenantRoutes:
     
     def test_create_tenant_success(self, test_client, auth_headers, sample_tenant_data, test_user_token):
         """Test successful tenant creation."""
-        logger.info("=" * 80)
-        logger.info("TEST: test_create_tenant_success")
-        logger.info(f"Auth Headers: {auth_headers}")
-        logger.info(f"Sample Tenant Data: {sample_tenant_data}")
-        
         response = test_client.post(
             "/api/v1/tenants",
             json=sample_tenant_data,
             headers=auth_headers
         )
-        
-        logger.info(f"Response Status: {response.status_code}")
-        logger.info(f"Response Headers: {dict(response.headers)}")
-        logger.info(f"Response Body: {response.text}")
-        
-        if response.status_code != status.HTTP_201_CREATED:
-            logger.error(f"Test failed! Expected 201, got {response.status_code}")
-            try:
-                logger.error(f"Response JSON: {response.json()}")
-            except:
-                logger.error(f"Response text: {response.text}")
-        
-        logger.info("=" * 80)
         
         assert response.status_code == status.HTTP_201_CREATED
         data = response.json()

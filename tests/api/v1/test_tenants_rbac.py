@@ -1,5 +1,5 @@
 """Tests for tenant RBAC (Role-Based Access Control)."""
-import pytest
+import uuid
 from fastapi import status
 
 
@@ -487,17 +487,11 @@ class TestTenantRBAC:
             headers=admin2_headers
         )
         assert update_response2.status_code == status.HTTP_403_FORBIDDEN
-        
-        # IMPORTANT: Clear cache to avoid polluting subsequent tests
-        fake_redis_client.client.flushall()
     
     def test_custom_group_grants_permissions_to_members(self, test_client, fake_redis_client):
         """Test that users in a custom group inherit the group's permissions."""
         from aihub.core.database.models import CustomGroup, CustomGroupMember
         import uuid
-        
-        # Clear cache at the beginning to avoid pollution from previous tests
-        fake_redis_client.client.flushall()
         
         # Admin creates tenant (use unique user ID to avoid conflicts)
         admin_token = test_client.create_test_user(None, "CG Admin")  # Let it generate unique ID
@@ -828,9 +822,6 @@ class TestTenantRBAC:
     
     def test_identity_group_grants_permissions_to_members(self, test_client, fake_redis_client):
         """Test that users in an identity group inherit the group's permissions."""
-        # Clear cache at the beginning
-        fake_redis_client.client.flushall()
-        
         # Define an identity group ID
         identity_group_id = "ig-admins-001"
         
