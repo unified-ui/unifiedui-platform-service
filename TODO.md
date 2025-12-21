@@ -104,8 +104,6 @@
     - in memory db konfigurieren für tests
     - die routes testen
 - Spec-Driven Vibe-Coding machen (in einem Spec projekt etc beschreiben)
-## TODO
-
 
 - tests bauen
     - insbesondere permissions testen!
@@ -115,10 +113,12 @@
     - wir fahren infrastruktur hoch für On-Prem Komponenten
     - und es wird auf Azure Test-Komponenten für Integration tests geben
         - integration testen
+## TODO
 
 - alle tests bauen
+
 - bauen tests für /aihub/utils/*
-- bauen factory tests für (nur initialisierung und ob interface functions vorhanden sind)
+- bauen mir nun unit tests für:
     - /aihub/core/caching
         - + /aihub/caching
     - /aihub/core/identity
