@@ -83,12 +83,12 @@ class ApplicationHandler:
         
         is_admin = False
         if matching_tenant:
-            user_permissions = matching_tenant["permissions"]
+            user_roles = matching_tenant["roles"]
             admin_permissions = [
                 TenantPermissionEnum.GLOBAL_ADMIN.value,
                 TenantPermissionEnum.APPLICATIONS_ADMIN.value
             ]
-            is_admin = any(perm in user_permissions for perm in admin_permissions)
+            is_admin = any(perm in user_roles for perm in admin_permissions)
         
         # Only get group IDs if not admin
         identity_group_ids = None
@@ -229,7 +229,7 @@ class ApplicationHandler:
         Returns:
             Created application response
         """
-        logger.info("Creating application", extra={"tenant_id": tenant_id, "name": request.name})
+        logger.info("Creating application", extra={"tenant_id": tenant_id, "app_name": request.name})
         
         application_id = str(uuid.uuid4())
         
@@ -253,9 +253,8 @@ class ApplicationHandler:
                 tenant_id=tenant_id,
                 application_id=application_id,
                 principal_id=user_id,
-                principal_type=PrincipalTypeEnum.IDENTITY_USER.value,
-                role=PermissionActionEnum.ADMIN.value,
-                name=f"Member: {user_id}",
+                principal_type=PrincipalTypeEnum.IDENTITY_USER,
+                role=PermissionActionEnum.ADMIN,
                 created_by=user_id,
                 updated_by=user_id
             )
@@ -367,7 +366,7 @@ class ApplicationHandler:
         """Invalidate list cache for a tenant."""
         if self.cache_client:
             pattern = f"applications:list:tenant:{tenant_id}:*"
-            self.cache_client.delete_pattern(pattern)
+            self.cache_client.client.delete_pattern(pattern)
 
     def _invalidate_detail_cache(self, tenant_id: str, application_id: str) -> None:
         """Invalidate detail cache for an application."""
@@ -379,7 +378,7 @@ class ApplicationHandler:
         """Invalidate permissions cache for an application."""
         if self.cache_client:
             pattern = f"applications:permissions:tenant:{tenant_id}:app:{application_id}:*"
-            self.cache_client.delete_pattern(pattern)
+            self.cache_client.client.delete_pattern(pattern)
 
     # ========== Permission Management Methods ==========
 
@@ -444,11 +443,11 @@ class ApplicationHandler:
                     principals_dict[key] = {
                         "principal_id": member.principal_id,
                         "principal_type": member.principal_type,
-                        "permissions": []
+                        "roles": []
                     }
                 
                 # Add role from member
-                principals_dict[key]["permissions"].append(member.role)
+                principals_dict[key]["roles"].append(member.role)
             
             principals = [
                 PrincipalPermissionsResponse(
@@ -536,7 +535,7 @@ class ApplicationHandler:
                 tenant_id=tenant_id,
                 principal_id=principal_id,
                 principal_type=principal_type,
-                permissions=permissions
+                roles=permissions
             )
 
     def set_application_permission(
@@ -582,13 +581,14 @@ class ApplicationHandler:
                 raise ApplicationNotFoundError(application_id)
             
             # Find or create member with this role
+            # Note: A principal can only have ONE role per application (enforced by unique constraint)
+            # So we need to update or insert
             member_query = (
                 select(ApplicationMember)
                 .where(
                     ApplicationMember.application_id == application_id,
                     ApplicationMember.principal_id == request.principal_id,
-                    ApplicationMember.principal_type == request.principal_type.value,
-                    ApplicationMember.role == request.permission.value
+                    ApplicationMember.principal_type == request.principal_type.value
                 )
             )
             member = session.execute(member_query).scalar_one_or_none()
@@ -601,9 +601,8 @@ class ApplicationHandler:
                     tenant_id=tenant_id,
                     application_id=application_id,
                     principal_id=request.principal_id,
-                    principal_type=request.principal_type.value,
-                    role=request.permission.value,
-                    name=f"Member: {request.principal_id}",
+                    principal_type=request.principal_type,
+                    role=request.role,
                     created_by=user_id,
                     updated_by=user_id
                 )
@@ -612,33 +611,42 @@ class ApplicationHandler:
                 session.refresh(member)
                 
                 logger.info("Member with role created", extra={"member_id": member_id})
+            elif member.role != request.role:
+                # Update existing member's role
+                member.role = request.role
+                member.updated_by = user_id
+                session.commit()
+                session.refresh(member)
                 
-                result = ApplicationPermissionResponse(
-                    id=member.id,
-                    application_id=application_id,
-                    tenant_id=tenant_id,
-                    principal_id=request.principal_id,
-                    principal_type=request.principal_type,
-                    action=request.permission,
-                    created_at=member.created_at,
-                    updated_at=member.updated_at
-                )
+                logger.info("Member role updated", extra={"member_id": member.id})
             else:
                 # Member with role already exists
                 logger.info("Member with role already exists", extra={"member_id": member.id})
-                result = ApplicationPermissionResponse(
-                    id=member.id,
-                    application_id=application_id,
-                    tenant_id=tenant_id,
-                    principal_id=request.principal_id,
-                    principal_type=request.principal_type,
-                    action=request.permission,
-                    created_at=member.created_at,
-                    updated_at=member.updated_at
-                )
+            
+            result = ApplicationPermissionResponse(
+                id=member.id,
+                application_id=application_id,
+                tenant_id=tenant_id,
+                principal_id=request.principal_id,
+                principal_type=request.principal_type,
+                role=request.role,
+                created_at=member.created_at,
+                updated_at=member.updated_at
+            )
             
             # Invalidate cache
             self._invalidate_permissions_cache(tenant_id, application_id)
+            
+            # Invalidate user cache so list operations reflect new permissions
+            if self.cache_client:
+                try:
+                    if request.principal_type.value == "IDENTITY_USER":
+                        self.cache_client.clear_cache_for_user(request.principal_id)
+                        logger.debug(f"Cleared cache for user {request.principal_id} after permission change")
+                    # Also clear cache for the user making the change
+                    self.cache_client.clear_cache_for_user(user_id)
+                except Exception as e:
+                    logger.warning(f"Failed to clear user cache: {e}")
             
             return result
 
@@ -706,6 +714,15 @@ class ApplicationHandler:
             
             # Invalidate cache
             self._invalidate_permissions_cache(tenant_id, application_id)
+            
+            # Invalidate user cache so list operations reflect removed permissions
+            if self.cache_client:
+                try:
+                    if principal_type == "IDENTITY_USER":
+                        self.cache_client.clear_cache_for_user(principal_id)
+                        logger.debug(f"Cleared cache for user {principal_id} after permission removal")
+                except Exception as e:
+                    logger.warning(f"Failed to clear user cache: {e}")
 
     @staticmethod
     def _model_to_response(application: Application) -> ApplicationResponse:

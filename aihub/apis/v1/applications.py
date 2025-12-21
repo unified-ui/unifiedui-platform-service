@@ -128,7 +128,7 @@ async def create_application(
             extra={
                 "tenant_id": tenant_id,
                 "user_id": user.identity.get_id(),
-                "application_name": create_request.name
+                "app_name": create_request.name
             }
         )
         return handler.create_application(
@@ -291,8 +291,7 @@ async def update_application(
     required_permissions=[
         TenantPermissionEnum.GLOBAL_ADMIN,
         TenantPermissionEnum.APPLICATIONS_ADMIN,
-        PermissionActionEnum.ADMIN,
-        PermissionActionEnum.WRITE
+        PermissionActionEnum.ADMIN
     ]
 )
 async def delete_application(
@@ -602,7 +601,7 @@ async def delete_application_permission(
             application_id=application_id,
             principal_id=delete_request.principal_id,
             principal_type=delete_request.principal_type.value,
-            permission=delete_request.permission.value
+            permission=delete_request.role.value
         )
         return Response(status_code=status.HTTP_204_NO_CONTENT)
     except ApplicationNotFoundError as e:
