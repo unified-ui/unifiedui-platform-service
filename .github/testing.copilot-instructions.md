@@ -10,6 +10,50 @@ applyTo: 'tests/**'
 - Test behavior, not implementation
 - Keep tests isolated and independent
 
+## Code Standards for Tests
+
+### Type Annotations (CRITICAL)
+- **ALWAYS** use type annotations in all test code
+- **EVERY** function/method parameter MUST have a type annotation
+- **EVERY** function/method MUST have a return type annotation
+- Use `typing` module for complex types
+
+**Example:**
+```python
+from typing import Optional, List
+import pytest
+
+def test_create_application(
+    db_client: SQLAlchemyClient,
+    mock_user: ContextIdentityUser,
+    tenant_id: str
+) -> None:
+    """Test application creation."""
+    handler = ApplicationHandler(db_client)
+    result: ApplicationResponse = handler.create_application(
+        tenant_id=tenant_id,
+        request=CreateApplicationRequest(name="Test App"),
+        user=mock_user
+    )
+    assert result.name == "Test App"
+
+@pytest.fixture
+def mock_user() -> ContextIdentityUser:
+    """Create a mock user for testing."""
+    return ContextIdentityUser(
+        identity=IdentityUser(id="test-123", email="test@example.com"),
+        groups=[],
+        custom_groups=[],
+        tenants=[]
+    )
+```
+
+**Common Type Annotations:**
+- Fixtures: `-> ReturnType`
+- Test functions: `-> None`
+- Mocks: `-> Mock` or `-> MagicMock`
+- Async functions: `async def test_something() -> None:`
+
 ## Test Structure
 ```
 tests/
