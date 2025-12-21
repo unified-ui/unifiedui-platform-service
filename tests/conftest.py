@@ -25,7 +25,7 @@ from aihub.core.database.config import DatabaseConfig
 from aihub.caching.redis.cache import RedisCache
 from aihub.caching.redis.client import RedisCacheClient
 from aihub.caching.client import CacheClient
-from aihub.core.identity.mock import MockIdentityToken
+from aihub.identity.mock import MockIdentityToken
 
 
 # Test database - use a temporary file instead of :memory: to share between connections

@@ -5,10 +5,10 @@ from jwt.exceptions import InvalidTokenError, ExpiredSignatureError
 
 from aihub.core.identity.providers import BaseIdentityProvider, BaseIdentityToken
 from aihub.core.identity.enums import IdenityProviderEnum
-from aihub.core.identity.extra_id.provider import ExtraIDIdentityProvider
-from aihub.core.identity.extra_id.token import ExtraIDIdentityTokenSerializer
-from aihub.core.identity.mock.token import MockIdentityToken
-from aihub.core.identity.mock.provider import MockIdentityProvider
+from aihub.identity.extra_id.provider import ExtraIDIdentityProvider
+from aihub.identity.extra_id.token import ExtraIDIdentityTokenSerializer
+from aihub.identity.mock.token import MockIdentityToken
+from aihub.identity.mock.provider import MockIdentityProvider
 
 
 class IdentityTokenFactory:
