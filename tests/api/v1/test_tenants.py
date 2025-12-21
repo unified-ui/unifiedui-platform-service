@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 class TestTenantRoutes:
     """Test suite for tenant API routes."""
     
-    def test_create_tenant_success(self, test_client, auth_headers, sample_tenant_data):
+    def test_create_tenant_success(self, test_client, auth_headers, sample_tenant_data, test_user_token):
         """Test successful tenant creation."""
         logger.info("=" * 80)
         logger.info("TEST: test_create_tenant_success")
@@ -48,7 +48,7 @@ class TestTenantRoutes:
         assert "id" in data
         assert "created_at" in data
         assert "updated_at" in data
-        assert data["created_by"] == "test-user-123"
+        assert data["created_by"] == test_user_token.get_id()
 
     def test_create_tenant_missing_name(self, test_client, auth_headers):
         """Test tenant creation with missing name."""
@@ -133,7 +133,7 @@ class TestTenantRoutes:
         assert isinstance(data, list)
         assert len(data) == 0
     
-    def test_list_tenants_with_data(self, test_client, auth_headers, sample_tenant_data):
+    def test_list_tenants_with_data(self, test_client, auth_headers, sample_tenant_data, test_user_token):
         """Test listing tenants with existing data."""
         # Create multiple tenants
         tenant_data_1 = sample_tenant_data.copy()
@@ -158,7 +158,7 @@ class TestTenantRoutes:
         assert "Test Tenant" in names
         assert "Second Tenant" in names
     
-    def test_list_tenants_with_pagination(self, test_client, auth_headers, sample_tenant_data):
+    def test_list_tenants_with_pagination(self, test_client, auth_headers, sample_tenant_data, test_user_token):
         """Test listing tenants with pagination parameters."""
         # Create multiple tenants
         for i in range(5):
@@ -185,7 +185,7 @@ class TestTenantRoutes:
         data = response.json()
         assert len(data) == 2
     
-    def test_list_tenants_with_name_filter(self, test_client, auth_headers):
+    def test_list_tenants_with_name_filter(self, test_client, auth_headers, test_user_token):
         """Test listing tenants with name filter."""
         # Create tenants with different names
         test_client.post("/api/v1/tenants", json={"name": "Production", "description": "Prod"}, headers=auth_headers)
@@ -204,7 +204,7 @@ class TestTenantRoutes:
         assert len(data) >= 1
         assert any(tenant["name"] == "Development" for tenant in data)
     
-    def test_update_tenant_success(self, test_client, auth_headers, sample_tenant_data, sample_update_tenant_data):
+    def test_update_tenant_success(self, test_client, auth_headers, sample_tenant_data, sample_update_tenant_data, test_user_token):
         """Test successful tenant update."""
         # Create a tenant
         create_response = test_client.post(
@@ -227,9 +227,9 @@ class TestTenantRoutes:
         assert data["id"] == tenant_id
         assert data["name"] == sample_update_tenant_data["name"]
         assert data["description"] == sample_update_tenant_data["description"]
-        assert data["updated_by"] == "test-user-123"
+        assert data["updated_by"] == test_user_token.get_id()
     
-    def test_update_tenant_not_found(self, test_client, auth_headers, sample_update_tenant_data):
+    def test_update_tenant_not_found(self, test_client, auth_headers, sample_update_tenant_data, test_user_token):
         """Test updating a non-existent tenant."""
         response = test_client.patch(
             "/api/v1/tenants/non-existent-id",
@@ -239,7 +239,7 @@ class TestTenantRoutes:
         
         assert response.status_code == status.HTTP_403_FORBIDDEN  # 403 instead of 404 for security
     
-    def test_update_tenant_partial(self, test_client, auth_headers, sample_tenant_data):
+    def test_update_tenant_partial(self, test_client, auth_headers, sample_tenant_data, test_user_token):
         """Test partial tenant update."""
         # Create a tenant
         create_response = test_client.post(
@@ -262,7 +262,7 @@ class TestTenantRoutes:
         assert data["name"] == "Partially Updated"
         assert data["description"] == sample_tenant_data["description"]
     
-    def test_delete_tenant_success(self, test_client, auth_headers, sample_tenant_data):
+    def test_delete_tenant_success(self, test_client, auth_headers, sample_tenant_data, test_user_token):
         """Test successful tenant deletion."""
         # Create a tenant
         create_response = test_client.post(
@@ -287,7 +287,7 @@ class TestTenantRoutes:
         )
         assert get_response.status_code == status.HTTP_403_FORBIDDEN
     
-    def test_delete_tenant_not_found(self, test_client, auth_headers):
+    def test_delete_tenant_not_found(self, test_client, auth_headers, test_user_token):
         """Test deleting a non-existent tenant."""
         response = test_client.request("DELETE", 
             "/api/v1/tenants/non-existent-id",
@@ -300,7 +300,7 @@ class TestTenantRoutes:
 class TestTenantPrincipalRoutes:
     """Test suite for tenant principal/role management routes."""
     
-    def test_list_tenant_principals_empty(self, test_client, auth_headers, sample_tenant_data):
+    def test_list_tenant_principals_empty(self, test_client, auth_headers, sample_tenant_data, test_user_token):
         """Test listing principals for a tenant with only the creator."""
         # Create a tenant
         create_response = test_client.post(
@@ -325,13 +325,13 @@ class TestTenantPrincipalRoutes:
         
         # Check creator has GLOBAL_ADMIN role
         creator_principal = next(
-            (p for p in data["principals"] if p["principal_id"] == "test-user-123"),
+            (p for p in data["principals"] if p["principal_id"] == test_user_token.get_id()),
             None
         )
         assert creator_principal is not None
         assert "GLOBAL_ADMIN" in creator_principal["roles"]
     
-    def test_get_principal_permissions(self, test_client, auth_headers, sample_tenant_data):
+    def test_get_principal_permissions(self, test_client, auth_headers, sample_tenant_data, test_user_token):
         """Test getting permissions for a specific principal."""
         # Create a tenant
         create_response = test_client.post(
@@ -350,7 +350,7 @@ class TestTenantPrincipalRoutes:
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         
-        assert data["principal_id"] == "test-user-123"
+        assert data["principal_id"] == test_user_token.get_id()
         assert data["principal_type"] == "IDENTITY_USER"
         assert "GLOBAL_ADMIN" in data["roles"]
     
@@ -555,7 +555,7 @@ class TestTenantPrincipalRoutes:
         assert "READER" not in data["roles"]
         assert "APPLICATIONS_ADMIN" in data["roles"]
     
-    def test_delete_principal_permission_not_found(self, test_client, auth_headers, sample_tenant_data):
+    def test_delete_principal_permission_not_found(self, test_client, auth_headers, sample_tenant_data, test_user_token):
         """Test removing a non-existent role."""
         # Create a tenant
         create_response = test_client.post(
@@ -581,7 +581,7 @@ class TestTenantPrincipalRoutes:
         # Should return 404 or handle gracefully
         assert response.status_code in [status.HTTP_404_NOT_FOUND, status.HTTP_200_OK]
     
-    def test_multi_user_access_control(self, test_client):
+    def test_multi_user_access_control(self, test_client, test_user_token):
         """Test that users can only see/manage tenants they have access to."""
         # Create two separate users
         user1_token = test_client.create_test_user("isolated-user-1", "Isolated User One")
@@ -625,7 +625,7 @@ class TestTenantPrincipalRoutes:
 
     """Test suite for tenant API routes."""
     
-    def test_create_tenant_success(self, test_client, auth_headers, sample_tenant_data):
+    def test_create_tenant_success(self, test_client, auth_headers, sample_tenant_data, test_user_token):
         """Test successful tenant creation."""
         response = test_client.post(
             "/api/v1/tenants",
@@ -641,7 +641,7 @@ class TestTenantPrincipalRoutes:
         assert "id" in data
         assert "created_at" in data
         assert "updated_at" in data
-        assert data["created_by"] == "test-user-123"
+        assert data["created_by"] == test_user_token.get_id()
     
     def test_create_tenant_missing_name(self, test_client, auth_headers):
         """Test tenant creation with missing name."""
@@ -698,7 +698,7 @@ class TestTenantPrincipalRoutes:
         assert isinstance(data, list)
         assert len(data) == 0
     
-    def test_list_tenants_with_data(self, test_client, auth_headers, sample_tenant_data):
+    def test_list_tenants_with_data(self, test_client, auth_headers, sample_tenant_data, test_user_token):
         """Test listing tenants with existing data."""
         # Create multiple tenants
         tenant_data_1 = sample_tenant_data.copy()
@@ -723,7 +723,7 @@ class TestTenantPrincipalRoutes:
         assert "Test Tenant" in names
         assert "Second Tenant" in names
     
-    def test_list_tenants_with_pagination(self, test_client, auth_headers, sample_tenant_data):
+    def test_list_tenants_with_pagination(self, test_client, auth_headers, sample_tenant_data, test_user_token):
         """Test listing tenants with pagination parameters."""
         # Create multiple tenants
         for i in range(5):
@@ -750,7 +750,7 @@ class TestTenantPrincipalRoutes:
         data = response.json()
         assert len(data) == 2
     
-    def test_list_tenants_with_name_filter(self, test_client, auth_headers):
+    def test_list_tenants_with_name_filter(self, test_client, auth_headers, test_user_token):
         """Test listing tenants with name filter."""
         # Create tenants with different names
         test_client.post("/api/v1/tenants", json={"name": "Production", "description": "Prod"}, headers=auth_headers)
@@ -769,7 +769,7 @@ class TestTenantPrincipalRoutes:
         assert len(data) >= 1
         assert any(tenant["name"] == "Development" for tenant in data)
     
-    def test_update_tenant_success(self, test_client, auth_headers, sample_tenant_data, sample_update_tenant_data):
+    def test_update_tenant_success(self, test_client, auth_headers, sample_tenant_data, sample_update_tenant_data, test_user_token):
         """Test successful tenant update."""
         # Create a tenant
         create_response = test_client.post(
@@ -792,9 +792,9 @@ class TestTenantPrincipalRoutes:
         assert data["id"] == tenant_id
         assert data["name"] == sample_update_tenant_data["name"]
         assert data["description"] == sample_update_tenant_data["description"]
-        assert data["updated_by"] == "test-user-123"
+        assert data["updated_by"] == test_user_token.get_id()
     
-    def test_update_tenant_not_found(self, test_client, auth_headers, sample_update_tenant_data):
+    def test_update_tenant_not_found(self, test_client, auth_headers, sample_update_tenant_data, test_user_token):
         """Test updating a non-existent tenant."""
         response = test_client.patch(
             "/api/v1/tenants/non-existent-id",
@@ -804,7 +804,7 @@ class TestTenantPrincipalRoutes:
         
         assert response.status_code == status.HTTP_403_FORBIDDEN  # 403 instead of 404 for security
     
-    def test_update_tenant_partial(self, test_client, auth_headers, sample_tenant_data):
+    def test_update_tenant_partial(self, test_client, auth_headers, sample_tenant_data, test_user_token):
         """Test partial tenant update."""
         # Create a tenant
         create_response = test_client.post(
@@ -827,7 +827,7 @@ class TestTenantPrincipalRoutes:
         assert data["name"] == "Partially Updated"
         assert data["description"] == sample_tenant_data["description"]
     
-    def test_delete_tenant_success(self, test_client, auth_headers, sample_tenant_data):
+    def test_delete_tenant_success(self, test_client, auth_headers, sample_tenant_data, test_user_token):
         """Test successful tenant deletion."""
         # Create a tenant
         create_response = test_client.post(
@@ -852,7 +852,7 @@ class TestTenantPrincipalRoutes:
         )
         assert get_response.status_code == status.HTTP_403_FORBIDDEN
     
-    def test_delete_tenant_not_found(self, test_client, auth_headers):
+    def test_delete_tenant_not_found(self, test_client, auth_headers, test_user_token):
         """Test deleting a non-existent tenant."""
         response = test_client.request("DELETE", 
             "/api/v1/tenants/non-existent-id",
@@ -865,7 +865,7 @@ class TestTenantPrincipalRoutes:
 class TestTenantPrincipalRoutes:
     """Test suite for tenant principal/role management routes."""
     
-    def test_list_tenant_principals_empty(self, test_client, auth_headers, sample_tenant_data):
+    def test_list_tenant_principals_empty(self, test_client, auth_headers, sample_tenant_data, test_user_token):
         """Test listing principals for a tenant with only the creator."""
         # Create a tenant
         create_response = test_client.post(
@@ -890,13 +890,13 @@ class TestTenantPrincipalRoutes:
         
         # Check creator has GLOBAL_ADMIN role
         creator_principal = next(
-            (p for p in data["principals"] if p["principal_id"] == "test-user-123"),
+            (p for p in data["principals"] if p["principal_id"] == test_user_token.get_id()),
             None
         )
         assert creator_principal is not None
         assert "GLOBAL_ADMIN" in creator_principal["roles"]
     
-    def test_get_principal_permissions(self, test_client, auth_headers, sample_tenant_data):
+    def test_get_principal_permissions(self, test_client, auth_headers, sample_tenant_data, test_user_token):
         """Test getting permissions for a specific principal."""
         # Create a tenant
         create_response = test_client.post(
@@ -915,7 +915,7 @@ class TestTenantPrincipalRoutes:
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         
-        assert data["principal_id"] == "test-user-123"
+        assert data["principal_id"] == test_user_token.get_id()
         assert data["principal_type"] == "IDENTITY_USER"
         assert "GLOBAL_ADMIN" in data["roles"]
     

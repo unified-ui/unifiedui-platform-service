@@ -220,7 +220,7 @@ def test_client(test_db_client, test_cache_client, fake_redis_client):
 def test_user_token():
     """Create a default test user token."""
     logger.info("Creating default test user token")
-    token = create_test_user()
+    token = create_test_user(user_id="test-user-123")
     logger.info(f"Default test user token created")
     return token
 
