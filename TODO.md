@@ -113,8 +113,6 @@
     - wir fahren infrastruktur hoch für On-Prem Komponenten
     - und es wird auf Azure Test-Komponenten für Integration tests geben
         - integration testen
-## TODO
-
 - alle tests bauen
 
 - bauen tests für /aihub/utils/*
@@ -127,9 +125,9 @@
         - + /aihub/middleware
     - /aihub/core/vault
         - + /aihub/vault
-
 - schreibe mir eine CI GitHub Action pipeline, welche die tests auf github ausführt
     - wichtig: das projekt nutzt uv -> also install, tests etc mit uv (pytest) ausführen
+## TODO
 
 - alle test datein checken
     - ist in list resource getestet, ob man nur seine frigegebenen resourcen sieht?
