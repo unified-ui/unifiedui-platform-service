@@ -2,10 +2,10 @@
 applyTo: '**'
 ---
 
-# AIHub Project Specifications
+# unified-ui Project Specifications
 
 ## Project Overview
-**AIHub** is an integration platform for multiple AI agent systems with role-based access control (RBAC).
+**unified-ui** is an integration platform for multiple AI agent systems with role-based access control (RBAC).
 
 ### Core Characteristics
 - **Multi-Agent Integration**: Support for various agent systems (factory pattern)

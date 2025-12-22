@@ -129,6 +129,19 @@
     - wichtig: das projekt nutzt uv -> also install, tests etc mit uv (pytest) ausführen
 ## TODO
 
+**Next Steps**
+1. Test-Dateien checken
+2. check_permissions optimieren
+3. Frontend bis dato entwickeln (siehe unten)
+4. Chat-Service entwickeln
+    - N8N Integration Human-in-the-Loop (Chat-Response + Rückfragen) entwickeln
+5. Weiteren Service als Human-in-the-Loop implementieren
+6. N8N komplexeren Workflow implementieren (mit RAG Reasoning etc) implementieren
+7. Autonomen Agent implementieren
+8. Frontend erweitern
+    - Chat Service
+    - Autonom Agent
+
 - alle test datein checken
     - ist in list resource getestet, ob man nur seine frigegebenen resourcen sieht?
     - checken, dass in den handler kein authoritation (außer bei lsit) durchgeführt wird!
@@ -141,13 +154,97 @@
         - also so schnell wie möglich
     - in check_permissions mit caching arbeiten; wenn user berechtigt -> super; wenn nicht wird nochmal in DB geschaut (vielleicht...)
 
----
-
 **Integrations**
 
 - invoke N8N etc
+- wenn über invoke die traces noch nicht mitgeliefert werden
+    - an Message-Broker einen "Job" senden (gibt conversationID, MessageID und externeID an) und dann integriert consumer entsprechend die traces des runs
 
 **Optimizations**
 
 - chat service als microservice in selber struktur (nur app-core und app-chat) auslagern
     - besser skalierbar
+
+**Frontend Entwicklung**
+
+- Ein Design in einer FRONTEND/* mit Copilot ausarbeiten
+    - mehrere Dateien, sodass man nach und nach implementieren und updaten kann
+        - STRUCTURE.md (beschreibung der Projektstruktur)
+        - COLOR_DESIGN.md (color theme etc)
+        - PAGES.md (beschreibung)
+        - PAGES/*
+            - LOGIN_PAGE.md
+            - ...
+        - COMPONENTS/*
+            - BUTTON.md
+            - TOAST.md
+            - MESSAGEBOX.md (so rechts oben als alert)
+    - dieses design sehr gut beschreiben und mit Copilot in the Loop ausarbeiten
+    - anschließend das Desgin mit Copilot erstellen, inkl. BE-Transaktionen
+
+- Design ausarbeiten
+    - hier fotos suchen / pinterest / design sachen
+    - Design
+        - Colors (Dark- und Light-Mode)
+            - vieleicht Schwarz und Gift-Grün? sowas in die richtig
+            - fest definierten Farb-Satz, den man ggf anpassne kann (nicht zu viele)
+            - über ENV soll man sagen, welches Color-Theme man nutzen möchte
+                - also Color-Theme dynamisch halten (und immer Light-Dark-Mode)
+    - Layout Design
+        - Header (rechts oben mit Profil + Tenants als DropDown + notifications icon)
+    - Eine Best-Practice Projekt-Struktur aufbauen
+        - Copilot-Instructions bauen
+        - Struktur aufbauen
+    - Components bauen
+        - Framework mit Copilot auswählen
+        - Standard Components aufbauen
+            - Buttons
+            - Toasts
+                - types: DELETE, ?
+            - DropDowns (searchable)
+            - checkboxen
+            - Toggle Buttons
+            - TextBoxen
+            - ???
+        - LayoutComponents abuen
+            - Sidebar
+            - Header
+            - MainLayout
+    - Pages bauen
+        - LoginPage
+            - beim einloggen: wenn Benutzer keinen Tenant hat -> wird ein "default" erstellt
+        - Dashboard Page
+            - Kontept entwickeln
+                - meine letzten Konversationen
+                - meine letzten Applications
+                - meine letzten Autonomen Agents
+                - meine Favoriten (Applications, AutoAgents)
+        - CredentialsPage
+            - Liste
+            - Details
+                - Access (Als OverLay)
+            - Form + Test-Connection
+        - TenantSettings
+            - IAM
+                - Tenant Access
+                - Custom Groups
+        - ApplicationsPage
+            - Liste
+            - Details
+                - Access (Als Overlay)
+                - Liste Conversations
+                    - Details / Messages
+                        - Access
+                        - Messages
+            - Form + Credentials direkt dort anlegbar (mit default namen)
+        - ConversationsPage
+            - als Komponente -> einmal unter Application
+            - einmal als page um alle conversations zu sehen
+        - Autonomous Agents
+            - Liste
+            - Details
+            - Tracing History
+                - Liste
+                - Details
+        - Widget Designer
+            - hier nur Placeholder
