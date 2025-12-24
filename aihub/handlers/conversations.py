@@ -98,13 +98,14 @@ class ConversationHandler:
             identity_group_ids = [g.id for g in user.groups]
             custom_group_ids = [g.id for g in user.custom_groups]
         
-        # Build cache key
-        filter_key = name_filter or "all"
-        active_key = "all" if is_active is None else str(is_active)
-        cache_key = f"conversations:list:tenant:{tenant_id}:user:{user_id}:skip:{skip}:limit:{limit}:filter:{filter_key}:active:{active_key}"
+        # Build cache key (without filters - caching only for unfiltered results)
+        cache_key = f"conversations:list:tenant:{tenant_id}:user:{user_id}:skip:{skip}:limit:{limit}"
         
-        # Check cache
-        if use_cache and self.cache_client:
+        # Check if any filters are applied
+        has_filters = name_filter is not None or is_active is not None
+        
+        # Check cache (disable caching when any filters are applied)
+        if use_cache and self.cache_client and not has_filters:
             try:
                 cached_data = self.cache_client.client.get(cache_key)
                 if cached_data is not None:
@@ -150,8 +151,8 @@ class ConversationHandler:
             logger.info("Retrieved conversations", extra={"count": len(conversations)})
             result = [self._model_to_response(conv) for conv in conversations]
             
-            # Cache the result
-            if use_cache and self.cache_client:
+            # Cache the result (only when no filters are applied)
+            if use_cache and self.cache_client and not has_filters:
                 try:
                     data = [r.model_dump() for r in result]
                     self.cache_client.client.set(cache_key, data, ttl=300)

@@ -52,12 +52,14 @@ class TenantHandler:
         """
         logger.info("Listing tenants", extra={"skip": skip, "limit": limit, "name_filter": name_filter})
         
-        # Build cache key
-        filter_key = name_filter or "all"
-        cache_key = f"tenants:list:skip:{skip}:limit:{limit}:filter:{filter_key}"
+        # Build cache key (without filters - caching only for unfiltered results)
+        cache_key = f"tenants:list:skip:{skip}:limit:{limit}"
         
-        # Check cache
-        cached_data = self._get_from_cache(cache_key, use_cache)
+        # Check if any filters are applied
+        has_filters = name_filter is not None
+        
+        # Check cache (disable caching when any filters are applied)
+        cached_data = self._get_from_cache(cache_key, use_cache and not has_filters)
         if cached_data is not None:
             return [TenantResponse(**item) for item in cached_data]
         
@@ -76,9 +78,10 @@ class TenantHandler:
             logger.info("Retrieved tenants", extra={"count": len(tenants)})
             result = [self._model_to_response(tenant) for tenant in tenants]
             
-            # Cache the result
-            cache_data = [item.model_dump() for item in result]
-            self._set_to_cache(cache_key, cache_data, ttl=300)
+            # Cache the result (only when no filters are applied)
+            if not has_filters:
+                cache_data = [item.model_dump() for item in result]
+                self._set_to_cache(cache_key, cache_data, ttl=300)
             
             return result
 

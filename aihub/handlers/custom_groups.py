@@ -63,12 +63,14 @@ class CustomGroupHandler:
         """
         logger.info("Listing custom groups", extra={"tenant_id": tenant_id, "skip": skip, "limit": limit})
         
-        # Build cache key
-        filter_key = name_filter or "all"
-        cache_key = f"custom_groups:list:tenant:{tenant_id}:skip:{skip}:limit:{limit}:filter:{filter_key}"
+        # Build cache key (without filters - caching only for unfiltered results)
+        cache_key = f"custom_groups:list:tenant:{tenant_id}:skip:{skip}:limit:{limit}"
         
-        # Check cache
-        if use_cache and self.cache_client:
+        # Check if any filters are applied
+        has_filters = name_filter is not None
+        
+        # Check cache (disable caching when any filters are applied)
+        if use_cache and self.cache_client and not has_filters:
             try:
                 cached_data = self.cache_client.client.get(cache_key)
                 if cached_data is not None:
@@ -89,8 +91,8 @@ class CustomGroupHandler:
             logger.info("Retrieved custom groups", extra={"count": len(groups)})
             result = [self._model_to_response(group) for group in groups]
             
-            # Cache the result
-            if self.cache_client:
+            # Cache the result (only when no filters are applied)
+            if self.cache_client and not has_filters:
                 try:
                     cache_data = [item.model_dump() for item in result]
                     self.cache_client.client.set(cache_key, cache_data, ttl=300)  # Cache for 5 minutes

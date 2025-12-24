@@ -102,14 +102,14 @@ class AutonomousAgentHandler:
             identity_group_ids = [g.id for g in user.groups]
             custom_group_ids = [g.id for g in user.custom_groups]
         
-        # Build cache key
-        filter_key = name_filter or "all"
-        active_key = "all" if is_active is None else str(is_active)
-        tags_key = ",".join(str(t) for t in sorted(tag_ids)) if tag_ids else "all"
-        cache_key = f"autonomous_agents:list:tenant:{tenant_id}:user:{user_id}:skip:{skip}:limit:{limit}:filter:{filter_key}:active:{active_key}:tags:{tags_key}"
+        # Build cache key (without filters - caching only for unfiltered results)
+        cache_key = f"autonomous_agents:list:tenant:{tenant_id}:user:{user_id}:skip:{skip}:limit:{limit}"
         
-        # Check cache (disable caching when filtering by tags for simplicity)
-        if use_cache and self.cache_client and not tag_ids:
+        # Check if any filters are applied
+        has_filters = name_filter is not None or is_active is not None or tag_ids is not None
+        
+        # Check cache (disable caching when any filters are applied)
+        if use_cache and self.cache_client and not has_filters:
             try:
                 cached_data = self.cache_client.client.get(cache_key)
                 if cached_data is not None:
@@ -203,8 +203,8 @@ class AutonomousAgentHandler:
             # Convert to response models
             responses = [self._model_to_response(agent) for agent in autonomous_agents]
             
-            # Cache the results (only when not filtering by tags)
-            if use_cache and self.cache_client and not tag_ids:
+            # Cache the results (only when no filters are applied)
+            if use_cache and self.cache_client and not has_filters:
                 try:
                     cache_data = [r.model_dump() for r in responses]
                     self.cache_client.client.set(cache_key, cache_data, ttl=300)
