@@ -394,8 +394,8 @@ class TestApplicationRoutes:
         )
         first_created_at = resp1.json()["created_at"]
         
-        # Wait more than 1 second to ensure different timestamp (DB stores seconds precision)
-        time.sleep(1.1)
+        # Wait briefly to ensure different timestamp (now with microsecond precision)
+        time.sleep(0.01)
         
         # Create second application
         resp2 = test_client.post(

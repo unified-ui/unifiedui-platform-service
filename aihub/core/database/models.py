@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from sqlalchemy import (
@@ -15,11 +15,31 @@ from sqlalchemy import (
     func,
 )
 from sqlalchemy.dialects import postgresql, mssql
+from sqlalchemy.dialects.postgresql import TIMESTAMP as PG_TIMESTAMP
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
-from sqlalchemy.types import JSON
+from sqlalchemy.types import JSON, TypeDecorator
 from sqlalchemy import Enum as SAEnum
 
 from aihub.core.database.enums import PermissionActionEnum, TenantRolesEnum, PrincipalTypeEnum, ApplicationTypeEnum
+
+
+# ---------- Utility functions ----------
+def utc_now() -> datetime:
+    """Return current UTC time with microsecond precision."""
+    return datetime.now(timezone.utc)
+
+
+# ---------- Custom DateTime with microsecond precision ----------
+class HighPrecisionDateTime(TypeDecorator):
+    """DateTime type that ensures microsecond precision across databases."""
+    impl = DateTime
+    cache_ok = True
+
+    def load_dialect_impl(self, dialect):
+        if dialect.name == "postgresql":
+            # PostgreSQL TIMESTAMP with 6 decimal places (microseconds)
+            return dialect.type_descriptor(PG_TIMESTAMP(precision=6, timezone=True))
+        return dialect.type_descriptor(DateTime(timezone=True))
 
 
 # ---------- Base ----------
@@ -75,10 +95,10 @@ class IdMixin:
 class AuditMixin:
     """Mixin for audit fields (timestamps and user tracking)."""
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, server_default=func.now()
+        HighPrecisionDateTime(), nullable=False, default=utc_now
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
+        HighPrecisionDateTime(), nullable=False, default=utc_now, onupdate=utc_now
     )
     created_by: Mapped[Optional[str]] = mapped_column(String(50))
     updated_by: Mapped[Optional[str]] = mapped_column(String(50))
