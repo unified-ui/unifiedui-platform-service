@@ -15,7 +15,9 @@ $ uvicorn aihub.app:app --reload --host 0.0.0.0 --port 8000
 
 $ pytest tests/api/v1/tenants.py -v
 source .venv/bin/activate
-pytest -n auto
+
+pytest -v
+pytest tests/ -n auto
 ```
 
 [OpenAPI Docs](http://localhost:8000/docs)

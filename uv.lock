@@ -35,6 +35,11 @@ test = [
     { name = "pytest-xdist" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "pytest-xdist" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "alembic", specifier = ">=1.13.0" },
@@ -61,6 +66,9 @@ requires-dist = [
     { name = "uvicorn", specifier = ">=0.38.0" },
 ]
 provides-extras = ["test"]
+
+[package.metadata.requires-dev]
+dev = [{ name = "pytest-xdist", specifier = ">=3.8.0" }]
 
 [[package]]
 name = "alembic"
