@@ -12,7 +12,8 @@ from aihub.core.database.models import (
     CredentialMember,
     AutonomousAgentMember,
     CustomGroupMember,
-    ConversationMember
+    ConversationMember,
+    DevelopmentPlatformMember
 )
 from aihub.handlers.dependencies.database import get_db_client
 from aihub.caching.dependencies import get_cache_client
@@ -214,7 +215,8 @@ def check_permissions(
                     "credential": (CredentialMember, "credential_id"),
                     "autonomous_agent": (AutonomousAgentMember, "autonomous_agent_id"),
                     "custom_group": (CustomGroupMember, "custom_group_id"),
-                    "conversation": (ConversationMember, "conversation_id")
+                    "conversation": (ConversationMember, "conversation_id"),
+                    "development_platform": (DevelopmentPlatformMember, "development_platform_id")
                 }
                 
                 if entity not in entity_config:
@@ -263,6 +265,7 @@ def check_permissions(
                         "autonomous_agent": TenantPermissionEnum.AUTONOMOUS_AGENTS_ADMIN.value,
                         "custom_group": TenantPermissionEnum.CUSTOM_GROUPS_ADMIN.value,
                         "conversation": TenantPermissionEnum.CONVERSATIONS_ADMIN.value,
+                        "development_platform": TenantPermissionEnum.DEVELOPMENT_PLATFORMS_ADMIN.value,
                     }
                     
                     entity_admin = entity_admin_map.get(entity)

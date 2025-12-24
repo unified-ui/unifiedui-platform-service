@@ -4,12 +4,13 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from aihub.apis.v1 import health, identity, tenants, custom_groups, credentials, applications, conversations, autonomous_agents
+from aihub.apis.v1 import health, identity, tenants, custom_groups, credentials, applications, conversations, autonomous_agents, development_platforms
 from aihub.exc.autonomous_agents import AutonomousAgentNotFoundError
 from aihub.exc.custom_groups import CustomGroupNotFoundError, CustomGroupError
 from aihub.exc.applications import ApplicationNotFoundError
 from aihub.exc.credentials import CredentialNotFoundError
 from aihub.exc.conversations import ConversationNotFoundError
+from aihub.exc.development_platforms import DevelopmentPlatformNotFoundError
 
 from aihub.core.config import settings
 from aihub.exc.tenants import TenantNotFoundError, TenantError
@@ -126,6 +127,16 @@ def create_app() -> FastAPI:
             content={"detail": str(exc)}
         )
     
+    # Development Platform exception handlers
+    
+    @app.exception_handler(DevelopmentPlatformNotFoundError)
+    async def development_platform_not_found_handler(request: Request, exc: DevelopmentPlatformNotFoundError):
+        """Handle development platform not found errors."""
+        return JSONResponse(
+            status_code=404,
+            content={"detail": str(exc)}
+        )
+    
     # Include routers
     app.include_router(
         health.router,
@@ -173,6 +184,12 @@ def create_app() -> FastAPI:
         autonomous_agents.router,
         prefix="/api/v1/tenants/{tenant_id}",
         tags=["Autonomous Agents"]
+    )
+    
+    app.include_router(
+        development_platforms.router,
+        prefix="/api/v1/tenants/{tenant_id}",
+        tags=["Development Platforms"]
     )
     
     return app

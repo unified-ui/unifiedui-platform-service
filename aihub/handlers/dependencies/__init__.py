@@ -25,6 +25,7 @@ from aihub.handlers.dependencies.credentials import get_credential_handler
 from aihub.handlers.dependencies.applications import get_application_handler
 from aihub.handlers.dependencies.conversations import get_conversation_handler
 from aihub.handlers.dependencies.autonomous_agents import get_autonomous_agent_handler
+from aihub.handlers.dependencies.development_platforms import get_development_platform_handler
 
 __all__ = [
     # Database
@@ -40,5 +41,6 @@ __all__ = [
     "get_application_handler",
     "get_conversation_handler",
     "get_autonomous_agent_handler",
+    "get_development_platform_handler",
 ]
 

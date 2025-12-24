@@ -308,4 +308,42 @@ class CredentialMember(Base, IdMixin, AuditMixin):
     )
 
 
+# ---------- Development Platforms ----------
+class DevelopmentPlatform(Base, IdNameDescriptionMixin, TenantScopedMixin):
+    """Development platform entity for embedding external development tools."""
+    __tablename__ = "development_platforms"
+
+    type: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    iframe_url: Mapped[str] = mapped_column(String(2000), nullable=False)
+    config: Mapped[dict] = mapped_column(PortableJSON, nullable=False, default=dict)
+
+    members: Mapped[list["DevelopmentPlatformMember"]] = relationship(
+        back_populates="development_platform", cascade="all, delete-orphan"
+    )
+
+    __table_args__ = (Index("ix_development_platforms_tenant", "tenant_id"),)
+
+
+class DevelopmentPlatformMember(Base, IdMixin, AuditMixin):
+    """Development platform membership table."""
+    __tablename__ = "development_platform_members"
+
+    tenant_id: Mapped[str] = mapped_column(String(36), nullable=False)
+    development_platform_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("development_platforms.id", ondelete="CASCADE"), nullable=False
+    )
+    principal_id: Mapped[str] = mapped_column(String(50), nullable=False)
+    principal_type: Mapped[str] = mapped_column(PrincipalTypeSAEnum, nullable=False)
+
+    role: Mapped[str] = mapped_column(PermissionActionSAEnum, nullable=False)
+
+    development_platform: Mapped["DevelopmentPlatform"] = relationship(back_populates="members")
+
+    __table_args__ = (
+        UniqueConstraint("development_platform_id", "principal_id", "principal_type", name="uq_development_platform_members"),
+        Index("ix_dpm_development_platform", "development_platform_id"),
+        Index("ix_dpm_principal", "principal_id"),
+    )
+
+
 
