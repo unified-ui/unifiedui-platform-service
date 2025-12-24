@@ -40,6 +40,7 @@ async def list_conversations(
     skip: int = 0,
     limit: int = 100,
     name_filter: Optional[str] = None,
+    is_active: Optional[int] = None,
     handler: ConversationHandler = Depends(get_conversation_handler)
 ) -> List[ConversationResponse]:
     """
@@ -54,6 +55,7 @@ async def list_conversations(
         skip: Number of items to skip
         limit: Maximum number of items to return
         name_filter: Optional filter by conversation name
+        is_active: Optional filter by active status (None=all, 1=active, 0=inactive)
         handler: Conversation handler dependency
         
     Returns:
@@ -77,6 +79,7 @@ async def list_conversations(
             skip=skip,
             limit=limit,
             name_filter=name_filter,
+            is_active=is_active,
             user=user
         )
     except Exception as e:

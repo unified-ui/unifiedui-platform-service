@@ -15,6 +15,7 @@ class CredentialResponse(BaseModel):
     type: str = Field(..., description="Type of credential")
     source: str = Field(..., description="Source system (e.g., vault)")
     credential_uri: str = Field(..., description="Vault URI reference (not the secret itself)")
+    is_active: bool = Field(..., description="Whether the credential is active")
     created_at: datetime = Field(..., description="Creation timestamp")
     updated_at: datetime = Field(..., description="Last update timestamp")
     created_by: Optional[str] = Field(None, description="Creator user ID")

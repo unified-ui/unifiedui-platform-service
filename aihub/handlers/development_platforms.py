@@ -53,6 +53,7 @@ class DevelopmentPlatformHandler:
         skip: int = 0,
         limit: int = 100,
         name_filter: Optional[str] = None,
+        is_active: Optional[int] = None,
         use_cache: bool = True
     ) -> List[DevelopmentPlatformResponse]:
         """
@@ -64,6 +65,7 @@ class DevelopmentPlatformHandler:
             skip: Number of items to skip
             limit: Maximum number of items to return
             name_filter: Optional filter by development platform name
+            is_active: Optional filter by active status (None=all, 1=active, 0=inactive)
             use_cache: Whether to use caching
             
         Returns:
@@ -99,7 +101,8 @@ class DevelopmentPlatformHandler:
         
         # Build cache key
         filter_key = name_filter or "all"
-        cache_key = f"development_platforms:list:tenant:{tenant_id}:user:{user_id}:skip:{skip}:limit:{limit}:filter:{filter_key}"
+        active_key = "all" if is_active is None else str(is_active)
+        cache_key = f"development_platforms:list:tenant:{tenant_id}:user:{user_id}:skip:{skip}:limit:{limit}:filter:{filter_key}:active:{active_key}"
         
         # Check cache
         if use_cache and self.cache_client:
@@ -137,6 +140,9 @@ class DevelopmentPlatformHandler:
             
             if name_filter:
                 query = query.where(DevelopmentPlatform.name.ilike(f"%{name_filter}%"))
+            
+            if is_active is not None:
+                query = query.where(DevelopmentPlatform.is_active == bool(is_active))
             
             query = query.offset(skip).limit(limit)
             development_platforms = session.execute(query).scalars().all()
@@ -738,6 +744,7 @@ class DevelopmentPlatformHandler:
             tenant_id=development_platform.tenant_id,
             name=development_platform.name,
             description=development_platform.description,
+            is_active=development_platform.is_active,
             type=development_platform.type,
             iframe_url=development_platform.iframe_url,
             config=development_platform.config,

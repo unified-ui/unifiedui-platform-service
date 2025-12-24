@@ -53,6 +53,7 @@ class ApplicationHandler:
         skip: int = 0,
         limit: int = 100,
         name_filter: Optional[str] = None,
+        is_active: Optional[int] = None,
         use_cache: bool = True
     ) -> List[ApplicationResponse]:
         """
@@ -64,6 +65,7 @@ class ApplicationHandler:
             skip: Number of items to skip
             limit: Maximum number of items to return
             name_filter: Optional filter by application name
+            is_active: Optional filter by active status (None=all, 1=active, 0=inactive)
             use_cache: Whether to use caching
             
         Returns:
@@ -99,7 +101,8 @@ class ApplicationHandler:
         
         # Build cache key
         filter_key = name_filter or "all"
-        cache_key = f"applications:list:tenant:{tenant_id}:user:{user_id}:skip:{skip}:limit:{limit}:filter:{filter_key}"
+        active_key = "all" if is_active is None else str(is_active)
+        cache_key = f"applications:list:tenant:{tenant_id}:user:{user_id}:skip:{skip}:limit:{limit}:filter:{filter_key}:active:{active_key}"
         
         # Check cache
         if use_cache and self.cache_client:
@@ -137,6 +140,10 @@ class ApplicationHandler:
             
             if name_filter:
                 query = query.where(Application.name.ilike(f"%{name_filter}%"))
+            
+            # Filter by is_active status
+            if is_active is not None:
+                query = query.where(Application.is_active == bool(is_active))
             
             query = query.offset(skip).limit(limit)
             applications = session.execute(query).scalars().all()
@@ -732,6 +739,7 @@ class ApplicationHandler:
             tenant_id=application.tenant_id,
             name=application.name,
             description=application.description,
+            is_active=application.is_active,
             config=application.config,
             created_at=application.created_at,
             updated_at=application.updated_at,

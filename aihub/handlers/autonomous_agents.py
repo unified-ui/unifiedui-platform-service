@@ -53,6 +53,7 @@ class AutonomousAgentHandler:
         skip: int = 0,
         limit: int = 100,
         name_filter: Optional[str] = None,
+        is_active: Optional[int] = None,
         use_cache: bool = True
     ) -> List[AutonomousAgentResponse]:
         """
@@ -64,6 +65,7 @@ class AutonomousAgentHandler:
             skip: Number of items to skip
             limit: Maximum number of items to return
             name_filter: Optional filter by autonomous agent name
+            is_active: Optional filter by active status (None=all, 1=active, 0=inactive)
             use_cache: Whether to use caching
             
         Returns:
@@ -98,7 +100,8 @@ class AutonomousAgentHandler:
         
         # Build cache key
         filter_key = name_filter or "all"
-        cache_key = f"autonomous_agents:list:tenant:{tenant_id}:user:{user_id}:skip:{skip}:limit:{limit}:filter:{filter_key}"
+        active_key = "all" if is_active is None else str(is_active)
+        cache_key = f"autonomous_agents:list:tenant:{tenant_id}:user:{user_id}:skip:{skip}:limit:{limit}:filter:{filter_key}:active:{active_key}"
         
         # Check cache
         if use_cache and self.cache_client:
@@ -116,6 +119,9 @@ class AutonomousAgentHandler:
                 query = select(AutonomousAgent).where(AutonomousAgent.tenant_id == tenant_id)
                 if name_filter:
                     query = query.where(AutonomousAgent.name.ilike(f"%{name_filter}%"))
+                # Filter by is_active status
+                if is_active is not None:
+                    query = query.where(AutonomousAgent.is_active == bool(is_active))
                 query = query.offset(skip).limit(limit)
                 autonomous_agents = session.execute(query).scalars().all()
             else:
@@ -153,6 +159,10 @@ class AutonomousAgentHandler:
                 
                 if name_filter:
                     query = query.where(AutonomousAgent.name.ilike(f"%{name_filter}%"))
+                
+                # Filter by is_active status
+                if is_active is not None:
+                    query = query.where(AutonomousAgent.is_active == bool(is_active))
                 
                 query = query.distinct().offset(skip).limit(limit)
                 autonomous_agents = session.execute(query).scalars().all()

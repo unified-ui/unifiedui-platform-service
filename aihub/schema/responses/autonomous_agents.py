@@ -12,6 +12,7 @@ class AutonomousAgentResponse(BaseModel):
     name: str = Field(..., description="Autonomous agent name")
     description: Optional[str] = Field(None, description="Autonomous agent description")
     config: dict = Field(default_factory=dict, description="Autonomous agent configuration")
+    is_active: bool = Field(..., description="Whether the autonomous agent is active")
     created_at: datetime = Field(..., description="Creation timestamp")
     updated_at: datetime = Field(..., description="Last update timestamp")
     created_by: Optional[str] = Field(None, description="Creator user ID")

@@ -40,6 +40,7 @@ async def list_autonomous_agents(
     skip: int = 0,
     limit: int = 100,
     name_filter: Optional[str] = None,
+    is_active: Optional[int] = None,
     handler: AutonomousAgentHandler = Depends(get_autonomous_agent_handler)
 ) -> List[AutonomousAgentResponse]:
     """
@@ -54,6 +55,7 @@ async def list_autonomous_agents(
         skip: Number of items to skip
         limit: Maximum number of items to return
         name_filter: Optional filter by autonomous agent name
+        is_active: Optional filter by active status (None=all, 1=active, 0=inactive)
         handler: Autonomous agent handler dependency
         
     Returns:
@@ -66,7 +68,8 @@ async def list_autonomous_agents(
             user=user,
             skip=skip,
             limit=limit,
-            name_filter=name_filter
+            name_filter=name_filter,
+            is_active=is_active
         )
     except Exception as e:
         logger.error(f"Failed to list autonomous agents: {e}", exc_info=True)

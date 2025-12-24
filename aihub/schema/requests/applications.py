@@ -9,6 +9,7 @@ class CreateApplicationRequest(BaseModel):
     name: str = Field(..., min_length=1, max_length=255, description="Application name")
     description: Optional[str] = Field(None, max_length=2000, description="Application description")
     config: Optional[dict] = Field(default_factory=dict, description="Application configuration")
+    is_active: bool = Field(False, description="Whether the application is active")
 
 
 class UpdateApplicationRequest(BaseModel):
@@ -17,3 +18,4 @@ class UpdateApplicationRequest(BaseModel):
     name: Optional[str] = Field(None, min_length=1, max_length=255, description="Application name")
     description: Optional[str] = Field(None, max_length=2000, description="Application description")
     config: Optional[dict] = Field(None, description="Application configuration")
+    is_active: Optional[bool] = Field(None, description="Whether the application is active")

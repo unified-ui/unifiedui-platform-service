@@ -14,6 +14,7 @@ class DevelopmentPlatformResponse(BaseModel):
     type: Optional[str] = Field(None, description="Type of development platform")
     iframe_url: str = Field(..., description="URL for the iframe embedding")
     config: dict = Field(default_factory=dict, description="Development platform configuration")
+    is_active: bool = Field(..., description="Whether the development platform is active")
     created_at: datetime = Field(..., description="Creation timestamp")
     updated_at: datetime = Field(..., description="Last update timestamp")
     created_by: Optional[str] = Field(None, description="Creator user ID")

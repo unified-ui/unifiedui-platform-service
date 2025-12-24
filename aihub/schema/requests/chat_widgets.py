@@ -12,6 +12,7 @@ class CreateChatWidgetRequest(BaseModel):
     description: Optional[str] = Field(None, max_length=2000, description="Chat widget description")
     type: Optional[ChatWidgetTypeEnum] = Field(None, description="Chat widget type (IFRAME or FORM)")
     config: dict = Field(..., description="Chat widget configuration (required)")
+    is_active: bool = Field(False, description="Whether the chat widget is active")
 
 
 class UpdateChatWidgetRequest(BaseModel):
@@ -21,3 +22,4 @@ class UpdateChatWidgetRequest(BaseModel):
     description: Optional[str] = Field(None, max_length=2000, description="Chat widget description")
     type: Optional[ChatWidgetTypeEnum] = Field(None, description="Chat widget type (IFRAME or FORM)")
     config: Optional[dict] = Field(None, description="Chat widget configuration")
+    is_active: Optional[bool] = Field(None, description="Whether the chat widget is active")

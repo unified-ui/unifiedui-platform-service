@@ -12,6 +12,7 @@ class CreateCredentialRequest(BaseModel):
     secret_value: str = Field(..., min_length=1, description="Secret value to store in vault")
     source: Optional[str] = Field(None, description="Source or origin of the credential")
     metadata: Optional[dict] = Field(None, description="Additional metadata")
+    is_active: bool = Field(False, description="Whether the credential is active")
 
 
 class UpdateCredentialRequest(BaseModel):
@@ -22,3 +23,4 @@ class UpdateCredentialRequest(BaseModel):
     credential_type: Optional[str] = Field(None, description="Type of credential")
     secret_value: Optional[str] = Field(None, min_length=1, description="New secret value")
     metadata: Optional[dict] = Field(None, description="Additional metadata")
+    is_active: Optional[bool] = Field(None, description="Whether the credential is active")

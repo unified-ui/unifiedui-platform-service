@@ -11,6 +11,7 @@ class ConversationResponse(BaseModel):
     tenant_id: str = Field(..., description="Tenant ID")
     name: str = Field(..., description="Conversation name")
     description: Optional[str] = Field(None, description="Conversation description")
+    is_active: bool = Field(..., description="Whether the conversation is active")
     created_at: datetime = Field(..., description="Creation timestamp")
     updated_at: datetime = Field(..., description="Last update timestamp")
     created_by: Optional[str] = Field(None, description="Creator user ID")

@@ -15,6 +15,7 @@ class ChatWidgetResponse(BaseModel):
     description: Optional[str] = Field(None, description="Chat widget description")
     type: Optional[ChatWidgetTypeEnum] = Field(None, description="Chat widget type (IFRAME or FORM)")
     config: dict = Field(default_factory=dict, description="Chat widget configuration")
+    is_active: bool = Field(..., description="Whether the chat widget is active")
     created_at: datetime = Field(..., description="Creation timestamp")
     updated_at: datetime = Field(..., description="Last update timestamp")
     created_by: Optional[str] = Field(None, description="Creator user ID")

@@ -53,6 +53,7 @@ class ChatWidgetHandler:
         skip: int = 0,
         limit: int = 100,
         name_filter: Optional[str] = None,
+        is_active: Optional[int] = None,
         use_cache: bool = True
     ) -> List[ChatWidgetResponse]:
         """
@@ -64,6 +65,7 @@ class ChatWidgetHandler:
             skip: Number of items to skip
             limit: Maximum number of items to return
             name_filter: Optional filter by chat widget name
+            is_active: Optional filter by active status (None=all, 1=active, 0=inactive)
             use_cache: Whether to use caching
             
         Returns:
@@ -99,7 +101,8 @@ class ChatWidgetHandler:
         
         # Build cache key
         filter_key = name_filter or "all"
-        cache_key = f"chat_widgets:list:tenant:{tenant_id}:user:{user_id}:skip:{skip}:limit:{limit}:filter:{filter_key}"
+        active_key = "all" if is_active is None else str(is_active)
+        cache_key = f"chat_widgets:list:tenant:{tenant_id}:user:{user_id}:skip:{skip}:limit:{limit}:filter:{filter_key}:active:{active_key}"
         
         # Check cache
         if use_cache and self.cache_client:
@@ -137,6 +140,9 @@ class ChatWidgetHandler:
             
             if name_filter:
                 query = query.where(ChatWidget.name.ilike(f"%{name_filter}%"))
+            
+            if is_active is not None:
+                query = query.where(ChatWidget.is_active == bool(is_active))
             
             query = query.offset(skip).limit(limit)
             chat_widgets = session.execute(query).scalars().all()
@@ -735,6 +741,7 @@ class ChatWidgetHandler:
             tenant_id=chat_widget.tenant_id,
             name=chat_widget.name,
             description=chat_widget.description,
+            is_active=chat_widget.is_active,
             type=chat_widget.type,
             config=chat_widget.config,
             created_at=chat_widget.created_at,

@@ -40,6 +40,7 @@ async def list_credentials(
     skip: int = 0,
     limit: int = 100,
     name_filter: Optional[str] = None,
+    is_active: Optional[int] = None,
     handler: CredentialHandler = Depends(get_credential_handler)
 ) -> List[CredentialResponse]:
     """
@@ -54,6 +55,7 @@ async def list_credentials(
         skip: Number of items to skip
         limit: Maximum number of items to return
         name_filter: Optional filter by credential name
+        is_active: Optional filter by active status (None=all, 1=active, 0=inactive)
         handler: Credential handler dependency
         
     Returns:
@@ -77,6 +79,7 @@ async def list_credentials(
             skip=skip,
             limit=limit,
             name_filter=name_filter,
+            is_active=is_active,
             user=user
         )
     except Exception as e:

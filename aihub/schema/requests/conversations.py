@@ -8,6 +8,7 @@ class CreateConversationRequest(BaseModel):
     
     name: str = Field(..., min_length=1, max_length=255, description="Conversation name")
     description: Optional[str] = Field(None, max_length=2000, description="Conversation description")
+    is_active: bool = Field(False, description="Whether the conversation is active")
 
 
 class UpdateConversationRequest(BaseModel):
@@ -15,3 +16,4 @@ class UpdateConversationRequest(BaseModel):
     
     name: Optional[str] = Field(None, min_length=1, max_length=255, description="Conversation name")
     description: Optional[str] = Field(None, max_length=2000, description="Conversation description")
+    is_active: Optional[bool] = Field(None, description="Whether the conversation is active")

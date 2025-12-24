@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import Optional
 
 from sqlalchemy import (
+    Boolean,
     String,
     DateTime,
     ForeignKey,
@@ -175,6 +176,7 @@ class Application(Base, IdNameDescriptionMixin, TenantScopedMixin):
     __tablename__ = "applications"
 
     config: Mapped[dict] = mapped_column(PortableJSON, nullable=False, default=dict)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
     members: Mapped[list["ApplicationMember"]] = relationship(
         back_populates="application", cascade="all, delete-orphan"
@@ -185,6 +187,8 @@ class Application(Base, IdNameDescriptionMixin, TenantScopedMixin):
 
 class Conversation(Base, IdNameDescriptionMixin, TenantScopedMixin):
     __tablename__ = "conversations"
+
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
     members: Mapped[list["ConversationMember"]] = relationship(
         back_populates="conversation", cascade="all, delete-orphan"
@@ -197,6 +201,7 @@ class AutonomousAgent(Base, IdNameDescriptionMixin, TenantScopedMixin):
     __tablename__ = "autonomous_agents"
 
     config: Mapped[dict] = mapped_column(PortableJSON, nullable=False, default=dict)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
     members: Mapped[list["AutonomousAgentMember"]] = relationship(
         back_populates="autonomous_agent", cascade="all, delete-orphan"
@@ -211,6 +216,7 @@ class Credential(Base, IdNameDescriptionMixin, TenantScopedMixin):
     type: Mapped[str] = mapped_column(String(50), nullable=False)
     source: Mapped[str] = mapped_column(String(255), nullable=False)
     credential_uri: Mapped[str] = mapped_column(String(2000), nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
     members: Mapped[list["CredentialMember"]] = relationship(
         back_populates="credential", cascade="all, delete-orphan"
@@ -316,6 +322,7 @@ class DevelopmentPlatform(Base, IdNameDescriptionMixin, TenantScopedMixin):
     type: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     iframe_url: Mapped[str] = mapped_column(String(2000), nullable=False)
     config: Mapped[dict] = mapped_column(PortableJSON, nullable=False, default=dict)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
     members: Mapped[list["DevelopmentPlatformMember"]] = relationship(
         back_populates="development_platform", cascade="all, delete-orphan"
@@ -353,6 +360,7 @@ class ChatWidget(Base, IdNameDescriptionMixin, TenantScopedMixin):
 
     type: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     config: Mapped[dict] = mapped_column(PortableJSON, nullable=False, default=dict)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
     members: Mapped[list["ChatWidgetMember"]] = relationship(
         back_populates="chat_widget", cascade="all, delete-orphan"
