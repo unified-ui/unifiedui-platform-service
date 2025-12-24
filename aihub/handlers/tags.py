@@ -32,26 +32,31 @@ RESOURCE_TAG_MAPPING = {
         "model": Application,
         "tag_model": ApplicationTag,
         "id_field": "application_id",
+        "cache_key_pattern": "applications:detail:tenant:{tenant_id}:app:{resource_id}",
     },
     "autonomous_agent": {
         "model": AutonomousAgent,
         "tag_model": AutonomousAgentTag,
         "id_field": "autonomous_agent_id",
+        "cache_key_pattern": "autonomous_agents:detail:tenant:{tenant_id}:agent:{resource_id}",
     },
     "chat_widget": {
         "model": ChatWidget,
         "tag_model": ChatWidgetTag,
         "id_field": "chat_widget_id",
+        "cache_key_pattern": "chat_widgets:detail:tenant:{tenant_id}:cw:{resource_id}",
     },
     "credential": {
         "model": Credential,
         "tag_model": CredentialTag,
         "id_field": "credential_id",
+        "cache_key_pattern": "credentials:detail:tenant:{tenant_id}:cred:{resource_id}",
     },
     "development_platform": {
         "model": DevelopmentPlatform,
         "tag_model": DevelopmentPlatformTag,
         "id_field": "development_platform_id",
+        "cache_key_pattern": "development_platforms:detail:tenant:{tenant_id}:dp:{resource_id}",
     },
 }
 
@@ -324,12 +329,54 @@ class TagHandler:
                 )
                 raise TagDeleteNotAllowedError(tag_id)
             
+            # Before deleting, find all resources using this tag for cache invalidation
+            affected_resources = self._find_resources_using_tag(session, tenant_id, tag_id)
+            
             session.delete(tag)
             logger.info("Tag deleted", extra={"tag_id": tag_id})
             
             # Invalidate caches
             self._invalidate_tag_list_cache(tenant_id)
             self._invalidate_tag_detail_cache(tenant_id, tag_id)
+            
+            # Invalidate caches for all affected resources
+            for resource_type, resource_id in affected_resources:
+                self._invalidate_resource_detail_cache(tenant_id, resource_type, resource_id)
+    
+    def _find_resources_using_tag(
+        self,
+        session: Session,
+        tenant_id: str,
+        tag_id: int
+    ) -> List[tuple]:
+        """
+        Find all resources that use a specific tag.
+        
+        Args:
+            session: SQLAlchemy session
+            tenant_id: The tenant ID
+            tag_id: The tag ID
+            
+        Returns:
+            List of (resource_type, resource_id) tuples
+        """
+        affected = []
+        
+        for resource_type, mapping in RESOURCE_TAG_MAPPING.items():
+            tag_model = mapping["tag_model"]
+            id_field = mapping["id_field"]
+            
+            results = session.execute(
+                select(getattr(tag_model, id_field)).where(
+                    tag_model.tag_id == tag_id,
+                    tag_model.tenant_id == tenant_id
+                )
+            ).scalars().all()
+            
+            for resource_id in results:
+                affected.append((resource_type, resource_id))
+        
+        return affected
 
     def get_resource_tags(
         self,
@@ -475,6 +522,7 @@ class TagHandler:
             
             # Invalidate caches
             self._invalidate_resource_tags_cache(tenant_id, resource_type, resource_id)
+            self._invalidate_resource_detail_cache(tenant_id, resource_type, resource_id)
             self._invalidate_tag_list_cache(tenant_id)
             
             return ResourceTagsResponse(tags=tag_responses)
@@ -515,8 +563,9 @@ class TagHandler:
             
             logger.info("Resource tags deleted")
             
-            # Invalidate cache
+            # Invalidate caches
             self._invalidate_resource_tags_cache(tenant_id, resource_type, resource_id)
+            self._invalidate_resource_detail_cache(tenant_id, resource_type, resource_id)
 
     def get_tags_for_resource_list(
         self,
@@ -603,6 +652,28 @@ class TagHandler:
                 logger.debug("Invalidated resource tags cache")
             except Exception as e:
                 logger.warning(f"Failed to invalidate resource tags cache: {e}")
+
+    def _invalidate_resource_detail_cache(
+        self,
+        tenant_id: str,
+        resource_type: str,
+        resource_id: str
+    ) -> None:
+        """Invalidate the parent resource detail cache when tags change."""
+        if self.cache_client:
+            mapping = RESOURCE_TAG_MAPPING.get(resource_type)
+            if not mapping or "cache_key_pattern" not in mapping:
+                return
+            
+            try:
+                cache_key = mapping["cache_key_pattern"].format(
+                    tenant_id=tenant_id,
+                    resource_id=resource_id
+                )
+                self.cache_client.client.delete(cache_key)
+                logger.debug(f"Invalidated {resource_type} detail cache")
+            except Exception as e:
+                logger.warning(f"Failed to invalidate {resource_type} detail cache: {e}")
 
     @staticmethod
     def _model_to_response(tag: Tag) -> TagResponse:

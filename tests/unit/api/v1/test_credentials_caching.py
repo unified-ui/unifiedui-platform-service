@@ -512,3 +512,112 @@ class TestCredentialCaching:
             headers=headers_a
         )
         assert delete_response.status_code == status.HTTP_204_NO_CONTENT
+
+
+class TestCredentialTagCacheInvalidation:
+    """Test suite for cache invalidation when adding/removing tags from credentials."""
+    
+    def test_adding_tags_invalidates_cache(self, test_client: TestClient, fake_redis_client: Any) -> None:
+        """Test that adding tags to a credential invalidates the credential cache."""
+        admin_token = test_client.create_test_user("cred-tag-cache-1", "Cred Tag Cache 1")
+        admin_headers = create_auth_headers(admin_token)
+        tenant_id = create_tenant_for_user(test_client, admin_token)
+        credential_id = create_credential(test_client, tenant_id, admin_headers, "Tagged Credential")
+        
+        # First read - cache the credential (no tags)
+        response1 = test_client.get(
+            ENDPOINT_CREDENTIAL_DETAIL.format(tenant_id=tenant_id, credential_id=credential_id),
+            headers=admin_headers
+        )
+        assert response1.status_code == status.HTTP_200_OK
+        assert response1.json()["tags"] == []
+        
+        # Add tags to credential
+        test_client.put(
+            f"/api/v1/tenants/{tenant_id}/credentials/{credential_id}/tags",
+            json={"tags": ["production", "api-key"]},
+            headers=admin_headers
+        )
+        
+        # Read credential again - should see the tags (cache invalidated)
+        response2 = test_client.get(
+            ENDPOINT_CREDENTIAL_DETAIL.format(tenant_id=tenant_id, credential_id=credential_id),
+            headers=admin_headers
+        )
+        assert response2.status_code == status.HTTP_200_OK
+        assert len(response2.json()["tags"]) == 2
+    
+    def test_removing_tags_invalidates_cache(self, test_client: TestClient, fake_redis_client: Any) -> None:
+        """Test that removing tags from a credential invalidates the credential cache."""
+        admin_token = test_client.create_test_user("cred-tag-cache-2", "Cred Tag Cache 2")
+        admin_headers = create_auth_headers(admin_token)
+        tenant_id = create_tenant_for_user(test_client, admin_token)
+        credential_id = create_credential(test_client, tenant_id, admin_headers, "Tagged Credential 2")
+        
+        # Set initial tags
+        test_client.put(
+            f"/api/v1/tenants/{tenant_id}/credentials/{credential_id}/tags",
+            json={"tags": ["tag1", "tag2"]},
+            headers=admin_headers
+        )
+        
+        # Read and cache
+        response1 = test_client.get(
+            ENDPOINT_CREDENTIAL_DETAIL.format(tenant_id=tenant_id, credential_id=credential_id),
+            headers=admin_headers
+        )
+        assert len(response1.json()["tags"]) == 2
+        
+        # Remove tags
+        test_client.delete(
+            f"/api/v1/tenants/{tenant_id}/credentials/{credential_id}/tags",
+            headers=admin_headers
+        )
+        
+        # Read credential again - should have no tags (cache invalidated)
+        response2 = test_client.get(
+            ENDPOINT_CREDENTIAL_DETAIL.format(tenant_id=tenant_id, credential_id=credential_id),
+            headers=admin_headers
+        )
+        assert response2.status_code == status.HTTP_200_OK
+        assert len(response2.json()["tags"]) == 0
+    
+    def test_replacing_tags_invalidates_cache(self, test_client: TestClient, fake_redis_client: Any) -> None:
+        """Test that replacing tags on a credential invalidates the credential cache."""
+        admin_token = test_client.create_test_user("cred-tag-cache-3", "Cred Tag Cache 3")
+        admin_headers = create_auth_headers(admin_token)
+        tenant_id = create_tenant_for_user(test_client, admin_token)
+        credential_id = create_credential(test_client, tenant_id, admin_headers, "Tagged Credential 3")
+        
+        # Set initial tags
+        test_client.put(
+            f"/api/v1/tenants/{tenant_id}/credentials/{credential_id}/tags",
+            json={"tags": ["old-tag"]},
+            headers=admin_headers
+        )
+        
+        # Read and cache
+        response1 = test_client.get(
+            ENDPOINT_CREDENTIAL_DETAIL.format(tenant_id=tenant_id, credential_id=credential_id),
+            headers=admin_headers
+        )
+        assert len(response1.json()["tags"]) == 1
+        assert response1.json()["tags"][0]["name"] == "old-tag"
+        
+        # Replace with new tags
+        test_client.put(
+            f"/api/v1/tenants/{tenant_id}/credentials/{credential_id}/tags",
+            json={"tags": ["new-tag-1", "new-tag-2"]},
+            headers=admin_headers
+        )
+        
+        # Read credential again - should have new tags (cache invalidated)
+        response2 = test_client.get(
+            ENDPOINT_CREDENTIAL_DETAIL.format(tenant_id=tenant_id, credential_id=credential_id),
+            headers=admin_headers
+        )
+        assert response2.status_code == status.HTTP_200_OK
+        assert len(response2.json()["tags"]) == 2
+        tag_names = [t["name"] for t in response2.json()["tags"]]
+        assert "new-tag-1" in tag_names
+        assert "new-tag-2" in tag_names

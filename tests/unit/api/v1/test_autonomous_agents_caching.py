@@ -498,4 +498,133 @@ class TestAutonomousAgentCaching:
             json={"name": "Updated by User2"},
             headers=headers2
         )
-        assert update_response.status_code == status.HTTP_200_OK
+
+
+class TestAutonomousAgentTagCacheInvalidation:
+    """Test suite for cache invalidation when adding/removing tags from autonomous agents."""
+    
+    def test_adding_tags_invalidates_cache(self, test_client: TestClient, test_user_token: Any) -> None:
+        """Test that adding tags to an autonomous agent invalidates the agent cache."""
+        user_token = test_client.create_test_user("agent-tag-cache-1", "Agent Tag Cache 1")
+        tenant_id = create_tenant_for_user(test_client, user_token)
+        headers = create_auth_headers(user_token, use_cache=True)
+        
+        # Create agent
+        create_response = test_client.post(
+            ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id),
+            json={"name": "Tagged Agent", "description": "Test", "config": {}},
+            headers=headers
+        )
+        agent_id = create_response.json()["id"]
+        
+        # First read - cache the agent (no tags)
+        response1 = test_client.get(
+            ENDPOINT_AUTONOMOUS_AGENT_DETAIL.format(tenant_id=tenant_id, autonomous_agent_id=agent_id),
+            headers=headers
+        )
+        assert response1.status_code == status.HTTP_200_OK
+        assert response1.json()["tags"] == []
+        
+        # Add tags to agent
+        test_client.put(
+            f"/api/v1/tenants/{tenant_id}/autonomous-agents/{agent_id}/tags",
+            json={"tags": ["production", "ml"]},
+            headers=headers
+        )
+        
+        # Read agent again - should see the tags (cache invalidated)
+        response2 = test_client.get(
+            ENDPOINT_AUTONOMOUS_AGENT_DETAIL.format(tenant_id=tenant_id, autonomous_agent_id=agent_id),
+            headers=headers
+        )
+        assert response2.status_code == status.HTTP_200_OK
+        assert len(response2.json()["tags"]) == 2
+    
+    def test_removing_tags_invalidates_cache(self, test_client: TestClient, test_user_token: Any) -> None:
+        """Test that removing tags from an autonomous agent invalidates the agent cache."""
+        user_token = test_client.create_test_user("agent-tag-cache-2", "Agent Tag Cache 2")
+        tenant_id = create_tenant_for_user(test_client, user_token)
+        headers = create_auth_headers(user_token, use_cache=True)
+        
+        # Create agent
+        create_response = test_client.post(
+            ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id),
+            json={"name": "Tagged Agent 2", "description": "Test", "config": {}},
+            headers=headers
+        )
+        agent_id = create_response.json()["id"]
+        
+        # Set initial tags
+        test_client.put(
+            f"/api/v1/tenants/{tenant_id}/autonomous-agents/{agent_id}/tags",
+            json={"tags": ["tag1", "tag2"]},
+            headers=headers
+        )
+        
+        # Read and cache
+        response1 = test_client.get(
+            ENDPOINT_AUTONOMOUS_AGENT_DETAIL.format(tenant_id=tenant_id, autonomous_agent_id=agent_id),
+            headers=headers
+        )
+        assert len(response1.json()["tags"]) == 2
+        
+        # Remove tags
+        test_client.delete(
+            f"/api/v1/tenants/{tenant_id}/autonomous-agents/{agent_id}/tags",
+            headers=headers
+        )
+        
+        # Read agent again - should have no tags (cache invalidated)
+        response2 = test_client.get(
+            ENDPOINT_AUTONOMOUS_AGENT_DETAIL.format(tenant_id=tenant_id, autonomous_agent_id=agent_id),
+            headers=headers
+        )
+        assert response2.status_code == status.HTTP_200_OK
+        assert len(response2.json()["tags"]) == 0
+    
+    def test_replacing_tags_invalidates_cache(self, test_client: TestClient, test_user_token: Any) -> None:
+        """Test that replacing tags on an autonomous agent invalidates the agent cache."""
+        user_token = test_client.create_test_user("agent-tag-cache-3", "Agent Tag Cache 3")
+        tenant_id = create_tenant_for_user(test_client, user_token)
+        headers = create_auth_headers(user_token, use_cache=True)
+        
+        # Create agent
+        create_response = test_client.post(
+            ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id),
+            json={"name": "Tagged Agent 3", "description": "Test", "config": {}},
+            headers=headers
+        )
+        agent_id = create_response.json()["id"]
+        
+        # Set initial tags
+        test_client.put(
+            f"/api/v1/tenants/{tenant_id}/autonomous-agents/{agent_id}/tags",
+            json={"tags": ["old-tag"]},
+            headers=headers
+        )
+        
+        # Read and cache
+        response1 = test_client.get(
+            ENDPOINT_AUTONOMOUS_AGENT_DETAIL.format(tenant_id=tenant_id, autonomous_agent_id=agent_id),
+            headers=headers
+        )
+        assert len(response1.json()["tags"]) == 1
+        assert response1.json()["tags"][0]["name"] == "old-tag"
+        
+        # Replace with new tags
+        test_client.put(
+            f"/api/v1/tenants/{tenant_id}/autonomous-agents/{agent_id}/tags",
+            json={"tags": ["new-tag-1", "new-tag-2"]},
+            headers=headers
+        )
+        
+        # Read agent again - should have new tags (cache invalidated)
+        response2 = test_client.get(
+            ENDPOINT_AUTONOMOUS_AGENT_DETAIL.format(tenant_id=tenant_id, autonomous_agent_id=agent_id),
+            headers=headers
+        )
+        assert response2.status_code == status.HTTP_200_OK
+        assert len(response2.json()["tags"]) == 2
+        tag_names = [t["name"] for t in response2.json()["tags"]]
+        assert "new-tag-1" in tag_names
+        assert "new-tag-2" in tag_names

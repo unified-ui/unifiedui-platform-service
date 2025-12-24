@@ -168,8 +168,8 @@ async def delete_tag(
         is_global_admin = False
         for tenant_info in user.tenants:
             if tenant_info.get("tenant", {}).get("id") == tenant_id:
-                permissions = tenant_info.get("permissions", [])
-                if TenantPermissionEnum.GLOBAL_ADMIN.value in permissions:
+                roles = tenant_info.get("roles", [])
+                if TenantPermissionEnum.GLOBAL_ADMIN.value in roles:
                     is_global_admin = True
                 break
         

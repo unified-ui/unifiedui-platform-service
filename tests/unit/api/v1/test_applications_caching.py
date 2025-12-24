@@ -485,3 +485,113 @@ class TestApplicationCaching:
             headers=global_admin_headers
         )
         assert response2.status_code == status.HTTP_200_OK
+
+
+class TestApplicationTagCacheInvalidation:
+    """Test suite for cache invalidation when adding/removing tags from applications."""
+    
+    def test_adding_tags_invalidates_cache(self, test_client: TestClient, fake_redis_client: Any) -> None:
+        """Test that adding tags to an application invalidates the application cache."""
+        admin_token = test_client.create_test_user("app-tag-cache-1", "App Tag Cache 1")
+        admin_headers = create_auth_headers(admin_token)
+        tenant_id = create_tenant_for_user(test_client, admin_token)
+        app_id = create_application(test_client, tenant_id, admin_headers, "Tagged App")
+        
+        # First read - cache the application (no tags)
+        response1 = test_client.get(
+            ENDPOINT_APPLICATION_DETAIL.format(tenant_id=tenant_id, application_id=app_id),
+            headers=admin_headers
+        )
+        assert response1.status_code == status.HTTP_200_OK
+        assert response1.json()["tags"] == []
+        
+        # Add tags to application
+        test_client.put(
+            f"/api/v1/tenants/{tenant_id}/applications/{app_id}/tags",
+            json={"tags": ["production", "critical"]},
+            headers=admin_headers
+        )
+        
+        # Read application again - should see the tags (cache invalidated)
+        response2 = test_client.get(
+            ENDPOINT_APPLICATION_DETAIL.format(tenant_id=tenant_id, application_id=app_id),
+            headers=admin_headers
+        )
+        assert response2.status_code == status.HTTP_200_OK
+        assert len(response2.json()["tags"]) == 2
+    
+    def test_removing_tags_invalidates_cache(self, test_client: TestClient, fake_redis_client: Any) -> None:
+        """Test that removing tags from an application invalidates the application cache."""
+        admin_token = test_client.create_test_user("app-tag-cache-2", "App Tag Cache 2")
+        admin_headers = create_auth_headers(admin_token)
+        tenant_id = create_tenant_for_user(test_client, admin_token)
+        app_id = create_application(test_client, tenant_id, admin_headers, "Tagged App 2")
+        
+        # Set initial tags
+        test_client.put(
+            f"/api/v1/tenants/{tenant_id}/applications/{app_id}/tags",
+            json={"tags": ["tag1", "tag2"]},
+            headers=admin_headers
+        )
+        
+        # Read and cache
+        response1 = test_client.get(
+            ENDPOINT_APPLICATION_DETAIL.format(tenant_id=tenant_id, application_id=app_id),
+            headers=admin_headers
+        )
+        assert len(response1.json()["tags"]) == 2
+        
+        # Remove tags
+        test_client.delete(
+            f"/api/v1/tenants/{tenant_id}/applications/{app_id}/tags",
+            headers=admin_headers
+        )
+        
+        # Read application again - should have no tags (cache invalidated)
+        response2 = test_client.get(
+            ENDPOINT_APPLICATION_DETAIL.format(tenant_id=tenant_id, application_id=app_id),
+            headers=admin_headers
+        )
+        assert response2.status_code == status.HTTP_200_OK
+        assert len(response2.json()["tags"]) == 0
+    
+    def test_replacing_tags_invalidates_cache(self, test_client: TestClient, fake_redis_client: Any) -> None:
+        """Test that replacing tags on an application invalidates the application cache."""
+        admin_token = test_client.create_test_user("app-tag-cache-3", "App Tag Cache 3")
+        admin_headers = create_auth_headers(admin_token)
+        tenant_id = create_tenant_for_user(test_client, admin_token)
+        app_id = create_application(test_client, tenant_id, admin_headers, "Tagged App 3")
+        
+        # Set initial tags
+        test_client.put(
+            f"/api/v1/tenants/{tenant_id}/applications/{app_id}/tags",
+            json={"tags": ["old-tag"]},
+            headers=admin_headers
+        )
+        
+        # Read and cache
+        response1 = test_client.get(
+            ENDPOINT_APPLICATION_DETAIL.format(tenant_id=tenant_id, application_id=app_id),
+            headers=admin_headers
+        )
+        assert len(response1.json()["tags"]) == 1
+        assert response1.json()["tags"][0]["name"] == "old-tag"
+        
+        # Replace with new tags
+        test_client.put(
+            f"/api/v1/tenants/{tenant_id}/applications/{app_id}/tags",
+            json={"tags": ["new-tag-1", "new-tag-2"]},
+            headers=admin_headers
+        )
+        
+        # Read application again - should have new tags (cache invalidated)
+        response2 = test_client.get(
+            ENDPOINT_APPLICATION_DETAIL.format(tenant_id=tenant_id, application_id=app_id),
+            headers=admin_headers
+        )
+        assert response2.status_code == status.HTTP_200_OK
+        assert len(response2.json()["tags"]) == 2
+        tag_names = [t["name"] for t in response2.json()["tags"]]
+        assert "new-tag-1" in tag_names
+        assert "new-tag-2" in tag_names
+
