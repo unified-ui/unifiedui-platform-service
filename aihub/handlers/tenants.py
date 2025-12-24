@@ -36,6 +36,8 @@ class TenantHandler:
         skip: int = 0,
         limit: int = 100,
         name_filter: Optional[str] = None,
+        order_by: Optional[str] = None,
+        order_direction: Optional[str] = None,
         use_cache: bool = True
     ) -> List[TenantResponse]:
         """
@@ -45,6 +47,8 @@ class TenantHandler:
             skip: Number of items to skip
             limit: Maximum number of items to return
             name_filter: Optional filter by tenant name (case-insensitive partial match)
+            order_by: Optional column name to order by
+            order_direction: Optional sort direction ('asc' or 'desc')
             use_cache: Whether to use caching (default: True)
             
         Returns:
@@ -56,7 +60,7 @@ class TenantHandler:
         cache_key = f"tenants:list:skip:{skip}:limit:{limit}"
         
         # Check if any filters are applied
-        has_filters = name_filter is not None
+        has_filters = name_filter is not None or order_by is not None
         
         # Check cache (disable caching when any filters are applied)
         cached_data = self._get_from_cache(cache_key, use_cache and not has_filters)
@@ -69,6 +73,14 @@ class TenantHandler:
             # Apply name filter if provided
             if name_filter:
                 query = query.where(Tenant.name.ilike(f"%{name_filter}%"))
+            
+            # Apply ordering if specified
+            if order_by and hasattr(Tenant, order_by):
+                column = getattr(Tenant, order_by)
+                if order_direction == "desc":
+                    query = query.order_by(column.desc())
+                else:
+                    query = query.order_by(column.asc())
             
             # Apply pagination
             query = query.offset(skip).limit(limit)

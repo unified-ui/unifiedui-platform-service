@@ -12,7 +12,9 @@ from aihub.logger import get_logger
 
 logger = get_logger(__name__)
 
-router = APIRouter(prefix="/users/{user_id}/favorites")
+router = APIRouter(
+    prefix="/users/{user_id}/favorites"
+)
 
 
 @router.get(

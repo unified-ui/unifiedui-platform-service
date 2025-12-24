@@ -57,6 +57,8 @@ class ChatWidgetHandler:
         name_filter: Optional[str] = None,
         is_active: Optional[int] = None,
         tag_ids: Optional[List[int]] = None,
+        order_by: Optional[str] = None,
+        order_direction: Optional[str] = None,
         use_cache: bool = True
     ) -> List[ChatWidgetResponse]:
         """
@@ -70,6 +72,8 @@ class ChatWidgetHandler:
             name_filter: Optional filter by chat widget name
             is_active: Optional filter by active status (None=all, 1=active, 0=inactive)
             tag_ids: Optional list of tag IDs to filter by (chat widgets must have ALL specified tags)
+            order_by: Optional column name to order by
+            order_direction: Optional sort direction ('asc' or 'desc')
             use_cache: Whether to use caching
             
         Returns:
@@ -107,7 +111,7 @@ class ChatWidgetHandler:
         cache_key = f"chat_widgets:list:tenant:{tenant_id}:user:{user_id}:skip:{skip}:limit:{limit}"
         
         # Check if any filters are applied
-        has_filters = name_filter is not None or is_active is not None or tag_ids is not None
+        has_filters = name_filter is not None or is_active is not None or tag_ids is not None or order_by is not None
         
         # Check cache (disable caching when any filters are applied)
         if use_cache and self.cache_client and not has_filters:
@@ -162,6 +166,14 @@ class ChatWidgetHandler:
                         )
                     )
                     query = query.where(ChatWidget.id.in_(tag_subquery))
+            
+            # Apply ordering if specified
+            if order_by and hasattr(ChatWidget, order_by):
+                column = getattr(ChatWidget, order_by)
+                if order_direction == "desc":
+                    query = query.order_by(column.desc())
+                else:
+                    query = query.order_by(column.asc())
             
             query = query.offset(skip).limit(limit)
             chat_widgets = session.execute(query).scalars().all()

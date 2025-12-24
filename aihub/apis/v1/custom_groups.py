@@ -6,7 +6,7 @@ from aihub.handlers.custom_groups import CustomGroupHandler
 from aihub.handlers.dependencies import get_custom_group_handler
 from aihub.core.middleware.apis.v1.auth import authenticate, check_permissions
 from aihub.core.identity.users import ContextIdentityUser
-from aihub.core.database.enums import TenantRolesEnum, PermissionActionEnum
+from aihub.core.database.enums import TenantRolesEnum, PermissionActionEnum, OrderDirectionEnum
 from aihub.schema.requests.custom_groups import (
     CreateCustomGroupRequest,
     UpdateCustomGroupRequest,
@@ -37,6 +37,8 @@ async def list_custom_groups(
     skip: int = Query(0, ge=0, description="Number of items to skip"),
     limit: int = Query(100, ge=1, le=1000, description="Maximum number of items to return"),
     name: Optional[str] = Query(None, description="Filter by group name"),
+    order_by: Optional[str] = Query(None, description="Column name to order by (e.g., 'name', 'created_at', 'updated_at')"),
+    order_direction: Optional[OrderDirectionEnum] = Query(None, description="Sort direction: 'asc' or 'desc'"),
     handler: CustomGroupHandler = Depends(get_custom_group_handler)
 ) -> list[CustomGroupResponse]:
     """
@@ -58,7 +60,9 @@ async def list_custom_groups(
         tenant_id=tenant_id,
         skip=skip,
         limit=limit,
-        name_filter=name
+        name_filter=name,
+        order_by=order_by,
+        order_direction=order_direction.value if order_direction else None
     )
 
 

@@ -1,4 +1,5 @@
 """Tests for applications API endpoints."""
+import time
 from typing import Any
 from fastapi import status
 from starlette.testclient import TestClient
@@ -315,6 +316,162 @@ class TestApplicationRoutes:
         data = response.json()
         assert len(data) == 1
         assert data[0]["name"] == "Production App"
+    
+    def test_list_applications_with_order_by_name_asc(self, test_client: TestClient, test_user_token: Any) -> None:
+        """Test listing applications ordered by name ascending."""
+        tenant_id = create_tenant_for_user(test_client, test_user_token)
+        headers = create_auth_headers(test_user_token, use_cache=False)
+        
+        # Create applications with different names (in non-alphabetical order)
+        test_client.post(
+            ENDPOINT_APPLICATIONS.format(tenant_id=tenant_id),
+            json={"name": "Zebra App", "description": "Z app", "type": "N8N"},
+            headers=headers
+        )
+        test_client.post(
+            ENDPOINT_APPLICATIONS.format(tenant_id=tenant_id),
+            json={"name": "Alpha App", "description": "A app", "type": "N8N"},
+            headers=headers
+        )
+        test_client.post(
+            ENDPOINT_APPLICATIONS.format(tenant_id=tenant_id),
+            json={"name": "Middle App", "description": "M app", "type": "N8N"},
+            headers=headers
+        )
+        
+        # Order by name ascending
+        response = test_client.get(
+            f"{ENDPOINT_APPLICATIONS.format(tenant_id=tenant_id)}?order_by=name&order_direction=asc",
+            headers=headers
+        )
+        
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert len(data) == 3
+        assert data[0]["name"] == "Alpha App"
+        assert data[1]["name"] == "Middle App"
+        assert data[2]["name"] == "Zebra App"
+    
+    def test_list_applications_with_order_by_name_desc(self, test_client: TestClient, test_user_token: Any) -> None:
+        """Test listing applications ordered by name descending."""
+        tenant_id = create_tenant_for_user(test_client, test_user_token)
+        headers = create_auth_headers(test_user_token, use_cache=False)
+        
+        # Create applications with different names
+        test_client.post(
+            ENDPOINT_APPLICATIONS.format(tenant_id=tenant_id),
+            json={"name": "Alpha App", "description": "A app", "type": "N8N"},
+            headers=headers
+        )
+        test_client.post(
+            ENDPOINT_APPLICATIONS.format(tenant_id=tenant_id),
+            json={"name": "Zebra App", "description": "Z app", "type": "N8N"},
+            headers=headers
+        )
+        
+        # Order by name descending
+        response = test_client.get(
+            f"{ENDPOINT_APPLICATIONS.format(tenant_id=tenant_id)}?order_by=name&order_direction=desc",
+            headers=headers
+        )
+        
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert len(data) == 2
+        assert data[0]["name"] == "Zebra App"
+        assert data[1]["name"] == "Alpha App"
+    
+    def test_list_applications_with_order_by_created_at(self, test_client: TestClient, test_user_token: Any) -> None:
+        """Test listing applications ordered by created_at."""
+        tenant_id = create_tenant_for_user(test_client, test_user_token)
+        headers = create_auth_headers(test_user_token, use_cache=False)
+        
+        # Create first application
+        resp1 = test_client.post(
+            ENDPOINT_APPLICATIONS.format(tenant_id=tenant_id),
+            json={"name": "First App", "description": "First", "type": "N8N"},
+            headers=headers
+        )
+        first_created_at = resp1.json()["created_at"]
+        
+        # Wait more than 1 second to ensure different timestamp (DB stores seconds precision)
+        time.sleep(1.1)
+        
+        # Create second application
+        resp2 = test_client.post(
+            ENDPOINT_APPLICATIONS.format(tenant_id=tenant_id),
+            json={"name": "Second App", "description": "Second", "type": "N8N"},
+            headers=headers
+        )
+        second_created_at = resp2.json()["created_at"]
+        
+        # Verify that second was created after first
+        assert second_created_at > first_created_at, f"Second ({second_created_at}) should be after First ({first_created_at})"
+        
+        # Order by created_at descending (newest first)
+        response = test_client.get(
+            f"{ENDPOINT_APPLICATIONS.format(tenant_id=tenant_id)}?order_by=created_at&order_direction=desc",
+            headers=headers
+        )
+        
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert len(data) == 2
+        # Second app should be first (newest)
+        assert data[0]["name"] == "Second App", f"Expected 'Second App' first but got {data[0]['name']}. Data: {[(d['name'], d['created_at']) for d in data]}"
+        assert data[1]["name"] == "First App"
+    
+    def test_list_applications_order_by_without_direction_defaults_to_asc(self, test_client: TestClient, test_user_token: Any) -> None:
+        """Test that order_by without direction defaults to ascending."""
+        tenant_id = create_tenant_for_user(test_client, test_user_token)
+        headers = create_auth_headers(test_user_token, use_cache=False)
+        
+        # Create applications
+        test_client.post(
+            ENDPOINT_APPLICATIONS.format(tenant_id=tenant_id),
+            json={"name": "Zebra App", "description": "Z app", "type": "N8N"},
+            headers=headers
+        )
+        test_client.post(
+            ENDPOINT_APPLICATIONS.format(tenant_id=tenant_id),
+            json={"name": "Alpha App", "description": "A app", "type": "N8N"},
+            headers=headers
+        )
+        
+        # Order by name without specifying direction
+        response = test_client.get(
+            f"{ENDPOINT_APPLICATIONS.format(tenant_id=tenant_id)}?order_by=name",
+            headers=headers
+        )
+        
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert len(data) == 2
+        # Should be ascending by default
+        assert data[0]["name"] == "Alpha App"
+        assert data[1]["name"] == "Zebra App"
+    
+    def test_list_applications_invalid_order_by_column_ignored(self, test_client: TestClient, test_user_token: Any) -> None:
+        """Test that invalid order_by column is silently ignored."""
+        tenant_id = create_tenant_for_user(test_client, test_user_token)
+        headers = create_auth_headers(test_user_token, use_cache=False)
+        
+        # Create applications
+        test_client.post(
+            ENDPOINT_APPLICATIONS.format(tenant_id=tenant_id),
+            json={"name": "Test App", "description": "Test", "type": "N8N"},
+            headers=headers
+        )
+        
+        # Use invalid column name - should not cause error
+        response = test_client.get(
+            f"{ENDPOINT_APPLICATIONS.format(tenant_id=tenant_id)}?order_by=invalid_column",
+            headers=headers
+        )
+        
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert len(data) == 1
     
     def test_update_application_success(self, test_client: TestClient, test_user_token: Any) -> None:
         """Test successful application update."""

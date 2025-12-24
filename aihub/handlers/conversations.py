@@ -54,6 +54,8 @@ class ConversationHandler:
         limit: int = 100,
         name_filter: Optional[str] = None,
         is_active: Optional[int] = None,
+        order_by: Optional[str] = None,
+        order_direction: Optional[str] = None,
         use_cache: bool = True
     ) -> List[ConversationResponse]:
         """
@@ -66,6 +68,8 @@ class ConversationHandler:
             limit: Maximum number of items to return
             name_filter: Optional filter by conversation name
             is_active: Optional filter by active status (None=all, 1=active, 0=inactive)
+            order_by: Optional column name to order by
+            order_direction: Optional sort direction ('asc' or 'desc')
             use_cache: Whether to use caching
             
         Returns:
@@ -102,7 +106,7 @@ class ConversationHandler:
         cache_key = f"conversations:list:tenant:{tenant_id}:user:{user_id}:skip:{skip}:limit:{limit}"
         
         # Check if any filters are applied
-        has_filters = name_filter is not None or is_active is not None
+        has_filters = name_filter is not None or is_active is not None or order_by is not None
         
         # Check cache (disable caching when any filters are applied)
         if use_cache and self.cache_client and not has_filters:
@@ -144,6 +148,14 @@ class ConversationHandler:
             # Filter by is_active status
             if is_active is not None:
                 query = query.where(Conversation.is_active == bool(is_active))
+            
+            # Apply ordering if specified
+            if order_by and hasattr(Conversation, order_by):
+                column = getattr(Conversation, order_by)
+                if order_direction == "desc":
+                    query = query.order_by(column.desc())
+                else:
+                    query = query.order_by(column.asc())
             
             query = query.offset(skip).limit(limit)
             conversations = session.execute(query).scalars().all()

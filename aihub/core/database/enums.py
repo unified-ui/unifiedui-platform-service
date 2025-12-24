@@ -64,3 +64,12 @@ class UserPermissionEnum(str, Enum):
 
     def all() -> list[str]:
         return [perm.value for perm in UserPermissionEnum]
+
+
+class OrderDirectionEnum(str, Enum):
+    """Enum for sort order direction in list queries."""
+    ASC = "asc"
+    DESC = "desc"
+
+    def all() -> list[str]:
+        return [direction.value for direction in OrderDirectionEnum]

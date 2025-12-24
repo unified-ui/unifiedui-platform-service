@@ -17,7 +17,7 @@ from aihub.schema.responses.conversation_permissions import (
 )
 from aihub.exc.conversations import ConversationNotFoundError
 from aihub.core.middleware.apis.v1.auth import authenticate, check_permissions
-from aihub.core.database.enums import TenantRolesEnum, PermissionActionEnum
+from aihub.core.database.enums import TenantRolesEnum, PermissionActionEnum, OrderDirectionEnum
 from aihub.logger import get_logger
 
 logger = get_logger(__name__)
@@ -41,6 +41,8 @@ async def list_conversations(
     limit: int = Query(100, ge=1, le=1000, description="Maximum number of items to return"),
     name_filter: Optional[str] = Query(None, description="Filter by conversation name"),
     is_active: Optional[int] = Query(None, ge=0, le=1, description="Filter by active status (1=active, 0=inactive)"),
+    order_by: Optional[str] = Query(None, description="Column name to order by (e.g., 'name', 'created_at', 'updated_at')"),
+    order_direction: Optional[OrderDirectionEnum] = Query(None, description="Sort direction: 'asc' or 'desc'"),
     handler: ConversationHandler = Depends(get_conversation_handler)
 ) -> List[ConversationResponse]:
     """
@@ -80,6 +82,8 @@ async def list_conversations(
             limit=limit,
             name_filter=name_filter,
             is_active=is_active,
+            order_by=order_by,
+            order_direction=order_direction.value if order_direction else None,
             user=user
         )
     except Exception as e:

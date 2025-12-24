@@ -265,6 +265,66 @@ class TestTenantRoutes:
         
         assert len(data) >= 1
         assert any(tenant["name"] == "Development" for tenant in data)
+
+    def test_list_tenants_with_order_by_name_asc(self, test_client: TestClient, auth_headers: dict[str, str], test_user_token: Any) -> None:
+        """Test listing tenants ordered by name ascending."""
+        # Create tenants with different names
+        test_client.post(ENDPOINT_TENANTS, json={"name": "Charlie", "description": "Third"}, headers=auth_headers)
+        test_client.post(ENDPOINT_TENANTS, json={"name": "Alpha", "description": "First"}, headers=auth_headers)
+        test_client.post(ENDPOINT_TENANTS, json={"name": "Beta", "description": "Second"}, headers=auth_headers)
+        
+        # Order by name ascending
+        response = test_client.get(
+            f"{ENDPOINT_TENANTS}?order_by=name&order_direction=asc",
+            headers=auth_headers
+        )
+        
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        
+        assert len(data) >= 3
+        names = [tenant["name"] for tenant in data]
+        assert names == sorted(names)
+    
+    def test_list_tenants_with_order_by_name_desc(self, test_client: TestClient, auth_headers: dict[str, str], test_user_token: Any) -> None:
+        """Test listing tenants ordered by name descending."""
+        # Create tenants with different names
+        test_client.post(ENDPOINT_TENANTS, json={"name": "Charlie", "description": "Third"}, headers=auth_headers)
+        test_client.post(ENDPOINT_TENANTS, json={"name": "Alpha", "description": "First"}, headers=auth_headers)
+        test_client.post(ENDPOINT_TENANTS, json={"name": "Beta", "description": "Second"}, headers=auth_headers)
+        
+        # Order by name descending
+        response = test_client.get(
+            f"{ENDPOINT_TENANTS}?order_by=name&order_direction=desc",
+            headers=auth_headers
+        )
+        
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        
+        assert len(data) >= 3
+        names = [tenant["name"] for tenant in data]
+        assert names == sorted(names, reverse=True)
+    
+    def test_list_tenants_order_by_without_direction(self, test_client: TestClient, auth_headers: dict[str, str], test_user_token: Any) -> None:
+        """Test listing tenants with order_by but without direction defaults to ascending."""
+        # Create tenants with different names
+        test_client.post(ENDPOINT_TENANTS, json={"name": "Charlie", "description": "Third"}, headers=auth_headers)
+        test_client.post(ENDPOINT_TENANTS, json={"name": "Alpha", "description": "First"}, headers=auth_headers)
+        test_client.post(ENDPOINT_TENANTS, json={"name": "Beta", "description": "Second"}, headers=auth_headers)
+        
+        # Order by name without direction - should default to ascending
+        response = test_client.get(
+            f"{ENDPOINT_TENANTS}?order_by=name",
+            headers=auth_headers
+        )
+        
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        
+        assert len(data) >= 3
+        names = [tenant["name"] for tenant in data]
+        assert names == sorted(names)
     
     def test_update_tenant_success(self, test_client: TestClient, auth_headers: dict[str, str], sample_tenant_data: dict[str, Any], sample_update_tenant_data: dict[str, Any], test_user_token: Any) -> None:
         """Test successful tenant update."""

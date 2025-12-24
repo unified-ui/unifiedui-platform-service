@@ -17,7 +17,7 @@ from aihub.schema.responses.autonomous_agent_permissions import (
 )
 from aihub.exc.autonomous_agents import AutonomousAgentNotFoundError, AutonomousAgentPermissionNotFoundError
 from aihub.core.middleware.apis.v1.auth import authenticate, check_permissions
-from aihub.core.database.enums import TenantRolesEnum, PermissionActionEnum
+from aihub.core.database.enums import TenantRolesEnum, PermissionActionEnum, OrderDirectionEnum
 from aihub.logger import get_logger
 
 logger = get_logger(__name__)
@@ -42,6 +42,8 @@ async def list_autonomous_agents(
     name_filter: Optional[str] = Query(None, description="Filter by autonomous agent name"),
     is_active: Optional[int] = Query(None, ge=0, le=1, description="Filter by active status (1=active, 0=inactive)"),
     tags: Optional[str] = Query(None, description="Comma-separated list of tag IDs to filter by (e.g., '10001,10002,10003')"),
+    order_by: Optional[str] = Query(None, description="Column name to order by (e.g., 'name', 'created_at', 'updated_at')"),
+    order_direction: Optional[OrderDirectionEnum] = Query(None, description="Sort direction: 'asc' or 'desc'"),
     handler: AutonomousAgentHandler = Depends(get_autonomous_agent_handler)
 ) -> List[AutonomousAgentResponse]:
     """
@@ -83,7 +85,9 @@ async def list_autonomous_agents(
             limit=limit,
             name_filter=name_filter,
             is_active=is_active,
-            tag_ids=tag_ids
+            tag_ids=tag_ids,
+            order_by=order_by,
+            order_direction=order_direction.value if order_direction else None
         )
     except HTTPException:
         raise

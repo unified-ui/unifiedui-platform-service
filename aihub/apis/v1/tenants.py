@@ -6,7 +6,7 @@ from aihub.handlers.tenants import TenantHandler
 from aihub.handlers.dependencies import get_tenant_handler
 from aihub.core.middleware.apis.v1.auth import authenticate, check_permissions
 from aihub.core.identity.users import ContextIdentityUser
-from aihub.core.database.enums import TenantRolesEnum
+from aihub.core.database.enums import TenantRolesEnum, OrderDirectionEnum
 from aihub.schema.requests.tenants import (
     CreateTenantRequest,
     UpdateTenantRequest,
@@ -36,6 +36,8 @@ async def list_tenants(
     skip: int = Query(0, ge=0, description="Number of items to skip"),
     limit: int = Query(100, ge=1, le=1000, description="Maximum number of items to return"),
     name: Optional[str] = Query(None, description="Filter by tenant name"),
+    order_by: Optional[str] = Query(None, description="Column name to order by (e.g., 'name', 'created_at', 'updated_at')"),
+    order_direction: Optional[OrderDirectionEnum] = Query(None, description="Sort direction: 'asc' or 'desc'"),
     handler: TenantHandler = Depends(get_tenant_handler)
 ) -> list[TenantResponse]:
     """
@@ -54,7 +56,9 @@ async def list_tenants(
     return handler.list_tenants(
         skip=skip,
         limit=limit,
-        name_filter=name
+        name_filter=name,
+        order_by=order_by,
+        order_direction=order_direction.value if order_direction else None
     )
 
 

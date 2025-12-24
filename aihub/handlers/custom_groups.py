@@ -46,6 +46,8 @@ class CustomGroupHandler:
         skip: int = 0,
         limit: int = 100,
         name_filter: Optional[str] = None,
+        order_by: Optional[str] = None,
+        order_direction: Optional[str] = None,
         use_cache: bool = True
     ) -> List[CustomGroupResponse]:
         """
@@ -56,6 +58,8 @@ class CustomGroupHandler:
             skip: Number of items to skip
             limit: Maximum number of items to return
             name_filter: Optional filter by group name (case-insensitive partial match)
+            order_by: Optional column name to order by
+            order_direction: Optional sort direction ('asc' or 'desc')
             use_cache: Whether to use caching (default: True)
             
         Returns:
@@ -67,7 +71,7 @@ class CustomGroupHandler:
         cache_key = f"custom_groups:list:tenant:{tenant_id}:skip:{skip}:limit:{limit}"
         
         # Check if any filters are applied
-        has_filters = name_filter is not None
+        has_filters = name_filter is not None or order_by is not None
         
         # Check cache (disable caching when any filters are applied)
         if use_cache and self.cache_client and not has_filters:
@@ -84,6 +88,14 @@ class CustomGroupHandler:
             
             if name_filter:
                 query = query.where(CustomGroup.name.ilike(f"%{name_filter}%"))
+            
+            # Apply ordering if specified
+            if order_by and hasattr(CustomGroup, order_by):
+                column = getattr(CustomGroup, order_by)
+                if order_direction == "desc":
+                    query = query.order_by(column.desc())
+                else:
+                    query = query.order_by(column.asc())
             
             query = query.offset(skip).limit(limit)
             groups = session.execute(query).scalars().all()
