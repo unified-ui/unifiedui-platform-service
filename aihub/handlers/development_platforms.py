@@ -5,9 +5,10 @@ import uuid
 from typing import TYPE_CHECKING, Optional, List
 
 from sqlalchemy import select, or_
+from sqlalchemy.orm import selectinload
 
 from aihub.core.database.client import SQLAlchemyClient
-from aihub.core.database.models import DevelopmentPlatform, DevelopmentPlatformMember
+from aihub.core.database.models import DevelopmentPlatform, DevelopmentPlatformMember, DevelopmentPlatformTag, Tag
 from aihub.core.database.enums import PermissionActionEnum, PrincipalTypeEnum
 from aihub.caching.client import CacheClient
 
@@ -17,6 +18,7 @@ if TYPE_CHECKING:
 from aihub.schema.requests.development_platforms import CreateDevelopmentPlatformRequest, UpdateDevelopmentPlatformRequest
 from aihub.schema.requests.development_platform_permissions import SetDevelopmentPlatformPermissionRequest
 from aihub.schema.responses.development_platforms import DevelopmentPlatformResponse
+from aihub.schema.responses.tags import TagSummary
 from aihub.schema.responses.development_platform_permissions import (
     DevelopmentPlatformPermissionResponse,
     DevelopmentPlatformPrincipalsResponse,
@@ -54,6 +56,7 @@ class DevelopmentPlatformHandler:
         limit: int = 100,
         name_filter: Optional[str] = None,
         is_active: Optional[int] = None,
+        tag_ids: Optional[List[int]] = None,
         use_cache: bool = True
     ) -> List[DevelopmentPlatformResponse]:
         """
@@ -66,6 +69,7 @@ class DevelopmentPlatformHandler:
             limit: Maximum number of items to return
             name_filter: Optional filter by development platform name
             is_active: Optional filter by active status (None=all, 1=active, 0=inactive)
+            tag_ids: Optional list of tag IDs to filter by (platforms must have ALL specified tags)
             use_cache: Whether to use caching
             
         Returns:
@@ -102,10 +106,11 @@ class DevelopmentPlatformHandler:
         # Build cache key
         filter_key = name_filter or "all"
         active_key = "all" if is_active is None else str(is_active)
-        cache_key = f"development_platforms:list:tenant:{tenant_id}:user:{user_id}:skip:{skip}:limit:{limit}:filter:{filter_key}:active:{active_key}"
+        tags_key = ",".join(str(t) for t in sorted(tag_ids)) if tag_ids else "all"
+        cache_key = f"development_platforms:list:tenant:{tenant_id}:user:{user_id}:skip:{skip}:limit:{limit}:filter:{filter_key}:active:{active_key}:tags:{tags_key}"
         
-        # Check cache
-        if use_cache and self.cache_client:
+        # Check cache (disable caching when filtering by tags for simplicity)
+        if use_cache and self.cache_client and not tag_ids:
             try:
                 cached_data = self.cache_client.client.get(cache_key)
                 if cached_data is not None:
@@ -115,7 +120,9 @@ class DevelopmentPlatformHandler:
                 logger.warning(f"Failed to get cached development platform list: {e}")
         
         with self.db_client.get_session() as session:
-            query = select(DevelopmentPlatform).where(DevelopmentPlatform.tenant_id == tenant_id)
+            query = select(DevelopmentPlatform).options(
+                selectinload(DevelopmentPlatform.tags).selectinload(DevelopmentPlatformTag.tag)
+            ).where(DevelopmentPlatform.tenant_id == tenant_id)
             
             # Filter by permissions if not admin
             if not is_admin:
@@ -144,14 +151,26 @@ class DevelopmentPlatformHandler:
             if is_active is not None:
                 query = query.where(DevelopmentPlatform.is_active == bool(is_active))
             
+            # Filter by tags (platforms must have ALL specified tags)
+            if tag_ids:
+                for tag_id in tag_ids:
+                    tag_subquery = (
+                        select(DevelopmentPlatformTag.development_platform_id)
+                        .where(
+                            DevelopmentPlatformTag.tenant_id == tenant_id,
+                            DevelopmentPlatformTag.tag_id == tag_id
+                        )
+                    )
+                    query = query.where(DevelopmentPlatform.id.in_(tag_subquery))
+            
             query = query.offset(skip).limit(limit)
             development_platforms = session.execute(query).scalars().all()
             
             logger.info("Retrieved development platforms", extra={"count": len(development_platforms)})
             result = [self._model_to_response(dp) for dp in development_platforms]
             
-            # Cache the result
-            if use_cache and self.cache_client:
+            # Cache the result (only when not filtering by tags)
+            if use_cache and self.cache_client and not tag_ids:
                 try:
                     data = [r.model_dump() for r in result]
                     self.cache_client.client.set(cache_key, data, ttl=300)
@@ -197,7 +216,9 @@ class DevelopmentPlatformHandler:
                 logger.warning(f"Failed to get cached development platform: {e}")
         
         with self.db_client.get_session() as session:
-            query = select(DevelopmentPlatform).where(
+            query = select(DevelopmentPlatform).options(
+                selectinload(DevelopmentPlatform.tags).selectinload(DevelopmentPlatformTag.tag)
+            ).where(
                 DevelopmentPlatform.id == development_platform_id,
                 DevelopmentPlatform.tenant_id == tenant_id
             )
@@ -303,7 +324,9 @@ class DevelopmentPlatformHandler:
         logger.info("Updating development platform", extra={"tenant_id": tenant_id, "development_platform_id": development_platform_id})
         
         with self.db_client.get_session() as session:
-            query = select(DevelopmentPlatform).where(
+            query = select(DevelopmentPlatform).options(
+                selectinload(DevelopmentPlatform.tags).selectinload(DevelopmentPlatformTag.tag)
+            ).where(
                 DevelopmentPlatform.id == development_platform_id,
                 DevelopmentPlatform.tenant_id == tenant_id
             )
@@ -327,7 +350,15 @@ class DevelopmentPlatformHandler:
             development_platform.updated_by = user_id
             
             session.commit()
-            session.refresh(development_platform)
+            
+            # Re-fetch with tags to ensure they are loaded
+            query = select(DevelopmentPlatform).options(
+                selectinload(DevelopmentPlatform.tags).selectinload(DevelopmentPlatformTag.tag)
+            ).where(
+                DevelopmentPlatform.id == development_platform_id,
+                DevelopmentPlatform.tenant_id == tenant_id
+            )
+            development_platform = session.execute(query).scalar_one_or_none()
             
             logger.info("Development platform updated", extra={"development_platform_id": development_platform_id})
             
@@ -739,6 +770,16 @@ class DevelopmentPlatformHandler:
     @staticmethod
     def _model_to_response(development_platform: DevelopmentPlatform) -> DevelopmentPlatformResponse:
         """Convert DevelopmentPlatform model to DevelopmentPlatformResponse."""
+        # Extract tags from the development platform's tags relationship
+        tags = []
+        if hasattr(development_platform, 'tags') and development_platform.tags:
+            for dp_tag in development_platform.tags:
+                if dp_tag.tag:
+                    tags.append(TagSummary(
+                        id=dp_tag.tag.id,
+                        name=dp_tag.tag.name
+                    ))
+        
         return DevelopmentPlatformResponse(
             id=development_platform.id,
             tenant_id=development_platform.tenant_id,
@@ -748,6 +789,7 @@ class DevelopmentPlatformHandler:
             type=development_platform.type,
             iframe_url=development_platform.iframe_url,
             config=development_platform.config,
+            tags=tags,
             created_at=development_platform.created_at,
             updated_at=development_platform.updated_at,
             created_by=development_platform.created_by,

@@ -27,6 +27,7 @@ from aihub.handlers.dependencies.conversations import get_conversation_handler
 from aihub.handlers.dependencies.autonomous_agents import get_autonomous_agent_handler
 from aihub.handlers.dependencies.development_platforms import get_development_platform_handler
 from aihub.handlers.dependencies.chat_widgets import get_chat_widget_handler
+from aihub.handlers.dependencies.tags import get_tag_handler
 
 __all__ = [
     # Database
@@ -44,5 +45,6 @@ __all__ = [
     "get_autonomous_agent_handler",
     "get_development_platform_handler",
     "get_chat_widget_handler",
+    "get_tag_handler",
 ]
 

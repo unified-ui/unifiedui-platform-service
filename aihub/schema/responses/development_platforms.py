@@ -1,7 +1,9 @@
 """Response schemas for development platforms."""
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List
 from pydantic import BaseModel, Field, ConfigDict
+
+from aihub.schema.responses.tags import TagSummary
 
 
 class DevelopmentPlatformResponse(BaseModel):
@@ -15,6 +17,7 @@ class DevelopmentPlatformResponse(BaseModel):
     iframe_url: str = Field(..., description="URL for the iframe embedding")
     config: dict = Field(default_factory=dict, description="Development platform configuration")
     is_active: bool = Field(..., description="Whether the development platform is active")
+    tags: List[TagSummary] = Field(default_factory=list, description="Tags on the development platform")
     created_at: datetime = Field(..., description="Creation timestamp")
     updated_at: datetime = Field(..., description="Last update timestamp")
     created_by: Optional[str] = Field(None, description="Creator user ID")

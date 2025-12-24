@@ -1,9 +1,10 @@
 """Response schemas for chat widgets."""
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List
 from pydantic import BaseModel, Field, ConfigDict
 
 from aihub.core.database.enums import ChatWidgetTypeEnum
+from aihub.schema.responses.tags import TagSummary
 
 
 class ChatWidgetResponse(BaseModel):
@@ -16,6 +17,7 @@ class ChatWidgetResponse(BaseModel):
     type: Optional[ChatWidgetTypeEnum] = Field(None, description="Chat widget type (IFRAME or FORM)")
     config: dict = Field(default_factory=dict, description="Chat widget configuration")
     is_active: bool = Field(..., description="Whether the chat widget is active")
+    tags: List[TagSummary] = Field(default_factory=list, description="Tags on the chat widget")
     created_at: datetime = Field(..., description="Creation timestamp")
     updated_at: datetime = Field(..., description="Last update timestamp")
     created_by: Optional[str] = Field(None, description="Creator user ID")

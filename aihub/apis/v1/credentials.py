@@ -1,7 +1,7 @@
 """API routes for credential management."""
 from typing import Optional, List
 
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, HTTPException, status, Request, Query
 from fastapi.responses import Response
 
 from aihub.core.identity.users import ContextIdentityUser
@@ -41,6 +41,7 @@ async def list_credentials(
     limit: int = 100,
     name_filter: Optional[str] = None,
     is_active: Optional[int] = None,
+    tags: Optional[str] = Query(None, description="Comma-separated list of tag IDs to filter by (e.g., '10001,10002,10003')"),
     handler: CredentialHandler = Depends(get_credential_handler)
 ) -> List[CredentialResponse]:
     """
@@ -56,12 +57,24 @@ async def list_credentials(
         limit: Maximum number of items to return
         name_filter: Optional filter by credential name
         is_active: Optional filter by active status (None=all, 1=active, 0=inactive)
+        tags: Optional comma-separated tag IDs to filter by
         handler: Credential handler dependency
         
     Returns:
         List of credentials (without secret values)
     """
     try:
+        # Parse tag IDs from comma-separated string
+        tag_ids = None
+        if tags:
+            try:
+                tag_ids = [int(t.strip()) for t in tags.split(",") if t.strip()]
+            except ValueError:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid tag IDs format. Must be comma-separated integers."
+                )
+        
         user: ContextIdentityUser = request.state.user
         
         logger.info(
@@ -80,8 +93,11 @@ async def list_credentials(
             limit=limit,
             name_filter=name_filter,
             is_active=is_active,
-            user=user
+            user=user,
+            tag_ids=tag_ids
         )
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Failed to list credentials: {e}")
         raise HTTPException(

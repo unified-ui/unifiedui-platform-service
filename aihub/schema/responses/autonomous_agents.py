@@ -1,7 +1,9 @@
 """Response schemas for autonomous agents."""
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List
 from pydantic import BaseModel, Field, ConfigDict
+
+from aihub.schema.responses.tags import TagSummary
 
 
 class AutonomousAgentResponse(BaseModel):
@@ -13,6 +15,7 @@ class AutonomousAgentResponse(BaseModel):
     description: Optional[str] = Field(None, description="Autonomous agent description")
     config: dict = Field(default_factory=dict, description="Autonomous agent configuration")
     is_active: bool = Field(..., description="Whether the autonomous agent is active")
+    tags: List[TagSummary] = Field(default_factory=list, description="Tags on the autonomous agent")
     created_at: datetime = Field(..., description="Creation timestamp")
     updated_at: datetime = Field(..., description="Last update timestamp")
     created_by: Optional[str] = Field(None, description="Creator user ID")

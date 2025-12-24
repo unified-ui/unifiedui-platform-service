@@ -1,7 +1,9 @@
 """Response schemas for credentials."""
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List
 from pydantic import BaseModel, Field, ConfigDict
+
+from aihub.schema.responses.tags import TagSummary
 
 
 class CredentialResponse(BaseModel):
@@ -16,6 +18,7 @@ class CredentialResponse(BaseModel):
     source: str = Field(..., description="Source system (e.g., vault)")
     credential_uri: str = Field(..., description="Vault URI reference (not the secret itself)")
     is_active: bool = Field(..., description="Whether the credential is active")
+    tags: List[TagSummary] = Field(default_factory=list, description="Tags on the credential")
     created_at: datetime = Field(..., description="Creation timestamp")
     updated_at: datetime = Field(..., description="Last update timestamp")
     created_by: Optional[str] = Field(None, description="Creator user ID")

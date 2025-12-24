@@ -4,7 +4,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from aihub.apis.v1 import health, identity, tenants, custom_groups, credentials, applications, conversations, autonomous_agents, development_platforms, chat_widgets
+from aihub.apis.v1 import health, identity, tenants, custom_groups, credentials, applications, conversations, autonomous_agents, development_platforms, chat_widgets, tags
 from aihub.exc.autonomous_agents import AutonomousAgentNotFoundError
 from aihub.exc.custom_groups import CustomGroupNotFoundError, CustomGroupError
 from aihub.exc.applications import ApplicationNotFoundError
@@ -12,6 +12,7 @@ from aihub.exc.credentials import CredentialNotFoundError
 from aihub.exc.conversations import ConversationNotFoundError
 from aihub.exc.development_platforms import DevelopmentPlatformNotFoundError
 from aihub.exc.chat_widgets import ChatWidgetNotFoundError
+from aihub.exc.tags import TagNotFoundError, TagDeleteNotAllowedError
 
 from aihub.core.config import settings
 from aihub.exc.tenants import TenantNotFoundError, TenantError
@@ -148,6 +149,24 @@ def create_app() -> FastAPI:
             content={"detail": str(exc)}
         )
     
+    # Tag exception handlers
+    
+    @app.exception_handler(TagNotFoundError)
+    async def tag_not_found_handler(request: Request, exc: TagNotFoundError):
+        """Handle tag not found errors."""
+        return JSONResponse(
+            status_code=404,
+            content={"detail": str(exc)}
+        )
+    
+    @app.exception_handler(TagDeleteNotAllowedError)
+    async def tag_delete_not_allowed_handler(request: Request, exc: TagDeleteNotAllowedError):
+        """Handle tag delete not allowed errors."""
+        return JSONResponse(
+            status_code=403,
+            content={"detail": str(exc)}
+        )
+    
     # Include routers
     app.include_router(
         health.router,
@@ -207,6 +226,44 @@ def create_app() -> FastAPI:
         chat_widgets.router,
         prefix="/api/v1/tenants/{tenant_id}",
         tags=["Chat Widgets"]
+    )
+    
+    # Tags routes
+    app.include_router(
+        tags.router,
+        prefix="/api/v1/tenants/{tenant_id}",
+        tags=["Tags"]
+    )
+    
+    # Resource-specific tag routes
+    app.include_router(
+        tags.application_tags_router,
+        prefix="/api/v1/tenants/{tenant_id}",
+        tags=["Application Tags"]
+    )
+    
+    app.include_router(
+        tags.autonomous_agent_tags_router,
+        prefix="/api/v1/tenants/{tenant_id}",
+        tags=["Autonomous Agent Tags"]
+    )
+    
+    app.include_router(
+        tags.chat_widget_tags_router,
+        prefix="/api/v1/tenants/{tenant_id}",
+        tags=["Chat Widget Tags"]
+    )
+    
+    app.include_router(
+        tags.credential_tags_router,
+        prefix="/api/v1/tenants/{tenant_id}",
+        tags=["Credential Tags"]
+    )
+    
+    app.include_router(
+        tags.development_platform_tags_router,
+        prefix="/api/v1/tenants/{tenant_id}",
+        tags=["Development Platform Tags"]
     )
     
     return app

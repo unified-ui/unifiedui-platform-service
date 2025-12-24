@@ -1,7 +1,7 @@
 """API routes for autonomous agent management."""
 from typing import Optional, List
 
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, HTTPException, status, Request, Query
 from fastapi.responses import Response
 
 from aihub.core.identity.users import ContextIdentityUser
@@ -41,6 +41,7 @@ async def list_autonomous_agents(
     limit: int = 100,
     name_filter: Optional[str] = None,
     is_active: Optional[int] = None,
+    tags: Optional[str] = Query(None, description="Comma-separated list of tag IDs to filter by (e.g., '10001,10002,10003')"),
     handler: AutonomousAgentHandler = Depends(get_autonomous_agent_handler)
 ) -> List[AutonomousAgentResponse]:
     """
@@ -56,12 +57,24 @@ async def list_autonomous_agents(
         limit: Maximum number of items to return
         name_filter: Optional filter by autonomous agent name
         is_active: Optional filter by active status (None=all, 1=active, 0=inactive)
+        tags: Optional comma-separated tag IDs to filter by
         handler: Autonomous agent handler dependency
         
     Returns:
         List of autonomous agents
     """
     try:
+        # Parse tag IDs from comma-separated string
+        tag_ids = None
+        if tags:
+            try:
+                tag_ids = [int(t.strip()) for t in tags.split(",") if t.strip()]
+            except ValueError:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid tag IDs format. Must be comma-separated integers."
+                )
+        
         user: ContextIdentityUser = request.state.user
         return handler.list_autonomous_agents(
             tenant_id=tenant_id,
@@ -69,8 +82,11 @@ async def list_autonomous_agents(
             skip=skip,
             limit=limit,
             name_filter=name_filter,
-            is_active=is_active
+            is_active=is_active,
+            tag_ids=tag_ids
         )
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Failed to list autonomous agents: {e}", exc_info=True)
         raise HTTPException(

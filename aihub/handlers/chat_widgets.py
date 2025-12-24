@@ -5,9 +5,10 @@ import uuid
 from typing import TYPE_CHECKING, Optional, List
 
 from sqlalchemy import select, or_
+from sqlalchemy.orm import selectinload
 
 from aihub.core.database.client import SQLAlchemyClient
-from aihub.core.database.models import ChatWidget, ChatWidgetMember
+from aihub.core.database.models import ChatWidget, ChatWidgetMember, ChatWidgetTag, Tag
 from aihub.core.database.enums import PermissionActionEnum, PrincipalTypeEnum
 from aihub.caching.client import CacheClient
 
@@ -17,6 +18,7 @@ if TYPE_CHECKING:
 from aihub.schema.requests.chat_widgets import CreateChatWidgetRequest, UpdateChatWidgetRequest
 from aihub.schema.requests.chat_widget_permissions import SetChatWidgetPermissionRequest
 from aihub.schema.responses.chat_widgets import ChatWidgetResponse
+from aihub.schema.responses.tags import TagSummary
 from aihub.schema.responses.chat_widget_permissions import (
     ChatWidgetPermissionResponse,
     ChatWidgetPrincipalsResponse,
@@ -54,6 +56,7 @@ class ChatWidgetHandler:
         limit: int = 100,
         name_filter: Optional[str] = None,
         is_active: Optional[int] = None,
+        tag_ids: Optional[List[int]] = None,
         use_cache: bool = True
     ) -> List[ChatWidgetResponse]:
         """
@@ -66,6 +69,7 @@ class ChatWidgetHandler:
             limit: Maximum number of items to return
             name_filter: Optional filter by chat widget name
             is_active: Optional filter by active status (None=all, 1=active, 0=inactive)
+            tag_ids: Optional list of tag IDs to filter by (chat widgets must have ALL specified tags)
             use_cache: Whether to use caching
             
         Returns:
@@ -102,10 +106,11 @@ class ChatWidgetHandler:
         # Build cache key
         filter_key = name_filter or "all"
         active_key = "all" if is_active is None else str(is_active)
-        cache_key = f"chat_widgets:list:tenant:{tenant_id}:user:{user_id}:skip:{skip}:limit:{limit}:filter:{filter_key}:active:{active_key}"
+        tags_key = ",".join(str(t) for t in sorted(tag_ids)) if tag_ids else "all"
+        cache_key = f"chat_widgets:list:tenant:{tenant_id}:user:{user_id}:skip:{skip}:limit:{limit}:filter:{filter_key}:active:{active_key}:tags:{tags_key}"
         
-        # Check cache
-        if use_cache and self.cache_client:
+        # Check cache (disable caching when filtering by tags for simplicity)
+        if use_cache and self.cache_client and not tag_ids:
             try:
                 cached_data = self.cache_client.client.get(cache_key)
                 if cached_data is not None:
@@ -115,7 +120,9 @@ class ChatWidgetHandler:
                 logger.warning(f"Failed to get cached chat widget list: {e}")
         
         with self.db_client.get_session() as session:
-            query = select(ChatWidget).where(ChatWidget.tenant_id == tenant_id)
+            query = select(ChatWidget).options(
+                selectinload(ChatWidget.tags).selectinload(ChatWidgetTag.tag)
+            ).where(ChatWidget.tenant_id == tenant_id)
             
             # Filter by permissions if not admin
             if not is_admin:
@@ -144,14 +151,26 @@ class ChatWidgetHandler:
             if is_active is not None:
                 query = query.where(ChatWidget.is_active == bool(is_active))
             
+            # Filter by tags (chat widgets must have ALL specified tags)
+            if tag_ids:
+                for tag_id in tag_ids:
+                    tag_subquery = (
+                        select(ChatWidgetTag.chat_widget_id)
+                        .where(
+                            ChatWidgetTag.tenant_id == tenant_id,
+                            ChatWidgetTag.tag_id == tag_id
+                        )
+                    )
+                    query = query.where(ChatWidget.id.in_(tag_subquery))
+            
             query = query.offset(skip).limit(limit)
             chat_widgets = session.execute(query).scalars().all()
             
             logger.info("Retrieved chat widgets", extra={"count": len(chat_widgets)})
             result = [self._model_to_response(cw) for cw in chat_widgets]
             
-            # Cache the result
-            if use_cache and self.cache_client:
+            # Cache the result (only when not filtering by tags)
+            if use_cache and self.cache_client and not tag_ids:
                 try:
                     data = [r.model_dump() for r in result]
                     self.cache_client.client.set(cache_key, data, ttl=300)
@@ -197,7 +216,9 @@ class ChatWidgetHandler:
                 logger.warning(f"Failed to get cached chat widget: {e}")
         
         with self.db_client.get_session() as session:
-            query = select(ChatWidget).where(
+            query = select(ChatWidget).options(
+                selectinload(ChatWidget.tags).selectinload(ChatWidgetTag.tag)
+            ).where(
                 ChatWidget.id == chat_widget_id,
                 ChatWidget.tenant_id == tenant_id
             )
@@ -302,7 +323,9 @@ class ChatWidgetHandler:
         logger.info("Updating chat widget", extra={"tenant_id": tenant_id, "chat_widget_id": chat_widget_id})
         
         with self.db_client.get_session() as session:
-            query = select(ChatWidget).where(
+            query = select(ChatWidget).options(
+                selectinload(ChatWidget.tags).selectinload(ChatWidgetTag.tag)
+            ).where(
                 ChatWidget.id == chat_widget_id,
                 ChatWidget.tenant_id == tenant_id
             )
@@ -324,7 +347,15 @@ class ChatWidgetHandler:
             chat_widget.updated_by = user_id
             
             session.commit()
-            session.refresh(chat_widget)
+            
+            # Re-fetch with tags to ensure they are loaded
+            query = select(ChatWidget).options(
+                selectinload(ChatWidget.tags).selectinload(ChatWidgetTag.tag)
+            ).where(
+                ChatWidget.id == chat_widget_id,
+                ChatWidget.tenant_id == tenant_id
+            )
+            chat_widget = session.execute(query).scalar_one_or_none()
             
             logger.info("Chat widget updated", extra={"chat_widget_id": chat_widget_id})
             
@@ -736,6 +767,16 @@ class ChatWidgetHandler:
     @staticmethod
     def _model_to_response(chat_widget: ChatWidget) -> ChatWidgetResponse:
         """Convert ChatWidget model to ChatWidgetResponse."""
+        # Extract tags from the chat widget's tags relationship
+        tags = []
+        if hasattr(chat_widget, 'tags') and chat_widget.tags:
+            for cw_tag in chat_widget.tags:
+                if cw_tag.tag:
+                    tags.append(TagSummary(
+                        id=cw_tag.tag.id,
+                        name=cw_tag.tag.name
+                    ))
+        
         return ChatWidgetResponse(
             id=chat_widget.id,
             tenant_id=chat_widget.tenant_id,
@@ -744,6 +785,7 @@ class ChatWidgetHandler:
             is_active=chat_widget.is_active,
             type=chat_widget.type,
             config=chat_widget.config,
+            tags=tags,
             created_at=chat_widget.created_at,
             updated_at=chat_widget.updated_at,
             created_by=chat_widget.created_by,

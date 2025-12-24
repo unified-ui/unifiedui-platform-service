@@ -5,9 +5,10 @@ import uuid
 from typing import TYPE_CHECKING, Optional, List
 
 from sqlalchemy import select, or_
+from sqlalchemy.orm import selectinload
 
 from aihub.core.database.client import SQLAlchemyClient
-from aihub.core.database.models import Credential, CredentialMember
+from aihub.core.database.models import Credential, CredentialMember, CredentialTag, Tag
 from aihub.core.database.enums import PermissionActionEnum, PrincipalTypeEnum
 from aihub.core.vault.client import BaseVaultClient
 from aihub.caching.client import CacheClient
@@ -17,6 +18,7 @@ if TYPE_CHECKING:
 from aihub.schema.requests.credentials import CreateCredentialRequest, UpdateCredentialRequest
 from aihub.schema.requests.credential_permissions import SetCredentialPermissionRequest
 from aihub.schema.responses.credentials import CredentialResponse
+from aihub.schema.responses.tags import TagSummary
 from aihub.schema.responses.credential_permissions import (
     CredentialPermissionResponse,
     CredentialPrincipalsResponse,
@@ -57,6 +59,7 @@ class CredentialHandler:
         limit: int = 100,
         name_filter: Optional[str] = None,
         is_active: Optional[int] = None,
+        tag_ids: Optional[List[int]] = None,
         use_cache: bool = True
     ) -> List[CredentialResponse]:
         """
@@ -69,6 +72,7 @@ class CredentialHandler:
             limit: Maximum number of items to return
             name_filter: Optional filter by credential name
             is_active: Optional filter by active status (None=all, 1=active, 0=inactive)
+            tag_ids: Optional list of tag IDs to filter by (credentials must have ALL specified tags)
             use_cache: Whether to use caching
             
         Returns:
@@ -105,10 +109,11 @@ class CredentialHandler:
         # Build cache key
         filter_key = name_filter or "all"
         active_key = "all" if is_active is None else str(is_active)
-        cache_key = f"credentials:list:tenant:{tenant_id}:user:{user_id}:skip:{skip}:limit:{limit}:filter:{filter_key}:active:{active_key}"
+        tags_key = ",".join(str(t) for t in sorted(tag_ids)) if tag_ids else "all"
+        cache_key = f"credentials:list:tenant:{tenant_id}:user:{user_id}:skip:{skip}:limit:{limit}:filter:{filter_key}:active:{active_key}:tags:{tags_key}"
         
-        # Check cache
-        if use_cache and self.cache_client:
+        # Check cache (disable caching when filtering by tags for simplicity)
+        if use_cache and self.cache_client and not tag_ids:
             try:
                 cached_data = self.cache_client.client.get(cache_key)
                 if cached_data is not None:
@@ -118,7 +123,9 @@ class CredentialHandler:
                 logger.warning(f"Failed to get cached credential list: {e}")
         
         with self.db_client.get_session() as session:
-            query = select(Credential).where(Credential.tenant_id == tenant_id)
+            query = select(Credential).options(
+                selectinload(Credential.tags).selectinload(CredentialTag.tag)
+            ).where(Credential.tenant_id == tenant_id)
             
             # Filter by permissions if not admin
             if not is_admin:
@@ -148,14 +155,26 @@ class CredentialHandler:
             if is_active is not None:
                 query = query.where(Credential.is_active == bool(is_active))
             
+            # Filter by tags (credentials must have ALL specified tags)
+            if tag_ids:
+                for tag_id in tag_ids:
+                    tag_subquery = (
+                        select(CredentialTag.credential_id)
+                        .where(
+                            CredentialTag.tenant_id == tenant_id,
+                            CredentialTag.tag_id == tag_id
+                        )
+                    )
+                    query = query.where(Credential.id.in_(tag_subquery))
+            
             query = query.offset(skip).limit(limit)
             credentials = session.execute(query).scalars().all()
             
             logger.info("Retrieved credentials", extra={"count": len(credentials)})
             result = [self._model_to_response(cred) for cred in credentials]
             
-            # Cache the result
-            if self.cache_client:
+            # Cache the result (only when not filtering by tags)
+            if self.cache_client and not tag_ids:
                 try:
                     cache_data = [item.model_dump() for item in result]
                     self.cache_client.client.set(cache_key, cache_data, ttl=30)  # 30 seconds
@@ -201,7 +220,9 @@ class CredentialHandler:
                 logger.warning(f"Failed to get cached credential: {e}")
         
         with self.db_client.get_session() as session:
-            query = select(Credential).where(
+            query = select(Credential).options(
+                selectinload(Credential.tags).selectinload(CredentialTag.tag)
+            ).where(
                 Credential.id == credential_id,
                 Credential.tenant_id == tenant_id
             )
@@ -364,7 +385,9 @@ class CredentialHandler:
         logger.info("Updating credential", extra={"tenant_id": tenant_id, "credential_id": credential_id})
         
         with self.db_client.get_session() as session:
-            query = select(Credential).where(
+            query = select(Credential).options(
+                selectinload(Credential.tags).selectinload(CredentialTag.tag)
+            ).where(
                 Credential.id == credential_id,
                 Credential.tenant_id == tenant_id
             )
@@ -409,6 +432,15 @@ class CredentialHandler:
                     logger.warning(f"Failed to invalidate cache: {e}")
             
             session.flush()
+            
+            # Re-fetch with tags to ensure they are loaded
+            query = select(Credential).options(
+                selectinload(Credential.tags).selectinload(CredentialTag.tag)
+            ).where(
+                Credential.id == credential_id,
+                Credential.tenant_id == tenant_id
+            )
+            credential = session.execute(query).scalar_one_or_none()
             
             logger.info("Credential updated", extra={"credential_id": credential_id})
             return self._model_to_response(credential)
@@ -798,6 +830,16 @@ class CredentialHandler:
     @staticmethod
     def _model_to_response(credential: Credential) -> CredentialResponse:
         """Convert Credential model to response."""
+        # Extract tags from the credential's tags relationship
+        tags = []
+        if hasattr(credential, 'tags') and credential.tags:
+            for cred_tag in credential.tags:
+                if cred_tag.tag:
+                    tags.append(TagSummary(
+                        id=cred_tag.tag.id,
+                        name=cred_tag.tag.name
+                    ))
+        
         return CredentialResponse(
             id=credential.id,
             tenant_id=credential.tenant_id,
@@ -807,6 +849,7 @@ class CredentialHandler:
             type=credential.type,
             source=credential.source,
             credential_uri=credential.credential_uri,
+            tags=tags,
             created_at=credential.created_at,
             updated_at=credential.updated_at,
             created_by=credential.created_by,

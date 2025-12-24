@@ -5,9 +5,10 @@ import uuid
 from typing import TYPE_CHECKING, Optional, List
 
 from sqlalchemy import select, or_
+from sqlalchemy.orm import selectinload
 
 from aihub.core.database.client import SQLAlchemyClient
-from aihub.core.database.models import Application, ApplicationMember
+from aihub.core.database.models import Application, ApplicationMember, ApplicationTag, Tag
 from aihub.core.database.enums import PermissionActionEnum, PrincipalTypeEnum
 from aihub.caching.client import CacheClient
 
@@ -17,6 +18,7 @@ if TYPE_CHECKING:
 from aihub.schema.requests.applications import CreateApplicationRequest, UpdateApplicationRequest
 from aihub.schema.requests.application_permissions import SetApplicationPermissionRequest
 from aihub.schema.responses.applications import ApplicationResponse
+from aihub.schema.responses.tags import TagSummary
 from aihub.schema.responses.application_permissions import (
     ApplicationPermissionResponse,
     ApplicationPrincipalsResponse,
@@ -54,6 +56,7 @@ class ApplicationHandler:
         limit: int = 100,
         name_filter: Optional[str] = None,
         is_active: Optional[int] = None,
+        tag_ids: Optional[List[int]] = None,
         use_cache: bool = True
     ) -> List[ApplicationResponse]:
         """
@@ -66,6 +69,7 @@ class ApplicationHandler:
             limit: Maximum number of items to return
             name_filter: Optional filter by application name
             is_active: Optional filter by active status (None=all, 1=active, 0=inactive)
+            tag_ids: Optional list of tag IDs to filter by (applications must have ALL specified tags)
             use_cache: Whether to use caching
             
         Returns:
@@ -102,10 +106,11 @@ class ApplicationHandler:
         # Build cache key
         filter_key = name_filter or "all"
         active_key = "all" if is_active is None else str(is_active)
-        cache_key = f"applications:list:tenant:{tenant_id}:user:{user_id}:skip:{skip}:limit:{limit}:filter:{filter_key}:active:{active_key}"
+        tags_key = ",".join(str(t) for t in sorted(tag_ids)) if tag_ids else "all"
+        cache_key = f"applications:list:tenant:{tenant_id}:user:{user_id}:skip:{skip}:limit:{limit}:filter:{filter_key}:active:{active_key}:tags:{tags_key}"
         
-        # Check cache
-        if use_cache and self.cache_client:
+        # Check cache (disable caching when filtering by tags for simplicity)
+        if use_cache and self.cache_client and not tag_ids:
             try:
                 cached_data = self.cache_client.client.get(cache_key)
                 if cached_data is not None:
@@ -115,7 +120,9 @@ class ApplicationHandler:
                 logger.warning(f"Failed to get cached application list: {e}")
         
         with self.db_client.get_session() as session:
-            query = select(Application).where(Application.tenant_id == tenant_id)
+            query = select(Application).options(
+                selectinload(Application.tags).selectinload(ApplicationTag.tag)
+            ).where(Application.tenant_id == tenant_id)
             
             # Filter by permissions if not admin
             if not is_admin:
@@ -145,14 +152,26 @@ class ApplicationHandler:
             if is_active is not None:
                 query = query.where(Application.is_active == bool(is_active))
             
+            # Filter by tags (applications must have ALL specified tags)
+            if tag_ids:
+                for tag_id in tag_ids:
+                    tag_subquery = (
+                        select(ApplicationTag.application_id)
+                        .where(
+                            ApplicationTag.tenant_id == tenant_id,
+                            ApplicationTag.tag_id == tag_id
+                        )
+                    )
+                    query = query.where(Application.id.in_(tag_subquery))
+            
             query = query.offset(skip).limit(limit)
             applications = session.execute(query).scalars().all()
             
             logger.info("Retrieved applications", extra={"count": len(applications)})
             result = [self._model_to_response(app) for app in applications]
             
-            # Cache the result
-            if use_cache and self.cache_client:
+            # Cache the result (only when not filtering by tags)
+            if use_cache and self.cache_client and not tag_ids:
                 try:
                     data = [r.model_dump() for r in result]
                     self.cache_client.client.set(cache_key, data, ttl=300)
@@ -198,7 +217,9 @@ class ApplicationHandler:
                 logger.warning(f"Failed to get cached application: {e}")
         
         with self.db_client.get_session() as session:
-            query = select(Application).where(
+            query = select(Application).options(
+                selectinload(Application.tags).selectinload(ApplicationTag.tag)
+            ).where(
                 Application.id == application_id,
                 Application.tenant_id == tenant_id
             )
@@ -302,7 +323,9 @@ class ApplicationHandler:
         logger.info("Updating application", extra={"tenant_id": tenant_id, "application_id": application_id})
         
         with self.db_client.get_session() as session:
-            query = select(Application).where(
+            query = select(Application).options(
+                selectinload(Application.tags).selectinload(ApplicationTag.tag)
+            ).where(
                 Application.id == application_id,
                 Application.tenant_id == tenant_id
             )
@@ -323,6 +346,12 @@ class ApplicationHandler:
             
             session.commit()
             session.refresh(application)
+            
+            # Re-fetch with tags for response
+            query = select(Application).options(
+                selectinload(Application.tags).selectinload(ApplicationTag.tag)
+            ).where(Application.id == application_id)
+            application = session.execute(query).scalar_one()
             
             logger.info("Application updated", extra={"application_id": application_id})
             
@@ -734,6 +763,16 @@ class ApplicationHandler:
     @staticmethod
     def _model_to_response(application: Application) -> ApplicationResponse:
         """Convert Application model to ApplicationResponse."""
+        # Extract tags from the application's tags relationship
+        tags = []
+        if hasattr(application, 'tags') and application.tags:
+            for app_tag in application.tags:
+                if app_tag.tag:
+                    tags.append(TagSummary(
+                        id=app_tag.tag.id,
+                        name=app_tag.tag.name
+                    ))
+        
         return ApplicationResponse(
             id=application.id,
             tenant_id=application.tenant_id,
@@ -741,6 +780,7 @@ class ApplicationHandler:
             description=application.description,
             is_active=application.is_active,
             config=application.config,
+            tags=tags,
             created_at=application.created_at,
             updated_at=application.updated_at,
             created_by=application.created_by,

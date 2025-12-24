@@ -5,9 +5,10 @@ import uuid
 from typing import TYPE_CHECKING, Optional, List
 
 from sqlalchemy import select, or_
+from sqlalchemy.orm import selectinload
 
 from aihub.core.database.client import SQLAlchemyClient
-from aihub.core.database.models import AutonomousAgent, AutonomousAgentMember
+from aihub.core.database.models import AutonomousAgent, AutonomousAgentMember, AutonomousAgentTag, Tag
 from aihub.core.database.enums import PermissionActionEnum, PrincipalTypeEnum
 from aihub.caching.client import CacheClient
 
@@ -17,6 +18,7 @@ if TYPE_CHECKING:
 from aihub.schema.requests.autonomous_agents import CreateAutonomousAgentRequest, UpdateAutonomousAgentRequest
 from aihub.schema.requests.autonomous_agent_permissions import SetAutonomousAgentPermissionRequest
 from aihub.schema.responses.autonomous_agents import AutonomousAgentResponse
+from aihub.schema.responses.tags import TagSummary
 from aihub.schema.responses.autonomous_agent_permissions import (
     AutonomousAgentPermissionResponse,
     AutonomousAgentPrincipalsResponse,
@@ -54,6 +56,7 @@ class AutonomousAgentHandler:
         limit: int = 100,
         name_filter: Optional[str] = None,
         is_active: Optional[int] = None,
+        tag_ids: Optional[List[int]] = None,
         use_cache: bool = True
     ) -> List[AutonomousAgentResponse]:
         """
@@ -66,6 +69,7 @@ class AutonomousAgentHandler:
             limit: Maximum number of items to return
             name_filter: Optional filter by autonomous agent name
             is_active: Optional filter by active status (None=all, 1=active, 0=inactive)
+            tag_ids: Optional list of tag IDs to filter by (agents must have ALL specified tags)
             use_cache: Whether to use caching
             
         Returns:
@@ -101,10 +105,11 @@ class AutonomousAgentHandler:
         # Build cache key
         filter_key = name_filter or "all"
         active_key = "all" if is_active is None else str(is_active)
-        cache_key = f"autonomous_agents:list:tenant:{tenant_id}:user:{user_id}:skip:{skip}:limit:{limit}:filter:{filter_key}:active:{active_key}"
+        tags_key = ",".join(str(t) for t in sorted(tag_ids)) if tag_ids else "all"
+        cache_key = f"autonomous_agents:list:tenant:{tenant_id}:user:{user_id}:skip:{skip}:limit:{limit}:filter:{filter_key}:active:{active_key}:tags:{tags_key}"
         
-        # Check cache
-        if use_cache and self.cache_client:
+        # Check cache (disable caching when filtering by tags for simplicity)
+        if use_cache and self.cache_client and not tag_ids:
             try:
                 cached_data = self.cache_client.client.get(cache_key)
                 if cached_data is not None:
@@ -116,18 +121,34 @@ class AutonomousAgentHandler:
         with self.db_client.get_session() as session:
             # If user is admin, return all autonomous agents
             if is_admin:
-                query = select(AutonomousAgent).where(AutonomousAgent.tenant_id == tenant_id)
+                query = select(AutonomousAgent).options(
+                    selectinload(AutonomousAgent.tags).selectinload(AutonomousAgentTag.tag)
+                ).where(AutonomousAgent.tenant_id == tenant_id)
                 if name_filter:
                     query = query.where(AutonomousAgent.name.ilike(f"%{name_filter}%"))
                 # Filter by is_active status
                 if is_active is not None:
                     query = query.where(AutonomousAgent.is_active == bool(is_active))
+                # Filter by tags (agents must have ALL specified tags)
+                if tag_ids:
+                    for tag_id in tag_ids:
+                        tag_subquery = (
+                            select(AutonomousAgentTag.autonomous_agent_id)
+                            .where(
+                                AutonomousAgentTag.tenant_id == tenant_id,
+                                AutonomousAgentTag.tag_id == tag_id
+                            )
+                        )
+                        query = query.where(AutonomousAgent.id.in_(tag_subquery))
                 query = query.offset(skip).limit(limit)
                 autonomous_agents = session.execute(query).scalars().all()
             else:
                 # Filter by permissions: user must have at least READ permission
                 query = (
                     select(AutonomousAgent)
+                    .options(
+                        selectinload(AutonomousAgent.tags).selectinload(AutonomousAgentTag.tag)
+                    )
                     .join(AutonomousAgentMember, AutonomousAgent.id == AutonomousAgentMember.autonomous_agent_id)
                     .where(AutonomousAgent.tenant_id == tenant_id)
                 )
@@ -164,14 +185,26 @@ class AutonomousAgentHandler:
                 if is_active is not None:
                     query = query.where(AutonomousAgent.is_active == bool(is_active))
                 
+                # Filter by tags (agents must have ALL specified tags)
+                if tag_ids:
+                    for tag_id in tag_ids:
+                        tag_subquery = (
+                            select(AutonomousAgentTag.autonomous_agent_id)
+                            .where(
+                                AutonomousAgentTag.tenant_id == tenant_id,
+                                AutonomousAgentTag.tag_id == tag_id
+                            )
+                        )
+                        query = query.where(AutonomousAgent.id.in_(tag_subquery))
+                
                 query = query.distinct().offset(skip).limit(limit)
                 autonomous_agents = session.execute(query).scalars().all()
             
             # Convert to response models
-            responses = [AutonomousAgentResponse.model_validate(agent) for agent in autonomous_agents]
+            responses = [self._model_to_response(agent) for agent in autonomous_agents]
             
-            # Cache the results
-            if use_cache and self.cache_client:
+            # Cache the results (only when not filtering by tags)
+            if use_cache and self.cache_client and not tag_ids:
                 try:
                     cache_data = [r.model_dump() for r in responses]
                     self.cache_client.client.set(cache_key, cache_data, ttl=300)
@@ -217,7 +250,9 @@ class AutonomousAgentHandler:
                 logger.warning(f"Failed to get cached autonomous agent: {e}")
         
         with self.db_client.get_session() as session:
-            query = select(AutonomousAgent).where(
+            query = select(AutonomousAgent).options(
+                selectinload(AutonomousAgent.tags).selectinload(AutonomousAgentTag.tag)
+            ).where(
                 AutonomousAgent.id == autonomous_agent_id,
                 AutonomousAgent.tenant_id == tenant_id
             )
@@ -226,7 +261,7 @@ class AutonomousAgentHandler:
             if not autonomous_agent:
                 raise AutonomousAgentNotFoundError(autonomous_agent_id)
             
-            response = AutonomousAgentResponse.model_validate(autonomous_agent)
+            response = self._model_to_response(autonomous_agent)
             
             # Cache the result
             if use_cache and self.cache_client:
@@ -290,7 +325,7 @@ class AutonomousAgentHandler:
             session.commit()
             session.refresh(autonomous_agent)
             
-            response = AutonomousAgentResponse.model_validate(autonomous_agent)
+            response = self._model_to_response(autonomous_agent)
             
             # Invalidate list cache
             self._invalidate_list_cache(tenant_id)
@@ -323,7 +358,9 @@ class AutonomousAgentHandler:
         logger.info("Updating autonomous agent", extra={"tenant_id": tenant_id, "autonomous_agent_id": autonomous_agent_id, "user_id": user_id})
         
         with self.db_client.get_session() as session:
-            query = select(AutonomousAgent).where(
+            query = select(AutonomousAgent).options(
+                selectinload(AutonomousAgent.tags).selectinload(AutonomousAgentTag.tag)
+            ).where(
                 AutonomousAgent.id == autonomous_agent_id,
                 AutonomousAgent.tenant_id == tenant_id
             )
@@ -343,9 +380,17 @@ class AutonomousAgentHandler:
             autonomous_agent.updated_by = user_id
             
             session.commit()
-            session.refresh(autonomous_agent)
             
-            response = AutonomousAgentResponse.model_validate(autonomous_agent)
+            # Re-fetch with tags to ensure they are loaded
+            query = select(AutonomousAgent).options(
+                selectinload(AutonomousAgent.tags).selectinload(AutonomousAgentTag.tag)
+            ).where(
+                AutonomousAgent.id == autonomous_agent_id,
+                AutonomousAgent.tenant_id == tenant_id
+            )
+            autonomous_agent = session.execute(query).scalar_one_or_none()
+            
+            response = self._model_to_response(autonomous_agent)
             
             # Invalidate caches
             self._invalidate_list_cache(tenant_id)
@@ -749,6 +794,33 @@ class AutonomousAgentHandler:
                 }
             principals_dict[key]["roles"].append(permission.permission)
         return list(principals_dict.values())
+
+    @staticmethod
+    def _model_to_response(agent: AutonomousAgent) -> AutonomousAgentResponse:
+        """Convert AutonomousAgent model to AutonomousAgentResponse."""
+        # Extract tags from the agent's tags relationship
+        tags = []
+        if hasattr(agent, 'tags') and agent.tags:
+            for agent_tag in agent.tags:
+                if agent_tag.tag:
+                    tags.append(TagSummary(
+                        id=agent_tag.tag.id,
+                        name=agent_tag.tag.name
+                    ))
+        
+        return AutonomousAgentResponse(
+            id=agent.id,
+            tenant_id=agent.tenant_id,
+            name=agent.name,
+            description=agent.description,
+            is_active=agent.is_active,
+            config=agent.config,
+            tags=tags,
+            created_at=agent.created_at,
+            updated_at=agent.updated_at,
+            created_by=agent.created_by,
+            updated_by=agent.updated_by
+        )
 
     @staticmethod
     def _validate_principal_type(principal_type: str) -> bool:

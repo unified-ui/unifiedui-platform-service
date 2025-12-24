@@ -5,11 +5,13 @@ from typing import Optional
 
 from sqlalchemy import (
     Boolean,
+    Integer,
     String,
     DateTime,
     ForeignKey,
     Index,
     UniqueConstraint,
+    Sequence,
     func,
 )
 from sqlalchemy.dialects import postgresql, mssql
@@ -181,6 +183,9 @@ class Application(Base, IdNameDescriptionMixin, TenantScopedMixin):
     members: Mapped[list["ApplicationMember"]] = relationship(
         back_populates="application", cascade="all, delete-orphan"
     )
+    tags: Mapped[list["ApplicationTag"]] = relationship(
+        back_populates="application", cascade="all, delete-orphan"
+    )
 
     __table_args__ = (Index("ix_applications_tenant", "tenant_id"),)
 
@@ -206,6 +211,9 @@ class AutonomousAgent(Base, IdNameDescriptionMixin, TenantScopedMixin):
     members: Mapped[list["AutonomousAgentMember"]] = relationship(
         back_populates="autonomous_agent", cascade="all, delete-orphan"
     )
+    tags: Mapped[list["AutonomousAgentTag"]] = relationship(
+        back_populates="autonomous_agent", cascade="all, delete-orphan"
+    )
 
     __table_args__ = (Index("ix_autonomous_agents_tenant", "tenant_id"),)
 
@@ -219,6 +227,9 @@ class Credential(Base, IdNameDescriptionMixin, TenantScopedMixin):
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
     members: Mapped[list["CredentialMember"]] = relationship(
+        back_populates="credential", cascade="all, delete-orphan"
+    )
+    tags: Mapped[list["CredentialTag"]] = relationship(
         back_populates="credential", cascade="all, delete-orphan"
     )
 
@@ -327,6 +338,9 @@ class DevelopmentPlatform(Base, IdNameDescriptionMixin, TenantScopedMixin):
     members: Mapped[list["DevelopmentPlatformMember"]] = relationship(
         back_populates="development_platform", cascade="all, delete-orphan"
     )
+    tags: Mapped[list["DevelopmentPlatformTag"]] = relationship(
+        back_populates="development_platform", cascade="all, delete-orphan"
+    )
 
     __table_args__ = (Index("ix_development_platforms_tenant", "tenant_id"),)
 
@@ -365,6 +379,9 @@ class ChatWidget(Base, IdNameDescriptionMixin, TenantScopedMixin):
     members: Mapped[list["ChatWidgetMember"]] = relationship(
         back_populates="chat_widget", cascade="all, delete-orphan"
     )
+    tags: Mapped[list["ChatWidgetTag"]] = relationship(
+        back_populates="chat_widget", cascade="all, delete-orphan"
+    )
 
     __table_args__ = (Index("ix_chat_widgets_tenant", "tenant_id"),)
 
@@ -391,4 +408,151 @@ class ChatWidgetMember(Base, IdMixin, AuditMixin):
     )
 
 
+# ---------- Tags ----------
+# Sequence for auto-incrementing tag IDs starting at 10000 (PostgreSQL only)
+# SQLite will use AUTOINCREMENT instead
+tag_id_seq = Sequence('tag_id_seq', start=10000, optional=True)
+
+
+class Tag(Base, AuditMixin):
+    """Tag entity for categorizing resources."""
+    __tablename__ = "tags"
+
+    # Note: For PostgreSQL, the sequence starts at 10000
+    # For SQLite (tests), it starts at 1 (standard autoincrement)
+    id: Mapped[int] = mapped_column(
+        Integer, tag_id_seq, primary_key=True, autoincrement=True
+    )
+    tenant_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False
+    )
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+
+    # Relationships to junction tables
+    application_tags: Mapped[list["ApplicationTag"]] = relationship(
+        back_populates="tag", cascade="all, delete-orphan"
+    )
+    autonomous_agent_tags: Mapped[list["AutonomousAgentTag"]] = relationship(
+        back_populates="tag", cascade="all, delete-orphan"
+    )
+    chat_widget_tags: Mapped[list["ChatWidgetTag"]] = relationship(
+        back_populates="tag", cascade="all, delete-orphan"
+    )
+    credential_tags: Mapped[list["CredentialTag"]] = relationship(
+        back_populates="tag", cascade="all, delete-orphan"
+    )
+    development_platform_tags: Mapped[list["DevelopmentPlatformTag"]] = relationship(
+        back_populates="tag", cascade="all, delete-orphan"
+    )
+
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "name", name="uq_tag_tenant_name"),
+        Index("ix_tags_tenant", "tenant_id"),
+        Index("ix_tags_name", "name"),
+    )
+
+
+class ApplicationTag(Base):
+    """Junction table for application tags."""
+    __tablename__ = "application_tags"
+
+    tenant_id: Mapped[str] = mapped_column(String(36), nullable=False, primary_key=True)
+    tag_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("tags.id", ondelete="CASCADE"), nullable=False, primary_key=True
+    )
+    application_id: Mapped[str] = mapped_column(
+        String(100), ForeignKey("applications.id", ondelete="CASCADE"), nullable=False, primary_key=True
+    )
+
+    tag: Mapped["Tag"] = relationship(back_populates="application_tags")
+    application: Mapped["Application"] = relationship(back_populates="tags")
+
+    __table_args__ = (
+        Index("ix_at_application", "application_id"),
+        Index("ix_at_tag", "tag_id"),
+    )
+
+
+class AutonomousAgentTag(Base):
+    """Junction table for autonomous agent tags."""
+    __tablename__ = "autonomous_agent_tags"
+
+    tenant_id: Mapped[str] = mapped_column(String(36), nullable=False, primary_key=True)
+    tag_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("tags.id", ondelete="CASCADE"), nullable=False, primary_key=True
+    )
+    autonomous_agent_id: Mapped[str] = mapped_column(
+        String(100), ForeignKey("autonomous_agents.id", ondelete="CASCADE"), nullable=False, primary_key=True
+    )
+
+    tag: Mapped["Tag"] = relationship(back_populates="autonomous_agent_tags")
+    autonomous_agent: Mapped["AutonomousAgent"] = relationship(back_populates="tags")
+
+    __table_args__ = (
+        Index("ix_aat_autonomous_agent", "autonomous_agent_id"),
+        Index("ix_aat_tag", "tag_id"),
+    )
+
+
+class ChatWidgetTag(Base):
+    """Junction table for chat widget tags."""
+    __tablename__ = "chat_widget_tags"
+
+    tenant_id: Mapped[str] = mapped_column(String(36), nullable=False, primary_key=True)
+    tag_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("tags.id", ondelete="CASCADE"), nullable=False, primary_key=True
+    )
+    chat_widget_id: Mapped[str] = mapped_column(
+        String(100), ForeignKey("chat_widgets.id", ondelete="CASCADE"), nullable=False, primary_key=True
+    )
+
+    tag: Mapped["Tag"] = relationship(back_populates="chat_widget_tags")
+    chat_widget: Mapped["ChatWidget"] = relationship(back_populates="tags")
+
+    __table_args__ = (
+        Index("ix_cwt_chat_widget", "chat_widget_id"),
+        Index("ix_cwt_tag", "tag_id"),
+    )
+
+
+class CredentialTag(Base):
+    """Junction table for credential tags."""
+    __tablename__ = "credential_tags"
+
+    tenant_id: Mapped[str] = mapped_column(String(36), nullable=False, primary_key=True)
+    tag_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("tags.id", ondelete="CASCADE"), nullable=False, primary_key=True
+    )
+    credential_id: Mapped[str] = mapped_column(
+        String(100), ForeignKey("credentials.id", ondelete="CASCADE"), nullable=False, primary_key=True
+    )
+
+    tag: Mapped["Tag"] = relationship(back_populates="credential_tags")
+    credential: Mapped["Credential"] = relationship(back_populates="tags")
+
+    __table_args__ = (
+        Index("ix_crt_credential", "credential_id"),
+        Index("ix_crt_tag", "tag_id"),
+    )
+
+
+class DevelopmentPlatformTag(Base):
+    """Junction table for development platform tags."""
+    __tablename__ = "development_platform_tags"
+
+    tenant_id: Mapped[str] = mapped_column(String(36), nullable=False, primary_key=True)
+    tag_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("tags.id", ondelete="CASCADE"), nullable=False, primary_key=True
+    )
+    development_platform_id: Mapped[str] = mapped_column(
+        String(100), ForeignKey("development_platforms.id", ondelete="CASCADE"), nullable=False, primary_key=True
+    )
+
+    tag: Mapped["Tag"] = relationship(back_populates="development_platform_tags")
+    development_platform: Mapped["DevelopmentPlatform"] = relationship(back_populates="tags")
+
+    __table_args__ = (
+        Index("ix_dpt_development_platform", "development_platform_id"),
+        Index("ix_dpt_tag", "tag_id"),
+    )
 
