@@ -56,6 +56,7 @@ class TestApplicationRoutes:
         app_data = {
             "name": "Test Application",
             "description": "A test application",
+            "type": "N8N",
             "config": {"key": "value"}
         }
         
@@ -70,6 +71,7 @@ class TestApplicationRoutes:
         
         assert data["name"] == app_data["name"]
         assert data["description"] == app_data["description"]
+        assert data["type"] == app_data["type"]
         assert data["config"] == app_data["config"]
         assert "id" in data
         assert data["tenant_id"] == tenant_id
@@ -156,7 +158,7 @@ class TestApplicationRoutes:
         # Try to create application as user2 (should fail - no tenant membership)
         response = test_client.post(
             ENDPOINT_APPLICATIONS.format(tenant_id=tenant_id),
-            json={"name": "Unauthorized App", "description": "Should fail"},
+            json={"name": "Unauthorized App", "description": "Should fail", "type": "N8N"},
             headers=headers2
         )
         
@@ -168,7 +170,7 @@ class TestApplicationRoutes:
         headers = create_auth_headers(test_user_token, use_cache=False)
         
         # Create an application
-        app_data = {"name": "Test Application", "description": "Test description"}
+        app_data = {"name": "Test Application", "description": "Test description", "type": "N8N"}
         create_response = test_client.post(
             ENDPOINT_APPLICATIONS.format(tenant_id=tenant_id),
             json=app_data,
@@ -223,8 +225,8 @@ class TestApplicationRoutes:
         headers = create_auth_headers(test_user_token, use_cache=False)
         
         # Create multiple applications
-        app1_data = {"name": "App 1", "description": "First app"}
-        app2_data = {"name": "App 2", "description": "Second app"}
+        app1_data = {"name": "App 1", "description": "First app", "type": "N8N"}
+        app2_data = {"name": "App 2", "description": "Second app", "type": "N8N"}
         
         test_client.post(
             ENDPOINT_APPLICATIONS.format(tenant_id=tenant_id),
@@ -262,7 +264,7 @@ class TestApplicationRoutes:
         for i in range(5):
             test_client.post(
                 ENDPOINT_APPLICATIONS.format(tenant_id=tenant_id),
-                json={"name": f"App {i}", "description": f"Description {i}"},
+                json={"name": f"App {i}", "description": f"Description {i}", "type": "N8N"},
                 headers=headers
             )
         
@@ -294,12 +296,12 @@ class TestApplicationRoutes:
         # Create applications with different names
         test_client.post(
             ENDPOINT_APPLICATIONS.format(tenant_id=tenant_id),
-            json={"name": "Production App", "description": "Prod"},
+            json={"name": "Production App", "description": "Prod", "type": "N8N"},
             headers=headers
         )
         test_client.post(
             ENDPOINT_APPLICATIONS.format(tenant_id=tenant_id),
-            json={"name": "Development App", "description": "Dev"},
+            json={"name": "Development App", "description": "Dev", "type": "N8N"},
             headers=headers
         )
         
@@ -320,7 +322,7 @@ class TestApplicationRoutes:
         headers = create_auth_headers(test_user_token, use_cache=False)
         
         # Create an application
-        app_data = {"name": "Original Name", "description": "Original"}
+        app_data = {"name": "Original Name", "description": "Original", "type": "N8N"}
         create_response = test_client.post(
             ENDPOINT_APPLICATIONS.format(tenant_id=tenant_id),
             json=app_data,
@@ -362,7 +364,7 @@ class TestApplicationRoutes:
         headers = create_auth_headers(test_user_token, use_cache=False)
         
         # Create an application
-        app_data = {"name": "Original", "description": "Description"}
+        app_data = {"name": "Original", "description": "Description", "type": "N8N"}
         create_response = test_client.post(
             ENDPOINT_APPLICATIONS.format(tenant_id=tenant_id),
             json=app_data,
@@ -389,7 +391,7 @@ class TestApplicationRoutes:
         headers = create_auth_headers(test_user_token, use_cache=False)
         
         # Create an application
-        app_data = {"name": "To Delete", "description": "Will be deleted"}
+        app_data = {"name": "To Delete", "description": "Will be deleted", "type": "N8N"}
         create_response = test_client.post(
             ENDPOINT_APPLICATIONS.format(tenant_id=tenant_id),
             json=app_data,
@@ -437,7 +439,7 @@ class TestApplicationPrincipalRoutes:
         headers = create_auth_headers(test_user_token, use_cache=False)
         
         # Create an application
-        app_data = {"name": "Test App", "description": "Test"}
+        app_data = {"name": "Test App", "description": "Test", "type": "N8N"}
         create_response = test_client.post(
             ENDPOINT_APPLICATIONS.format(tenant_id=tenant_id),
             json=app_data,
@@ -472,7 +474,7 @@ class TestApplicationPrincipalRoutes:
         headers = create_auth_headers(test_user_token, use_cache=False)
         
         # Create an application
-        app_data = {"name": "Test App", "description": "Test"}
+        app_data = {"name": "Test App", "description": "Test", "type": "N8N"}
         create_response = test_client.post(
             ENDPOINT_APPLICATIONS.format(tenant_id=tenant_id),
             json=app_data,
@@ -503,7 +505,7 @@ class TestApplicationPrincipalRoutes:
         headers = create_auth_headers(test_user_token, use_cache=False)
         
         # Create an application
-        app_data = {"name": "Test App", "description": "Test"}
+        app_data = {"name": "Test App", "description": "Test", "type": "N8N"}
         create_response = test_client.post(
             ENDPOINT_APPLICATIONS.format(tenant_id=tenant_id),
             json=app_data,
@@ -537,7 +539,7 @@ class TestApplicationPrincipalRoutes:
         headers = create_auth_headers(test_user_token, use_cache=False)
         
         # Create an application
-        app_data = {"name": "Test App", "description": "Test"}
+        app_data = {"name": "Test App", "description": "Test", "type": "N8N"}
         create_response = test_client.post(
             ENDPOINT_APPLICATIONS.format(tenant_id=tenant_id),
             json=app_data,
@@ -579,7 +581,7 @@ class TestApplicationPrincipalRoutes:
         headers = create_auth_headers(test_user_token, use_cache=False)
         
         # Create an application
-        app_data = {"name": "Test App", "description": "Test"}
+        app_data = {"name": "Test App", "description": "Test", "type": "N8N"}
         create_response = test_client.post(
             ENDPOINT_APPLICATIONS.format(tenant_id=tenant_id),
             json=app_data,
@@ -601,7 +603,7 @@ class TestApplicationPrincipalRoutes:
         headers = create_auth_headers(test_user_token, use_cache=False)
         
         # Create an application
-        app_data = {"name": "Test App", "description": "Test"}
+        app_data = {"name": "Test App", "description": "Test", "type": "N8N"}
         create_response = test_client.post(
             ENDPOINT_APPLICATIONS.format(tenant_id=tenant_id),
             json=app_data,
@@ -626,7 +628,7 @@ class TestApplicationPrincipalRoutes:
         headers = create_auth_headers(test_user_token, use_cache=False)
         
         # Create an application
-        app_data = {"name": "Test App", "description": "Test"}
+        app_data = {"name": "Test App", "description": "Test", "type": "N8N"}
         create_response = test_client.post(
             ENDPOINT_APPLICATIONS.format(tenant_id=tenant_id),
             json=app_data,
@@ -652,7 +654,7 @@ class TestApplicationPrincipalRoutes:
         headers = create_auth_headers(test_user_token, use_cache=False)
         
         # Create an application
-        app_data = {"name": "Test App", "description": "Test"}
+        app_data = {"name": "Test App", "description": "Test", "type": "N8N"}
         create_response = test_client.post(
             ENDPOINT_APPLICATIONS.format(tenant_id=tenant_id),
             json=app_data,
@@ -678,7 +680,7 @@ class TestApplicationPrincipalRoutes:
         headers = create_auth_headers(test_user_token, use_cache=False)
         
         # Create an application
-        app_data = {"name": "Test App", "description": "Test"}
+        app_data = {"name": "Test App", "description": "Test", "type": "N8N"}
         create_response = test_client.post(
             ENDPOINT_APPLICATIONS.format(tenant_id=tenant_id),
             json=app_data,
@@ -729,7 +731,7 @@ class TestApplicationPrincipalRoutes:
         headers = create_auth_headers(test_user_token, use_cache=False)
         
         # Create an application
-        app_data = {"name": "Test App", "description": "Test"}
+        app_data = {"name": "Test App", "description": "Test", "type": "N8N"}
         create_response = test_client.post(
             ENDPOINT_APPLICATIONS.format(tenant_id=tenant_id),
             json=app_data,

@@ -239,31 +239,31 @@ def create_app() -> FastAPI:
     app.include_router(
         tags.application_tags_router,
         prefix="/api/v1/tenants/{tenant_id}",
-        tags=["Application Tags"]
+        tags=["Applications"]
     )
     
     app.include_router(
         tags.autonomous_agent_tags_router,
         prefix="/api/v1/tenants/{tenant_id}",
-        tags=["Autonomous Agent Tags"]
+        tags=["Autonomous Agents"]
     )
     
     app.include_router(
         tags.chat_widget_tags_router,
         prefix="/api/v1/tenants/{tenant_id}",
-        tags=["Chat Widget Tags"]
+        tags=["Chat Widgets"]
     )
     
     app.include_router(
         tags.credential_tags_router,
         prefix="/api/v1/tenants/{tenant_id}",
-        tags=["Credential Tags"]
+        tags=["Credentials"]
     )
     
     app.include_router(
         tags.development_platform_tags_router,
         prefix="/api/v1/tenants/{tenant_id}",
-        tags=["Development Platform Tags"]
+        tags=["Development Platforms"]
     )
     
     # User Favorites routes

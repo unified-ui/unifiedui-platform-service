@@ -23,6 +23,15 @@ class TenantRolesEnum(str, Enum):
         return [permission.value for permission in TenantRolesEnum]
 
 
+class ApplicationTypeEnum(str, Enum):
+    N8N = "N8N"
+    MICROSOFT_FOUNDRY = "MICROSOFT_FOUNDRY"
+    REST_API = "REST_API"
+
+    def all() -> list[str]:
+        return [app_type.value for app_type in ApplicationTypeEnum]
+
+
 class ChatWidgetTypeEnum(str, Enum):
     IFRAME = "IFRAME"
     FORM = "FORM"

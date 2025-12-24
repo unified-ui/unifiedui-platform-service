@@ -19,7 +19,7 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from sqlalchemy.types import JSON
 from sqlalchemy import Enum as SAEnum
 
-from aihub.core.database.enums import PermissionActionEnum, TenantRolesEnum, PrincipalTypeEnum
+from aihub.core.database.enums import PermissionActionEnum, TenantRolesEnum, PrincipalTypeEnum, ApplicationTypeEnum
 
 
 # ---------- Base ----------
@@ -52,6 +52,14 @@ PermissionActionSAEnum = SAEnum(
 PrincipalTypeSAEnum = SAEnum(
     *PrincipalTypeEnum.all(),
     name="principal_type",
+    native_enum=False,
+    create_constraint=True,
+    validate_strings=True,
+)
+
+ApplicationTypeSAEnum = SAEnum(
+    *ApplicationTypeEnum.all(),
+    name="application_type",
     native_enum=False,
     create_constraint=True,
     validate_strings=True,
@@ -177,6 +185,7 @@ class CustomGroupMember(Base, IdMixin, AuditMixin):
 class Application(Base, IdNameDescriptionMixin, TenantScopedMixin):
     __tablename__ = "applications"
 
+    type: Mapped[str] = mapped_column(ApplicationTypeSAEnum, nullable=False)
     config: Mapped[dict] = mapped_column(PortableJSON, nullable=False, default=dict)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 

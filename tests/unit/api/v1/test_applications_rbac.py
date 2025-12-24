@@ -44,7 +44,7 @@ def create_application(test_client: TestClient, tenant_id: str, headers: dict, a
     """Helper function to create an application and return its ID."""
     response = test_client.post(
         ENDPOINT_APPLICATIONS.format(tenant_id=tenant_id),
-        json={"name": app_name, "description": f"Application {app_name}"},
+        json={"name": app_name, "description": f"Application {app_name}", "type": "N8N"},
         headers=headers
     )
     assert response.status_code == status.HTTP_201_CREATED

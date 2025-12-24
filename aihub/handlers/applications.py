@@ -268,7 +268,9 @@ class ApplicationHandler:
                 tenant_id=tenant_id,
                 name=request.name,
                 description=request.description,
+                type=request.type.value,
                 config=request.config or {},
+                is_active=request.is_active,
                 created_by=user_id,
                 updated_by=user_id
             )
@@ -339,8 +341,12 @@ class ApplicationHandler:
                 application.name = request.name
             if request.description is not None:
                 application.description = request.description
+            if request.type is not None:
+                application.type = request.type.value
             if request.config is not None:
                 application.config = request.config
+            if request.is_active is not None:
+                application.is_active = request.is_active
             
             application.updated_by = user_id
             
@@ -778,6 +784,7 @@ class ApplicationHandler:
             tenant_id=application.tenant_id,
             name=application.name,
             description=application.description,
+            type=application.type,
             is_active=application.is_active,
             config=application.config,
             tags=tags,

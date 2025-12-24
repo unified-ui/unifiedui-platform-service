@@ -54,6 +54,7 @@ def create_application_in_db(test_client: TestClient, tenant_id: str, user_id: s
             tenant_id=tenant_id,
             name=name,
             description=f"Application {name}",
+            type="N8N",
             config={},
             is_active=True,
             created_by=user_id,

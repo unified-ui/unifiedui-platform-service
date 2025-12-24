@@ -49,8 +49,8 @@ class Settings(BaseSettings):
     secrets_encryption_key: Optional[str] = None
     
     # API Configuration
-    api_title: str = "AIHub API"
-    api_description: str = "AIHub - AI Application Management Platform"
+    api_title: str = "unified-ui API"
+    api_description: str = "unified-ui - AI Application Management Platform"
     api_version: str = "1.0.0"
     
     # CORS Configuration
