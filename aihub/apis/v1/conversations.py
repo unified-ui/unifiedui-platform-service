@@ -1,7 +1,7 @@
 """API routes for conversation management."""
 from typing import Optional, List
 
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, HTTPException, status, Request, Query
 from fastapi.responses import Response
 
 from aihub.core.identity.users import ContextIdentityUser
@@ -37,10 +37,10 @@ router = APIRouter(
 async def list_conversations(
     request: Request,
     tenant_id: str,
-    skip: int = 0,
-    limit: int = 100,
-    name_filter: Optional[str] = None,
-    is_active: Optional[int] = None,
+    skip: int = Query(0, ge=0, description="Number of items to skip"),
+    limit: int = Query(100, ge=1, le=1000, description="Maximum number of items to return"),
+    name_filter: Optional[str] = Query(None, description="Filter by conversation name"),
+    is_active: Optional[int] = Query(None, ge=0, le=1, description="Filter by active status (1=active, 0=inactive)"),
     handler: ConversationHandler = Depends(get_conversation_handler)
 ) -> List[ConversationResponse]:
     """

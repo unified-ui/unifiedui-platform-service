@@ -37,10 +37,10 @@ router = APIRouter(
 async def list_chat_widgets(
     request: Request,
     tenant_id: str,
-    skip: int = 0,
-    limit: int = 100,
-    name_filter: Optional[str] = None,
-    is_active: Optional[int] = None,
+    skip: int = Query(0, ge=0, description="Number of items to skip"),
+    limit: int = Query(100, ge=1, le=1000, description="Maximum number of items to return"),
+    name_filter: Optional[str] = Query(None, description="Filter by chat widget name"),
+    is_active: Optional[int] = Query(None, ge=0, le=1, description="Filter by active status (1=active, 0=inactive)"),
     tags: Optional[str] = Query(None, description="Comma-separated list of tag IDs to filter by (e.g., '10001,10002,10003')"),
     handler: ChatWidgetHandler = Depends(get_chat_widget_handler)
 ) -> List[ChatWidgetResponse]:
