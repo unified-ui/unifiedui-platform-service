@@ -1,9 +1,14 @@
 """Tests for tags RBAC (Role-Based Access Control)."""
+import uuid
 from typing import Any
 from fastapi import status
 from starlette.testclient import TestClient
 
 from aihub.core.database.enums import PermissionActionEnum, PrincipalTypeEnum
+from aihub.core.database.models import (
+    Application, ApplicationMember,
+    AutonomousAgent, AutonomousAgentMember,
+)
 from tests.conftest import create_auth_headers
 
 
@@ -44,26 +49,116 @@ def create_tenant_for_user(test_client: TestClient, user_token: Any, tenant_name
     return response.json()["id"]
 
 
-def create_application(test_client: TestClient, tenant_id: str, headers: dict, app_name: str = "Test App") -> str:
-    """Helper function to create an application and return its ID."""
-    response = test_client.post(
-        ENDPOINT_APPLICATIONS.format(tenant_id=tenant_id),
-        json={"name": app_name, "description": f"Application {app_name}"},
-        headers=headers
-    )
-    assert response.status_code == status.HTTP_201_CREATED
-    return response.json()["id"]
+def create_application_in_db(test_client: TestClient, tenant_id: str, user_id: str, name: str = "Test App") -> str:
+    """Helper function to create an application directly in DB and return its ID."""
+    app_id = str(uuid.uuid4())
+    with test_client.db_client.get_session() as session:
+        app = Application(
+            id=app_id,
+            tenant_id=tenant_id,
+            name=name,
+            description=f"Application {name}",
+            config={},
+            is_active=True,
+            created_by=user_id,
+            updated_by=user_id
+        )
+        session.add(app)
+        session.commit()
+
+        member = ApplicationMember(
+            id=str(uuid.uuid4()),
+            tenant_id=tenant_id,
+            application_id=app_id,
+            principal_id=user_id,
+            principal_type=PrincipalTypeEnum.IDENTITY_USER,
+            role=PermissionActionEnum.ADMIN,
+            created_by=user_id,
+            updated_by=user_id
+        )
+        session.add(member)
+        session.commit()
+    return app_id
 
 
-def create_autonomous_agent(test_client: TestClient, tenant_id: str, headers: dict, name: str = "Test Agent") -> str:
-    """Helper function to create an autonomous agent and return its ID."""
-    response = test_client.post(
-        ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id),
-        json={"name": name, "description": f"Agent {name}"},
-        headers=headers
-    )
-    assert response.status_code == status.HTTP_201_CREATED
-    return response.json()["id"]
+def create_autonomous_agent_in_db(test_client: TestClient, tenant_id: str, user_id: str, name: str = "Test Agent") -> str:
+    """Helper function to create an autonomous agent directly in DB and return its ID."""
+    agent_id = str(uuid.uuid4())
+    with test_client.db_client.get_session() as session:
+        agent = AutonomousAgent(
+            id=agent_id,
+            tenant_id=tenant_id,
+            name=name,
+            description=f"Agent {name}",
+            config={},
+            is_active=True,
+            created_by=user_id,
+            updated_by=user_id
+        )
+        session.add(agent)
+        session.commit()
+
+        member = AutonomousAgentMember(
+            id=str(uuid.uuid4()),
+            tenant_id=tenant_id,
+            autonomous_agent_id=agent_id,
+            principal_id=user_id,
+            principal_type=PrincipalTypeEnum.IDENTITY_USER,
+            role=PermissionActionEnum.ADMIN,
+            created_by=user_id,
+            updated_by=user_id
+        )
+        session.add(member)
+        session.commit()
+    return agent_id
+
+
+def add_user_to_application_in_db(
+    test_client: TestClient,
+    tenant_id: str,
+    application_id: str,
+    user_id: str,
+    admin_id: str,
+    role: PermissionActionEnum = PermissionActionEnum.READ
+) -> None:
+    """Helper function to add a user to an application directly in DB."""
+    with test_client.db_client.get_session() as session:
+        member = ApplicationMember(
+            id=str(uuid.uuid4()),
+            tenant_id=tenant_id,
+            application_id=application_id,
+            principal_id=user_id,
+            principal_type=PrincipalTypeEnum.IDENTITY_USER,
+            role=role,
+            created_by=admin_id,
+            updated_by=admin_id
+        )
+        session.add(member)
+        session.commit()
+
+
+def add_user_to_autonomous_agent_in_db(
+    test_client: TestClient,
+    tenant_id: str,
+    autonomous_agent_id: str,
+    user_id: str,
+    admin_id: str,
+    role: PermissionActionEnum = PermissionActionEnum.READ
+) -> None:
+    """Helper function to add a user to an autonomous agent directly in DB."""
+    with test_client.db_client.get_session() as session:
+        member = AutonomousAgentMember(
+            id=str(uuid.uuid4()),
+            tenant_id=tenant_id,
+            autonomous_agent_id=autonomous_agent_id,
+            principal_id=user_id,
+            principal_type=PrincipalTypeEnum.IDENTITY_USER,
+            role=role,
+            created_by=admin_id,
+            updated_by=admin_id
+        )
+        session.add(member)
+        session.commit()
 
 
 def add_user_to_tenant(test_client: TestClient, tenant_id: str, admin_headers: dict, user_id: str, role: str = "READER") -> None:
@@ -248,7 +343,7 @@ class TestResourceTagRBAC:
         admin_token = test_client.create_test_user("res-tag-admin-1", "Resource Tag Admin 1")
         admin_headers = create_auth_headers(admin_token, use_cache=False)
         tenant_id = create_tenant_for_user(test_client, admin_token)
-        app_id = create_application(test_client, tenant_id, admin_headers, "Test App")
+        app_id = create_application_in_db(test_client, tenant_id, "res-tag-admin-1", "Test App")
         
         # Set tags on application
         test_client.put(
@@ -261,11 +356,7 @@ class TestResourceTagRBAC:
         reader_token = test_client.create_test_user("res-tag-reader-1", "Resource Tag Reader 1")
         reader_headers = create_auth_headers(reader_token, use_cache=False)
         add_user_to_tenant(test_client, tenant_id, admin_headers, "res-tag-reader-1", "READER")
-        test_client.put(
-            ENDPOINT_APPLICATION_PRINCIPALS.format(tenant_id=tenant_id, application_id=app_id),
-            json={"principal_id": "res-tag-reader-1", "principal_type": PRINCIPAL_TYPE_USER, "role": ROLE_READ},
-            headers=admin_headers
-        )
+        add_user_to_application_in_db(test_client, tenant_id, app_id, "res-tag-reader-1", "res-tag-admin-1", PermissionActionEnum.READ)
         
         # Reader can get tags
         response = test_client.get(
@@ -281,17 +372,13 @@ class TestResourceTagRBAC:
         admin_token = test_client.create_test_user("res-tag-admin-2", "Resource Tag Admin 2")
         admin_headers = create_auth_headers(admin_token, use_cache=False)
         tenant_id = create_tenant_for_user(test_client, admin_token)
-        app_id = create_application(test_client, tenant_id, admin_headers, "Test App 2")
+        app_id = create_application_in_db(test_client, tenant_id, "res-tag-admin-2", "Test App 2")
         
         # Add reader user
         reader_token = test_client.create_test_user("res-tag-reader-2", "Resource Tag Reader 2")
         reader_headers = create_auth_headers(reader_token, use_cache=False)
         add_user_to_tenant(test_client, tenant_id, admin_headers, "res-tag-reader-2", "READER")
-        test_client.put(
-            ENDPOINT_APPLICATION_PRINCIPALS.format(tenant_id=tenant_id, application_id=app_id),
-            json={"principal_id": "res-tag-reader-2", "principal_type": PRINCIPAL_TYPE_USER, "role": ROLE_READ},
-            headers=admin_headers
-        )
+        add_user_to_application_in_db(test_client, tenant_id, app_id, "res-tag-reader-2", "res-tag-admin-2", PermissionActionEnum.READ)
         
         # Reader cannot set tags
         response = test_client.put(
@@ -307,7 +394,7 @@ class TestResourceTagRBAC:
         admin_token = test_client.create_test_user("res-tag-admin-3", "Resource Tag Admin 3")
         admin_headers = create_auth_headers(admin_token, use_cache=False)
         tenant_id = create_tenant_for_user(test_client, admin_token)
-        app_id = create_application(test_client, tenant_id, admin_headers, "Test App 3")
+        app_id = create_application_in_db(test_client, tenant_id, "res-tag-admin-3", "Test App 3")
         
         test_client.put(
             ENDPOINT_APPLICATION_TAGS.format(tenant_id=tenant_id, application_id=app_id),
@@ -319,11 +406,7 @@ class TestResourceTagRBAC:
         reader_token = test_client.create_test_user("res-tag-reader-3", "Resource Tag Reader 3")
         reader_headers = create_auth_headers(reader_token, use_cache=False)
         add_user_to_tenant(test_client, tenant_id, admin_headers, "res-tag-reader-3", "READER")
-        test_client.put(
-            ENDPOINT_APPLICATION_PRINCIPALS.format(tenant_id=tenant_id, application_id=app_id),
-            json={"principal_id": "res-tag-reader-3", "principal_type": PRINCIPAL_TYPE_USER, "role": ROLE_READ},
-            headers=admin_headers
-        )
+        add_user_to_application_in_db(test_client, tenant_id, app_id, "res-tag-reader-3", "res-tag-admin-3", PermissionActionEnum.READ)
         
         # Reader cannot delete tags
         response = test_client.delete(
@@ -338,17 +421,13 @@ class TestResourceTagRBAC:
         admin_token = test_client.create_test_user("res-tag-admin-4", "Resource Tag Admin 4")
         admin_headers = create_auth_headers(admin_token, use_cache=False)
         tenant_id = create_tenant_for_user(test_client, admin_token)
-        app_id = create_application(test_client, tenant_id, admin_headers, "Test App 4")
+        app_id = create_application_in_db(test_client, tenant_id, "res-tag-admin-4", "Test App 4")
         
         # Add writer user
         writer_token = test_client.create_test_user("res-tag-writer-1", "Resource Tag Writer 1")
         writer_headers = create_auth_headers(writer_token, use_cache=False)
         add_user_to_tenant(test_client, tenant_id, admin_headers, "res-tag-writer-1", "READER")
-        test_client.put(
-            ENDPOINT_APPLICATION_PRINCIPALS.format(tenant_id=tenant_id, application_id=app_id),
-            json={"principal_id": "res-tag-writer-1", "principal_type": PRINCIPAL_TYPE_USER, "role": ROLE_WRITE},
-            headers=admin_headers
-        )
+        add_user_to_application_in_db(test_client, tenant_id, app_id, "res-tag-writer-1", "res-tag-admin-4", PermissionActionEnum.WRITE)
         
         # Writer can set tags
         response = test_client.put(
@@ -365,7 +444,7 @@ class TestResourceTagRBAC:
         admin_token = test_client.create_test_user("res-tag-admin-5", "Resource Tag Admin 5")
         admin_headers = create_auth_headers(admin_token, use_cache=False)
         tenant_id = create_tenant_for_user(test_client, admin_token)
-        app_id = create_application(test_client, tenant_id, admin_headers, "Test App 5")
+        app_id = create_application_in_db(test_client, tenant_id, "res-tag-admin-5", "Test App 5")
         
         test_client.put(
             ENDPOINT_APPLICATION_TAGS.format(tenant_id=tenant_id, application_id=app_id),
@@ -377,11 +456,7 @@ class TestResourceTagRBAC:
         writer_token = test_client.create_test_user("res-tag-writer-2", "Resource Tag Writer 2")
         writer_headers = create_auth_headers(writer_token, use_cache=False)
         add_user_to_tenant(test_client, tenant_id, admin_headers, "res-tag-writer-2", "READER")
-        test_client.put(
-            ENDPOINT_APPLICATION_PRINCIPALS.format(tenant_id=tenant_id, application_id=app_id),
-            json={"principal_id": "res-tag-writer-2", "principal_type": PRINCIPAL_TYPE_USER, "role": ROLE_WRITE},
-            headers=admin_headers
-        )
+        add_user_to_application_in_db(test_client, tenant_id, app_id, "res-tag-writer-2", "res-tag-admin-5", PermissionActionEnum.WRITE)
         
         # Writer can delete tags
         response = test_client.delete(
@@ -396,17 +471,13 @@ class TestResourceTagRBAC:
         admin_token = test_client.create_test_user("res-tag-admin-6", "Resource Tag Admin 6")
         admin_headers = create_auth_headers(admin_token, use_cache=False)
         tenant_id = create_tenant_for_user(test_client, admin_token)
-        app_id = create_application(test_client, tenant_id, admin_headers, "Test App 6")
+        app_id = create_application_in_db(test_client, tenant_id, "res-tag-admin-6", "Test App 6")
         
         # Add resource admin user
         res_admin_token = test_client.create_test_user("res-tag-admin-user-1", "Resource Tag Admin User 1")
         res_admin_headers = create_auth_headers(res_admin_token, use_cache=False)
         add_user_to_tenant(test_client, tenant_id, admin_headers, "res-tag-admin-user-1", "READER")
-        test_client.put(
-            ENDPOINT_APPLICATION_PRINCIPALS.format(tenant_id=tenant_id, application_id=app_id),
-            json={"principal_id": "res-tag-admin-user-1", "principal_type": PRINCIPAL_TYPE_USER, "role": ROLE_ADMIN},
-            headers=admin_headers
-        )
+        add_user_to_application_in_db(test_client, tenant_id, app_id, "res-tag-admin-user-1", "res-tag-admin-6", PermissionActionEnum.ADMIN)
         
         # Resource admin can set tags
         set_response = test_client.put(
@@ -436,7 +507,7 @@ class TestResourceTagRBAC:
         admin_token = test_client.create_test_user("res-tag-admin-7", "Resource Tag Admin 7")
         admin_headers = create_auth_headers(admin_token, use_cache=False)
         tenant_id = create_tenant_for_user(test_client, admin_token)
-        app_id = create_application(test_client, tenant_id, admin_headers, "Test App 7")
+        app_id = create_application_in_db(test_client, tenant_id, "res-tag-admin-7", "Test App 7")
         
         # Create another GLOBAL_ADMIN
         global_admin_token = test_client.create_test_user("res-tag-global-1", "Resource Tag Global 1")
@@ -464,7 +535,7 @@ class TestResourceTagRBAC:
         admin_token = test_client.create_test_user("res-tag-admin-8", "Resource Tag Admin 8")
         admin_headers = create_auth_headers(admin_token, use_cache=False)
         tenant_id = create_tenant_for_user(test_client, admin_token)
-        app_id = create_application(test_client, tenant_id, admin_headers, "Test App 8")
+        app_id = create_application_in_db(test_client, tenant_id, "res-tag-admin-8", "Test App 8")
         
         # Create APPLICATIONS_ADMIN
         apps_admin_token = test_client.create_test_user("res-tag-apps-admin-1", "Resource Tag Apps Admin 1")
@@ -488,17 +559,13 @@ class TestAutonomousAgentTagRBAC:
         admin_token = test_client.create_test_user("agent-tag-admin-1", "Agent Tag Admin 1")
         admin_headers = create_auth_headers(admin_token, use_cache=False)
         tenant_id = create_tenant_for_user(test_client, admin_token)
-        agent_id = create_autonomous_agent(test_client, tenant_id, admin_headers, "Test Agent")
+        agent_id = create_autonomous_agent_in_db(test_client, tenant_id, "agent-tag-admin-1", "Test Agent")
         
         # Add writer user
         writer_token = test_client.create_test_user("agent-tag-writer-1", "Agent Tag Writer 1")
         writer_headers = create_auth_headers(writer_token, use_cache=False)
         add_user_to_tenant(test_client, tenant_id, admin_headers, "agent-tag-writer-1", "READER")
-        test_client.put(
-            ENDPOINT_AUTONOMOUS_AGENT_PRINCIPALS.format(tenant_id=tenant_id, autonomous_agent_id=agent_id),
-            json={"principal_id": "agent-tag-writer-1", "principal_type": PRINCIPAL_TYPE_USER, "role": ROLE_WRITE},
-            headers=admin_headers
-        )
+        add_user_to_autonomous_agent_in_db(test_client, tenant_id, agent_id, "agent-tag-writer-1", "agent-tag-admin-1", PermissionActionEnum.WRITE)
         
         # Writer can set tags
         response = test_client.put(
@@ -514,17 +581,13 @@ class TestAutonomousAgentTagRBAC:
         admin_token = test_client.create_test_user("agent-tag-admin-2", "Agent Tag Admin 2")
         admin_headers = create_auth_headers(admin_token, use_cache=False)
         tenant_id = create_tenant_for_user(test_client, admin_token)
-        agent_id = create_autonomous_agent(test_client, tenant_id, admin_headers, "Test Agent 2")
+        agent_id = create_autonomous_agent_in_db(test_client, tenant_id, "agent-tag-admin-2", "Test Agent 2")
         
         # Add reader user
         reader_token = test_client.create_test_user("agent-tag-reader-1", "Agent Tag Reader 1")
         reader_headers = create_auth_headers(reader_token, use_cache=False)
         add_user_to_tenant(test_client, tenant_id, admin_headers, "agent-tag-reader-1", "READER")
-        test_client.put(
-            ENDPOINT_AUTONOMOUS_AGENT_PRINCIPALS.format(tenant_id=tenant_id, autonomous_agent_id=agent_id),
-            json={"principal_id": "agent-tag-reader-1", "principal_type": PRINCIPAL_TYPE_USER, "role": ROLE_READ},
-            headers=admin_headers
-        )
+        add_user_to_autonomous_agent_in_db(test_client, tenant_id, agent_id, "agent-tag-reader-1", "agent-tag-admin-2", PermissionActionEnum.READ)
         
         # Reader cannot set tags
         response = test_client.put(

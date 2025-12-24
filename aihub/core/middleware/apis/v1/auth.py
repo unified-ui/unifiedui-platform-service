@@ -269,6 +269,34 @@ def check_permissions(
                     detail=f"Access denied: User does not have required permissions on this tag (ID: {tag_id})"
                 )
             
+            elif entity == "user_favorite":
+                # Special handling for user favorites - only the user themselves can manage their favorites
+                tenant_id = request.path_params.get("tenant_id")
+                target_user_id = request.path_params.get("user_id")
+                
+                if not tenant_id:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="tenant_id not found in path parameters"
+                    )
+                if not target_user_id:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="user_id not found in path parameters"
+                    )
+                
+                # Check if requesting user is the target user (IS_CREATOR check for favorites)
+                if UserPermissionEnum.IS_CREATOR in required_permissions:
+                    current_user_id = user.identity.get_id()
+                    if current_user_id == target_user_id:
+                        return await func(*args, **kwargs)
+                
+                # No permission matched
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=f"Access denied: User can only manage their own favorites"
+                )
+            
             else:
                 # Handle resource entities (application, credential, autonomous_agent, custom_group, conversation)
                 # Now role is directly in member table - no need for JOIN

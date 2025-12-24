@@ -186,6 +186,9 @@ class Application(Base, IdNameDescriptionMixin, TenantScopedMixin):
     tags: Mapped[list["ApplicationTag"]] = relationship(
         back_populates="application", cascade="all, delete-orphan"
     )
+    user_favorites: Mapped[list["ApplicationUserFavorite"]] = relationship(
+        back_populates="application", cascade="all, delete-orphan"
+    )
 
     __table_args__ = (Index("ix_applications_tenant", "tenant_id"),)
 
@@ -196,6 +199,9 @@ class Conversation(Base, IdNameDescriptionMixin, TenantScopedMixin):
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
     members: Mapped[list["ConversationMember"]] = relationship(
+        back_populates="conversation", cascade="all, delete-orphan"
+    )
+    user_favorites: Mapped[list["ConversationUserFavorite"]] = relationship(
         back_populates="conversation", cascade="all, delete-orphan"
     )
 
@@ -212,6 +218,9 @@ class AutonomousAgent(Base, IdNameDescriptionMixin, TenantScopedMixin):
         back_populates="autonomous_agent", cascade="all, delete-orphan"
     )
     tags: Mapped[list["AutonomousAgentTag"]] = relationship(
+        back_populates="autonomous_agent", cascade="all, delete-orphan"
+    )
+    user_favorites: Mapped[list["AutonomousAgentUserFavorite"]] = relationship(
         back_populates="autonomous_agent", cascade="all, delete-orphan"
     )
 
@@ -339,6 +348,9 @@ class DevelopmentPlatform(Base, IdNameDescriptionMixin, TenantScopedMixin):
         back_populates="development_platform", cascade="all, delete-orphan"
     )
     tags: Mapped[list["DevelopmentPlatformTag"]] = relationship(
+        back_populates="development_platform", cascade="all, delete-orphan"
+    )
+    user_favorites: Mapped[list["DevelopmentPlatformUserFavorite"]] = relationship(
         back_populates="development_platform", cascade="all, delete-orphan"
     )
 
@@ -554,5 +566,86 @@ class DevelopmentPlatformTag(Base):
     __table_args__ = (
         Index("ix_dpt_development_platform", "development_platform_id"),
         Index("ix_dpt_tag", "tag_id"),
+    )
+
+
+# ---------- User Favorites ----------
+class ApplicationUserFavorite(Base, AuditMixin):
+    """User favorites for applications."""
+    __tablename__ = "application_user_favorites"
+
+    tenant_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False, primary_key=True
+    )
+    user_id: Mapped[str] = mapped_column(String(50), nullable=False, primary_key=True)
+    application_id: Mapped[str] = mapped_column(
+        String(100), ForeignKey("applications.id", ondelete="CASCADE"), nullable=False, primary_key=True
+    )
+
+    application: Mapped["Application"] = relationship(back_populates="user_favorites")
+
+    __table_args__ = (
+        Index("ix_auf_user", "user_id"),
+        Index("ix_auf_application", "application_id"),
+    )
+
+
+class AutonomousAgentUserFavorite(Base, AuditMixin):
+    """User favorites for autonomous agents."""
+    __tablename__ = "autonomous_agent_user_favorites"
+
+    tenant_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False, primary_key=True
+    )
+    user_id: Mapped[str] = mapped_column(String(50), nullable=False, primary_key=True)
+    autonomous_agent_id: Mapped[str] = mapped_column(
+        String(100), ForeignKey("autonomous_agents.id", ondelete="CASCADE"), nullable=False, primary_key=True
+    )
+
+    autonomous_agent: Mapped["AutonomousAgent"] = relationship(back_populates="user_favorites")
+
+    __table_args__ = (
+        Index("ix_aauf_user", "user_id"),
+        Index("ix_aauf_autonomous_agent", "autonomous_agent_id"),
+    )
+
+
+class DevelopmentPlatformUserFavorite(Base, AuditMixin):
+    """User favorites for development platforms."""
+    __tablename__ = "development_platform_user_favorites"
+
+    tenant_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False, primary_key=True
+    )
+    user_id: Mapped[str] = mapped_column(String(50), nullable=False, primary_key=True)
+    development_platform_id: Mapped[str] = mapped_column(
+        String(100), ForeignKey("development_platforms.id", ondelete="CASCADE"), nullable=False, primary_key=True
+    )
+
+    development_platform: Mapped["DevelopmentPlatform"] = relationship(back_populates="user_favorites")
+
+    __table_args__ = (
+        Index("ix_dpuf_user", "user_id"),
+        Index("ix_dpuf_development_platform", "development_platform_id"),
+    )
+
+
+class ConversationUserFavorite(Base, AuditMixin):
+    """User favorites for conversations."""
+    __tablename__ = "conversation_user_favorites"
+
+    tenant_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False, primary_key=True
+    )
+    user_id: Mapped[str] = mapped_column(String(50), nullable=False, primary_key=True)
+    conversation_id: Mapped[str] = mapped_column(
+        String(100), ForeignKey("conversations.id", ondelete="CASCADE"), nullable=False, primary_key=True
+    )
+
+    conversation: Mapped["Conversation"] = relationship(back_populates="user_favorites")
+
+    __table_args__ = (
+        Index("ix_cuf_user", "user_id"),
+        Index("ix_cuf_conversation", "conversation_id"),
     )
 

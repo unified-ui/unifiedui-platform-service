@@ -1,9 +1,14 @@
 """Tests for tags caching behavior."""
+import uuid
 from typing import Any
 from fastapi import status
 from starlette.testclient import TestClient
 
 from aihub.core.database.enums import PermissionActionEnum, PrincipalTypeEnum
+from aihub.core.database.models import (
+    Application, ApplicationMember,
+    AutonomousAgent, AutonomousAgentMember,
+)
 from tests.conftest import create_auth_headers
 
 
@@ -40,26 +45,92 @@ def create_tenant_for_user(test_client: TestClient, user_token: Any, tenant_name
     return response.json()["id"]
 
 
-def create_application(test_client: TestClient, tenant_id: str, headers: dict, app_name: str = "Test App") -> str:
-    """Helper function to create an application and return its ID."""
-    response = test_client.post(
-        ENDPOINT_APPLICATIONS.format(tenant_id=tenant_id),
-        json={"name": app_name, "description": f"Application {app_name}"},
-        headers=headers
-    )
-    assert response.status_code == status.HTTP_201_CREATED
-    return response.json()["id"]
+def create_application_in_db(test_client: TestClient, tenant_id: str, user_id: str, name: str = "Test App") -> str:
+    """Helper function to create an application directly in DB and return its ID."""
+    app_id = str(uuid.uuid4())
+    with test_client.db_client.get_session() as session:
+        app = Application(
+            id=app_id,
+            tenant_id=tenant_id,
+            name=name,
+            description=f"Application {name}",
+            config={},
+            is_active=True,
+            created_by=user_id,
+            updated_by=user_id
+        )
+        session.add(app)
+        session.commit()
+
+        member = ApplicationMember(
+            id=str(uuid.uuid4()),
+            tenant_id=tenant_id,
+            application_id=app_id,
+            principal_id=user_id,
+            principal_type=PrincipalTypeEnum.IDENTITY_USER,
+            role=PermissionActionEnum.ADMIN,
+            created_by=user_id,
+            updated_by=user_id
+        )
+        session.add(member)
+        session.commit()
+    return app_id
 
 
-def create_autonomous_agent(test_client: TestClient, tenant_id: str, headers: dict, name: str = "Test Agent") -> str:
-    """Helper function to create an autonomous agent and return its ID."""
-    response = test_client.post(
-        ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id),
-        json={"name": name, "description": f"Agent {name}"},
-        headers=headers
-    )
-    assert response.status_code == status.HTTP_201_CREATED
-    return response.json()["id"]
+def create_autonomous_agent_in_db(test_client: TestClient, tenant_id: str, user_id: str, name: str = "Test Agent") -> str:
+    """Helper function to create an autonomous agent directly in DB and return its ID."""
+    agent_id = str(uuid.uuid4())
+    with test_client.db_client.get_session() as session:
+        agent = AutonomousAgent(
+            id=agent_id,
+            tenant_id=tenant_id,
+            name=name,
+            description=f"Agent {name}",
+            config={},
+            is_active=True,
+            created_by=user_id,
+            updated_by=user_id
+        )
+        session.add(agent)
+        session.commit()
+
+        member = AutonomousAgentMember(
+            id=str(uuid.uuid4()),
+            tenant_id=tenant_id,
+            autonomous_agent_id=agent_id,
+            principal_id=user_id,
+            principal_type=PrincipalTypeEnum.IDENTITY_USER,
+            role=PermissionActionEnum.ADMIN,
+            created_by=user_id,
+            updated_by=user_id
+        )
+        session.add(member)
+        session.commit()
+    return agent_id
+
+
+def add_user_to_application_in_db(
+    test_client: TestClient,
+    tenant_id: str,
+    application_id: str,
+    user_id: str,
+    admin_id: str,
+    role: PermissionActionEnum = PermissionActionEnum.READ
+) -> None:
+    """Helper function to add a user to an application directly in DB."""
+    with test_client.db_client.get_session() as session:
+        member = ApplicationMember(
+            id=str(uuid.uuid4()),
+            tenant_id=tenant_id,
+            application_id=application_id,
+            principal_id=user_id,
+            principal_type=PrincipalTypeEnum.IDENTITY_USER,
+            role=role,
+            created_by=admin_id,
+            updated_by=admin_id
+        )
+        session.add(member)
+        session.commit()
 
 
 def add_user_to_tenant(test_client: TestClient, tenant_id: str, admin_headers: dict, user_id: str, role: str = "READER") -> None:
@@ -179,7 +250,7 @@ class TestResourceTagCacheInvalidation:
         admin_token = test_client.create_test_user("app-tag-cache-1", "App Tag Cache 1")
         admin_headers = create_auth_headers(admin_token)
         tenant_id = create_tenant_for_user(test_client, admin_token)
-        app_id = create_application(test_client, tenant_id, admin_headers, "Cached App")
+        app_id = create_application_in_db(test_client, tenant_id, "app-tag-cache-1", "Cached App")
         
         # First read - cache the application (no tags)
         response1 = test_client.get(
@@ -209,7 +280,7 @@ class TestResourceTagCacheInvalidation:
         admin_token = test_client.create_test_user("app-tag-cache-2", "App Tag Cache 2")
         admin_headers = create_auth_headers(admin_token)
         tenant_id = create_tenant_for_user(test_client, admin_token)
-        app_id = create_application(test_client, tenant_id, admin_headers, "Cached App 2")
+        app_id = create_application_in_db(test_client, tenant_id, "app-tag-cache-2", "Cached App 2")
         
         # Set initial tags
         test_client.put(
@@ -243,7 +314,7 @@ class TestResourceTagCacheInvalidation:
         admin_token = test_client.create_test_user("app-tag-cache-3", "App Tag Cache 3")
         admin_headers = create_auth_headers(admin_token)
         tenant_id = create_tenant_for_user(test_client, admin_token)
-        app_id = create_application(test_client, tenant_id, admin_headers, "Cached App 3")
+        app_id = create_application_in_db(test_client, tenant_id, "app-tag-cache-3", "Cached App 3")
         
         # Set initial tags
         test_client.put(
@@ -285,7 +356,7 @@ class TestResourceTagCacheInvalidation:
         admin_token = test_client.create_test_user("agent-tag-cache-1", "Agent Tag Cache 1")
         admin_headers = create_auth_headers(admin_token)
         tenant_id = create_tenant_for_user(test_client, admin_token)
-        agent_id = create_autonomous_agent(test_client, tenant_id, admin_headers, "Cached Agent")
+        agent_id = create_autonomous_agent_in_db(test_client, tenant_id, "agent-tag-cache-1", "Cached Agent")
         
         # First read - cache the agent (no tags)
         response1 = test_client.get(
@@ -316,8 +387,8 @@ class TestResourceTagCacheInvalidation:
         tenant_id = create_tenant_for_user(test_client, admin_token)
         
         # Create multiple applications
-        app1_id = create_application(test_client, tenant_id, admin_headers, "App 1")
-        app2_id = create_application(test_client, tenant_id, admin_headers, "App 2")
+        app1_id = create_application_in_db(test_client, tenant_id, "app-list-tag-cache-1", "App 1")
+        app2_id = create_application_in_db(test_client, tenant_id, "app-list-tag-cache-1", "App 2")
         
         # Set tags on app1
         test_client.put(
@@ -360,17 +431,13 @@ class TestResourceTagCacheInvalidation:
         admin_token = test_client.create_test_user("write-tag-cache-1", "Write Tag Cache 1")
         admin_headers = create_auth_headers(admin_token)
         tenant_id = create_tenant_for_user(test_client, admin_token)
-        app_id = create_application(test_client, tenant_id, admin_headers, "Shared App")
+        app_id = create_application_in_db(test_client, tenant_id, "write-tag-cache-1", "Shared App")
         
         # Create writer user with WRITE permission
         writer_token = test_client.create_test_user("write-tag-writer-1", "Write Tag Writer 1")
         writer_headers = create_auth_headers(writer_token)
         add_user_to_tenant(test_client, tenant_id, admin_headers, "write-tag-writer-1", "READER")
-        test_client.put(
-            ENDPOINT_APPLICATION_PRINCIPALS.format(tenant_id=tenant_id, application_id=app_id),
-            json={"principal_id": "write-tag-writer-1", "principal_type": PRINCIPAL_TYPE_USER, "role": ROLE_WRITE},
-            headers=admin_headers
-        )
+        add_user_to_application_in_db(test_client, tenant_id, app_id, "write-tag-writer-1", "write-tag-cache-1", PermissionActionEnum.WRITE)
         
         # Admin reads application (caches it)
         response1 = test_client.get(
@@ -399,7 +466,7 @@ class TestResourceTagCacheInvalidation:
         admin_token = test_client.create_test_user("delete-tag-cache-1", "Delete Tag Cache 1")
         admin_headers = create_auth_headers(admin_token)
         tenant_id = create_tenant_for_user(test_client, admin_token)
-        app_id = create_application(test_client, tenant_id, admin_headers, "Tagged App")
+        app_id = create_application_in_db(test_client, tenant_id, "delete-tag-cache-1", "Tagged App")
         
         # Set tags on application
         test_client.put(

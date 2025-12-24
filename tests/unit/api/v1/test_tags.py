@@ -1,8 +1,17 @@
 """Tests for tags API endpoints."""
+import uuid
 from typing import Any
 from fastapi import status
 from starlette.testclient import TestClient
 
+from aihub.core.database.enums import PermissionActionEnum, PrincipalTypeEnum
+from aihub.core.database.models import (
+    Application, ApplicationMember,
+    AutonomousAgent, AutonomousAgentMember,
+    ChatWidget, ChatWidgetMember,
+    Credential, CredentialMember,
+    DevelopmentPlatform, DevelopmentPlatformMember,
+)
 from tests.conftest import create_auth_headers
 
 
@@ -35,74 +44,169 @@ def create_tenant_for_user(test_client: TestClient, user_token: Any, tenant_name
     return response.json()["id"]
 
 
-def create_application(test_client: TestClient, tenant_id: str, user_token: Any, name: str = "Test App") -> str:
-    """Helper function to create an application and return its ID."""
-    headers = create_auth_headers(user_token, use_cache=False)
-    response = test_client.post(
-        ENDPOINT_APPLICATIONS.format(tenant_id=tenant_id),
-        json={"name": name, "description": "Test application"},
-        headers=headers
-    )
-    assert response.status_code == status.HTTP_201_CREATED
-    return response.json()["id"]
+def create_application_in_db(test_client: TestClient, tenant_id: str, user_id: str, name: str = "Test App") -> str:
+    """Helper function to create an application directly in DB and return its ID."""
+    app_id = str(uuid.uuid4())
+    with test_client.db_client.get_session() as session:
+        app = Application(
+            id=app_id,
+            tenant_id=tenant_id,
+            name=name,
+            description="Test application",
+            config={},
+            is_active=True,
+            created_by=user_id,
+            updated_by=user_id
+        )
+        session.add(app)
+        session.commit()
+
+        member = ApplicationMember(
+            id=str(uuid.uuid4()),
+            tenant_id=tenant_id,
+            application_id=app_id,
+            principal_id=user_id,
+            principal_type=PrincipalTypeEnum.IDENTITY_USER,
+            role=PermissionActionEnum.ADMIN,
+            created_by=user_id,
+            updated_by=user_id
+        )
+        session.add(member)
+        session.commit()
+    return app_id
 
 
-def create_autonomous_agent(test_client: TestClient, tenant_id: str, user_token: Any, name: str = "Test Agent") -> str:
-    """Helper function to create an autonomous agent and return its ID."""
-    headers = create_auth_headers(user_token, use_cache=False)
-    response = test_client.post(
-        ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id),
-        json={"name": name, "description": "Test autonomous agent"},
-        headers=headers
-    )
-    assert response.status_code == status.HTTP_201_CREATED
-    return response.json()["id"]
+def create_autonomous_agent_in_db(test_client: TestClient, tenant_id: str, user_id: str, name: str = "Test Agent") -> str:
+    """Helper function to create an autonomous agent directly in DB and return its ID."""
+    agent_id = str(uuid.uuid4())
+    with test_client.db_client.get_session() as session:
+        agent = AutonomousAgent(
+            id=agent_id,
+            tenant_id=tenant_id,
+            name=name,
+            description="Test autonomous agent",
+            config={},
+            is_active=True,
+            created_by=user_id,
+            updated_by=user_id
+        )
+        session.add(agent)
+        session.commit()
+
+        member = AutonomousAgentMember(
+            id=str(uuid.uuid4()),
+            tenant_id=tenant_id,
+            autonomous_agent_id=agent_id,
+            principal_id=user_id,
+            principal_type=PrincipalTypeEnum.IDENTITY_USER,
+            role=PermissionActionEnum.ADMIN,
+            created_by=user_id,
+            updated_by=user_id
+        )
+        session.add(member)
+        session.commit()
+    return agent_id
 
 
-def create_chat_widget(test_client: TestClient, tenant_id: str, user_token: Any, name: str = "Test Widget") -> str:
-    """Helper function to create a chat widget and return its ID."""
-    headers = create_auth_headers(user_token, use_cache=False)
-    response = test_client.post(
-        ENDPOINT_CHAT_WIDGETS.format(tenant_id=tenant_id),
-        json={"name": name, "description": "Test chat widget", "type": "IFRAME", "config": {}},
-        headers=headers
-    )
-    assert response.status_code == status.HTTP_201_CREATED
-    return response.json()["id"]
+def create_chat_widget_in_db(test_client: TestClient, tenant_id: str, user_id: str, name: str = "Test Widget") -> str:
+    """Helper function to create a chat widget directly in DB and return its ID."""
+    widget_id = str(uuid.uuid4())
+    with test_client.db_client.get_session() as session:
+        widget = ChatWidget(
+            id=widget_id,
+            tenant_id=tenant_id,
+            name=name,
+            description="Test chat widget",
+            type="IFRAME",
+            config={},
+            is_active=True,
+            created_by=user_id,
+            updated_by=user_id
+        )
+        session.add(widget)
+        session.commit()
+
+        member = ChatWidgetMember(
+            id=str(uuid.uuid4()),
+            tenant_id=tenant_id,
+            chat_widget_id=widget_id,
+            principal_id=user_id,
+            principal_type=PrincipalTypeEnum.IDENTITY_USER,
+            role=PermissionActionEnum.ADMIN,
+            created_by=user_id,
+            updated_by=user_id
+        )
+        session.add(member)
+        session.commit()
+    return widget_id
 
 
-def create_credential(test_client: TestClient, tenant_id: str, user_token: Any, name: str = "Test Cred") -> str:
-    """Helper function to create a credential and return its ID."""
-    headers = create_auth_headers(user_token, use_cache=False)
-    response = test_client.post(
-        ENDPOINT_CREDENTIALS.format(tenant_id=tenant_id),
-        json={
-            "name": name,
-            "description": "Test credential",
-            "credential_type": "API_KEY",
-            "secret_value": "test-secret-value-12345"
-        },
-        headers=headers
-    )
-    assert response.status_code == status.HTTP_201_CREATED
-    return response.json()["id"]
+def create_credential_in_db(test_client: TestClient, tenant_id: str, user_id: str, name: str = "Test Cred") -> str:
+    """Helper function to create a credential directly in DB and return its ID."""
+    cred_id = str(uuid.uuid4())
+    with test_client.db_client.get_session() as session:
+        cred = Credential(
+            id=cred_id,
+            tenant_id=tenant_id,
+            name=name,
+            description="Test credential",
+            type="API_KEY",
+            source="test",
+            credential_uri="vault://test",
+            is_active=True,
+            created_by=user_id,
+            updated_by=user_id
+        )
+        session.add(cred)
+        session.commit()
+
+        member = CredentialMember(
+            id=str(uuid.uuid4()),
+            tenant_id=tenant_id,
+            credential_id=cred_id,
+            principal_id=user_id,
+            principal_type=PrincipalTypeEnum.IDENTITY_USER,
+            role=PermissionActionEnum.ADMIN,
+            created_by=user_id,
+            updated_by=user_id
+        )
+        session.add(member)
+        session.commit()
+    return cred_id
 
 
-def create_development_platform(test_client: TestClient, tenant_id: str, user_token: Any, name: str = "Test Platform") -> str:
-    """Helper function to create a development platform and return its ID."""
-    headers = create_auth_headers(user_token, use_cache=False)
-    response = test_client.post(
-        ENDPOINT_DEVELOPMENT_PLATFORMS.format(tenant_id=tenant_id),
-        json={
-            "name": name,
-            "description": "Test development platform",
-            "type": "IDE",
-            "iframe_url": "https://example.com/ide"
-        },
-        headers=headers
-    )
-    assert response.status_code == status.HTTP_201_CREATED
-    return response.json()["id"]
+def create_development_platform_in_db(test_client: TestClient, tenant_id: str, user_id: str, name: str = "Test Platform") -> str:
+    """Helper function to create a development platform directly in DB and return its ID."""
+    platform_id = str(uuid.uuid4())
+    with test_client.db_client.get_session() as session:
+        platform = DevelopmentPlatform(
+            id=platform_id,
+            tenant_id=tenant_id,
+            name=name,
+            description="Test development platform",
+            type="IDE",
+            iframe_url="https://example.com/ide",
+            config={},
+            is_active=True,
+            created_by=user_id,
+            updated_by=user_id
+        )
+        session.add(platform)
+        session.commit()
+
+        member = DevelopmentPlatformMember(
+            id=str(uuid.uuid4()),
+            tenant_id=tenant_id,
+            development_platform_id=platform_id,
+            principal_id=user_id,
+            principal_type=PrincipalTypeEnum.IDENTITY_USER,
+            role=PermissionActionEnum.ADMIN,
+            created_by=user_id,
+            updated_by=user_id
+        )
+        session.add(member)
+        session.commit()
+    return platform_id
 
 
 class TestTagRoutes:
@@ -324,7 +428,7 @@ class TestApplicationTagRoutes:
     ) -> None:
         """Test getting tags for an application with no tags."""
         tenant_id = create_tenant_for_user(test_client, test_user_token)
-        app_id = create_application(test_client, tenant_id, test_user_token)
+        app_id = create_application_in_db(test_client, tenant_id, test_user_token.get_id())
         headers = create_auth_headers(test_user_token, use_cache=False)
         
         response = test_client.get(
@@ -343,7 +447,7 @@ class TestApplicationTagRoutes:
     ) -> None:
         """Test setting tags on an application."""
         tenant_id = create_tenant_for_user(test_client, test_user_token)
-        app_id = create_application(test_client, tenant_id, test_user_token)
+        app_id = create_application_in_db(test_client, tenant_id, test_user_token.get_id())
         headers = create_auth_headers(test_user_token, use_cache=False)
         
         # Set tags (should create new tags automatically)
@@ -369,7 +473,7 @@ class TestApplicationTagRoutes:
     ) -> None:
         """Test that setting tags creates new tags if they don't exist."""
         tenant_id = create_tenant_for_user(test_client, test_user_token)
-        app_id = create_application(test_client, tenant_id, test_user_token)
+        app_id = create_application_in_db(test_client, tenant_id, test_user_token.get_id())
         headers = create_auth_headers(test_user_token, use_cache=False)
         
         # Set tags with new tag names
@@ -399,7 +503,7 @@ class TestApplicationTagRoutes:
     ) -> None:
         """Test that setting tags replaces existing tags."""
         tenant_id = create_tenant_for_user(test_client, test_user_token)
-        app_id = create_application(test_client, tenant_id, test_user_token)
+        app_id = create_application_in_db(test_client, tenant_id, test_user_token.get_id())
         headers = create_auth_headers(test_user_token, use_cache=False)
         
         # Set initial tags
@@ -433,7 +537,7 @@ class TestApplicationTagRoutes:
     ) -> None:
         """Test deleting all tags from an application."""
         tenant_id = create_tenant_for_user(test_client, test_user_token)
-        app_id = create_application(test_client, tenant_id, test_user_token)
+        app_id = create_application_in_db(test_client, tenant_id, test_user_token.get_id())
         headers = create_auth_headers(test_user_token, use_cache=False)
         
         # Set tags
@@ -465,7 +569,7 @@ class TestApplicationTagRoutes:
     ) -> None:
         """Test that tags are included in application responses."""
         tenant_id = create_tenant_for_user(test_client, test_user_token)
-        app_id = create_application(test_client, tenant_id, test_user_token)
+        app_id = create_application_in_db(test_client, tenant_id, test_user_token.get_id())
         headers = create_auth_headers(test_user_token, use_cache=False)
         
         # Set tags
@@ -504,9 +608,9 @@ class TestApplicationListFilterByTags:
         headers = create_auth_headers(test_user_token, use_cache=False)
         
         # Create applications
-        app1_id = create_application(test_client, tenant_id, test_user_token, "App 1")
-        app2_id = create_application(test_client, tenant_id, test_user_token, "App 2")
-        app3_id = create_application(test_client, tenant_id, test_user_token, "App 3")
+        app1_id = create_application_in_db(test_client, tenant_id, test_user_token.get_id(), "App 1")
+        app2_id = create_application_in_db(test_client, tenant_id, test_user_token.get_id(), "App 2")
+        app3_id = create_application_in_db(test_client, tenant_id, test_user_token.get_id(), "App 3")
         
         # Set tags
         test_client.put(
@@ -557,9 +661,9 @@ class TestApplicationListFilterByTags:
         headers = create_auth_headers(test_user_token, use_cache=False)
         
         # Create applications
-        app1_id = create_application(test_client, tenant_id, test_user_token, "App 1")
-        app2_id = create_application(test_client, tenant_id, test_user_token, "App 2")
-        app3_id = create_application(test_client, tenant_id, test_user_token, "App 3")
+        app1_id = create_application_in_db(test_client, tenant_id, test_user_token.get_id(), "App 1")
+        app2_id = create_application_in_db(test_client, tenant_id, test_user_token.get_id(), "App 2")
+        app3_id = create_application_in_db(test_client, tenant_id, test_user_token.get_id(), "App 3")
         
         # Set tags
         test_client.put(
@@ -608,7 +712,7 @@ class TestApplicationListFilterByTags:
         headers = create_auth_headers(test_user_token, use_cache=False)
         
         # Create an application
-        create_application(test_client, tenant_id, test_user_token)
+        create_application_in_db(test_client, tenant_id, test_user_token.get_id())
         
         # Try to filter with invalid tag format
         response = test_client.get(
@@ -630,7 +734,7 @@ class TestAutonomousAgentTagRoutes:
     ) -> None:
         """Test setting and getting tags on an autonomous agent."""
         tenant_id = create_tenant_for_user(test_client, test_user_token)
-        agent_id = create_autonomous_agent(test_client, tenant_id, test_user_token)
+        agent_id = create_autonomous_agent_in_db(test_client, tenant_id, test_user_token.get_id())
         headers = create_auth_headers(test_user_token, use_cache=False)
         
         # Set tags
@@ -664,7 +768,7 @@ class TestChatWidgetTagRoutes:
     ) -> None:
         """Test setting and getting tags on a chat widget."""
         tenant_id = create_tenant_for_user(test_client, test_user_token)
-        widget_id = create_chat_widget(test_client, tenant_id, test_user_token)
+        widget_id = create_chat_widget_in_db(test_client, tenant_id, test_user_token.get_id())
         headers = create_auth_headers(test_user_token, use_cache=False)
         
         # Set tags
@@ -698,7 +802,7 @@ class TestCredentialTagRoutes:
     ) -> None:
         """Test setting and getting tags on a credential."""
         tenant_id = create_tenant_for_user(test_client, test_user_token)
-        cred_id = create_credential(test_client, tenant_id, test_user_token)
+        cred_id = create_credential_in_db(test_client, tenant_id, test_user_token.get_id())
         headers = create_auth_headers(test_user_token, use_cache=False)
         
         # Set tags
@@ -732,7 +836,7 @@ class TestDevelopmentPlatformTagRoutes:
     ) -> None:
         """Test setting and getting tags on a development platform."""
         tenant_id = create_tenant_for_user(test_client, test_user_token)
-        platform_id = create_development_platform(test_client, tenant_id, test_user_token)
+        platform_id = create_development_platform_in_db(test_client, tenant_id, test_user_token.get_id())
         headers = create_auth_headers(test_user_token, use_cache=False)
         
         # Set tags
@@ -766,7 +870,7 @@ class TestTagCascadeDelete:
     ) -> None:
         """Test that deleting a tag removes it from all associated resources."""
         tenant_id = create_tenant_for_user(test_client, test_user_token)
-        app_id = create_application(test_client, tenant_id, test_user_token)
+        app_id = create_application_in_db(test_client, tenant_id, test_user_token.get_id())
         headers = create_auth_headers(test_user_token, use_cache=False)
         
         # Set tags on application

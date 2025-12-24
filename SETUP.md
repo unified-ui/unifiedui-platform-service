@@ -17,7 +17,7 @@ $ pytest tests/api/v1/tenants.py -v
 source .venv/bin/activate
 
 pytest -v
-pytest tests/ -n auto
+pytest aihub/tests/ -n auto
 ```
 
 [OpenAPI Docs](http://localhost:8000/docs)

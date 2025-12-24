@@ -4,7 +4,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from aihub.apis.v1 import health, identity, tenants, custom_groups, credentials, applications, conversations, autonomous_agents, development_platforms, chat_widgets, tags
+from aihub.apis.v1 import health, identity, tenants, custom_groups, credentials, applications, conversations, autonomous_agents, development_platforms, chat_widgets, tags, user_favorites
 from aihub.exc.autonomous_agents import AutonomousAgentNotFoundError
 from aihub.exc.custom_groups import CustomGroupNotFoundError, CustomGroupError
 from aihub.exc.applications import ApplicationNotFoundError
@@ -264,6 +264,13 @@ def create_app() -> FastAPI:
         tags.development_platform_tags_router,
         prefix="/api/v1/tenants/{tenant_id}",
         tags=["Development Platform Tags"]
+    )
+    
+    # User Favorites routes
+    app.include_router(
+        user_favorites.router,
+        prefix="/api/v1/tenants/{tenant_id}",
+        tags=["User Favorites"]
     )
     
     return app

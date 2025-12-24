@@ -28,6 +28,7 @@ from aihub.handlers.dependencies.autonomous_agents import get_autonomous_agent_h
 from aihub.handlers.dependencies.development_platforms import get_development_platform_handler
 from aihub.handlers.dependencies.chat_widgets import get_chat_widget_handler
 from aihub.handlers.dependencies.tags import get_tag_handler
+from aihub.handlers.dependencies.user_favorites import get_user_favorites_handler
 
 __all__ = [
     # Database
@@ -46,5 +47,6 @@ __all__ = [
     "get_development_platform_handler",
     "get_chat_widget_handler",
     "get_tag_handler",
+    "get_user_favorites_handler",
 ]
 
