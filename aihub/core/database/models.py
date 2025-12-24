@@ -346,4 +346,41 @@ class DevelopmentPlatformMember(Base, IdMixin, AuditMixin):
     )
 
 
+# ---------- Chat Widgets ----------
+class ChatWidget(Base, IdNameDescriptionMixin, TenantScopedMixin):
+    """Chat widget entity for embedding chat interfaces."""
+    __tablename__ = "chat_widgets"
+
+    type: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    config: Mapped[dict] = mapped_column(PortableJSON, nullable=False, default=dict)
+
+    members: Mapped[list["ChatWidgetMember"]] = relationship(
+        back_populates="chat_widget", cascade="all, delete-orphan"
+    )
+
+    __table_args__ = (Index("ix_chat_widgets_tenant", "tenant_id"),)
+
+
+class ChatWidgetMember(Base, IdMixin, AuditMixin):
+    """Chat widget membership table."""
+    __tablename__ = "chat_widget_members"
+
+    tenant_id: Mapped[str] = mapped_column(String(36), nullable=False)
+    chat_widget_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("chat_widgets.id", ondelete="CASCADE"), nullable=False
+    )
+    principal_id: Mapped[str] = mapped_column(String(50), nullable=False)
+    principal_type: Mapped[str] = mapped_column(PrincipalTypeSAEnum, nullable=False)
+
+    role: Mapped[str] = mapped_column(PermissionActionSAEnum, nullable=False)
+
+    chat_widget: Mapped["ChatWidget"] = relationship(back_populates="members")
+
+    __table_args__ = (
+        UniqueConstraint("chat_widget_id", "principal_id", "principal_type", name="uq_chat_widget_members"),
+        Index("ix_cwm_chat_widget", "chat_widget_id"),
+        Index("ix_cwm_principal", "principal_id"),
+    )
+
+
 

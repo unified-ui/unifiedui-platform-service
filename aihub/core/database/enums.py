@@ -16,9 +16,19 @@ class TenantPermissionEnum(str, Enum):
     AUTONOMOUS_AGENTS_CREATOR = "AUTONOMOUS_AGENTS_CREATOR"
     DEVELOPMENT_PLATFORMS_ADMIN = "DEVELOPMENT_PLATFORMS_ADMIN"
     DEVELOPMENT_PLATFORMS_CREATOR = "DEVELOPMENT_PLATFORMS_CREATOR"
+    CHAT_WIDGETS_ADMIN = "CHAT_WIDGETS_ADMIN"
+    CHAT_WIDGETS_CREATOR = "CHAT_WIDGETS_CREATOR"
 
     def all() -> list[str]:
         return [permission.value for permission in TenantPermissionEnum]
+
+
+class ChatWidgetTypeEnum(str, Enum):
+    IFRAME = "IFRAME"
+    FORM = "FORM"
+
+    def all() -> list[str]:
+        return [widget_type.value for widget_type in ChatWidgetTypeEnum]
 
 
 class PermissionActionEnum(str, Enum):

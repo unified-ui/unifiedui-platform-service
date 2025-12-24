@@ -4,13 +4,14 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from aihub.apis.v1 import health, identity, tenants, custom_groups, credentials, applications, conversations, autonomous_agents, development_platforms
+from aihub.apis.v1 import health, identity, tenants, custom_groups, credentials, applications, conversations, autonomous_agents, development_platforms, chat_widgets
 from aihub.exc.autonomous_agents import AutonomousAgentNotFoundError
 from aihub.exc.custom_groups import CustomGroupNotFoundError, CustomGroupError
 from aihub.exc.applications import ApplicationNotFoundError
 from aihub.exc.credentials import CredentialNotFoundError
 from aihub.exc.conversations import ConversationNotFoundError
 from aihub.exc.development_platforms import DevelopmentPlatformNotFoundError
+from aihub.exc.chat_widgets import ChatWidgetNotFoundError
 
 from aihub.core.config import settings
 from aihub.exc.tenants import TenantNotFoundError, TenantError
@@ -137,6 +138,16 @@ def create_app() -> FastAPI:
             content={"detail": str(exc)}
         )
     
+    # Chat Widget exception handlers
+    
+    @app.exception_handler(ChatWidgetNotFoundError)
+    async def chat_widget_not_found_handler(request: Request, exc: ChatWidgetNotFoundError):
+        """Handle chat widget not found errors."""
+        return JSONResponse(
+            status_code=404,
+            content={"detail": str(exc)}
+        )
+    
     # Include routers
     app.include_router(
         health.router,
@@ -190,6 +201,12 @@ def create_app() -> FastAPI:
         development_platforms.router,
         prefix="/api/v1/tenants/{tenant_id}",
         tags=["Development Platforms"]
+    )
+    
+    app.include_router(
+        chat_widgets.router,
+        prefix="/api/v1/tenants/{tenant_id}",
+        tags=["Chat Widgets"]
     )
     
     return app
