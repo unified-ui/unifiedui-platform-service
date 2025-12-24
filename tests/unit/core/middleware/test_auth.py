@@ -5,7 +5,7 @@ from fastapi import Request, HTTPException, status
 
 from aihub.core.middleware.apis.v1.auth import authenticate, check_permissions
 from aihub.core.identity.users import ContextIdentityUser
-from aihub.core.database.enums import TenantPermissionEnum, PermissionActionEnum
+from aihub.core.database.enums import TenantRolesEnum, PermissionActionEnum
 
 
 class TestAuthenticateDecorator:
@@ -212,7 +212,7 @@ class TestCheckPermissionsDecorator:
         mock_request = Mock(spec=Request)
         mock_request.state = Mock(spec=[])  # No user attribute
         
-        @check_permissions(entity="tenant", required_permissions=[TenantPermissionEnum.READER])
+        @check_permissions(entity="tenant", required_permissions=[TenantRolesEnum.READER])
         async def test_handler(request: Request):
             return "success"
         
@@ -230,7 +230,7 @@ class TestCheckPermissionsDecorator:
         mock_request.state.user = Mock()
         mock_request.path_params = {}
         
-        @check_permissions(entity="tenant", required_permissions=[TenantPermissionEnum.READER])
+        @check_permissions(entity="tenant", required_permissions=[TenantRolesEnum.READER])
         async def test_handler(request: Request):
             return "success"
         
@@ -253,7 +253,7 @@ class TestCheckPermissionsDecorator:
         mock_request.state.user = mock_user
         mock_request.path_params = {"tenant_id": "tenant-123"}
         
-        @check_permissions(entity="tenant", required_permissions=[TenantPermissionEnum.READER])
+        @check_permissions(entity="tenant", required_permissions=[TenantRolesEnum.READER])
         async def test_handler(request: Request):
             return "success"
         
@@ -267,7 +267,7 @@ class TestCheckPermissionsDecorator:
         """Test that user with correct tenant permission is allowed."""
         mock_user = Mock()
         mock_user.tenants = [
-            {"tenant": {"id": "tenant-123"}, "roles": [TenantPermissionEnum.READER.value]}
+            {"tenant": {"id": "tenant-123"}, "roles": [TenantRolesEnum.READER.value]}
         ]
         
         mock_request = Mock(spec=Request)
@@ -275,7 +275,7 @@ class TestCheckPermissionsDecorator:
         mock_request.state.user = mock_user
         mock_request.path_params = {"tenant_id": "tenant-123"}
         
-        @check_permissions(entity="tenant", required_permissions=[TenantPermissionEnum.READER])
+        @check_permissions(entity="tenant", required_permissions=[TenantRolesEnum.READER])
         async def test_handler(request: Request):
             return "success"
         
@@ -290,7 +290,7 @@ class TestCheckPermissionsDecorator:
         mock_user.groups = []
         mock_user.custom_groups = []
         mock_user.tenants = [
-            {"tenant": {"id": "tenant-123"}, "roles": [TenantPermissionEnum.GLOBAL_ADMIN.value]}
+            {"tenant": {"id": "tenant-123"}, "roles": [TenantRolesEnum.GLOBAL_ADMIN.value]}
         ]
         
         mock_request = Mock(spec=Request)

@@ -75,7 +75,7 @@ class AutonomousAgentHandler:
         Returns:
             List of autonomous agent responses
         """
-        from aihub.core.database.enums import TenantPermissionEnum
+        from aihub.core.database.enums import TenantRolesEnum
         
         logger.info("Listing autonomous agents", extra={"tenant_id": tenant_id, "skip": skip, "limit": limit})
         
@@ -92,7 +92,7 @@ class AutonomousAgentHandler:
             tenant_permissions = matching_tenant.get("permissions", [])
             is_admin = any(
                 p in tenant_permissions 
-                for p in [TenantPermissionEnum.GLOBAL_ADMIN.value, TenantPermissionEnum.AUTONOMOUS_AGENTS_ADMIN.value]
+                for p in [TenantRolesEnum.GLOBAL_ADMIN.value, TenantRolesEnum.AUTONOMOUS_AGENTS_ADMIN.value]
             )
         
         # Only get group IDs if not admin

@@ -17,7 +17,7 @@ from aihub.schema.responses.credential_permissions import (
 )
 from aihub.exc.credentials import CredentialNotFoundError
 from aihub.core.middleware.apis.v1.auth import authenticate, check_permissions
-from aihub.core.database.enums import TenantPermissionEnum, PermissionActionEnum
+from aihub.core.database.enums import TenantRolesEnum, PermissionActionEnum
 from aihub.logger import get_logger
 
 logger = get_logger(__name__)
@@ -117,9 +117,9 @@ async def list_credentials(
 @check_permissions(
     entity="tenant",
     required_permissions=[
-        TenantPermissionEnum.GLOBAL_ADMIN,
-        TenantPermissionEnum.CREDENTIALS_ADMIN,
-        TenantPermissionEnum.CREDENTIALS_CREATOR
+        TenantRolesEnum.GLOBAL_ADMIN,
+        TenantRolesEnum.CREDENTIALS_ADMIN,
+        TenantRolesEnum.CREDENTIALS_CREATOR
     ]
 )
 async def create_credential(

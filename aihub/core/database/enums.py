@@ -1,7 +1,7 @@
 from enum import Enum
 
 
-class TenantPermissionEnum(str, Enum):
+class TenantRolesEnum(str, Enum):
     READER = "READER"
     GLOBAL_ADMIN = "GLOBAL_ADMIN"
     CUSTOM_GROUPS_ADMIN = "CUSTOM_GROUPS_ADMIN"
@@ -20,7 +20,7 @@ class TenantPermissionEnum(str, Enum):
     CHAT_WIDGETS_CREATOR = "CHAT_WIDGETS_CREATOR"
 
     def all() -> list[str]:
-        return [permission.value for permission in TenantPermissionEnum]
+        return [permission.value for permission in TenantRolesEnum]
 
 
 class ChatWidgetTypeEnum(str, Enum):

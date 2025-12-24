@@ -3,7 +3,7 @@ from typing import Any
 from fastapi import status
 from starlette.testclient import TestClient
 
-from aihub.core.database.enums import PermissionActionEnum, PrincipalTypeEnum, TenantPermissionEnum
+from aihub.core.database.enums import PermissionActionEnum, PrincipalTypeEnum, TenantRolesEnum
 from tests.conftest import create_auth_headers
 
 
@@ -41,7 +41,7 @@ def add_user_to_tenant(test_client: TestClient, creator_token: Any, tenant_id: s
         json={
             "principal_id": user_id,
             "principal_type": PRINCIPAL_TYPE_USER,
-            "role": TenantPermissionEnum.READER.value
+            "role": TenantRolesEnum.READER.value
         },
         headers=headers
     )

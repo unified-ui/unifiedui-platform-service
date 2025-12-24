@@ -75,7 +75,7 @@ class ChatWidgetHandler:
         Returns:
             List of chat widget responses
         """
-        from aihub.core.database.enums import TenantPermissionEnum
+        from aihub.core.database.enums import TenantRolesEnum
         
         logger.info("Listing chat widgets", extra={"tenant_id": tenant_id, "skip": skip, "limit": limit})
         
@@ -91,8 +91,8 @@ class ChatWidgetHandler:
         if matching_tenant:
             user_roles = matching_tenant["roles"]
             admin_permissions = [
-                TenantPermissionEnum.GLOBAL_ADMIN.value,
-                TenantPermissionEnum.CHAT_WIDGETS_ADMIN.value
+                TenantRolesEnum.GLOBAL_ADMIN.value,
+                TenantRolesEnum.CHAT_WIDGETS_ADMIN.value
             ]
             is_admin = any(perm in user_roles for perm in admin_permissions)
         

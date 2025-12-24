@@ -75,7 +75,7 @@ class DevelopmentPlatformHandler:
         Returns:
             List of development platform responses
         """
-        from aihub.core.database.enums import TenantPermissionEnum
+        from aihub.core.database.enums import TenantRolesEnum
         
         logger.info("Listing development platforms", extra={"tenant_id": tenant_id, "skip": skip, "limit": limit})
         
@@ -91,8 +91,8 @@ class DevelopmentPlatformHandler:
         if matching_tenant:
             user_roles = matching_tenant["roles"]
             admin_permissions = [
-                TenantPermissionEnum.GLOBAL_ADMIN.value,
-                TenantPermissionEnum.DEVELOPMENT_PLATFORMS_ADMIN.value
+                TenantRolesEnum.GLOBAL_ADMIN.value,
+                TenantRolesEnum.DEVELOPMENT_PLATFORMS_ADMIN.value
             ]
             is_admin = any(perm in user_roles for perm in admin_permissions)
         

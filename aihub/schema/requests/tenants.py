@@ -2,7 +2,7 @@
 from pydantic import BaseModel, Field, field_validator
 from typing import Optional
 
-from aihub.core.database.enums import TenantPermissionEnum, PrincipalTypeEnum
+from aihub.core.database.enums import TenantRolesEnum, PrincipalTypeEnum
 
 
 class CreateTenantRequest(BaseModel):
@@ -67,7 +67,7 @@ class SetPrincipalRequest(BaseModel):
     @classmethod
     def validate_role(cls, v: str) -> str:
         """Validate that role is a valid TenantPermissionEnum value."""
-        valid_roles = [r.value for r in TenantPermissionEnum]
+        valid_roles = [r.value for r in TenantRolesEnum]
         if v not in valid_roles:
             raise ValueError(f"Invalid role. Must be one of: {', '.join(valid_roles)}")
         return v
@@ -110,7 +110,7 @@ class DeletePrincipalRequest(BaseModel):
     @classmethod
     def validate_role(cls, v: str) -> str:
         """Validate that role is a valid TenantPermissionEnum value."""
-        valid_roles = [r.value for r in TenantPermissionEnum]
+        valid_roles = [r.value for r in TenantRolesEnum]
         if v not in valid_roles:
             raise ValueError(f"Invalid role. Must be one of: {', '.join(valid_roles)}")
         return v

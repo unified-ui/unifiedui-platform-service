@@ -11,7 +11,7 @@ from aihub.schema.requests.tags import CreateTagRequest, SetResourceTagsRequest
 from aihub.schema.responses.tags import TagResponse, TagListResponse, ResourceTagsResponse
 from aihub.exc.tags import TagNotFoundError, TagDeleteNotAllowedError
 from aihub.core.middleware.apis.v1.auth import authenticate, check_permissions
-from aihub.core.database.enums import TenantPermissionEnum, PermissionActionEnum
+from aihub.core.database.enums import TenantRolesEnum, PermissionActionEnum
 from aihub.logger import get_logger
 
 logger = get_logger(__name__)
@@ -164,20 +164,10 @@ async def delete_tag(
             }
         )
         
-        # Check if user is GLOBAL_ADMIN
-        is_global_admin = False
-        for tenant_info in user.tenants:
-            if tenant_info.get("tenant", {}).get("id") == tenant_id:
-                roles = tenant_info.get("roles", [])
-                if TenantPermissionEnum.GLOBAL_ADMIN.value in roles:
-                    is_global_admin = True
-                break
-        
         handler.delete_tag(
             tenant_id=tenant_id,
             tag_id=tag_id,
-            user=user,
-            is_global_admin=is_global_admin
+            user=user
         )
         return Response(status_code=status.HTTP_204_NO_CONTENT)
     except TagNotFoundError as e:
@@ -213,8 +203,8 @@ application_tags_router = APIRouter(prefix="/applications/{application_id}/tags"
 @check_permissions(
     entity="application",
     required_permissions=[
-        TenantPermissionEnum.GLOBAL_ADMIN,
-        TenantPermissionEnum.APPLICATIONS_ADMIN,
+        TenantRolesEnum.GLOBAL_ADMIN,
+        TenantRolesEnum.APPLICATIONS_ADMIN,
         PermissionActionEnum.ADMIN,
         PermissionActionEnum.WRITE,
         PermissionActionEnum.READ
@@ -264,8 +254,8 @@ async def get_application_tags(
 @check_permissions(
     entity="application",
     required_permissions=[
-        TenantPermissionEnum.GLOBAL_ADMIN,
-        TenantPermissionEnum.APPLICATIONS_ADMIN,
+        TenantRolesEnum.GLOBAL_ADMIN,
+        TenantRolesEnum.APPLICATIONS_ADMIN,
         PermissionActionEnum.ADMIN,
         PermissionActionEnum.WRITE
     ]
@@ -316,8 +306,8 @@ async def set_application_tags(
 @check_permissions(
     entity="application",
     required_permissions=[
-        TenantPermissionEnum.GLOBAL_ADMIN,
-        TenantPermissionEnum.APPLICATIONS_ADMIN,
+        TenantRolesEnum.GLOBAL_ADMIN,
+        TenantRolesEnum.APPLICATIONS_ADMIN,
         PermissionActionEnum.ADMIN,
         PermissionActionEnum.WRITE
     ]
@@ -370,8 +360,8 @@ autonomous_agent_tags_router = APIRouter(prefix="/autonomous-agents/{autonomous_
 @check_permissions(
     entity="autonomous_agent",
     required_permissions=[
-        TenantPermissionEnum.GLOBAL_ADMIN,
-        TenantPermissionEnum.AUTONOMOUS_AGENTS_ADMIN,
+        TenantRolesEnum.GLOBAL_ADMIN,
+        TenantRolesEnum.AUTONOMOUS_AGENTS_ADMIN,
         PermissionActionEnum.ADMIN,
         PermissionActionEnum.WRITE,
         PermissionActionEnum.READ
@@ -421,8 +411,8 @@ async def get_autonomous_agent_tags(
 @check_permissions(
     entity="autonomous_agent",
     required_permissions=[
-        TenantPermissionEnum.GLOBAL_ADMIN,
-        TenantPermissionEnum.AUTONOMOUS_AGENTS_ADMIN,
+        TenantRolesEnum.GLOBAL_ADMIN,
+        TenantRolesEnum.AUTONOMOUS_AGENTS_ADMIN,
         PermissionActionEnum.ADMIN,
         PermissionActionEnum.WRITE
     ]
@@ -473,8 +463,8 @@ async def set_autonomous_agent_tags(
 @check_permissions(
     entity="autonomous_agent",
     required_permissions=[
-        TenantPermissionEnum.GLOBAL_ADMIN,
-        TenantPermissionEnum.AUTONOMOUS_AGENTS_ADMIN,
+        TenantRolesEnum.GLOBAL_ADMIN,
+        TenantRolesEnum.AUTONOMOUS_AGENTS_ADMIN,
         PermissionActionEnum.ADMIN,
         PermissionActionEnum.WRITE
     ]
@@ -527,8 +517,8 @@ chat_widget_tags_router = APIRouter(prefix="/chat-widgets/{chat_widget_id}/tags"
 @check_permissions(
     entity="chat_widget",
     required_permissions=[
-        TenantPermissionEnum.GLOBAL_ADMIN,
-        TenantPermissionEnum.CHAT_WIDGETS_ADMIN,
+        TenantRolesEnum.GLOBAL_ADMIN,
+        TenantRolesEnum.CHAT_WIDGETS_ADMIN,
         PermissionActionEnum.ADMIN,
         PermissionActionEnum.WRITE,
         PermissionActionEnum.READ
@@ -578,8 +568,8 @@ async def get_chat_widget_tags(
 @check_permissions(
     entity="chat_widget",
     required_permissions=[
-        TenantPermissionEnum.GLOBAL_ADMIN,
-        TenantPermissionEnum.CHAT_WIDGETS_ADMIN,
+        TenantRolesEnum.GLOBAL_ADMIN,
+        TenantRolesEnum.CHAT_WIDGETS_ADMIN,
         PermissionActionEnum.ADMIN,
         PermissionActionEnum.WRITE
     ]
@@ -630,8 +620,8 @@ async def set_chat_widget_tags(
 @check_permissions(
     entity="chat_widget",
     required_permissions=[
-        TenantPermissionEnum.GLOBAL_ADMIN,
-        TenantPermissionEnum.CHAT_WIDGETS_ADMIN,
+        TenantRolesEnum.GLOBAL_ADMIN,
+        TenantRolesEnum.CHAT_WIDGETS_ADMIN,
         PermissionActionEnum.ADMIN,
         PermissionActionEnum.WRITE
     ]
@@ -684,8 +674,8 @@ credential_tags_router = APIRouter(prefix="/credentials/{credential_id}/tags")
 @check_permissions(
     entity="credential",
     required_permissions=[
-        TenantPermissionEnum.GLOBAL_ADMIN,
-        TenantPermissionEnum.CREDENTIALS_ADMIN,
+        TenantRolesEnum.GLOBAL_ADMIN,
+        TenantRolesEnum.CREDENTIALS_ADMIN,
         PermissionActionEnum.ADMIN,
         PermissionActionEnum.WRITE,
         PermissionActionEnum.READ
@@ -735,8 +725,8 @@ async def get_credential_tags(
 @check_permissions(
     entity="credential",
     required_permissions=[
-        TenantPermissionEnum.GLOBAL_ADMIN,
-        TenantPermissionEnum.CREDENTIALS_ADMIN,
+        TenantRolesEnum.GLOBAL_ADMIN,
+        TenantRolesEnum.CREDENTIALS_ADMIN,
         PermissionActionEnum.ADMIN,
         PermissionActionEnum.WRITE
     ]
@@ -787,8 +777,8 @@ async def set_credential_tags(
 @check_permissions(
     entity="credential",
     required_permissions=[
-        TenantPermissionEnum.GLOBAL_ADMIN,
-        TenantPermissionEnum.CREDENTIALS_ADMIN,
+        TenantRolesEnum.GLOBAL_ADMIN,
+        TenantRolesEnum.CREDENTIALS_ADMIN,
         PermissionActionEnum.ADMIN,
         PermissionActionEnum.WRITE
     ]
@@ -841,8 +831,8 @@ development_platform_tags_router = APIRouter(prefix="/development-platforms/{dev
 @check_permissions(
     entity="development_platform",
     required_permissions=[
-        TenantPermissionEnum.GLOBAL_ADMIN,
-        TenantPermissionEnum.DEVELOPMENT_PLATFORMS_ADMIN,
+        TenantRolesEnum.GLOBAL_ADMIN,
+        TenantRolesEnum.DEVELOPMENT_PLATFORMS_ADMIN,
         PermissionActionEnum.ADMIN,
         PermissionActionEnum.WRITE,
         PermissionActionEnum.READ
@@ -892,8 +882,8 @@ async def get_development_platform_tags(
 @check_permissions(
     entity="development_platform",
     required_permissions=[
-        TenantPermissionEnum.GLOBAL_ADMIN,
-        TenantPermissionEnum.DEVELOPMENT_PLATFORMS_ADMIN,
+        TenantRolesEnum.GLOBAL_ADMIN,
+        TenantRolesEnum.DEVELOPMENT_PLATFORMS_ADMIN,
         PermissionActionEnum.ADMIN,
         PermissionActionEnum.WRITE
     ]
@@ -944,8 +934,8 @@ async def set_development_platform_tags(
 @check_permissions(
     entity="development_platform",
     required_permissions=[
-        TenantPermissionEnum.GLOBAL_ADMIN,
-        TenantPermissionEnum.DEVELOPMENT_PLATFORMS_ADMIN,
+        TenantRolesEnum.GLOBAL_ADMIN,
+        TenantRolesEnum.DEVELOPMENT_PLATFORMS_ADMIN,
         PermissionActionEnum.ADMIN,
         PermissionActionEnum.WRITE
     ]

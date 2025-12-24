@@ -78,7 +78,7 @@ class CredentialHandler:
         Returns:
             List of credential responses (without secret values)
         """
-        from aihub.core.database.enums import TenantPermissionEnum
+        from aihub.core.database.enums import TenantRolesEnum
         
         logger.info("Listing credentials", extra={"tenant_id": tenant_id, "skip": skip, "limit": limit})
         
@@ -94,8 +94,8 @@ class CredentialHandler:
         if matching_tenant:
             user_roles = matching_tenant["roles"]  # Changed from "permissions" to "roles"
             admin_permissions = [
-                TenantPermissionEnum.GLOBAL_ADMIN.value,
-                TenantPermissionEnum.CREDENTIALS_ADMIN.value
+                TenantRolesEnum.GLOBAL_ADMIN.value,
+                TenantRolesEnum.CREDENTIALS_ADMIN.value
             ]
             is_admin = any(perm in user_roles for perm in admin_permissions)
         

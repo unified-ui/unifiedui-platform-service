@@ -6,7 +6,7 @@ from sqlalchemy import select
 
 from aihub.core.identity.users import ContextIdentityUser
 from aihub.handlers.dependencies import get_db_client
-from aihub.core.database.enums import TenantPermissionEnum, PermissionActionEnum
+from aihub.core.database.enums import TenantRolesEnum, PermissionActionEnum
 from aihub.core.database.models import (
     ApplicationMember,
     CredentialMember,
@@ -123,7 +123,7 @@ def authenticate(func: Callable) -> Callable:
 
 def check_permissions(
     entity: str = "tenant",
-    required_permissions: Union[list[Union[TenantPermissionEnum, PermissionActionEnum]], None] = None
+    required_permissions: Union[list[Union[TenantRolesEnum, PermissionActionEnum]], None] = None
 ) -> Callable:
     """
     Decorator factory to check if the authenticated user has the required permissions.
@@ -257,18 +257,18 @@ def check_permissions(
                     user_tenant_permissions = matching_tenant["roles"]
                     
                     # GLOBAL_ADMIN grants access to all resources
-                    if TenantPermissionEnum.GLOBAL_ADMIN.value in user_tenant_permissions:
+                    if TenantRolesEnum.GLOBAL_ADMIN.value in user_tenant_permissions:
                         return await func(*args, **kwargs)
                     
                     # Entity-specific admin permissions
                     entity_admin_map = {
-                        "application": TenantPermissionEnum.APPLICATIONS_ADMIN.value,
-                        "credential": TenantPermissionEnum.CREDENTIALS_ADMIN.value,
-                        "autonomous_agent": TenantPermissionEnum.AUTONOMOUS_AGENTS_ADMIN.value,
-                        "custom_group": TenantPermissionEnum.CUSTOM_GROUPS_ADMIN.value,
-                        "conversation": TenantPermissionEnum.CONVERSATIONS_ADMIN.value,
-                        "development_platform": TenantPermissionEnum.DEVELOPMENT_PLATFORMS_ADMIN.value,
-                        "chat_widget": TenantPermissionEnum.CHAT_WIDGETS_ADMIN.value,
+                        "application": TenantRolesEnum.APPLICATIONS_ADMIN.value,
+                        "credential": TenantRolesEnum.CREDENTIALS_ADMIN.value,
+                        "autonomous_agent": TenantRolesEnum.AUTONOMOUS_AGENTS_ADMIN.value,
+                        "custom_group": TenantRolesEnum.CUSTOM_GROUPS_ADMIN.value,
+                        "conversation": TenantRolesEnum.CONVERSATIONS_ADMIN.value,
+                        "development_platform": TenantRolesEnum.DEVELOPMENT_PLATFORMS_ADMIN.value,
+                        "chat_widget": TenantRolesEnum.CHAT_WIDGETS_ADMIN.value,
                     }
                     
                     entity_admin = entity_admin_map.get(entity)

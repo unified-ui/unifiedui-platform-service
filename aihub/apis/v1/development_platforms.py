@@ -17,7 +17,7 @@ from aihub.schema.responses.development_platform_permissions import (
 )
 from aihub.exc.development_platforms import DevelopmentPlatformNotFoundError
 from aihub.core.middleware.apis.v1.auth import authenticate, check_permissions
-from aihub.core.database.enums import TenantPermissionEnum, PermissionActionEnum
+from aihub.core.database.enums import TenantRolesEnum, PermissionActionEnum
 from aihub.logger import get_logger
 
 logger = get_logger(__name__)
@@ -117,9 +117,9 @@ async def list_development_platforms(
 @check_permissions(
     entity="tenant",
     required_permissions=[
-        TenantPermissionEnum.GLOBAL_ADMIN,
-        TenantPermissionEnum.DEVELOPMENT_PLATFORMS_ADMIN,
-        TenantPermissionEnum.DEVELOPMENT_PLATFORMS_CREATOR
+        TenantRolesEnum.GLOBAL_ADMIN,
+        TenantRolesEnum.DEVELOPMENT_PLATFORMS_ADMIN,
+        TenantRolesEnum.DEVELOPMENT_PLATFORMS_CREATOR
     ]
 )
 async def create_development_platform(
@@ -173,8 +173,8 @@ async def create_development_platform(
 @check_permissions(
     entity="development_platform",
     required_permissions=[
-        TenantPermissionEnum.GLOBAL_ADMIN,
-        TenantPermissionEnum.DEVELOPMENT_PLATFORMS_ADMIN,
+        TenantRolesEnum.GLOBAL_ADMIN,
+        TenantRolesEnum.DEVELOPMENT_PLATFORMS_ADMIN,
         PermissionActionEnum.ADMIN,
         PermissionActionEnum.WRITE,
         PermissionActionEnum.READ
@@ -239,8 +239,8 @@ async def get_development_platform(
 @check_permissions(
     entity="development_platform",
     required_permissions=[
-        TenantPermissionEnum.GLOBAL_ADMIN,
-        TenantPermissionEnum.DEVELOPMENT_PLATFORMS_ADMIN,
+        TenantRolesEnum.GLOBAL_ADMIN,
+        TenantRolesEnum.DEVELOPMENT_PLATFORMS_ADMIN,
         PermissionActionEnum.ADMIN,
         PermissionActionEnum.WRITE
     ]
@@ -308,8 +308,8 @@ async def update_development_platform(
 @check_permissions(
     entity="development_platform",
     required_permissions=[
-        TenantPermissionEnum.GLOBAL_ADMIN,
-        TenantPermissionEnum.DEVELOPMENT_PLATFORMS_ADMIN,
+        TenantRolesEnum.GLOBAL_ADMIN,
+        TenantRolesEnum.DEVELOPMENT_PLATFORMS_ADMIN,
         PermissionActionEnum.ADMIN
     ]
 )
@@ -375,8 +375,8 @@ async def delete_development_platform(
 @check_permissions(
     entity="development_platform",
     required_permissions=[
-        TenantPermissionEnum.GLOBAL_ADMIN,
-        TenantPermissionEnum.DEVELOPMENT_PLATFORMS_ADMIN,
+        TenantRolesEnum.GLOBAL_ADMIN,
+        TenantRolesEnum.DEVELOPMENT_PLATFORMS_ADMIN,
         PermissionActionEnum.ADMIN,
         PermissionActionEnum.WRITE,
         PermissionActionEnum.READ
@@ -440,8 +440,8 @@ async def list_development_platform_permissions(
 @check_permissions(
     entity="development_platform",
     required_permissions=[
-        TenantPermissionEnum.GLOBAL_ADMIN,
-        TenantPermissionEnum.DEVELOPMENT_PLATFORMS_ADMIN,
+        TenantRolesEnum.GLOBAL_ADMIN,
+        TenantRolesEnum.DEVELOPMENT_PLATFORMS_ADMIN,
         PermissionActionEnum.ADMIN,
         PermissionActionEnum.WRITE,
         PermissionActionEnum.READ
@@ -509,8 +509,8 @@ async def get_development_platform_permission(
 @check_permissions(
     entity="development_platform",
     required_permissions=[
-        TenantPermissionEnum.GLOBAL_ADMIN,
-        TenantPermissionEnum.DEVELOPMENT_PLATFORMS_ADMIN,
+        TenantRolesEnum.GLOBAL_ADMIN,
+        TenantRolesEnum.DEVELOPMENT_PLATFORMS_ADMIN,
         PermissionActionEnum.ADMIN
     ]
 )
@@ -577,8 +577,8 @@ async def set_development_platform_permission(
 @check_permissions(
     entity="development_platform",
     required_permissions=[
-        TenantPermissionEnum.GLOBAL_ADMIN,
-        TenantPermissionEnum.DEVELOPMENT_PLATFORMS_ADMIN,
+        TenantRolesEnum.GLOBAL_ADMIN,
+        TenantRolesEnum.DEVELOPMENT_PLATFORMS_ADMIN,
         PermissionActionEnum.ADMIN
     ]
 )

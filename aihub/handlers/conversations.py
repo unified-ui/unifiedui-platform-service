@@ -71,7 +71,7 @@ class ConversationHandler:
         Returns:
             List of conversation responses
         """
-        from aihub.core.database.enums import TenantPermissionEnum
+        from aihub.core.database.enums import TenantRolesEnum
         
         logger.info("Listing conversations", extra={"tenant_id": tenant_id, "skip": skip, "limit": limit})
         
@@ -88,7 +88,7 @@ class ConversationHandler:
             tenant_permissions = matching_tenant.get("permissions", matching_tenant.get("roles", []))
             is_admin = any(
                 p in tenant_permissions 
-                for p in [TenantPermissionEnum.GLOBAL_ADMIN.value, TenantPermissionEnum.CONVERSATIONS_ADMIN.value]
+                for p in [TenantRolesEnum.GLOBAL_ADMIN.value, TenantRolesEnum.CONVERSATIONS_ADMIN.value]
             )
         
         # Only get group IDs if not admin

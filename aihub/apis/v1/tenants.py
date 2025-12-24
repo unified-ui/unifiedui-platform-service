@@ -6,7 +6,7 @@ from aihub.handlers.tenants import TenantHandler
 from aihub.handlers.dependencies import get_tenant_handler
 from aihub.core.middleware.apis.v1.auth import authenticate, check_permissions
 from aihub.core.identity.users import ContextIdentityUser
-from aihub.core.database.enums import TenantPermissionEnum
+from aihub.core.database.enums import TenantRolesEnum
 from aihub.schema.requests.tenants import (
     CreateTenantRequest,
     UpdateTenantRequest,
@@ -126,7 +126,7 @@ async def create_tenant(
     description="Update an existing tenant"
 )
 @authenticate
-@check_permissions(entity="tenant", required_permissions=[TenantPermissionEnum.GLOBAL_ADMIN])
+@check_permissions(entity="tenant", required_permissions=[TenantRolesEnum.GLOBAL_ADMIN])
 async def update_tenant(
     request: Request,
     tenant_id: str,
@@ -161,7 +161,7 @@ async def update_tenant(
     description="Delete a tenant by ID"
 )
 @authenticate
-@check_permissions(entity="tenant", required_permissions=[TenantPermissionEnum.GLOBAL_ADMIN])
+@check_permissions(entity="tenant", required_permissions=[TenantRolesEnum.GLOBAL_ADMIN])
 async def delete_tenant(
     request: Request,
     tenant_id: str,
@@ -255,7 +255,7 @@ async def get_principal_permissions(
     description="Add or update a role for a principal on a tenant"
 )
 @authenticate
-@check_permissions(entity="tenant", required_permissions=[TenantPermissionEnum.GLOBAL_ADMIN])
+@check_permissions(entity="tenant", required_permissions=[TenantRolesEnum.GLOBAL_ADMIN])
 async def set_principal_permission(
     request: Request,
     tenant_id: str,
@@ -299,7 +299,7 @@ async def set_principal_permission(
     description="Remove a specific role from a principal on a tenant"
 )
 @authenticate
-@check_permissions(entity="tenant", required_permissions=[TenantPermissionEnum.GLOBAL_ADMIN])
+@check_permissions(entity="tenant", required_permissions=[TenantRolesEnum.GLOBAL_ADMIN])
 async def delete_principal_permission(
     request: Request,
     tenant_id: str,

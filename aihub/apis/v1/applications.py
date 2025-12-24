@@ -17,7 +17,7 @@ from aihub.schema.responses.application_permissions import (
 )
 from aihub.exc.applications import ApplicationNotFoundError
 from aihub.core.middleware.apis.v1.auth import authenticate, check_permissions
-from aihub.core.database.enums import TenantPermissionEnum, PermissionActionEnum
+from aihub.core.database.enums import TenantRolesEnum, PermissionActionEnum
 from aihub.logger import get_logger
 
 logger = get_logger(__name__)
@@ -118,9 +118,9 @@ async def list_applications(
 @check_permissions(
     entity="tenant",
     required_permissions=[
-        TenantPermissionEnum.GLOBAL_ADMIN,
-        TenantPermissionEnum.APPLICATIONS_ADMIN,
-        TenantPermissionEnum.APPLICATIONS_CREATOR
+        TenantRolesEnum.GLOBAL_ADMIN,
+        TenantRolesEnum.APPLICATIONS_ADMIN,
+        TenantRolesEnum.APPLICATIONS_CREATOR
     ]
 )
 async def create_application(
@@ -174,8 +174,8 @@ async def create_application(
 @check_permissions(
     entity="application",
     required_permissions=[
-        TenantPermissionEnum.GLOBAL_ADMIN,
-        TenantPermissionEnum.APPLICATIONS_ADMIN,
+        TenantRolesEnum.GLOBAL_ADMIN,
+        TenantRolesEnum.APPLICATIONS_ADMIN,
         PermissionActionEnum.ADMIN,
         PermissionActionEnum.WRITE,
         PermissionActionEnum.READ
@@ -240,8 +240,8 @@ async def get_application(
 @check_permissions(
     entity="application",
     required_permissions=[
-        TenantPermissionEnum.GLOBAL_ADMIN,
-        TenantPermissionEnum.APPLICATIONS_ADMIN,
+        TenantRolesEnum.GLOBAL_ADMIN,
+        TenantRolesEnum.APPLICATIONS_ADMIN,
         PermissionActionEnum.ADMIN,
         PermissionActionEnum.WRITE
     ]
@@ -309,8 +309,8 @@ async def update_application(
 @check_permissions(
     entity="application",
     required_permissions=[
-        TenantPermissionEnum.GLOBAL_ADMIN,
-        TenantPermissionEnum.APPLICATIONS_ADMIN,
+        TenantRolesEnum.GLOBAL_ADMIN,
+        TenantRolesEnum.APPLICATIONS_ADMIN,
         PermissionActionEnum.ADMIN
     ]
 )
@@ -376,8 +376,8 @@ async def delete_application(
 @check_permissions(
     entity="application",
     required_permissions=[
-        TenantPermissionEnum.GLOBAL_ADMIN,
-        TenantPermissionEnum.APPLICATIONS_ADMIN,
+        TenantRolesEnum.GLOBAL_ADMIN,
+        TenantRolesEnum.APPLICATIONS_ADMIN,
         PermissionActionEnum.ADMIN,
         PermissionActionEnum.WRITE,
         PermissionActionEnum.READ
@@ -441,8 +441,8 @@ async def list_application_permissions(
 @check_permissions(
     entity="application",
     required_permissions=[
-        TenantPermissionEnum.GLOBAL_ADMIN,
-        TenantPermissionEnum.APPLICATIONS_ADMIN,
+        TenantRolesEnum.GLOBAL_ADMIN,
+        TenantRolesEnum.APPLICATIONS_ADMIN,
         PermissionActionEnum.ADMIN,
         PermissionActionEnum.WRITE,
         PermissionActionEnum.READ
@@ -510,8 +510,8 @@ async def get_application_permission(
 @check_permissions(
     entity="application",
     required_permissions=[
-        TenantPermissionEnum.GLOBAL_ADMIN,
-        TenantPermissionEnum.APPLICATIONS_ADMIN,
+        TenantRolesEnum.GLOBAL_ADMIN,
+        TenantRolesEnum.APPLICATIONS_ADMIN,
         PermissionActionEnum.ADMIN
     ]
 )
@@ -578,8 +578,8 @@ async def set_application_permission(
 @check_permissions(
     entity="application",
     required_permissions=[
-        TenantPermissionEnum.GLOBAL_ADMIN,
-        TenantPermissionEnum.APPLICATIONS_ADMIN,
+        TenantRolesEnum.GLOBAL_ADMIN,
+        TenantRolesEnum.APPLICATIONS_ADMIN,
         PermissionActionEnum.ADMIN
     ]
 )

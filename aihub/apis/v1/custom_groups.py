@@ -6,7 +6,7 @@ from aihub.handlers.custom_groups import CustomGroupHandler
 from aihub.handlers.dependencies import get_custom_group_handler
 from aihub.core.middleware.apis.v1.auth import authenticate, check_permissions
 from aihub.core.identity.users import ContextIdentityUser
-from aihub.core.database.enums import TenantPermissionEnum, PermissionActionEnum
+from aihub.core.database.enums import TenantRolesEnum, PermissionActionEnum
 from aihub.schema.requests.custom_groups import (
     CreateCustomGroupRequest,
     UpdateCustomGroupRequest,
@@ -100,7 +100,7 @@ async def get_custom_group(
     description="Create a new custom group and assign creator as ADMIN (requires CUSTOM_GROUP_CREATOR, CUSTOM_GROUPS_ADMIN, or GLOBAL_ADMIN on tenant)"
 )
 @authenticate
-@check_permissions(entity="tenant", required_permissions=[TenantPermissionEnum.CUSTOM_GROUP_CREATOR, TenantPermissionEnum.CUSTOM_GROUPS_ADMIN, TenantPermissionEnum.GLOBAL_ADMIN])
+@check_permissions(entity="tenant", required_permissions=[TenantRolesEnum.CUSTOM_GROUP_CREATOR, TenantRolesEnum.CUSTOM_GROUPS_ADMIN, TenantRolesEnum.GLOBAL_ADMIN])
 async def create_custom_group(
     request: Request,
     tenant_id: str,

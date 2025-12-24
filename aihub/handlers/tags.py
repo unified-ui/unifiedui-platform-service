@@ -286,8 +286,7 @@ class TagHandler:
         self,
         tenant_id: str,
         tag_id: int,
-        user: ContextIdentityUser,
-        is_global_admin: bool = False
+        user: ContextIdentityUser
     ) -> None:
         """
         Delete a tag.
@@ -298,7 +297,6 @@ class TagHandler:
             tenant_id: The ID of the tenant
             tag_id: The ID of the tag
             user: ContextIdentityUser object
-            is_global_admin: Whether the user has GLOBAL_ADMIN role on the tenant
             
         Raises:
             TagNotFoundError: If tag not found
@@ -321,8 +319,8 @@ class TagHandler:
             if not tag:
                 raise TagNotFoundError(tag_id)
             
-            # Check if user is GLOBAL_ADMIN or the creator
-            if not is_global_admin and tag.created_by != user_id:
+            # Only creator can delete (GLOBAL_ADMIN bypass is handled by @check_permissions)
+            if tag.created_by != user_id:
                 logger.warning(
                     "Tag delete not allowed",
                     extra={"tag_id": tag_id, "user_id": user_id, "created_by": tag.created_by}

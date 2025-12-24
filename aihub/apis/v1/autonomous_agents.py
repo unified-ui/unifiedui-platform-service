@@ -17,7 +17,7 @@ from aihub.schema.responses.autonomous_agent_permissions import (
 )
 from aihub.exc.autonomous_agents import AutonomousAgentNotFoundError, AutonomousAgentPermissionNotFoundError
 from aihub.core.middleware.apis.v1.auth import authenticate, check_permissions
-from aihub.core.database.enums import TenantPermissionEnum, PermissionActionEnum
+from aihub.core.database.enums import TenantRolesEnum, PermissionActionEnum
 from aihub.logger import get_logger
 
 logger = get_logger(__name__)
@@ -106,9 +106,9 @@ async def list_autonomous_agents(
 @check_permissions(
     entity="tenant",
     required_permissions=[
-        TenantPermissionEnum.GLOBAL_ADMIN,
-        TenantPermissionEnum.AUTONOMOUS_AGENTS_ADMIN,
-        TenantPermissionEnum.AUTONOMOUS_AGENTS_CREATOR
+        TenantRolesEnum.GLOBAL_ADMIN,
+        TenantRolesEnum.AUTONOMOUS_AGENTS_ADMIN,
+        TenantRolesEnum.AUTONOMOUS_AGENTS_CREATOR
     ]
 )
 async def create_autonomous_agent(
@@ -159,8 +159,8 @@ async def create_autonomous_agent(
 @check_permissions(
     entity="autonomous_agent",
     required_permissions=[
-        TenantPermissionEnum.GLOBAL_ADMIN,
-        TenantPermissionEnum.AUTONOMOUS_AGENTS_ADMIN,
+        TenantRolesEnum.GLOBAL_ADMIN,
+        TenantRolesEnum.AUTONOMOUS_AGENTS_ADMIN,
         PermissionActionEnum.ADMIN,
         PermissionActionEnum.WRITE,
         PermissionActionEnum.READ
@@ -214,8 +214,8 @@ async def get_autonomous_agent(
 @check_permissions(
     entity="autonomous_agent",
     required_permissions=[
-        TenantPermissionEnum.GLOBAL_ADMIN,
-        TenantPermissionEnum.AUTONOMOUS_AGENTS_ADMIN,
+        TenantRolesEnum.GLOBAL_ADMIN,
+        TenantRolesEnum.AUTONOMOUS_AGENTS_ADMIN,
         PermissionActionEnum.ADMIN,
         PermissionActionEnum.WRITE
     ]
@@ -275,8 +275,8 @@ async def update_autonomous_agent(
 @check_permissions(
     entity="autonomous_agent",
     required_permissions=[
-        TenantPermissionEnum.GLOBAL_ADMIN,
-        TenantPermissionEnum.AUTONOMOUS_AGENTS_ADMIN,
+        TenantRolesEnum.GLOBAL_ADMIN,
+        TenantRolesEnum.AUTONOMOUS_AGENTS_ADMIN,
         PermissionActionEnum.ADMIN
     ]
 )
@@ -331,8 +331,8 @@ async def delete_autonomous_agent(
 @check_permissions(
     entity="autonomous_agent",
     required_permissions=[
-        TenantPermissionEnum.GLOBAL_ADMIN,
-        TenantPermissionEnum.AUTONOMOUS_AGENTS_ADMIN,
+        TenantRolesEnum.GLOBAL_ADMIN,
+        TenantRolesEnum.AUTONOMOUS_AGENTS_ADMIN,
         PermissionActionEnum.ADMIN,
         PermissionActionEnum.WRITE,
         PermissionActionEnum.READ
@@ -386,8 +386,8 @@ async def list_autonomous_agent_permissions(
 @check_permissions(
     entity="autonomous_agent",
     required_permissions=[
-        TenantPermissionEnum.GLOBAL_ADMIN,
-        TenantPermissionEnum.AUTONOMOUS_AGENTS_ADMIN,
+        TenantRolesEnum.GLOBAL_ADMIN,
+        TenantRolesEnum.AUTONOMOUS_AGENTS_ADMIN,
         PermissionActionEnum.ADMIN,
         PermissionActionEnum.WRITE,
         PermissionActionEnum.READ
@@ -444,8 +444,8 @@ async def get_autonomous_agent_permission(
 @check_permissions(
     entity="autonomous_agent",
     required_permissions=[
-        TenantPermissionEnum.GLOBAL_ADMIN,
-        TenantPermissionEnum.AUTONOMOUS_AGENTS_ADMIN,
+        TenantRolesEnum.GLOBAL_ADMIN,
+        TenantRolesEnum.AUTONOMOUS_AGENTS_ADMIN,
         PermissionActionEnum.ADMIN
     ]
 )
@@ -504,8 +504,8 @@ async def set_autonomous_agent_permission(
 @check_permissions(
     entity="autonomous_agent",
     required_permissions=[
-        TenantPermissionEnum.GLOBAL_ADMIN,
-        TenantPermissionEnum.AUTONOMOUS_AGENTS_ADMIN,
+        TenantRolesEnum.GLOBAL_ADMIN,
+        TenantRolesEnum.AUTONOMOUS_AGENTS_ADMIN,
         PermissionActionEnum.ADMIN
     ]
 )

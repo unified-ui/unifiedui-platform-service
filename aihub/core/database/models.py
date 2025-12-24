@@ -19,7 +19,7 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from sqlalchemy.types import JSON
 from sqlalchemy import Enum as SAEnum
 
-from aihub.core.database.enums import PermissionActionEnum, TenantPermissionEnum, PrincipalTypeEnum
+from aihub.core.database.enums import PermissionActionEnum, TenantRolesEnum, PrincipalTypeEnum
 
 
 # ---------- Base ----------
@@ -34,7 +34,7 @@ PortableJSON = JSON().with_variant(postgresql.JSONB(), "postgresql").with_varian
 
 # ---------- Enums (DB-agnostic via CHECK constraints) ----------
 TenantPermissionSAEnum = SAEnum(
-    *TenantPermissionEnum.all(),
+    *TenantRolesEnum.all(),
     name="tenant_role",
     native_enum=False,
     create_constraint=True,
