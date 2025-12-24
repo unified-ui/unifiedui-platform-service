@@ -47,3 +47,11 @@ class PrincipalTypeEnum(str, Enum):
 
     def all() -> list[str]:
         return [principal_type.value for principal_type in PrincipalTypeEnum]
+
+
+class UserPermissionEnum(str, Enum):
+    """Special user-level permissions for resource access."""
+    IS_CREATOR = "IS_CREATOR"
+
+    def all() -> list[str]:
+        return [perm.value for perm in UserPermissionEnum]

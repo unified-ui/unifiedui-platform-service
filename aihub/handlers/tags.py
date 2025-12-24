@@ -285,28 +285,21 @@ class TagHandler:
     def delete_tag(
         self,
         tenant_id: str,
-        tag_id: int,
-        user: ContextIdentityUser
+        tag_id: int
     ) -> None:
         """
         Delete a tag.
         
-        Only GLOBAL_ADMIN or the tag creator can delete a tag.
+        Permission check (GLOBAL_ADMIN or creator) is handled by @check_permissions decorator.
         
         Args:
             tenant_id: The ID of the tenant
             tag_id: The ID of the tag
-            user: ContextIdentityUser object
             
         Raises:
             TagNotFoundError: If tag not found
-            TagDeleteNotAllowedError: If user is not allowed to delete the tag
         """
-        from aihub.exc.tags import TagDeleteNotAllowedError
-        
         logger.info("Deleting tag", extra={"tenant_id": tenant_id, "tag_id": tag_id})
-        
-        user_id = user.identity.get_id()
         
         with self.db_client.get_session() as session:
             tag = session.execute(
@@ -318,14 +311,6 @@ class TagHandler:
             
             if not tag:
                 raise TagNotFoundError(tag_id)
-            
-            # Only creator can delete (GLOBAL_ADMIN bypass is handled by @check_permissions)
-            if tag.created_by != user_id:
-                logger.warning(
-                    "Tag delete not allowed",
-                    extra={"tag_id": tag_id, "user_id": user_id, "created_by": tag.created_by}
-                )
-                raise TagDeleteNotAllowedError(tag_id)
             
             # Before deleting, find all resources using this tag for cache invalidation
             affected_resources = self._find_resources_using_tag(session, tenant_id, tag_id)

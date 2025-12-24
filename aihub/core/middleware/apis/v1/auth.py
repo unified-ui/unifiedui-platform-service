@@ -6,7 +6,7 @@ from sqlalchemy import select
 
 from aihub.core.identity.users import ContextIdentityUser
 from aihub.handlers.dependencies import get_db_client
-from aihub.core.database.enums import TenantRolesEnum, PermissionActionEnum
+from aihub.core.database.enums import TenantRolesEnum, PermissionActionEnum, UserPermissionEnum
 from aihub.core.database.models import (
     ApplicationMember,
     CredentialMember,
@@ -14,7 +14,8 @@ from aihub.core.database.models import (
     CustomGroupMember,
     ConversationMember,
     DevelopmentPlatformMember,
-    ChatWidgetMember
+    ChatWidgetMember,
+    Tag
 )
 from aihub.handlers.dependencies.database import get_db_client
 from aihub.caching.dependencies import get_cache_client
@@ -123,17 +124,18 @@ def authenticate(func: Callable) -> Callable:
 
 def check_permissions(
     entity: str = "tenant",
-    required_permissions: Union[list[Union[TenantRolesEnum, PermissionActionEnum]], None] = None
+    required_permissions: Union[list[Union[TenantRolesEnum, PermissionActionEnum, UserPermissionEnum]], None] = None
 ) -> Callable:
     """
     Decorator factory to check if the authenticated user has the required permissions.
     
     Args:
         entity: The entity type to check permissions for 
-               Options: "tenant", "application", "credential", "autonomous_agent", "custom_group", "conversation"
+               Options: "tenant", "application", "credential", "autonomous_agent", "custom_group", "conversation", "tag"
         required_permissions: List of required permission enums
                             - For tenant: [TenantPermissionEnum.GLOBAL_ADMIN, TenantPermissionEnum.READER, etc.]
                             - For resources: [PermissionActionEnum.READ, PermissionActionEnum.WRITE, PermissionActionEnum.ADMIN]
+                            - Special: [UserPermissions.IS_CREATOR] - allows access if user is the creator
                             If None or empty, no permission check is performed
     
     Raises:
@@ -146,6 +148,10 @@ def check_permissions(
         
         @check_permissions(entity="application", required_permissions=[PermissionActionEnum.WRITE, PermissionActionEnum.ADMIN])
         async def update_application(...):
+            ...
+        
+        @check_permissions(entity="tag", required_permissions=[TenantRolesEnum.GLOBAL_ADMIN, UserPermissions.IS_CREATOR])
+        async def delete_tag(...):
             ...
     """
     def decorator(func: Callable) -> Callable:
@@ -205,6 +211,63 @@ def check_permissions(
                         status_code=status.HTTP_403_FORBIDDEN,
                         detail=f"Access denied: User does not have required permissions. Required: {required_perms_str}, Has: {user_roles}"
                     )
+            
+            elif entity == "tag":
+                # Special handling for tags - check GLOBAL_ADMIN first, then IS_CREATOR
+                tenant_id = request.path_params.get("tenant_id")
+                tag_id = request.path_params.get("tag_id")
+                
+                if not tenant_id:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="tenant_id not found in path parameters"
+                    )
+                if not tag_id:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="tag_id not found in path parameters"
+                    )
+                
+                # Check tenant-level permissions first (GLOBAL_ADMIN)
+                user_tenants = user.tenants
+                matching_tenant = next(
+                    (t for t in user_tenants if t["tenant"]["id"] == tenant_id),
+                    None
+                )
+                
+                if matching_tenant:
+                    user_tenant_permissions = matching_tenant["roles"]
+                    
+                    # Check for TenantRolesEnum permissions (like GLOBAL_ADMIN)
+                    tenant_role_perms = [
+                        perm for perm in required_permissions 
+                        if isinstance(perm, TenantRolesEnum)
+                    ]
+                    for perm in tenant_role_perms:
+                        if perm.value in user_tenant_permissions:
+                            return await func(*args, **kwargs)
+                
+                # Check IS_CREATOR permission
+                if UserPermissionEnum.IS_CREATOR in required_permissions:
+                    user_id = user.identity.get_id()
+                    db_client = get_db_client()
+                    
+                    with db_client.get_session() as session:
+                        tag = session.execute(
+                            select(Tag).where(
+                                Tag.id == tag_id,
+                                Tag.tenant_id == tenant_id
+                            )
+                        ).scalar_one_or_none()
+                        
+                        if tag and tag.created_by == user_id:
+                            return await func(*args, **kwargs)
+                
+                # No permission matched
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=f"Access denied: User does not have required permissions on this tag (ID: {tag_id})"
+                )
             
             else:
                 # Handle resource entities (application, credential, autonomous_agent, custom_group, conversation)

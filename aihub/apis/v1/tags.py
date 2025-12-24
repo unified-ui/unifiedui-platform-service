@@ -11,7 +11,7 @@ from aihub.schema.requests.tags import CreateTagRequest, SetResourceTagsRequest
 from aihub.schema.responses.tags import TagResponse, TagListResponse, ResourceTagsResponse
 from aihub.exc.tags import TagNotFoundError, TagDeleteNotAllowedError
 from aihub.core.middleware.apis.v1.auth import authenticate, check_permissions
-from aihub.core.database.enums import TenantRolesEnum, PermissionActionEnum
+from aihub.core.database.enums import TenantRolesEnum, PermissionActionEnum, UserPermissionEnum
 from aihub.logger import get_logger
 
 logger = get_logger(__name__)
@@ -132,6 +132,10 @@ async def create_tag(
     description="Delete a tag. Only GLOBAL_ADMIN or the tag creator can delete."
 )
 @authenticate
+@check_permissions(
+    entity="tag",
+    required_permissions=[TenantRolesEnum.GLOBAL_ADMIN, UserPermissionEnum.IS_CREATOR]
+)
 async def delete_tag(
     request: Request,
     tenant_id: str,
@@ -166,18 +170,12 @@ async def delete_tag(
         
         handler.delete_tag(
             tenant_id=tenant_id,
-            tag_id=tag_id,
-            user=user
+            tag_id=tag_id
         )
         return Response(status_code=status.HTTP_204_NO_CONTENT)
     except TagNotFoundError as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e)
-        )
-    except TagDeleteNotAllowedError as e:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
             detail=str(e)
         )
     except Exception as e:
