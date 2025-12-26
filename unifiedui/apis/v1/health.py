@@ -1,7 +1,7 @@
 from datetime import datetime, UTC
 from fastapi import APIRouter, status
 
-from aihub.schema.responses.healthcheck import HealthCheckResponse
+from unifiedui.schema.responses.healthcheck import HealthCheckResponse
 
 
 router = APIRouter()

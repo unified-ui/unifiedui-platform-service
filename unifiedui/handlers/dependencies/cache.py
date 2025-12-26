@@ -2,8 +2,8 @@
 import os
 from typing import Optional
 
-from aihub.caching.client import CacheClient, CacheClientFactory
-from aihub.logger import get_logger
+from unifiedui.caching.client import CacheClient, CacheClientFactory
+from unifiedui.logger import get_logger
 
 logger = get_logger(__name__)
 

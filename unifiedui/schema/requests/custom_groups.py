@@ -1,7 +1,7 @@
 """Request schemas for custom groups."""
 from pydantic import BaseModel, Field, field_validator
 
-from aihub.core.database.enums import PermissionActionEnum, PrincipalTypeEnum
+from unifiedui.core.database.enums import PermissionActionEnum, PrincipalTypeEnum
 
 
 class CreateCustomGroupRequest(BaseModel):

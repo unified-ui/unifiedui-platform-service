@@ -2,13 +2,13 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.responses import Response
 
-from aihub.core.identity.users import ContextIdentityUser
-from aihub.handlers.user_favorites import UserFavoritesHandler
-from aihub.handlers.dependencies import get_user_favorites_handler
-from aihub.schema.responses.user_favorites import UserFavoriteResponse, UserFavoritesListResponse
-from aihub.core.middleware.apis.v1.auth import authenticate, check_permissions
-from aihub.core.database.enums import UserPermissionEnum
-from aihub.logger import get_logger
+from unifiedui.core.identity.users import ContextIdentityUser
+from unifiedui.handlers.user_favorites import UserFavoritesHandler
+from unifiedui.handlers.dependencies import get_user_favorites_handler
+from unifiedui.schema.responses.user_favorites import UserFavoriteResponse, UserFavoritesListResponse
+from unifiedui.core.middleware.apis.v1.auth import authenticate, check_permissions
+from unifiedui.core.database.enums import UserPermissionEnum
+from unifiedui.logger import get_logger
 
 logger = get_logger(__name__)
 

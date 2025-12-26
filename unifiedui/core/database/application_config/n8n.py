@@ -1,7 +1,7 @@
 from abc import ABC
 from dataclasses import dataclass
 
-from aihub.core.database.models.application_config.base import BaseApplicationConfig
+from unifiedui.core.database.models.application_config.base import BaseApplicationConfig
 
 
 @dataclass

@@ -4,7 +4,7 @@ from typing import Any
 from fastapi import status
 from starlette.testclient import TestClient
 
-from aihub.core.database.enums import TenantRolesEnum, PrincipalTypeEnum
+from unifiedui.core.database.enums import TenantRolesEnum, PrincipalTypeEnum
 from tests.conftest import create_auth_headers
 
 

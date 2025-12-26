@@ -3,12 +3,12 @@ import time
 
 from jwt.exceptions import InvalidTokenError, ExpiredSignatureError
 
-from aihub.core.identity.providers import BaseIdentityProvider, BaseIdentityToken
-from aihub.core.identity.enums import IdenityProviderEnum
-from aihub.identity.extra_id.provider import ExtraIDIdentityProvider
-from aihub.identity.extra_id.token import ExtraIDIdentityTokenSerializer
-from aihub.identity.mock.token import MockIdentityToken
-from aihub.identity.mock.provider import MockIdentityProvider
+from unifiedui.core.identity.providers import BaseIdentityProvider, BaseIdentityToken
+from unifiedui.core.identity.enums import IdenityProviderEnum
+from unifiedui.identity.extra_id.provider import ExtraIDIdentityProvider
+from unifiedui.identity.extra_id.token import ExtraIDIdentityTokenSerializer
+from unifiedui.identity.mock.token import MockIdentityToken
+from unifiedui.identity.mock.provider import MockIdentityProvider
 
 
 class IdentityTokenFactory:

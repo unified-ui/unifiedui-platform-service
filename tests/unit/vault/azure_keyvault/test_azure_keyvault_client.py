@@ -1,15 +1,15 @@
-"""Unit tests for aihub/vault/azure_keyvault/client.py - AzureKeyVaultClient."""
+"""Unit tests for unifiedui/vault/azure_keyvault/client.py - AzureKeyVaultClient."""
 import pytest
 from unittest.mock import Mock, patch
 
-from aihub.vault.azure_keyvault.client import AzureKeyVaultClient
-from aihub.core.vault.client import BaseVaultClient
+from unifiedui.vault.azure_keyvault.client import AzureKeyVaultClient
+from unifiedui.core.vault.client import BaseVaultClient
 
 
 class TestAzureKeyVaultClient:
     """Test suite for AzureKeyVaultClient."""
     
-    @patch('aihub.vault.azure_keyvault.client.AzureKeyVault')
+    @patch('unifiedui.vault.azure_keyvault.client.AzureKeyVault')
     def test_initialization(self, mock_vault_class):
         """Test client initialization."""
         mock_vault = Mock()
@@ -20,13 +20,13 @@ class TestAzureKeyVaultClient:
         mock_vault_class.assert_called_once_with(vault_url="https://test.vault.azure.net/")
         assert client._vault is mock_vault
     
-    @patch('aihub.vault.azure_keyvault.client.AzureKeyVault')
+    @patch('unifiedui.vault.azure_keyvault.client.AzureKeyVault')
     def test_is_base_vault_client(self, mock_vault_class):
         """Test that AzureKeyVaultClient extends BaseVaultClient."""
         client = AzureKeyVaultClient(vault_url="https://test.vault.azure.net/")
         assert isinstance(client, BaseVaultClient)
     
-    @patch('aihub.vault.azure_keyvault.client.AzureKeyVault')
+    @patch('unifiedui.vault.azure_keyvault.client.AzureKeyVault')
     def test_get_vault(self, mock_vault_class):
         """Test get_vault returns the vault instance."""
         mock_vault = Mock()
@@ -37,7 +37,7 @@ class TestAzureKeyVaultClient:
         
         assert vault is mock_vault
     
-    @patch('aihub.vault.azure_keyvault.client.AzureKeyVault')
+    @patch('unifiedui.vault.azure_keyvault.client.AzureKeyVault')
     def test_with_cache_client(self, mock_vault_class):
         """Test initialization with cache client."""
         mock_vault = Mock()

@@ -1,17 +1,17 @@
-"""Unit tests for aihub/vault/azure_keyvault/keyvault.py - AzureKeyVault."""
+"""Unit tests for unifiedui/vault/azure_keyvault/keyvault.py - AzureKeyVault."""
 import pytest
 from unittest.mock import Mock, MagicMock, patch
 import os
 
-from aihub.vault.azure_keyvault.keyvault import AzureKeyVault
-from aihub.core.vault.vault import BaseVault
+from unifiedui.vault.azure_keyvault.keyvault import AzureKeyVault
+from unifiedui.core.vault.vault import BaseVault
 
 
 class TestAzureKeyVault:
     """Test suite for AzureKeyVault implementation."""
     
-    @patch('aihub.vault.azure_keyvault.keyvault.SecretClient')
-    @patch('aihub.vault.azure_keyvault.keyvault.DefaultAzureCredential')
+    @patch('unifiedui.vault.azure_keyvault.keyvault.SecretClient')
+    @patch('unifiedui.vault.azure_keyvault.keyvault.DefaultAzureCredential')
     def test_initialization_with_vault_url(self, mock_credential, mock_secret_client):
         """Test initialization with explicit vault URL."""
         vault = AzureKeyVault(vault_url="https://test-vault.vault.azure.net/")
@@ -21,31 +21,31 @@ class TestAzureKeyVault:
         mock_secret_client.assert_called_once()
     
     @patch.dict(os.environ, {"AZURE_KEYVAULT_URL": "https://env-vault.vault.azure.net/"})
-    @patch('aihub.vault.azure_keyvault.keyvault.SecretClient')
-    @patch('aihub.vault.azure_keyvault.keyvault.DefaultAzureCredential')
+    @patch('unifiedui.vault.azure_keyvault.keyvault.SecretClient')
+    @patch('unifiedui.vault.azure_keyvault.keyvault.DefaultAzureCredential')
     def test_initialization_from_env(self, mock_credential, mock_secret_client):
         """Test initialization from environment variable."""
         vault = AzureKeyVault()
         
         assert vault.vault_url == "https://env-vault.vault.azure.net/"
     
-    @patch('aihub.vault.azure_keyvault.keyvault.SecretClient')
-    @patch('aihub.vault.azure_keyvault.keyvault.DefaultAzureCredential')
+    @patch('unifiedui.vault.azure_keyvault.keyvault.SecretClient')
+    @patch('unifiedui.vault.azure_keyvault.keyvault.DefaultAzureCredential')
     def test_initialization_without_url_raises_error(self, mock_credential, mock_secret_client):
         """Test initialization without URL raises ValueError."""
         with patch.dict(os.environ, {}, clear=True):
             with pytest.raises(ValueError, match="AZURE_KEYVAULT_URL must be provided"):
                 AzureKeyVault()
     
-    @patch('aihub.vault.azure_keyvault.keyvault.SecretClient')
-    @patch('aihub.vault.azure_keyvault.keyvault.DefaultAzureCredential')
+    @patch('unifiedui.vault.azure_keyvault.keyvault.SecretClient')
+    @patch('unifiedui.vault.azure_keyvault.keyvault.DefaultAzureCredential')
     def test_is_base_vault_implementation(self, mock_credential, mock_secret_client):
         """Test that AzureKeyVault implements BaseVault."""
         vault = AzureKeyVault(vault_url="https://test.vault.azure.net/")
         assert isinstance(vault, BaseVault)
     
-    @patch('aihub.vault.azure_keyvault.keyvault.SecretClient')
-    @patch('aihub.vault.azure_keyvault.keyvault.DefaultAzureCredential')
+    @patch('unifiedui.vault.azure_keyvault.keyvault.SecretClient')
+    @patch('unifiedui.vault.azure_keyvault.keyvault.DefaultAzureCredential')
     def test_store_secret(self, mock_credential, mock_secret_client_class):
         """Test storing a secret."""
         mock_client = Mock()
@@ -62,8 +62,8 @@ class TestAzureKeyVault:
         assert uri == "azurekv://myvault/api-key/abc123"
         mock_client.set_secret.assert_called_once_with("api-key", "secret-value-123", tags={})
     
-    @patch('aihub.vault.azure_keyvault.keyvault.SecretClient')
-    @patch('aihub.vault.azure_keyvault.keyvault.DefaultAzureCredential')
+    @patch('unifiedui.vault.azure_keyvault.keyvault.SecretClient')
+    @patch('unifiedui.vault.azure_keyvault.keyvault.DefaultAzureCredential')
     def test_store_secret_with_metadata(self, mock_credential, mock_secret_client_class):
         """Test storing a secret with metadata."""
         mock_client = Mock()
@@ -80,8 +80,8 @@ class TestAzureKeyVault:
         
         mock_client.set_secret.assert_called_once_with("db-password", "secret123", tags=metadata)
     
-    @patch('aihub.vault.azure_keyvault.keyvault.SecretClient')
-    @patch('aihub.vault.azure_keyvault.keyvault.DefaultAzureCredential')
+    @patch('unifiedui.vault.azure_keyvault.keyvault.SecretClient')
+    @patch('unifiedui.vault.azure_keyvault.keyvault.DefaultAzureCredential')
     def test_store_secret_normalizes_name(self, mock_credential, mock_secret_client_class):
         """Test that secret name is normalized (underscores to hyphens)."""
         mock_client = Mock()
@@ -98,8 +98,8 @@ class TestAzureKeyVault:
         # Should replace underscores with hyphens
         mock_client.set_secret.assert_called_once_with("my-api-key", "value", tags={})
     
-    @patch('aihub.vault.azure_keyvault.keyvault.SecretClient')
-    @patch('aihub.vault.azure_keyvault.keyvault.DefaultAzureCredential')
+    @patch('unifiedui.vault.azure_keyvault.keyvault.SecretClient')
+    @patch('unifiedui.vault.azure_keyvault.keyvault.DefaultAzureCredential')
     def test_get_secret(self, mock_credential, mock_secret_client_class):
         """Test retrieving a secret."""
         mock_client = Mock()
@@ -115,8 +115,8 @@ class TestAzureKeyVault:
         assert value == "secret-value-123"
         mock_client.get_secret.assert_called_once_with("api-key", version="abc123")
     
-    @patch('aihub.vault.azure_keyvault.keyvault.SecretClient')
-    @patch('aihub.vault.azure_keyvault.keyvault.DefaultAzureCredential')
+    @patch('unifiedui.vault.azure_keyvault.keyvault.SecretClient')
+    @patch('unifiedui.vault.azure_keyvault.keyvault.DefaultAzureCredential')
     def test_get_secret_without_version(self, mock_credential, mock_secret_client_class):
         """Test retrieving a secret without version (latest)."""
         mock_client = Mock()
@@ -132,8 +132,8 @@ class TestAzureKeyVault:
         assert value == "latest-value"
         mock_client.get_secret.assert_called_once_with("api-key", version=None)
     
-    @patch('aihub.vault.azure_keyvault.keyvault.SecretClient')
-    @patch('aihub.vault.azure_keyvault.keyvault.DefaultAzureCredential')
+    @patch('unifiedui.vault.azure_keyvault.keyvault.SecretClient')
+    @patch('unifiedui.vault.azure_keyvault.keyvault.DefaultAzureCredential')
     def test_get_secret_invalid_uri(self, mock_credential, mock_secret_client_class):
         """Test get_secret with invalid URI returns None."""
         mock_client = Mock()
@@ -145,8 +145,8 @@ class TestAzureKeyVault:
         assert value is None
         mock_client.get_secret.assert_not_called()
     
-    @patch('aihub.vault.azure_keyvault.keyvault.SecretClient')
-    @patch('aihub.vault.azure_keyvault.keyvault.DefaultAzureCredential')
+    @patch('unifiedui.vault.azure_keyvault.keyvault.SecretClient')
+    @patch('unifiedui.vault.azure_keyvault.keyvault.DefaultAzureCredential')
     def test_get_secret_handles_error(self, mock_credential, mock_secret_client_class):
         """Test get_secret handles errors gracefully."""
         mock_client = Mock()
@@ -158,8 +158,8 @@ class TestAzureKeyVault:
         
         assert value is None
     
-    @patch('aihub.vault.azure_keyvault.keyvault.SecretClient')
-    @patch('aihub.vault.azure_keyvault.keyvault.DefaultAzureCredential')
+    @patch('unifiedui.vault.azure_keyvault.keyvault.SecretClient')
+    @patch('unifiedui.vault.azure_keyvault.keyvault.DefaultAzureCredential')
     def test_update_secret(self, mock_credential, mock_secret_client_class):
         """Test updating a secret."""
         mock_client = Mock()
@@ -171,8 +171,8 @@ class TestAzureKeyVault:
         assert result is True
         mock_client.set_secret.assert_called_once_with("api-key", "new-value", tags={})
     
-    @patch('aihub.vault.azure_keyvault.keyvault.SecretClient')
-    @patch('aihub.vault.azure_keyvault.keyvault.DefaultAzureCredential')
+    @patch('unifiedui.vault.azure_keyvault.keyvault.SecretClient')
+    @patch('unifiedui.vault.azure_keyvault.keyvault.DefaultAzureCredential')
     def test_update_secret_with_metadata(self, mock_credential, mock_secret_client_class):
         """Test updating a secret with new metadata."""
         mock_client = Mock()
@@ -185,8 +185,8 @@ class TestAzureKeyVault:
         assert result is True
         mock_client.set_secret.assert_called_once_with("key", "value", tags=metadata)
     
-    @patch('aihub.vault.azure_keyvault.keyvault.SecretClient')
-    @patch('aihub.vault.azure_keyvault.keyvault.DefaultAzureCredential')
+    @patch('unifiedui.vault.azure_keyvault.keyvault.SecretClient')
+    @patch('unifiedui.vault.azure_keyvault.keyvault.DefaultAzureCredential')
     def test_update_secret_invalid_uri(self, mock_credential, mock_secret_client_class):
         """Test update_secret with invalid URI returns False."""
         mock_client = Mock()
@@ -198,8 +198,8 @@ class TestAzureKeyVault:
         assert result is False
         mock_client.set_secret.assert_not_called()
     
-    @patch('aihub.vault.azure_keyvault.keyvault.SecretClient')
-    @patch('aihub.vault.azure_keyvault.keyvault.DefaultAzureCredential')
+    @patch('unifiedui.vault.azure_keyvault.keyvault.SecretClient')
+    @patch('unifiedui.vault.azure_keyvault.keyvault.DefaultAzureCredential')
     def test_delete_secret(self, mock_credential, mock_secret_client_class):
         """Test deleting a secret."""
         mock_client = Mock()
@@ -212,8 +212,8 @@ class TestAzureKeyVault:
         assert result is True
         mock_client.begin_delete_secret.assert_called_once_with("api-key")
     
-    @patch('aihub.vault.azure_keyvault.keyvault.SecretClient')
-    @patch('aihub.vault.azure_keyvault.keyvault.DefaultAzureCredential')
+    @patch('unifiedui.vault.azure_keyvault.keyvault.SecretClient')
+    @patch('unifiedui.vault.azure_keyvault.keyvault.DefaultAzureCredential')
     def test_ping_success(self, mock_credential, mock_secret_client_class):
         """Test ping returns True when vault is accessible."""
         mock_client = Mock()
@@ -225,8 +225,8 @@ class TestAzureKeyVault:
         
         assert result is True
     
-    @patch('aihub.vault.azure_keyvault.keyvault.SecretClient')
-    @patch('aihub.vault.azure_keyvault.keyvault.DefaultAzureCredential')
+    @patch('unifiedui.vault.azure_keyvault.keyvault.SecretClient')
+    @patch('unifiedui.vault.azure_keyvault.keyvault.DefaultAzureCredential')
     def test_ping_failure(self, mock_credential, mock_secret_client_class):
         """Test ping returns False when vault is not accessible."""
         mock_client = Mock()

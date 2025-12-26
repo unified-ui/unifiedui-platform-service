@@ -1,7 +1,7 @@
 """Request schemas for development platform permissions."""
 from pydantic import BaseModel, Field
 
-from aihub.core.database.enums import PermissionActionEnum, PrincipalTypeEnum
+from unifiedui.core.database.enums import PermissionActionEnum, PrincipalTypeEnum
 
 
 class SetDevelopmentPlatformPermissionRequest(BaseModel):

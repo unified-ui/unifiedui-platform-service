@@ -21,8 +21,8 @@ class DatabaseConfig:
         Args:
             host: Database host (default: localhost)
             port: Database port (default: 5432)
-            database: Database name (default: aihub)
-            user: Database user (default: aihub)
+            database: Database name (default: unifiedui)
+            user: Database user (default: unifiedui)
             password: Database password
             database_url: Complete database URL (overrides other params)
         """
@@ -31,9 +31,9 @@ class DatabaseConfig:
         else:
             self.host = host or os.getenv("DB_HOST", "localhost")
             self.port = port or int(os.getenv("DB_PORT", "5432"))
-            self.database = database or os.getenv("DB_NAME", "aihub")
-            self.user = user or os.getenv("DB_USER", "aihub")
-            self.password = password or os.getenv("DB_PASSWORD", "aihub_password")
+            self.database = database or os.getenv("DB_NAME", "unifiedui")
+            self.user = user or os.getenv("DB_USER", "unifiedui")
+            self.password = password or os.getenv("DB_PASSWORD", "unifiedui_password")
             
             self.database_url = (
                 f"postgresql://{self.user}:{self.password}"

@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import List
 from pydantic import BaseModel, Field
 
-# filepath: /Users/enricogoerlitz/Developer/repos/aihub/aihub/schema/responses/tenants.py
+# filepath: /Users/enricogoerlitz/Developer/repos/unifiedui/unifiedui/schema/responses/tenants.py
 
 
 class TenantResponse(BaseModel):

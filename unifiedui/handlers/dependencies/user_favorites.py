@@ -1,7 +1,7 @@
 """FastAPI dependencies for user favorites handler."""
-from aihub.handlers.user_favorites import UserFavoritesHandler
-from aihub.handlers.dependencies.database import get_db_client
-from aihub.handlers.dependencies.cache import get_cache_client
+from unifiedui.handlers.user_favorites import UserFavoritesHandler
+from unifiedui.handlers.dependencies.database import get_db_client
+from unifiedui.handlers.dependencies.cache import get_cache_client
 
 
 def get_user_favorites_handler() -> UserFavoritesHandler:

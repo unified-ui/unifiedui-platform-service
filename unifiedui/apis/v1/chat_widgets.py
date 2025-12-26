@@ -4,21 +4,21 @@ from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Query
 from fastapi.responses import Response
 
-from aihub.core.identity.users import ContextIdentityUser
-from aihub.handlers.chat_widgets import ChatWidgetHandler
-from aihub.handlers.dependencies import get_chat_widget_handler
-from aihub.schema.requests.chat_widgets import CreateChatWidgetRequest, UpdateChatWidgetRequest
-from aihub.schema.requests.chat_widget_permissions import SetChatWidgetPermissionRequest
-from aihub.schema.responses.chat_widgets import ChatWidgetResponse
-from aihub.schema.responses.chat_widget_permissions import (
+from unifiedui.core.identity.users import ContextIdentityUser
+from unifiedui.handlers.chat_widgets import ChatWidgetHandler
+from unifiedui.handlers.dependencies import get_chat_widget_handler
+from unifiedui.schema.requests.chat_widgets import CreateChatWidgetRequest, UpdateChatWidgetRequest
+from unifiedui.schema.requests.chat_widget_permissions import SetChatWidgetPermissionRequest
+from unifiedui.schema.responses.chat_widgets import ChatWidgetResponse
+from unifiedui.schema.responses.chat_widget_permissions import (
     ChatWidgetPermissionResponse,
     ChatWidgetPrincipalsResponse,
     PrincipalPermissionsResponse
 )
-from aihub.exc.chat_widgets import ChatWidgetNotFoundError
-from aihub.core.middleware.apis.v1.auth import authenticate, check_permissions
-from aihub.core.database.enums import TenantRolesEnum, PermissionActionEnum, OrderDirectionEnum
-from aihub.logger import get_logger
+from unifiedui.exc.chat_widgets import ChatWidgetNotFoundError
+from unifiedui.core.middleware.apis.v1.auth import authenticate, check_permissions
+from unifiedui.core.database.enums import TenantRolesEnum, PermissionActionEnum, OrderDirectionEnum
+from unifiedui.logger import get_logger
 
 logger = get_logger(__name__)
 

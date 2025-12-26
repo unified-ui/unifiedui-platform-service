@@ -4,10 +4,10 @@ import pytest
 from typing import Generator
 from fastapi.testclient import TestClient
 
-from aihub.app import create_app
-from aihub.core.database.client import SQLAlchemyClient
-from aihub.caching.client import CacheClient
-from aihub.caching.redis.cache import RedisCache
+from unifiedui.app import create_app
+from unifiedui.core.database.client import SQLAlchemyClient
+from unifiedui.caching.client import CacheClient
+from unifiedui.caching.redis.cache import RedisCache
 from tests.fixtures.auth import create_test_user, create_auth_headers
 
 logger = logging.getLogger(__name__)
@@ -26,10 +26,10 @@ def test_client(
     logger.info(f"Test DB URL: {test_db_client.config.database_url}")
     
     # Set test clients as global singletons BEFORE app creation
-    import aihub.handlers.dependencies.database as db_dep
-    import aihub.caching.dependencies as old_cache_dep
-    import aihub.handlers.dependencies.cache as new_cache_dep
-    import aihub.handlers.dependencies.vault as vault_dep
+    import unifiedui.handlers.dependencies.database as db_dep
+    import unifiedui.caching.dependencies as old_cache_dep
+    import unifiedui.handlers.dependencies.cache as new_cache_dep
+    import unifiedui.handlers.dependencies.vault as vault_dep
     
     # Clear ALL cache databases before test to avoid pollution from previous tests
     fake_redis_client.client.flushall()

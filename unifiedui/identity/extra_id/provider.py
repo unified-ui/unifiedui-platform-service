@@ -1,9 +1,9 @@
 import requests
 
-from aihub.core.identity.providers import BaseIdentityProvider, BaseIdentityToken
-from aihub.schema.responses.identity import IdentityGroupResponse, IdentityUserResponse
-from aihub.utils.api_client import APIJSONBearerClient
-from aihub.utils.api_query import APIFilterQuery
+from unifiedui.core.identity.providers import BaseIdentityProvider, BaseIdentityToken
+from unifiedui.schema.responses.identity import IdentityGroupResponse, IdentityUserResponse
+from unifiedui.utils.api_client import APIJSONBearerClient
+from unifiedui.utils.api_query import APIFilterQuery
 
 
 class ExtraIDIdentityProvider(BaseIdentityProvider, APIJSONBearerClient):

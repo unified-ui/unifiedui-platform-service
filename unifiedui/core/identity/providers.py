@@ -1,8 +1,8 @@
 from abc import ABC, abstractmethod
 from enum import Enum
 
-from aihub.utils.api_query import APIFilterQuery
-from aihub.schema.responses.identity import IdentityGroupResponse, IdentityUserResponse
+from unifiedui.utils.api_query import APIFilterQuery
+from unifiedui.schema.responses.identity import IdentityGroupResponse, IdentityUserResponse
 
 
 class BaseIdentityToken(ABC):

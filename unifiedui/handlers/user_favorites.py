@@ -5,20 +5,20 @@ from typing import TYPE_CHECKING, Optional, List
 
 from sqlalchemy import select, delete
 
-from aihub.core.database.client import SQLAlchemyClient
-from aihub.core.database.models import (
+from unifiedui.core.database.client import SQLAlchemyClient
+from unifiedui.core.database.models import (
     ApplicationUserFavorite,
     AutonomousAgentUserFavorite,
     DevelopmentPlatformUserFavorite,
     ConversationUserFavorite
 )
-from aihub.caching.client import CacheClient
+from unifiedui.caching.client import CacheClient
 
 if TYPE_CHECKING:
-    from aihub.core.identity.users import ContextIdentityUser
+    from unifiedui.core.identity.users import ContextIdentityUser
 
-from aihub.schema.responses.user_favorites import UserFavoriteResponse, UserFavoritesListResponse
-from aihub.logger import get_logger
+from unifiedui.schema.responses.user_favorites import UserFavoriteResponse, UserFavoritesListResponse
+from unifiedui.logger import get_logger
 
 logger = get_logger(__name__)
 

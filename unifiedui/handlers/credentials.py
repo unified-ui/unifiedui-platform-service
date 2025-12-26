@@ -7,25 +7,25 @@ from typing import TYPE_CHECKING, Optional, List
 from sqlalchemy import select, or_
 from sqlalchemy.orm import selectinload
 
-from aihub.core.database.client import SQLAlchemyClient
-from aihub.core.database.models import Credential, CredentialMember, CredentialTag, Tag
-from aihub.core.database.enums import PermissionActionEnum, PrincipalTypeEnum
-from aihub.core.vault.client import BaseVaultClient
-from aihub.caching.client import CacheClient
+from unifiedui.core.database.client import SQLAlchemyClient
+from unifiedui.core.database.models import Credential, CredentialMember, CredentialTag, Tag
+from unifiedui.core.database.enums import PermissionActionEnum, PrincipalTypeEnum
+from unifiedui.core.vault.client import BaseVaultClient
+from unifiedui.caching.client import CacheClient
 
 if TYPE_CHECKING:
-    from aihub.core.identity.users import ContextIdentityUser
-from aihub.schema.requests.credentials import CreateCredentialRequest, UpdateCredentialRequest
-from aihub.schema.requests.credential_permissions import SetCredentialPermissionRequest
-from aihub.schema.responses.credentials import CredentialResponse
-from aihub.schema.responses.tags import TagSummary
-from aihub.schema.responses.credential_permissions import (
+    from unifiedui.core.identity.users import ContextIdentityUser
+from unifiedui.schema.requests.credentials import CreateCredentialRequest, UpdateCredentialRequest
+from unifiedui.schema.requests.credential_permissions import SetCredentialPermissionRequest
+from unifiedui.schema.responses.credentials import CredentialResponse
+from unifiedui.schema.responses.tags import TagSummary
+from unifiedui.schema.responses.credential_permissions import (
     CredentialPermissionResponse,
     CredentialPrincipalsResponse,
     PrincipalPermissionsResponse
 )
-from aihub.exc.credentials import CredentialNotFoundError
-from aihub.logger import get_logger
+from unifiedui.exc.credentials import CredentialNotFoundError
+from unifiedui.logger import get_logger
 
 logger = get_logger(__name__)
 
@@ -82,7 +82,7 @@ class CredentialHandler:
         Returns:
             List of credential responses (without secret values)
         """
-        from aihub.core.database.enums import TenantRolesEnum
+        from unifiedui.core.database.enums import TenantRolesEnum
         
         logger.info("Listing credentials", extra={"tenant_id": tenant_id, "skip": skip, "limit": limit})
         

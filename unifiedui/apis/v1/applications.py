@@ -4,21 +4,21 @@ from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Query
 from fastapi.responses import Response
 
-from aihub.core.identity.users import ContextIdentityUser
-from aihub.handlers.applications import ApplicationHandler
-from aihub.handlers.dependencies import get_application_handler
-from aihub.schema.requests.applications import CreateApplicationRequest, UpdateApplicationRequest
-from aihub.schema.requests.application_permissions import SetApplicationPermissionRequest
-from aihub.schema.responses.applications import ApplicationResponse
-from aihub.schema.responses.application_permissions import (
+from unifiedui.core.identity.users import ContextIdentityUser
+from unifiedui.handlers.applications import ApplicationHandler
+from unifiedui.handlers.dependencies import get_application_handler
+from unifiedui.schema.requests.applications import CreateApplicationRequest, UpdateApplicationRequest
+from unifiedui.schema.requests.application_permissions import SetApplicationPermissionRequest
+from unifiedui.schema.responses.applications import ApplicationResponse
+from unifiedui.schema.responses.application_permissions import (
     ApplicationPermissionResponse,
     ApplicationPrincipalsResponse,
     PrincipalPermissionsResponse
 )
-from aihub.exc.applications import ApplicationNotFoundError
-from aihub.core.middleware.apis.v1.auth import authenticate, check_permissions
-from aihub.core.database.enums import TenantRolesEnum, PermissionActionEnum, OrderDirectionEnum
-from aihub.logger import get_logger
+from unifiedui.exc.applications import ApplicationNotFoundError
+from unifiedui.core.middleware.apis.v1.auth import authenticate, check_permissions
+from unifiedui.core.database.enums import TenantRolesEnum, PermissionActionEnum, OrderDirectionEnum
+from unifiedui.logger import get_logger
 
 logger = get_logger(__name__)
 

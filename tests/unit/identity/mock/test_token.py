@@ -1,11 +1,11 @@
-"""Unit tests for aihub/identity/mock/token.py - MockIdentityToken."""
+"""Unit tests for unifiedui/identity/mock/token.py - MockIdentityToken."""
 import pytest
 import jwt
 import time
 
-from aihub.identity.mock.token import MockIdentityToken
-from aihub.core.identity.providers import BaseIdentityToken
-from aihub.core.identity.enums import IdenityProviderEnum
+from unifiedui.identity.mock.token import MockIdentityToken
+from unifiedui.core.identity.providers import BaseIdentityToken
+from unifiedui.core.identity.enums import IdenityProviderEnum
 
 
 class TestMockIdentityToken:

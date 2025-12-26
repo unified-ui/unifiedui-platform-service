@@ -6,22 +6,22 @@ from datetime import datetime, UTC
 from sqlalchemy import select, and_, or_
 from sqlalchemy.orm import Session
 
-from aihub.core.database.client import SQLAlchemyClient
-from aihub.core.database.models import CustomGroup, CustomGroupMember
-from aihub.caching.client import CacheClient
-from aihub.schema.requests.custom_groups import (
+from unifiedui.core.database.client import SQLAlchemyClient
+from unifiedui.core.database.models import CustomGroup, CustomGroupMember
+from unifiedui.caching.client import CacheClient
+from unifiedui.schema.requests.custom_groups import (
     CreateCustomGroupRequest,
     UpdateCustomGroupRequest,
     SetPrincipalRoleRequest,
     DeletePrincipalRoleRequest
 )
-from aihub.schema.responses.custom_groups import (
+from unifiedui.schema.responses.custom_groups import (
     CustomGroupResponse,
     CustomGroupPrincipalsResponse,
     PrincipalsResponse
 )
-from aihub.exc.custom_groups import CustomGroupNotFoundError
-from aihub.logger import get_logger
+from unifiedui.exc.custom_groups import CustomGroupNotFoundError
+from unifiedui.logger import get_logger
 
 logger = get_logger(__name__)
 

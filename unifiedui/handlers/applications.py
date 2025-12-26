@@ -7,25 +7,25 @@ from typing import TYPE_CHECKING, Optional, List
 from sqlalchemy import select, or_
 from sqlalchemy.orm import selectinload
 
-from aihub.core.database.client import SQLAlchemyClient
-from aihub.core.database.models import Application, ApplicationMember, ApplicationTag, Tag
-from aihub.core.database.enums import PermissionActionEnum, PrincipalTypeEnum
-from aihub.caching.client import CacheClient
+from unifiedui.core.database.client import SQLAlchemyClient
+from unifiedui.core.database.models import Application, ApplicationMember, ApplicationTag, Tag
+from unifiedui.core.database.enums import PermissionActionEnum, PrincipalTypeEnum
+from unifiedui.caching.client import CacheClient
 
 if TYPE_CHECKING:
-    from aihub.core.identity.users import ContextIdentityUser
+    from unifiedui.core.identity.users import ContextIdentityUser
 
-from aihub.schema.requests.applications import CreateApplicationRequest, UpdateApplicationRequest
-from aihub.schema.requests.application_permissions import SetApplicationPermissionRequest
-from aihub.schema.responses.applications import ApplicationResponse
-from aihub.schema.responses.tags import TagSummary
-from aihub.schema.responses.application_permissions import (
+from unifiedui.schema.requests.applications import CreateApplicationRequest, UpdateApplicationRequest
+from unifiedui.schema.requests.application_permissions import SetApplicationPermissionRequest
+from unifiedui.schema.responses.applications import ApplicationResponse
+from unifiedui.schema.responses.tags import TagSummary
+from unifiedui.schema.responses.application_permissions import (
     ApplicationPermissionResponse,
     ApplicationPrincipalsResponse,
     PrincipalPermissionsResponse
 )
-from aihub.exc.applications import ApplicationNotFoundError
-from aihub.logger import get_logger
+from unifiedui.exc.applications import ApplicationNotFoundError
+from unifiedui.logger import get_logger
 
 logger = get_logger(__name__)
 
@@ -79,7 +79,7 @@ class ApplicationHandler:
         Returns:
             List of application responses
         """
-        from aihub.core.database.enums import TenantRolesEnum
+        from unifiedui.core.database.enums import TenantRolesEnum
         
         logger.info("Listing applications", extra={"tenant_id": tenant_id, "skip": skip, "limit": limit})
         

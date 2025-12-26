@@ -3,8 +3,8 @@ from typing import Optional, List
 from pymongo.database import Database
 from pymongo.collection import Collection
 
-from aihub.core.docdatabase.collections.permissions import PermissionsCollection
-from aihub.core.docdatabase.models.permissions import PermissionModel, AssignedTo
+from unifiedui.core.docdatabase.collections.permissions import PermissionsCollection
+from unifiedui.core.docdatabase.models.permissions import PermissionModel, AssignedTo
 
 
 class MongoDBPermissionsCollection(PermissionsCollection):

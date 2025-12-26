@@ -1,9 +1,9 @@
-"""Unit tests for aihub/core/caching/client.py - BaseCacheClient abstract class."""
+"""Unit tests for unifiedui/core/caching/client.py - BaseCacheClient abstract class."""
 import pytest
 from abc import ABC
 
-from aihub.core.caching.client import BaseCacheClient
-from aihub.core.caching.cache import BaseCache
+from unifiedui.core.caching.client import BaseCacheClient
+from unifiedui.core.caching.cache import BaseCache
 
 
 class MockBaseCache(BaseCache):

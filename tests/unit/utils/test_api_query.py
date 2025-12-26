@@ -1,8 +1,8 @@
-"""Unit tests for aihub/utils/api_query.py"""
+"""Unit tests for unifiedui/utils/api_query.py"""
 import pytest
 from dataclasses import fields
 
-from aihub.utils.api_query import APIFilterQuery
+from unifiedui.utils.api_query import APIFilterQuery
 
 
 class TestAPIFilterQuery:

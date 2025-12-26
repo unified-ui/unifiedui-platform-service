@@ -3,11 +3,11 @@ from typing import Optional
 
 from fastapi import Depends
 
-from aihub.core.database.client import SQLAlchemyClient
-from aihub.handlers.applications import ApplicationHandler
-from aihub.caching.client import CacheClient
-from aihub.handlers.dependencies.database import get_db_client
-from aihub.handlers.dependencies.cache import get_cache_client
+from unifiedui.core.database.client import SQLAlchemyClient
+from unifiedui.handlers.applications import ApplicationHandler
+from unifiedui.caching.client import CacheClient
+from unifiedui.handlers.dependencies.database import get_db_client
+from unifiedui.handlers.dependencies.cache import get_cache_client
 
 
 def get_application_handler(

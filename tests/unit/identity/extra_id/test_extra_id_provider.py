@@ -1,12 +1,12 @@
-"""Unit tests for aihub/identity/extra_id/provider.py - ExtraID Identity Provider."""
+"""Unit tests for unifiedui/identity/extra_id/provider.py - ExtraID Identity Provider."""
 import pytest
 from unittest.mock import Mock, patch, MagicMock
 
-from aihub.identity.extra_id.provider import ExtraIDIdentityProvider
-from aihub.identity.extra_id.token import ExtraIDIdentityTokenSerializer
-from aihub.schema.responses.identity import IdentityGroupResponse, IdentityUserResponse
-from aihub.utils.api_query import APIFilterQuery
-from aihub.core.identity.providers import BaseIdentityProvider
+from unifiedui.identity.extra_id.provider import ExtraIDIdentityProvider
+from unifiedui.identity.extra_id.token import ExtraIDIdentityTokenSerializer
+from unifiedui.schema.responses.identity import IdentityGroupResponse, IdentityUserResponse
+from unifiedui.utils.api_query import APIFilterQuery
+from unifiedui.core.identity.providers import BaseIdentityProvider
 
 
 class TestExtraIDIdentityProvider:
@@ -27,7 +27,7 @@ class TestExtraIDIdentityProvider:
         assert isinstance(self.provider, BaseIdentityProvider)
         assert self.provider.identity_token == self.token
 
-    @patch('aihub.identity.extra_id.provider.requests.get')
+    @patch('unifiedui.identity.extra_id.provider.requests.get')
     def test_get_current_user_security_groups(self, mock_get):
         """Test getting current user's security groups."""
         mock_response = Mock()
@@ -46,7 +46,7 @@ class TestExtraIDIdentityProvider:
         assert groups[0].display_name == "Group 1"
         mock_get.assert_called_once()
 
-    @patch('aihub.identity.extra_id.provider.requests.get')
+    @patch('unifiedui.identity.extra_id.provider.requests.get')
     def test_get_current_user_security_groups_with_next_link(self, mock_get):
         """Test getting groups with next_link."""
         mock_response = Mock()
@@ -62,7 +62,7 @@ class TestExtraIDIdentityProvider:
         assert call_args[1]["params"] == {}
         assert len(groups) == 1
 
-    @patch('aihub.identity.extra_id.provider.requests.get')
+    @patch('unifiedui.identity.extra_id.provider.requests.get')
     def test_get_security_groups(self, mock_get):
         """Test getting all security groups."""
         mock_response = Mock()
@@ -77,7 +77,7 @@ class TestExtraIDIdentityProvider:
         assert len(groups) == 1
         assert next_link == "https://next-link"
 
-    @patch('aihub.identity.extra_id.provider.requests.get')
+    @patch('unifiedui.identity.extra_id.provider.requests.get')
     def test_get_security_groups_with_search(self, mock_get):
         """Test getting groups with search query."""
         mock_response = Mock()
@@ -92,7 +92,7 @@ class TestExtraIDIdentityProvider:
         assert call_args[1]["headers"]["ConsistencyLevel"] == "eventual"
         assert "$search" in call_args[1]["params"]
 
-    @patch('aihub.identity.extra_id.provider.requests.get')
+    @patch('unifiedui.identity.extra_id.provider.requests.get')
     def test_get_security_groups_with_next_link(self, mock_get):
         """Test getting groups with next_link parameter."""
         mock_response = Mock()
@@ -108,7 +108,7 @@ class TestExtraIDIdentityProvider:
         assert call_args[1]["params"] == {}
         assert len(groups) == 1
 
-    @patch('aihub.identity.extra_id.provider.requests.get')
+    @patch('unifiedui.identity.extra_id.provider.requests.get')
     def test_get_users(self, mock_get):
         """Test getting users from directory."""
         mock_response = Mock()
@@ -126,7 +126,7 @@ class TestExtraIDIdentityProvider:
         assert users[0].id == "u1"
         assert next_link == "next-page"
 
-    @patch('aihub.identity.extra_id.provider.requests.get')
+    @patch('unifiedui.identity.extra_id.provider.requests.get')
     def test_get_users_with_search(self, mock_get):
         """Test getting users with search query."""
         mock_response = Mock()
@@ -141,7 +141,7 @@ class TestExtraIDIdentityProvider:
         assert "$search" in call_args[1]["params"]
         assert len(users) == 1
     
-    @patch('aihub.identity.extra_id.provider.requests.get')
+    @patch('unifiedui.identity.extra_id.provider.requests.get')
     def test_get_users_with_next_link(self, mock_get):
         """Test getting users with next_link."""
         mock_response = Mock()
@@ -157,7 +157,7 @@ class TestExtraIDIdentityProvider:
         assert call_args[1]["params"] == {}
         assert len(users) == 1
 
-    @patch('aihub.identity.extra_id.provider.requests.get')
+    @patch('unifiedui.identity.extra_id.provider.requests.get')
     def test_get_user_by_id(self, mock_get):
         """Test getting a specific user by ID."""
         mock_response = Mock()
@@ -180,7 +180,7 @@ class TestExtraIDIdentityProvider:
         assert user.lastname == "Doe"
         assert user.mail == "john.doe@test.com"
 
-    @patch('aihub.identity.extra_id.provider.requests.get')
+    @patch('unifiedui.identity.extra_id.provider.requests.get')
     def test_get_group_by_id(self, mock_get):
         """Test getting a specific group by ID."""
         mock_response = Mock()

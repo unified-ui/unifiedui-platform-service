@@ -2,12 +2,12 @@
 from functools import lru_cache
 from typing import Optional
 
-from aihub.core.config import settings
-from aihub.core.vault.client import BaseVaultClient
-from aihub.vault.azure_keyvault.client import AzureKeyVaultClient
-from aihub.vault.hashicorp_vault.client import HashiCorpVaultClient
-from aihub.handlers.dependencies.cache import get_cache_client
-from aihub.logger import get_logger
+from unifiedui.core.config import settings
+from unifiedui.core.vault.client import BaseVaultClient
+from unifiedui.vault.azure_keyvault.client import AzureKeyVaultClient
+from unifiedui.vault.hashicorp_vault.client import HashiCorpVaultClient
+from unifiedui.handlers.dependencies.cache import get_cache_client
+from unifiedui.logger import get_logger
 
 logger = get_logger(__name__)
 

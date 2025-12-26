@@ -1,16 +1,16 @@
 from typing import TYPE_CHECKING, Optional
 from sqlalchemy import select
 
-from aihub.handlers.tenants import TenantHandler
-from aihub.core.identity.factory import IdentityProviderFactory, IdentityTokenFactory
-from aihub.schema.responses.identity import IdentityGroupResponse, IdentityUserResponse
-from aihub.schema.responses.tenants import TenantResponse
-from aihub.utils.api_query import APIFilterQuery
-from aihub.core.database.client import SQLAlchemyClient
-from aihub.caching.client import CacheClient
-from aihub.handlers.dependencies import get_db_client
-from aihub.core.database.models import CustomGroup, CustomGroupMember
-from aihub.logger import get_logger
+from unifiedui.handlers.tenants import TenantHandler
+from unifiedui.core.identity.factory import IdentityProviderFactory, IdentityTokenFactory
+from unifiedui.schema.responses.identity import IdentityGroupResponse, IdentityUserResponse
+from unifiedui.schema.responses.tenants import TenantResponse
+from unifiedui.utils.api_query import APIFilterQuery
+from unifiedui.core.database.client import SQLAlchemyClient
+from unifiedui.caching.client import CacheClient
+from unifiedui.handlers.dependencies import get_db_client
+from unifiedui.core.database.models import CustomGroup, CustomGroupMember
+from unifiedui.logger import get_logger
 
 logger = get_logger(__name__)
 
@@ -99,7 +99,7 @@ class ContextIdentityUser:
         db_client = self._database_client or get_db_client()
         
         with db_client.get_session() as session:
-            from aihub.core.database.models import CustomGroupMember
+            from unifiedui.core.database.models import CustomGroupMember
             
             query = (
                 select(CustomGroup)
@@ -155,7 +155,7 @@ class ContextIdentityUser:
         # Use TenantHandler to get tenants with roles (caching is handled in the handler)
         db_client = self._database_client
         if not db_client:
-            from aihub.handlers.dependencies import get_db_client
+            from unifiedui.handlers.dependencies import get_db_client
             db_client = get_db_client()
         handler = TenantHandler(db_client, self._cache)
         

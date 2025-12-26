@@ -2,10 +2,10 @@
 import os
 from typing import Optional
 
-from aihub.core.caching.client import BaseCacheClient
-from aihub.core.caching.collections.tenants import TenantsCacheCollection
-from aihub.caching.enums import CacheTypeEnum
-from aihub.caching.redis.client import RedisCacheClient
+from unifiedui.core.caching.client import BaseCacheClient
+from unifiedui.core.caching.collections.tenants import TenantsCacheCollection
+from unifiedui.caching.enums import CacheTypeEnum
+from unifiedui.caching.redis.client import RedisCacheClient
 
 
 class CacheClient:

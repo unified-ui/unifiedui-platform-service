@@ -6,8 +6,8 @@ from typing import List, Optional, Type, TYPE_CHECKING
 from sqlalchemy import select, delete
 from sqlalchemy.orm import Session
 
-from aihub.core.database.client import SQLAlchemyClient
-from aihub.core.database.models import (
+from unifiedui.core.database.client import SQLAlchemyClient
+from unifiedui.core.database.models import (
     Tag,
     Application, ApplicationTag,
     AutonomousAgent, AutonomousAgentTag,
@@ -15,13 +15,13 @@ from aihub.core.database.models import (
     Credential, CredentialTag,
     DevelopmentPlatform, DevelopmentPlatformTag,
 )
-from aihub.caching.client import CacheClient
-from aihub.schema.responses.tags import TagResponse, TagListResponse, ResourceTagsResponse, TagSummary
-from aihub.exc.tags import TagNotFoundError
-from aihub.logger import get_logger
+from unifiedui.caching.client import CacheClient
+from unifiedui.schema.responses.tags import TagResponse, TagListResponse, ResourceTagsResponse, TagSummary
+from unifiedui.exc.tags import TagNotFoundError
+from unifiedui.logger import get_logger
 
 if TYPE_CHECKING:
-    from aihub.core.identity.users import ContextIdentityUser
+    from unifiedui.core.identity.users import ContextIdentityUser
 
 logger = get_logger(__name__)
 

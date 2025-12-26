@@ -6,24 +6,24 @@ from typing import TYPE_CHECKING, Optional, List
 
 from sqlalchemy import select
 
-from aihub.core.database.client import SQLAlchemyClient
-from aihub.core.database.models import Conversation, ConversationMember
-from aihub.core.database.enums import PermissionActionEnum, PrincipalTypeEnum
-from aihub.caching.client import CacheClient
+from unifiedui.core.database.client import SQLAlchemyClient
+from unifiedui.core.database.models import Conversation, ConversationMember
+from unifiedui.core.database.enums import PermissionActionEnum, PrincipalTypeEnum
+from unifiedui.caching.client import CacheClient
 
 if TYPE_CHECKING:
-    from aihub.core.identity.users import ContextIdentityUser
+    from unifiedui.core.identity.users import ContextIdentityUser
 
-from aihub.schema.requests.conversations import CreateConversationRequest, UpdateConversationRequest
-from aihub.schema.requests.conversation_permissions import SetConversationPermissionRequest
-from aihub.schema.responses.conversations import ConversationResponse
-from aihub.schema.responses.conversation_permissions import (
+from unifiedui.schema.requests.conversations import CreateConversationRequest, UpdateConversationRequest
+from unifiedui.schema.requests.conversation_permissions import SetConversationPermissionRequest
+from unifiedui.schema.responses.conversations import ConversationResponse
+from unifiedui.schema.responses.conversation_permissions import (
     ConversationPermissionResponse,
     ConversationPrincipalsResponse,
     PrincipalPermissionsResponse
 )
-from aihub.exc.conversations import ConversationNotFoundError
-from aihub.logger import get_logger
+from unifiedui.exc.conversations import ConversationNotFoundError
+from unifiedui.logger import get_logger
 
 logger = get_logger(__name__)
 
@@ -75,7 +75,7 @@ class ConversationHandler:
         Returns:
             List of conversation responses
         """
-        from aihub.core.database.enums import TenantRolesEnum
+        from unifiedui.core.database.enums import TenantRolesEnum
         
         logger.info("Listing conversations", extra={"tenant_id": tenant_id, "skip": skip, "limit": limit})
         

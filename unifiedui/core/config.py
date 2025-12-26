@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     # MongoDB Configuration (Optional)
     document_database: Optional[str] = None
     mongodb_connection_string: Optional[str] = None
-    mongodb_database_name: str = "aihub"
+    mongodb_database_name: str = "unifiedui"
     
     # Cache Configuration (Optional)
     cache_enabled: bool = False

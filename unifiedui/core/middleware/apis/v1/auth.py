@@ -4,10 +4,10 @@ from typing import Callable, Any, Union
 from fastapi import Request, HTTPException, status
 from sqlalchemy import select
 
-from aihub.core.identity.users import ContextIdentityUser
-from aihub.handlers.dependencies import get_db_client
-from aihub.core.database.enums import TenantRolesEnum, PermissionActionEnum, UserPermissionEnum
-from aihub.core.database.models import (
+from unifiedui.core.identity.users import ContextIdentityUser
+from unifiedui.handlers.dependencies import get_db_client
+from unifiedui.core.database.enums import TenantRolesEnum, PermissionActionEnum, UserPermissionEnum
+from unifiedui.core.database.models import (
     ApplicationMember,
     CredentialMember,
     AutonomousAgentMember,
@@ -17,8 +17,8 @@ from aihub.core.database.models import (
     ChatWidgetMember,
     Tag
 )
-from aihub.handlers.dependencies.database import get_db_client
-from aihub.caching.dependencies import get_cache_client
+from unifiedui.handlers.dependencies.database import get_db_client
+from unifiedui.caching.dependencies import get_cache_client
 
 
 def authenticate(func: Callable) -> Callable:

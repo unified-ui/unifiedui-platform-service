@@ -2,7 +2,7 @@
 from abc import ABC, abstractmethod
 from typing import Any, Optional
 
-from aihub.core.caching.cache import BaseCache
+from unifiedui.core.caching.cache import BaseCache
 
 
 class BaseCacheClient(ABC):

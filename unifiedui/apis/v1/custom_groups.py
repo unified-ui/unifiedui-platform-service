@@ -2,18 +2,18 @@
 from typing import Optional
 from fastapi import APIRouter, status, Query, Depends, Request
 
-from aihub.handlers.custom_groups import CustomGroupHandler
-from aihub.handlers.dependencies import get_custom_group_handler
-from aihub.core.middleware.apis.v1.auth import authenticate, check_permissions
-from aihub.core.identity.users import ContextIdentityUser
-from aihub.core.database.enums import TenantRolesEnum, PermissionActionEnum, OrderDirectionEnum
-from aihub.schema.requests.custom_groups import (
+from unifiedui.handlers.custom_groups import CustomGroupHandler
+from unifiedui.handlers.dependencies import get_custom_group_handler
+from unifiedui.core.middleware.apis.v1.auth import authenticate, check_permissions
+from unifiedui.core.identity.users import ContextIdentityUser
+from unifiedui.core.database.enums import TenantRolesEnum, PermissionActionEnum, OrderDirectionEnum
+from unifiedui.schema.requests.custom_groups import (
     CreateCustomGroupRequest,
     UpdateCustomGroupRequest,
     SetPrincipalRoleRequest,
     DeletePrincipalRoleRequest
 )
-from aihub.schema.responses.custom_groups import (
+from unifiedui.schema.responses.custom_groups import (
     CustomGroupResponse,
     CustomGroupPrincipalsResponse,
     PrincipalsResponse

@@ -2,12 +2,12 @@
 import os
 from typing import Optional
 
-from aihub.core.docdatabase.base import BaseDatabaseClient
-from aihub.docdatabase.enums import DocumentDatabaseTypeEnum
-from aihub.docdatabase.mongo.client import MongoDBDatabaseClient
-from aihub.core.docdatabase.collections.tenants import TenantsCollection
-from aihub.core.docdatabase.collections.permissions import PermissionsCollection
-from aihub.core.docdatabase.collections.custom_groups import CustomGroupsCollection
+from unifiedui.core.docdatabase.base import BaseDatabaseClient
+from unifiedui.docdatabase.enums import DocumentDatabaseTypeEnum
+from unifiedui.docdatabase.mongo.client import MongoDBDatabaseClient
+from unifiedui.core.docdatabase.collections.tenants import TenantsCollection
+from unifiedui.core.docdatabase.collections.permissions import PermissionsCollection
+from unifiedui.core.docdatabase.collections.custom_groups import CustomGroupsCollection
 
 
 class DatabaseClient:
@@ -149,7 +149,7 @@ class DatabaseClientFactory:
 
         # Get database name
         if database_name is None:
-            database_name = os.getenv("MONGODB_DATABASE_NAME", "aihub")
+            database_name = os.getenv("MONGODB_DATABASE_NAME", "unifiedui")
 
         client = MongoDBDatabaseClient(
             connection_string=connection_string,

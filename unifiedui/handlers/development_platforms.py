@@ -7,25 +7,25 @@ from typing import TYPE_CHECKING, Optional, List
 from sqlalchemy import select, or_
 from sqlalchemy.orm import selectinload
 
-from aihub.core.database.client import SQLAlchemyClient
-from aihub.core.database.models import DevelopmentPlatform, DevelopmentPlatformMember, DevelopmentPlatformTag, Tag
-from aihub.core.database.enums import PermissionActionEnum, PrincipalTypeEnum
-from aihub.caching.client import CacheClient
+from unifiedui.core.database.client import SQLAlchemyClient
+from unifiedui.core.database.models import DevelopmentPlatform, DevelopmentPlatformMember, DevelopmentPlatformTag, Tag
+from unifiedui.core.database.enums import PermissionActionEnum, PrincipalTypeEnum
+from unifiedui.caching.client import CacheClient
 
 if TYPE_CHECKING:
-    from aihub.core.identity.users import ContextIdentityUser
+    from unifiedui.core.identity.users import ContextIdentityUser
 
-from aihub.schema.requests.development_platforms import CreateDevelopmentPlatformRequest, UpdateDevelopmentPlatformRequest
-from aihub.schema.requests.development_platform_permissions import SetDevelopmentPlatformPermissionRequest
-from aihub.schema.responses.development_platforms import DevelopmentPlatformResponse
-from aihub.schema.responses.tags import TagSummary
-from aihub.schema.responses.development_platform_permissions import (
+from unifiedui.schema.requests.development_platforms import CreateDevelopmentPlatformRequest, UpdateDevelopmentPlatformRequest
+from unifiedui.schema.requests.development_platform_permissions import SetDevelopmentPlatformPermissionRequest
+from unifiedui.schema.responses.development_platforms import DevelopmentPlatformResponse
+from unifiedui.schema.responses.tags import TagSummary
+from unifiedui.schema.responses.development_platform_permissions import (
     DevelopmentPlatformPermissionResponse,
     DevelopmentPlatformPrincipalsResponse,
     PrincipalPermissionsResponse
 )
-from aihub.exc.development_platforms import DevelopmentPlatformNotFoundError
-from aihub.logger import get_logger
+from unifiedui.exc.development_platforms import DevelopmentPlatformNotFoundError
+from unifiedui.logger import get_logger
 
 logger = get_logger(__name__)
 
@@ -79,7 +79,7 @@ class DevelopmentPlatformHandler:
         Returns:
             List of development platform responses
         """
-        from aihub.core.database.enums import TenantRolesEnum
+        from unifiedui.core.database.enums import TenantRolesEnum
         
         logger.info("Listing development platforms", extra={"tenant_id": tenant_id, "skip": skip, "limit": limit})
         

@@ -3,8 +3,8 @@ from datetime import datetime
 from typing import Optional, List
 from pydantic import BaseModel, Field, ConfigDict
 
-from aihub.core.database.enums import ApplicationTypeEnum
-from aihub.schema.responses.tags import TagSummary
+from unifiedui.core.database.enums import ApplicationTypeEnum
+from unifiedui.schema.responses.tags import TagSummary
 
 
 class ApplicationResponse(BaseModel):

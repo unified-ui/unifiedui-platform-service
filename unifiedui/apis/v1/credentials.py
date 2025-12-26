@@ -4,21 +4,21 @@ from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Query
 from fastapi.responses import Response
 
-from aihub.core.identity.users import ContextIdentityUser
-from aihub.handlers.credentials import CredentialHandler
-from aihub.handlers.dependencies import get_credential_handler
-from aihub.schema.requests.credentials import CreateCredentialRequest, UpdateCredentialRequest
-from aihub.schema.requests.credential_permissions import SetCredentialPermissionRequest
-from aihub.schema.responses.credentials import CredentialResponse
-from aihub.schema.responses.credential_permissions import (
+from unifiedui.core.identity.users import ContextIdentityUser
+from unifiedui.handlers.credentials import CredentialHandler
+from unifiedui.handlers.dependencies import get_credential_handler
+from unifiedui.schema.requests.credentials import CreateCredentialRequest, UpdateCredentialRequest
+from unifiedui.schema.requests.credential_permissions import SetCredentialPermissionRequest
+from unifiedui.schema.responses.credentials import CredentialResponse
+from unifiedui.schema.responses.credential_permissions import (
     CredentialPermissionResponse,
     CredentialPrincipalsResponse,
     PrincipalPermissionsResponse
 )
-from aihub.exc.credentials import CredentialNotFoundError
-from aihub.core.middleware.apis.v1.auth import authenticate, check_permissions
-from aihub.core.database.enums import TenantRolesEnum, PermissionActionEnum, OrderDirectionEnum
-from aihub.logger import get_logger
+from unifiedui.exc.credentials import CredentialNotFoundError
+from unifiedui.core.middleware.apis.v1.auth import authenticate, check_permissions
+from unifiedui.core.database.enums import TenantRolesEnum, PermissionActionEnum, OrderDirectionEnum
+from unifiedui.logger import get_logger
 
 logger = get_logger(__name__)
 

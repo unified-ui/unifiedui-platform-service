@@ -1,10 +1,10 @@
 """HashiCorp Vault client implementation."""
 from typing import Optional, Any
 
-from aihub.core.vault.client import BaseVaultClient
-from aihub.core.vault.vault import BaseVault
-from aihub.vault.hashicorp_vault.vault import HashiCorpVault
-from aihub.logger import get_logger
+from unifiedui.core.vault.client import BaseVaultClient
+from unifiedui.core.vault.vault import BaseVault
+from unifiedui.vault.hashicorp_vault.vault import HashiCorpVault
+from unifiedui.logger import get_logger
 
 logger = get_logger(__name__)
 

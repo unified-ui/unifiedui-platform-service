@@ -1,29 +1,29 @@
-name: aihub-infra
+name: unifiedui-infra
 
 services:
-  aihub-postgres:
+  unifiedui-database:
     image: postgres:16-alpine
-    container_name: aihub-postgres
+    container_name: unifiedui-database
     restart: unless-stopped
     ports:
       - "5432:5432"
     environment:
-      - POSTGRES_USER=aihub
-      - POSTGRES_PASSWORD=aihub_password
-      - POSTGRES_DB=aihub
+      - POSTGRES_USER=unifiedui
+      - POSTGRES_PASSWORD=unifiedui_password
+      - POSTGRES_DB=unifiedui
     volumes:
-      - postgres_data_aihub:/var/lib/postgresql/data
+      - postgres_data_unifiedui:/var/lib/postgresql/data
     networks:
-      - aihub_network
+      - unifiedui_network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U aihub"]
+      test: ["CMD-SHELL", "pg_isready -U unifiedui"]
       interval: 10s
       timeout: 5s
       retries: 5
 
-  aihub-mongodb:
+  unifiedui-docdatabase:
     image: mongo:8.2
-    container_name: aihub-mongodb
+    container_name: unifiedui-docdatabase
     ports:
       - "27017:27017"
     environment:
@@ -32,11 +32,11 @@ services:
     volumes:
       - mongo_data:/data/db
     networks:
-      - aihub_network
+      - unifiedui_network
 
-  aihub-redis:
+  unifiedui-cache:
     image: redis:8.4
-    container_name: aihub-redis
+    container_name: unifiedui-cache
     environment:
       REDIS_PASSWORD: admin
     command: ["redis-server", "--requirepass", "admin"]
@@ -45,11 +45,11 @@ services:
     volumes:
       - redis_data:/data
     networks:
-      - aihub_network
+      - unifiedui_network
 
-  aihub-rabbitmq:
+  unifiedui-message-broker:
     image: rabbitmq:4.2-management
-    container_name: aihub-rabbitmq
+    container_name: unifiedui-message-broker
     ports:
       - "5672:5672"   # AMQP protocol
       - "15672:15672" # Management UI
@@ -59,11 +59,11 @@ services:
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
     networks:
-      - aihub_network
+      - unifiedui_network
 
-  aihub-vault:
+  unifiedui-vault:
     image: hashicorp/vault:1.18
-    container_name: aihub-vault
+    container_name: unifiedui-vault
     ports:
       - "8200:8200"
     environment:
@@ -74,16 +74,16 @@ services:
       - IPC_LOCK
     command: vault server -dev
     networks:
-      - aihub_network
+      - unifiedui_network
   
 volumes:
   mongo_data:
   redis_data:
   rabbitmq_data:
   minio_data:
-  postgres_data_aihub:
+  postgres_data_unifiedui:
 
 networks:
-  aihub_network:
-    name: aihub_network
+  unifiedui_network:
+    name: unifiedui_network
     driver: bridge

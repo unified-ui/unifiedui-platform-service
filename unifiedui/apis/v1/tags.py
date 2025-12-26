@@ -4,15 +4,15 @@ from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Query
 from fastapi.responses import Response
 
-from aihub.core.identity.users import ContextIdentityUser
-from aihub.handlers.tags import TagHandler
-from aihub.handlers.dependencies import get_tag_handler
-from aihub.schema.requests.tags import CreateTagRequest, SetResourceTagsRequest
-from aihub.schema.responses.tags import TagResponse, TagListResponse, ResourceTagsResponse
-from aihub.exc.tags import TagNotFoundError, TagDeleteNotAllowedError
-from aihub.core.middleware.apis.v1.auth import authenticate, check_permissions
-from aihub.core.database.enums import TenantRolesEnum, PermissionActionEnum, UserPermissionEnum
-from aihub.logger import get_logger
+from unifiedui.core.identity.users import ContextIdentityUser
+from unifiedui.handlers.tags import TagHandler
+from unifiedui.handlers.dependencies import get_tag_handler
+from unifiedui.schema.requests.tags import CreateTagRequest, SetResourceTagsRequest
+from unifiedui.schema.responses.tags import TagResponse, TagListResponse, ResourceTagsResponse
+from unifiedui.exc.tags import TagNotFoundError, TagDeleteNotAllowedError
+from unifiedui.core.middleware.apis.v1.auth import authenticate, check_permissions
+from unifiedui.core.database.enums import TenantRolesEnum, PermissionActionEnum, UserPermissionEnum
+from unifiedui.logger import get_logger
 
 logger = get_logger(__name__)
 

@@ -1,11 +1,11 @@
-"""Unit tests for aihub/identity/mock/provider.py - Mock Identity Provider."""
+"""Unit tests for unifiedui/identity/mock/provider.py - Mock Identity Provider."""
 import pytest
 from unittest.mock import Mock
 
-from aihub.identity.mock.provider import MockIdentityProvider
-from aihub.identity.mock.token import MockIdentityToken
-from aihub.schema.responses.identity import IdentityGroupResponse, IdentityUserResponse
-from aihub.utils.api_query import APIFilterQuery
+from unifiedui.identity.mock.provider import MockIdentityProvider
+from unifiedui.identity.mock.token import MockIdentityToken
+from unifiedui.schema.responses.identity import IdentityGroupResponse, IdentityUserResponse
+from unifiedui.utils.api_query import APIFilterQuery
 
 
 class TestMockIdentityProvider:

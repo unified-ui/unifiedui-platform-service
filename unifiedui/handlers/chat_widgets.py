@@ -7,25 +7,25 @@ from typing import TYPE_CHECKING, Optional, List
 from sqlalchemy import select, or_
 from sqlalchemy.orm import selectinload
 
-from aihub.core.database.client import SQLAlchemyClient
-from aihub.core.database.models import ChatWidget, ChatWidgetMember, ChatWidgetTag, Tag
-from aihub.core.database.enums import PermissionActionEnum, PrincipalTypeEnum
-from aihub.caching.client import CacheClient
+from unifiedui.core.database.client import SQLAlchemyClient
+from unifiedui.core.database.models import ChatWidget, ChatWidgetMember, ChatWidgetTag, Tag
+from unifiedui.core.database.enums import PermissionActionEnum, PrincipalTypeEnum
+from unifiedui.caching.client import CacheClient
 
 if TYPE_CHECKING:
-    from aihub.core.identity.users import ContextIdentityUser
+    from unifiedui.core.identity.users import ContextIdentityUser
 
-from aihub.schema.requests.chat_widgets import CreateChatWidgetRequest, UpdateChatWidgetRequest
-from aihub.schema.requests.chat_widget_permissions import SetChatWidgetPermissionRequest
-from aihub.schema.responses.chat_widgets import ChatWidgetResponse
-from aihub.schema.responses.tags import TagSummary
-from aihub.schema.responses.chat_widget_permissions import (
+from unifiedui.schema.requests.chat_widgets import CreateChatWidgetRequest, UpdateChatWidgetRequest
+from unifiedui.schema.requests.chat_widget_permissions import SetChatWidgetPermissionRequest
+from unifiedui.schema.responses.chat_widgets import ChatWidgetResponse
+from unifiedui.schema.responses.tags import TagSummary
+from unifiedui.schema.responses.chat_widget_permissions import (
     ChatWidgetPermissionResponse,
     ChatWidgetPrincipalsResponse,
     PrincipalPermissionsResponse
 )
-from aihub.exc.chat_widgets import ChatWidgetNotFoundError
-from aihub.logger import get_logger
+from unifiedui.exc.chat_widgets import ChatWidgetNotFoundError
+from unifiedui.logger import get_logger
 
 logger = get_logger(__name__)
 
@@ -79,7 +79,7 @@ class ChatWidgetHandler:
         Returns:
             List of chat widget responses
         """
-        from aihub.core.database.enums import TenantRolesEnum
+        from unifiedui.core.database.enums import TenantRolesEnum
         
         logger.info("Listing chat widgets", extra={"tenant_id": tenant_id, "skip": skip, "limit": limit})
         

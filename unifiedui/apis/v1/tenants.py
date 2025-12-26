@@ -2,18 +2,18 @@
 from typing import Optional
 from fastapi import APIRouter, status, Query, Depends, Request
 
-from aihub.handlers.tenants import TenantHandler
-from aihub.handlers.dependencies import get_tenant_handler
-from aihub.core.middleware.apis.v1.auth import authenticate, check_permissions
-from aihub.core.identity.users import ContextIdentityUser
-from aihub.core.database.enums import TenantRolesEnum, OrderDirectionEnum
-from aihub.schema.requests.tenants import (
+from unifiedui.handlers.tenants import TenantHandler
+from unifiedui.handlers.dependencies import get_tenant_handler
+from unifiedui.core.middleware.apis.v1.auth import authenticate, check_permissions
+from unifiedui.core.identity.users import ContextIdentityUser
+from unifiedui.core.database.enums import TenantRolesEnum, OrderDirectionEnum
+from unifiedui.schema.requests.tenants import (
     CreateTenantRequest,
     UpdateTenantRequest,
     SetPrincipalRequest,
     DeletePrincipalRequest
 )
-from aihub.schema.responses.tenants import (
+from unifiedui.schema.responses.tenants import (
     TenantResponse,
     PrincipalsResponse,
     TenantPrincipalsResponse

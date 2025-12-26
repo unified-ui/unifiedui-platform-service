@@ -4,8 +4,8 @@ from typing import Any
 from fastapi import status
 from starlette.testclient import TestClient
 
-from aihub.core.database.enums import PermissionActionEnum, PrincipalTypeEnum
-from aihub.core.database.models import (
+from unifiedui.core.database.enums import PermissionActionEnum, PrincipalTypeEnum
+from unifiedui.core.database.models import (
     Application, ApplicationMember,
     AutonomousAgent, AutonomousAgentMember,
 )

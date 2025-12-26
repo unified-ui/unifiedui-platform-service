@@ -6,9 +6,9 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.pool import QueuePool
 
-from aihub.core.database.config import DatabaseConfig
-from aihub.core.database.models import Base
-from aihub.logger import get_logger
+from unifiedui.core.database.config import DatabaseConfig
+from unifiedui.core.database.models import Base
+from unifiedui.logger import get_logger
 
 logger = get_logger(__name__)
 

@@ -7,25 +7,25 @@ from typing import TYPE_CHECKING, Optional, List
 from sqlalchemy import select, or_
 from sqlalchemy.orm import selectinload
 
-from aihub.core.database.client import SQLAlchemyClient
-from aihub.core.database.models import AutonomousAgent, AutonomousAgentMember, AutonomousAgentTag, Tag
-from aihub.core.database.enums import PermissionActionEnum, PrincipalTypeEnum
-from aihub.caching.client import CacheClient
+from unifiedui.core.database.client import SQLAlchemyClient
+from unifiedui.core.database.models import AutonomousAgent, AutonomousAgentMember, AutonomousAgentTag, Tag
+from unifiedui.core.database.enums import PermissionActionEnum, PrincipalTypeEnum
+from unifiedui.caching.client import CacheClient
 
 if TYPE_CHECKING:
-    from aihub.core.identity.users import ContextIdentityUser
+    from unifiedui.core.identity.users import ContextIdentityUser
 
-from aihub.schema.requests.autonomous_agents import CreateAutonomousAgentRequest, UpdateAutonomousAgentRequest
-from aihub.schema.requests.autonomous_agent_permissions import SetAutonomousAgentPermissionRequest
-from aihub.schema.responses.autonomous_agents import AutonomousAgentResponse
-from aihub.schema.responses.tags import TagSummary
-from aihub.schema.responses.autonomous_agent_permissions import (
+from unifiedui.schema.requests.autonomous_agents import CreateAutonomousAgentRequest, UpdateAutonomousAgentRequest
+from unifiedui.schema.requests.autonomous_agent_permissions import SetAutonomousAgentPermissionRequest
+from unifiedui.schema.responses.autonomous_agents import AutonomousAgentResponse
+from unifiedui.schema.responses.tags import TagSummary
+from unifiedui.schema.responses.autonomous_agent_permissions import (
     AutonomousAgentPermissionResponse,
     AutonomousAgentPrincipalsResponse,
     PrincipalPermissionsResponse
 )
-from aihub.exc.autonomous_agents import AutonomousAgentNotFoundError, AutonomousAgentPermissionNotFoundError
-from aihub.logger import get_logger
+from unifiedui.exc.autonomous_agents import AutonomousAgentNotFoundError, AutonomousAgentPermissionNotFoundError
+from unifiedui.logger import get_logger
 
 logger = get_logger(__name__)
 
@@ -79,7 +79,7 @@ class AutonomousAgentHandler:
         Returns:
             List of autonomous agent responses
         """
-        from aihub.core.database.enums import TenantRolesEnum
+        from unifiedui.core.database.enums import TenantRolesEnum
         
         logger.info("Listing autonomous agents", extra={"tenant_id": tenant_id, "skip": skip, "limit": limit})
         

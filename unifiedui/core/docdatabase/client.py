@@ -2,7 +2,7 @@
 from abc import ABC, abstractmethod
 from typing import Any, Optional
 
-from aihub.core.database.collections.applications import BaseApplicationsCollectionClient
+from unifiedui.core.database.collections.applications import BaseApplicationsCollectionClient
 
 class BaseDatabaseClient(ABC):
     """Abstract base class for database clients."""

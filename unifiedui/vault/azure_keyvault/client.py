@@ -1,10 +1,10 @@
 """Azure Key Vault client implementation."""
 from typing import Optional, Any
 
-from aihub.core.vault.client import BaseVaultClient
-from aihub.core.vault.vault import BaseVault
-from aihub.vault.azure_keyvault.keyvault import AzureKeyVault
-from aihub.logger import get_logger
+from unifiedui.core.vault.client import BaseVaultClient
+from unifiedui.core.vault.vault import BaseVault
+from unifiedui.vault.azure_keyvault.keyvault import AzureKeyVault
+from unifiedui.logger import get_logger
 
 logger = get_logger(__name__)
 

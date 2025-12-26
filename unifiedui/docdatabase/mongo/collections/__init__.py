@@ -1,3 +1,3 @@
-from aihub.docdatabase.mongo.collections.tenants import MongoDBTenantsCollection
+from unifiedui.docdatabase.mongo.collections.tenants import MongoDBTenantsCollection
 
 __all__ = ["MongoDBTenantsCollection"]

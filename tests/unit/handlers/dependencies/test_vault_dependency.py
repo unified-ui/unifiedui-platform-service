@@ -1,8 +1,8 @@
-"""Unit tests for aihub/handlers/dependencies/vault.py - Vault dependency."""
+"""Unit tests for unifiedui/handlers/dependencies/vault.py - Vault dependency."""
 import pytest
 from unittest.mock import patch, Mock
 
-from aihub.handlers.dependencies.vault import get_vault_client
+from unifiedui.handlers.dependencies.vault import get_vault_client
 
 
 class TestGetVaultClient:
@@ -10,12 +10,12 @@ class TestGetVaultClient:
 
     def teardown_method(self):
         """Reset global vault client and clear cache."""
-        import aihub.handlers.dependencies.vault
-        aihub.handlers.dependencies.vault._vault_client = None
+        import unifiedui.handlers.dependencies.vault
+        unifiedui.handlers.dependencies.vault._vault_client = None
         # Clear lru_cache
         get_vault_client.cache_clear()
 
-    @patch('aihub.handlers.dependencies.vault.settings')
+    @patch('unifiedui.handlers.dependencies.vault.settings')
     def test_get_vault_client_no_vault_configured(self, mock_settings):
         """Test when no vault is configured."""
         mock_settings.vault_type = None
@@ -24,9 +24,9 @@ class TestGetVaultClient:
         
         assert result is None
 
-    @patch('aihub.handlers.dependencies.vault.settings')
-    @patch('aihub.handlers.dependencies.vault.AzureKeyVaultClient')
-    @patch('aihub.handlers.dependencies.vault.get_cache_client')
+    @patch('unifiedui.handlers.dependencies.vault.settings')
+    @patch('unifiedui.handlers.dependencies.vault.AzureKeyVaultClient')
+    @patch('unifiedui.handlers.dependencies.vault.get_cache_client')
     def test_get_vault_client_azure_keyvault(self, mock_cache, mock_vault_class, mock_settings):
         """Test Azure KeyVault client initialization."""
         mock_settings.vault_type = "AZURE_KEYVAULT"
@@ -46,8 +46,8 @@ class TestGetVaultClient:
             cache_client=mock_cache_client
         )
 
-    @patch('aihub.handlers.dependencies.vault.settings')
-    @patch('aihub.handlers.dependencies.vault.AzureKeyVaultClient')
+    @patch('unifiedui.handlers.dependencies.vault.settings')
+    @patch('unifiedui.handlers.dependencies.vault.AzureKeyVaultClient')
     def test_get_vault_client_azure_keyvault_no_cache(self, mock_vault_class, mock_settings):
         """Test Azure KeyVault without caching."""
         mock_settings.vault_type = "azure_keyvault"  # Test case-insensitive
@@ -64,7 +64,7 @@ class TestGetVaultClient:
             cache_client=None
         )
 
-    @patch('aihub.handlers.dependencies.vault.settings')
+    @patch('unifiedui.handlers.dependencies.vault.settings')
     def test_get_vault_client_azure_keyvault_missing_name(self, mock_settings):
         """Test Azure KeyVault without vault name raises error."""
         mock_settings.vault_type = "AZURE_KEYVAULT"
@@ -75,9 +75,9 @@ class TestGetVaultClient:
         
         assert "azure_keyvault_vault_name must be set" in str(exc_info.value)
 
-    @patch('aihub.handlers.dependencies.vault.settings')
-    @patch('aihub.handlers.dependencies.vault.HashiCorpVaultClient')
-    @patch('aihub.handlers.dependencies.vault.get_cache_client')
+    @patch('unifiedui.handlers.dependencies.vault.settings')
+    @patch('unifiedui.handlers.dependencies.vault.HashiCorpVaultClient')
+    @patch('unifiedui.handlers.dependencies.vault.get_cache_client')
     def test_get_vault_client_hashicorp(self, mock_cache, mock_vault_class, mock_settings):
         """Test HashiCorp Vault client initialization."""
         mock_settings.vault_type = "HASHICORP_VAULT"
@@ -99,7 +99,7 @@ class TestGetVaultClient:
             cache_client=mock_cache_client
         )
 
-    @patch('aihub.handlers.dependencies.vault.settings')
+    @patch('unifiedui.handlers.dependencies.vault.settings')
     def test_get_vault_client_hashicorp_missing_addr(self, mock_settings):
         """Test HashiCorp Vault without address raises error."""
         mock_settings.vault_type = "hashicorp_vault"  # Test case-insensitive
@@ -110,7 +110,7 @@ class TestGetVaultClient:
         
         assert "vault_addr must be set" in str(exc_info.value)
 
-    @patch('aihub.handlers.dependencies.vault.settings')
+    @patch('unifiedui.handlers.dependencies.vault.settings')
     def test_get_vault_client_unsupported_type(self, mock_settings):
         """Test unsupported vault type raises error."""
         mock_settings.vault_type = "UNKNOWN_VAULT"
@@ -121,8 +121,8 @@ class TestGetVaultClient:
         assert "Unsupported vault type" in str(exc_info.value)
         assert "UNKNOWN_VAULT" in str(exc_info.value)
 
-    @patch('aihub.handlers.dependencies.vault.settings')
-    @patch('aihub.handlers.dependencies.vault.AzureKeyVaultClient')
+    @patch('unifiedui.handlers.dependencies.vault.settings')
+    @patch('unifiedui.handlers.dependencies.vault.AzureKeyVaultClient')
     def test_get_vault_client_cached(self, mock_vault_class, mock_settings):
         """Test that vault client is cached (lru_cache)."""
         mock_settings.vault_type = "AZURE_KEYVAULT"
@@ -139,13 +139,13 @@ class TestGetVaultClient:
         # Vault class should only be called once
         assert mock_vault_class.call_count == 1
 
-    @patch('aihub.handlers.dependencies.vault.settings')
-    @patch('aihub.handlers.dependencies.vault.AzureKeyVaultClient')
+    @patch('unifiedui.handlers.dependencies.vault.settings')
+    @patch('unifiedui.handlers.dependencies.vault.AzureKeyVaultClient')
     def test_get_vault_client_test_vault_client_set(self, mock_vault_class, mock_settings):
         """Test that test vault client is returned when set."""
-        import aihub.handlers.dependencies.vault
+        import unifiedui.handlers.dependencies.vault
         test_client = Mock()
-        aihub.handlers.dependencies.vault._vault_client = test_client
+        unifiedui.handlers.dependencies.vault._vault_client = test_client
         
         result = get_vault_client()
         

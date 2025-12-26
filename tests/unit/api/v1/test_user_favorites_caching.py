@@ -3,8 +3,8 @@ import uuid
 from fastapi import status
 from starlette.testclient import TestClient
 
-from aihub.core.database.enums import PermissionActionEnum, PrincipalTypeEnum
-from aihub.core.database.models import Application, ApplicationMember
+from unifiedui.core.database.enums import PermissionActionEnum, PrincipalTypeEnum
+from unifiedui.core.database.models import Application, ApplicationMember
 from tests.conftest import create_auth_headers
 
 

@@ -6,13 +6,13 @@ from datetime import datetime
 from sqlalchemy import select, and_, or_
 from sqlalchemy.orm import Session
 
-from aihub.core.database.client import SQLAlchemyClient
-from aihub.core.database.models import Tenant, TenantMember, TenantMemberRole, CustomGroupMember
-from aihub.schema.requests.tenants import CreateTenantRequest, UpdateTenantRequest
-from aihub.schema.responses.tenants import TenantResponse
-from aihub.exc.tenants import TenantNotFoundError
-from aihub.caching.client import CacheClient
-from aihub.logger import get_logger
+from unifiedui.core.database.client import SQLAlchemyClient
+from unifiedui.core.database.models import Tenant, TenantMember, TenantMemberRole, CustomGroupMember
+from unifiedui.schema.requests.tenants import CreateTenantRequest, UpdateTenantRequest
+from unifiedui.schema.responses.tenants import TenantResponse
+from unifiedui.exc.tenants import TenantNotFoundError
+from unifiedui.caching.client import CacheClient
+from unifiedui.logger import get_logger
 
 logger = get_logger(__name__)
 
@@ -891,7 +891,7 @@ class TenantHandler:
         Returns:
             TenantRoleResponse
         """
-        from aihub.schema.responses.tenants import TenantRoleResponse
+        from unifiedui.schema.responses.tenants import TenantRoleResponse
         # Generate a human-readable name from the role value
         role_name = role.role.replace("_", " ").title() if role.role else None
         return TenantRoleResponse(

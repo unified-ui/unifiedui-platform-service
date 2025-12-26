@@ -4,21 +4,21 @@ from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Query
 from fastapi.responses import Response
 
-from aihub.core.identity.users import ContextIdentityUser
-from aihub.handlers.conversations import ConversationHandler
-from aihub.handlers.dependencies import get_conversation_handler
-from aihub.schema.requests.conversations import CreateConversationRequest, UpdateConversationRequest
-from aihub.schema.requests.conversation_permissions import SetConversationPermissionRequest
-from aihub.schema.responses.conversations import ConversationResponse
-from aihub.schema.responses.conversation_permissions import (
+from unifiedui.core.identity.users import ContextIdentityUser
+from unifiedui.handlers.conversations import ConversationHandler
+from unifiedui.handlers.dependencies import get_conversation_handler
+from unifiedui.schema.requests.conversations import CreateConversationRequest, UpdateConversationRequest
+from unifiedui.schema.requests.conversation_permissions import SetConversationPermissionRequest
+from unifiedui.schema.responses.conversations import ConversationResponse
+from unifiedui.schema.responses.conversation_permissions import (
     ConversationPermissionResponse,
     ConversationPrincipalsResponse,
     PrincipalPermissionsResponse
 )
-from aihub.exc.conversations import ConversationNotFoundError
-from aihub.core.middleware.apis.v1.auth import authenticate, check_permissions
-from aihub.core.database.enums import TenantRolesEnum, PermissionActionEnum, OrderDirectionEnum
-from aihub.logger import get_logger
+from unifiedui.exc.conversations import ConversationNotFoundError
+from unifiedui.core.middleware.apis.v1.auth import authenticate, check_permissions
+from unifiedui.core.database.enums import TenantRolesEnum, PermissionActionEnum, OrderDirectionEnum
+from unifiedui.logger import get_logger
 
 logger = get_logger(__name__)
 

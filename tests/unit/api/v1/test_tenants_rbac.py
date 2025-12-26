@@ -4,7 +4,7 @@ from typing import Any
 from fastapi import status
 from starlette.testclient import TestClient
 
-from aihub.core.database.enums import TenantRolesEnum, PrincipalTypeEnum
+from unifiedui.core.database.enums import TenantRolesEnum, PrincipalTypeEnum
 from tests.conftest import create_auth_headers
 
 
@@ -514,7 +514,7 @@ class TestTenantRBAC:
     
     def test_custom_group_grants_permissions_to_members(self, test_client: TestClient, fake_redis_client: Any) -> None:
         """Test that users in a custom group inherit the group's permissions."""
-        from aihub.core.database.models import CustomGroup, CustomGroupMember
+        from unifiedui.core.database.models import CustomGroup, CustomGroupMember
         import uuid
         
         # Admin creates tenant (use unique user ID to avoid conflicts)
@@ -558,7 +558,7 @@ class TestTenantRBAC:
         
         # Add user to custom group directly in DB (not via API)
         # Grant GLOBAL_ADMIN role to the custom group directly in DB (not via API)
-        from aihub.core.database.models import TenantMember, TenantMemberRole
+        from unifiedui.core.database.models import TenantMember, TenantMemberRole
         
         # Use test_client.db_client to write to the SAME DB that the API reads from!
         with test_client.db_client.get_session() as session:
@@ -637,7 +637,7 @@ class TestTenantRBAC:
     
     def test_custom_group_with_reader_role_limits_members(self, test_client: TestClient, fake_redis_client: Any) -> None:
         """Test that custom group with READER role limits member capabilities."""
-        from aihub.core.database.models import CustomGroup, CustomGroupMember
+        from unifiedui.core.database.models import CustomGroup, CustomGroupMember
         import uuid
         
         # Admin creates tenant
@@ -673,7 +673,7 @@ class TestTenantRBAC:
         reader_user_id = reader_user_token.get_id()  # Get actual user ID from token
         
         # Add user to custom group and grant permissions directly in DB (not via API)
-        from aihub.core.database.models import TenantMember, TenantMemberRole
+        from unifiedui.core.database.models import TenantMember, TenantMemberRole
         
         # Use test_client.db_client to write to the SAME DB that the API reads from!
         with test_client.db_client.get_session() as session:
@@ -751,7 +751,7 @@ class TestTenantRBAC:
     
     def test_user_not_in_custom_group_has_no_group_permissions(self, test_client: TestClient, fake_redis_client: Any) -> None:
         """Test that users who are NOT in a custom group do not get the group's permissions."""
-        from aihub.core.database.models import CustomGroup, CustomGroupMember
+        from unifiedui.core.database.models import CustomGroup, CustomGroupMember
         import uuid
         
         # Admin creates tenant
@@ -788,7 +788,7 @@ class TestTenantRBAC:
         non_member_headers = create_auth_headers(non_member_token, use_cache=False)
         
         # Add only first user to custom group and grant permissions directly in DB (not via API)
-        from aihub.core.database.models import TenantMember, TenantMemberRole
+        from unifiedui.core.database.models import TenantMember, TenantMemberRole
         
         # Use test_client.db_client to write to the SAME DB that the API reads from!
         with test_client.db_client.get_session() as session:

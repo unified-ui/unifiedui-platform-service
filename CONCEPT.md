@@ -1,4 +1,4 @@
-# AIHub Concept
+# unifiedui Concept
 
 ## Document Metadata
 
@@ -10,8 +10,8 @@
 | **Status** | Draft |
 | **Last Updated** | 2025-12-07 |
 
-## AIHub Vision
-**AIHub** transforms the complexity of managing multiple AI systems into a single, unified experience. In today's AI landscape, organizations deploy agents across diverse platforms—Microsoft Foundry, n8n, LangGraph, Copilot, and custom solutions—resulting in fragmented user experiences, inconsistent monitoring, and operational silos. AIHub eliminates these challenges by providing a **Unified-UI for your AI**, where every agent, regardless of origin, converges into one cohesive platform.
+## unifiedui Vision
+**unifiedui** transforms the complexity of managing multiple AI systems into a single, unified experience. In today's AI landscape, organizations deploy agents across diverse platforms—Microsoft Foundry, n8n, LangGraph, Copilot, and custom solutions—resulting in fragmented user experiences, inconsistent monitoring, and operational silos. unifiedui eliminates these challenges by providing a **Unified-UI for your AI**, where every agent, regardless of origin, converges into one cohesive platform.
 
 ### The Problem We Solve
 
@@ -36,43 +36,43 @@ The AI and agent landscape evolves at unprecedented speed:
 - **Framework churn**: Developers of agent systems must constantly adapt to emerging trends, migrating codebases and retraining teams on new platforms
 - **UI disruption for end users**: Each framework migration traditionally forces business users to learn new interfaces, disrupting productivity and adoption
 
-AIHub solves this by **decoupling the agent framework from the user experience**:
+unifiedui solves this by **decoupling the agent framework from the user experience**:
 - **Integrate legacy and modern systems simultaneously**: Continue running your existing agents built on older platforms while gradually adopting new tools—all accessible through the same unified interface
 - **Seamless transitions**: Migrate from one agent framework to another without forcing users to adapt to new UIs or losing conversation history
-- **Future-proof architecture**: AIHub is not an agent framework—it's an **integration platform**. We remain perpetually state-of-the-art by integrating the latest agent technologies as they emerge, rather than building our own tools that risk obsolescence
+- **Future-proof architecture**: unifiedui is not an agent framework—it's an **integration platform**. We remain perpetually state-of-the-art by integrating the latest agent technologies as they emerge, rather than building our own tools that risk obsolescence
 
 This means your organization can adopt cutting-edge AI innovations without the operational chaos of platform migrations, ensuring both technical agility and user continuity.
 
-### The AIHub Solution
+### The unifiedui Solution
 
 **One Unified Interface, Every Agent**  
-AIHub provides a single, consistent chat experience for all your AI agents—whether they're built on enterprise platforms like Microsoft Foundry, workflow automation tools like n8n, or custom frameworks like LangGraph. Users interact with every agent through the same intuitive interface, complete with:
+unifiedui provides a single, consistent chat experience for all your AI agents—whether they're built on enterprise platforms like Microsoft Foundry, workflow automation tools like n8n, or custom frameworks like LangGraph. Users interact with every agent through the same intuitive interface, complete with:
 - **Custom widget integration** for specialized interactions (forms, data visualization, interactive components)
 - **Consistent conversation history** across all agent types
 - **Unified access control** via your existing identity provider (Microsoft Entra ID, Google OAuth)
 
 **Centralized Tracing and Observability**  
-AIHub's **unified tracing framework** ingests telemetry from all your agents—conversational and autonomous—into a single database:
+unifiedui's **unified tracing framework** ingests telemetry from all your agents—conversational and autonomous—into a single database:
 - **Monitor all agents** from one dashboard, regardless of their underlying platform
 - **Semantic search** across traces, conversations, and agent outputs
 - **Chat with your traces**: Ask natural language questions about agent behavior, performance patterns, and historical interactions
-- **No lock-in**: Even agents without native tracing stores (e.g., custom LangGraph deployments) can stream telemetry to AIHub via our SDK
+- **No lock-in**: Even agents without native tracing stores (e.g., custom LangGraph deployments) can stream telemetry to unifiedui via our SDK
 
 **Cloud-Agnostic Architecture**  
-Deploy AIHub wherever your business needs it:
+Deploy unifiedui wherever your business needs it:
 - **SaaS**: Fully managed, zero-ops deployment for rapid adoption
-- **Azure, AWS, or GCP**: Run AIHub in your preferred cloud environment with full control over data residency
+- **Azure, AWS, or GCP**: Run unifiedui in your preferred cloud environment with full control over data residency
 - **On-Premises**: Deploy entirely within your data center for maximum compliance and security
 
-Agent systems themselves remain platform-agnostic—develop and deploy them anywhere, and AIHub seamlessly integrates them through standardized APIs.
+Agent systems themselves remain platform-agnostic—develop and deploy them anywhere, and unifiedui seamlessly integrates them through standardized APIs.
 
 **Native Support for Custom Agents**  
-Building a specialized LangGraph multi-agent system or deploying Azure Functions-based autonomous agents? AIHub's SDK makes integration effortless:
+Building a specialized LangGraph multi-agent system or deploying Azure Functions-based autonomous agents? unifiedui's SDK makes integration effortless:
 - **Minimal code changes**: Add our SDK to send conversation data and tracing telemetry
-- **No UI development required**: Instantly expose your custom agents through AIHub's chat interface
-- **Built-in authentication**: Leverage AIHub's identity integration without implementing your own auth layer
+- **No UI development required**: Instantly expose your custom agents through unifiedui's chat interface
+- **Built-in authentication**: Leverage unifiedui's identity integration without implementing your own auth layer
 
-### Why AIHub Matters
+### Why unifiedui Matters
 
 **For Business Leaders**  
 - **Accelerate AI adoption**: Users engage with AI through a single, familiar interface—no training on multiple platforms
@@ -89,37 +89,37 @@ Building a specialized LangGraph multi-agent system or deploying Azure Functions
 - **Contextual interactions**: Widgets adapt to business requirements, providing forms, visualizations, and custom UIs within conversations
 - **Trustworthy AI**: Transparent tracing and audit logs ensure accountability and explainability
 
-### The AIHub Advantage
+### The unifiedui Advantage
 
-AIHub isn't just another chat interface—it's the **integration layer for your entire AI landscape**. Whether you're running enterprise agents on Microsoft platforms, automating workflows with n8n, or deploying cutting-edge custom solutions with LangGraph, AIHub provides the foundation for scalable, observable, and user-friendly AI operations.
+unifiedui isn't just another chat interface—it's the **integration layer for your entire AI landscape**. Whether you're running enterprise agents on Microsoft platforms, automating workflows with n8n, or deploying cutting-edge custom solutions with LangGraph, unifiedui provides the foundation for scalable, observable, and user-friendly AI operations.
 
 **Integrate your AI landscape. Unify your experience. Accelerate your innovation.**
 
-## AIHub Overview
+## unifiedui Overview
 
-**AIHub** is a unified interface platform for deploying and managing AI chat applications powered by external agent systems. It serves as a central hub that integrates diverse agent platforms—such as Microsoft Foundry, n8n, Copilot, and others—into a single, cohesive application environment.
+**unifiedui** is a unified interface platform for deploying and managing AI chat applications powered by external agent systems. It serves as a central hub that integrates diverse agent platforms—such as Microsoft Foundry, n8n, Copilot, and others—into a single, cohesive application environment.
 
 ### Key Capabilities
 
 - **Unified Chat Interface**: Interact with multiple agent systems through a consistent chat experience, regardless of the underlying platform
 - **Flexible Widget System**: Seamlessly embed custom, context-aware widgets into chat conversations to handle specialized use cases like forms, data visualization, and interactive components
-- **Autonomous Agent Tracing**: Configure background agents to write tracing data directly to AIHub's centralized tracing database, providing visibility into autonomous operations alongside interactive conversations
+- **Autonomous Agent Tracing**: Configure background agents to write tracing data directly to unifiedui's centralized tracing database, providing visibility into autonomous operations alongside interactive conversations
 - **Multi-Provider Identity**: Integrate with your identity provider of choice (Microsoft Entra ID, Google OAuth, and more) for secure authentication and authorization
 - **Configurable Applications**: Define chat applications with specific agent configurations, share them with teams, or deploy them organization-wide with granular permission controls
 
 ### Deployment Options
 
-AIHub offers flexible deployment models to meet your infrastructure and compliance requirements:
+unifiedui offers flexible deployment models to meet your infrastructure and compliance requirements:
 
 - **SaaS**: Fully managed cloud service with minimal setup and maintenance overhead
 - **Cloud Deployment**: Deploy in your own cloud environment (Azure, AWS, or GCP) for greater control over data residency and infrastructure
-- **On-Premises**: Run AIHub entirely within your own data center for maximum security and compliance control
+- **On-Premises**: Run unifiedui entirely within your own data center for maximum security and compliance control
 
 ### Core Value Proposition
 
-AIHub enables you to:
+unifiedui enables you to:
 
-1. **Build once, integrate anywhere**: Develop agents on your preferred platform and integrate them effortlessly through AIHub's standardized API
+1. **Build once, integrate anywhere**: Develop agents on your preferred platform and integrate them effortlessly through unifiedui's standardized API
 2. **Centralize agent interaction**: Manage both conversational and autonomous agents from a single interface
 3. **Customize experiences**: Leverage the widget system to tailor chat interactions to specific business requirements
 4. **Control access**: Use role-based permissions and group management to govern who can access, modify, and invoke applications
@@ -128,10 +128,10 @@ AIHub enables you to:
 ## Architecture
 
 ### Technology Stack
-AIHub's architecture is built on modern, scalable technologies designed to support flexible deployment across multiple cloud providers:
+unifiedui's architecture is built on modern, scalable technologies designed to support flexible deployment across multiple cloud providers:
 
 #### Database Layer
-AIHub uses a **JSON-based document database** such as Azure Cosmos DB, MongoDB, or equivalent services on AWS and GCP. This approach provides:
+unifiedui uses a **JSON-based document database** such as Azure Cosmos DB, MongoDB, or equivalent services on AWS and GCP. This approach provides:
 - **Schema flexibility** through native JSON document storage
 - **Low-latency access** to conversation history, application configurations, and tracing data
 - **Elastic scalability** to accommodate varying workloads from small teams to enterprise-wide deployments
@@ -145,7 +145,7 @@ Key data models include:
 
 #### Caching Layer
 
-AIHub implements a **caching layer** to optimize performance and reduce load on the underlying database. The cache layer is critical for minimizing latency in authorization checks and frequently accessed data.
+unifiedui implements a **caching layer** to optimize performance and reduce load on the underlying database. The cache layer is critical for minimizing latency in authorization checks and frequently accessed data.
 
 **Key Use Cases:**
 
@@ -162,11 +162,11 @@ AIHub implements a **caching layer** to optimize performance and reduce load on 
 
 #### Message Broker and Event Processing Layer
 
-AIHub implements an **event-driven architecture** for autonomous agent tracing ingestion, decoupling trace collection from the core API.
+unifiedui implements an **event-driven architecture** for autonomous agent tracing ingestion, decoupling trace collection from the core API.
 
 **Purpose:**
 
-External agent systems write tracing data to a message broker instead of directly calling AIHub APIs. A dedicated microservice (consumer) processes these messages asynchronously and ingests them into the database.
+External agent systems write tracing data to a message broker instead of directly calling unifiedui APIs. A dedicated microservice (consumer) processes these messages asynchronously and ingests them into the database.
 
 **Supported Message Brokers:**
 
@@ -183,7 +183,7 @@ External agent systems write tracing data to a message broker instead of directl
     - Authentication uses the agent's identity provider credentials or dedicated service principal
 
 2. **Message Broker**
-    - Acts as the event buffer between external agents and AIHub
+    - Acts as the event buffer between external agents and unifiedui
     - Provides durability, ordering guarantees, and delivery semantics
     - Scales independently to handle high-throughput tracing workloads
 
@@ -196,7 +196,7 @@ External agent systems write tracing data to a message broker instead of directl
 
 **Key Benefits:**
 
-- **Asynchronous Processing**: Tracing ingestion does not block agent execution or impact AIHub API performance
+- **Asynchronous Processing**: Tracing ingestion does not block agent execution or impact unifiedui API performance
 - **Scalability**: Consumer microservice scales independently based on message throughput
 - **Resilience**: Message broker buffers traces during outages or high-load periods
 - **Decoupling**: External agents remain operational even if the consumer microservice is temporarily unavailable
@@ -211,26 +211,26 @@ External agent systems write tracing data to a message broker instead of directl
 
 **Deployment Patterns:**
 
-- **SaaS**: AIHub operates a shared message broker and consumer service
-- **Cloud Deployment**: Customer-managed message broker with AIHub-managed consumer microservice
+- **SaaS**: unifiedui operates a shared message broker and consumer service
+- **Cloud Deployment**: Customer-managed message broker with unifiedui-managed consumer microservice
 - **On-Premises**: Fully customer-managed message broker and consumer infrastructure
 
 #### Secrets Management Layer
 
 **Purpose:**
 
-AIHub's secrets management layer ensures secure storage and retrieval of sensitive credentials across two distinct scopes:
+unifiedui's secrets management layer ensures secure storage and retrieval of sensitive credentials across two distinct scopes:
 
-1. **Infrastructure Secrets**: Environment variables and configuration required for AIHub's own operation
+1. **Infrastructure Secrets**: Environment variables and configuration required for unifiedui's own operation
 2. **Application Secrets**: User-defined keys for external agent systems and autonomous agent authentication keys
 
 **Architecture Overview:**
 
-AIHub implements a **dual-keystore architecture** to separate concerns and maintain security boundaries:
+unifiedui implements a **dual-keystore architecture** to separate concerns and maintain security boundaries:
 
-#### 1. AIHub Infrastructure Keystore
+#### 1. unifiedui Infrastructure Keystore
 
-Manages secrets required for AIHub's core infrastructure and operation.
+Manages secrets required for unifiedui's core infrastructure and operation.
 
 **Stored Secrets:**
 - Database connection strings
@@ -247,13 +247,13 @@ Manages secrets required for AIHub's core infrastructure and operation.
 - **On-Premises**: HashiCorp Vault or equivalent enterprise secrets management solution
 
 **Access Pattern:**
-- AIHub retrieves these secrets **at startup** using managed identity
+- unifiedui retrieves these secrets **at startup** using managed identity
 - Secrets are loaded into memory and refreshed periodically (e.g., every 24 hours)
-- No API exposure—these secrets are never accessible via AIHub's public API
+- No API exposure—these secrets are never accessible via unifiedui's public API
 
-#### 2. AIHub Application Keystore
+#### 2. unifiedui Application Keystore
 
-Manages secrets created and used by AIHub applications and autonomous agents.
+Manages secrets created and used by unifiedui applications and autonomous agents.
 
 **Stored Secrets:**
 - Application authentication keys for external agent systems (e.g., Microsoft Foundry API keys, n8n webhook tokens)
@@ -263,25 +263,25 @@ Manages secrets created and used by AIHub applications and autonomous agents.
 **Implementation:**
 Uses the same underlying secrets management service as the infrastructure keystore, but maintains logical separation through:
 - **Separate resource/folder structure**: Application secrets stored in dedicated namespace
-- **Different access policies**: Governed by AIHub's permission model rather than infrastructure access controls
-- **API-driven lifecycle**: Created, updated, and rotated via AIHub API endpoints
+- **Different access policies**: Governed by unifiedui's permission model rather than infrastructure access controls
+- **API-driven lifecycle**: Created, updated, and rotated via unifiedui API endpoints
 
 **Access Pattern:**
 - **Write-only via API**: Users can create/update secrets through `/api/v1/keystore/secrets/` but cannot retrieve actual values
-- **Internal retrieval**: AIHub backend retrieves secret values when invoking external agents or validating autonomous agent keys
+- **Internal retrieval**: unifiedui backend retrieves secret values when invoking external agents or validating autonomous agent keys
 - **Metadata queries**: API returns secret metadata (name, creation date, last rotation) without exposing actual values
 
 **Security Characteristics:**
 
 - **Encryption at rest**: All secrets encrypted using provider-managed or customer-managed keys
 - **Audit logging**: All access to secrets is logged for compliance and security monitoring
-- **Access control**: Infrastructure secrets use cloud IAM; application secrets use AIHub's permission model
+- **Access control**: Infrastructure secrets use cloud IAM; application secrets use unifiedui's permission model
 - **Key rotation**: Autonomous agent keys support dual-key rotation without service interruption
-- **Principle of least privilege**: AIHub uses scoped permissions when accessing secrets (read-only for infrastructure secrets, read/write for application secrets)
+- **Principle of least privilege**: unifiedui uses scoped permissions when accessing secrets (read-only for infrastructure secrets, read/write for application secrets)
 
 **Best Practices:**
 
-- **Never log secret values**: AIHub ensures secrets are never written to application logs
+- **Never log secret values**: unifiedui ensures secrets are never written to application logs
 - **Use managed identities**: Prefer managed identity/workload identity over static credentials for accessing keystores
 - **Regular rotation**: Configure automated rotation policies for long-lived secrets
 - **Separate environments**: Use distinct keystores for development, staging, and production deployments
@@ -342,7 +342,7 @@ The user interface is built with **React** and **TypeScript**, offering a type-s
 
 ### Widgets
 
-**Widgets** enable the integration of custom UI components into chat conversations. Widgets can be either default components provided by AIHub or custom widgets embedded via iframe. Applications can be configured to include specific widget types along with instructions that guide the agent on how and when to integrate these widgets into the conversation.
+**Widgets** enable the integration of custom UI components into chat conversations. Widgets can be either default components provided by unifiedui or custom widgets embedded via iframe. Applications can be configured to include specific widget types along with instructions that guide the agent on how and when to integrate these widgets into the conversation.
 
 
 | Method | Endpoint | Description |
@@ -372,7 +372,7 @@ The user interface is built with **React** and **TypeScript**, offering a type-s
 
 ### Autonomous Agents and Tracing
 
-**Autonomous Agents** operate independently in the background and write tracing data to AIHub's centralized tracing database. Each agent is issued two rotatable keys (primary and secondary) for secure data ingestion.
+**Autonomous Agents** operate independently in the background and write tracing data to unifiedui's centralized tracing database. Each agent is issued two rotatable keys (primary and secondary) for secure data ingestion.
 
 #### Autonomous Agent Endpoints
 
@@ -392,7 +392,7 @@ The user interface is built with **React** and **TypeScript**, offering a type-s
 
 ### Identity
 
-**Identity** endpoints provide access to user and group information from both the configured identity provider and AIHub's custom group management system.
+**Identity** endpoints provide access to user and group information from both the configured identity provider and unifiedui's custom group management system.
 
 #### Identity Provider Endpoints
 
@@ -419,17 +419,17 @@ The user interface is built with **React** and **TypeScript**, offering a type-s
 
 ## Authentication Concept
 
-AIHub implements a **unified authentication system** based entirely on identity provider integration, ensuring consistent security policies across all user and service interactions.
+unifiedui implements a **unified authentication system** based entirely on identity provider integration, ensuring consistent security policies across all user and service interactions.
 
 ### User Authentication (Interactive Sessions)
 
 #### Identity Provider Integration
 
-AIHub integrates with enterprise identity providers to authenticate end users:
+unifiedui integrates with enterprise identity providers to authenticate end users:
 
 - **Supported Providers**: Microsoft Entra ID, Google OAuth, and other OAuth 2.0/OIDC-compliant providers
 - **Authentication Flow**: Users authenticate via the configured identity provider and receive a JWT bearer token
-- **Token Validation**: All API requests include the bearer token in the `Authorization` header, which AIHub validates against the identity provider
+- **Token Validation**: All API requests include the bearer token in the `Authorization` header, which unifiedui validates against the identity provider
 
 **Example Request:**
 ```http
@@ -438,12 +438,12 @@ Authorization: Bearer <jwt-token>
 
 #### Permission Resolution
 
-After successful authentication, AIHub resolves user permissions by:
+After successful authentication, unifiedui resolves user permissions by:
 
 1. **Retrieving user identity** from the validated JWT token (user ID, email, groups)
 2. **Querying group memberships** from both:
     - Identity provider groups (e.g., Microsoft Entra ID groups)
-    - AIHub custom groups (managed within the application)
+    - unifiedui custom groups (managed within the application)
 3. **Resolving permissions** assigned to those groups
 4. **Caching resolved permissions** to optimize subsequent authorization checks
 
@@ -465,7 +465,7 @@ Autonomous agents use the **same identity provider authentication** as interacti
 Authorization for autonomous agents follows the same permission model as users:
 
 1. **Service principal identity** is extracted from the validated JWT token
-2. **Group memberships** are resolved (identity provider groups and/or AIHub custom groups)
+2. **Group memberships** are resolved (identity provider groups and/or unifiedui custom groups)
 3. **Permissions** assigned to those groups determine what operations the agent can perform
 4. **Resource-specific permissions** control which autonomous agent resources can be accessed
 
@@ -496,7 +496,7 @@ Application secrets stored in the keystore are protected by:
 - **Stateless authentication**: All requests are validated independently using JWT tokens
 - **Token expiration**: Managed by the identity provider; expired tokens are rejected
 - **Permission cache TTL**: User permissions are cached with configurable expiration (typically 5-15 minutes) and invalidated on permission changes
-- **No server-side sessions**: AIHub does not maintain server-side session state, ensuring horizontal scalability
+- **No server-side sessions**: unifiedui does not maintain server-side session state, ensuring horizontal scalability
 
 ### Security Best Practices
 
@@ -510,7 +510,7 @@ Application secrets stored in the keystore are protected by:
 
 ## Permission Model
 
-AIHub uses a flexible permission system that supports granular access control across all resources. Permissions can be assigned to identity provider groups, custom groups, or predefined role groups.
+unifiedui uses a flexible permission system that supports granular access control across all resources. Permissions can be assigned to identity provider groups, custom groups, or predefined role groups.
 
 ### Permission Structure
 
@@ -550,7 +550,7 @@ Permissions follow the pattern `<resource>:<action>` or `<resource>/{id}:<action
 
 ### Permission Groups
 
-AIHub supports multiple approaches to organizing permissions:
+unifiedui supports multiple approaches to organizing permissions:
 
 #### Predefined Role Groups
 - **VIEWER** — Read-only access across all resources
@@ -565,8 +565,8 @@ AIHub supports multiple approaches to organizing permissions:
 #### Identity Provider Groups
 Use groups from your configured identity provider (e.g., Microsoft Entra ID) to assign permissions based on existing organizational structures.
 
-#### AIHub Custom Groups
-Create and manage custom groups within AIHub for fine-grained permission assignment independent of your identity provider.
+#### unifiedui Custom Groups
+Create and manage custom groups within unifiedui for fine-grained permission assignment independent of your identity provider.
 
 ## Widget Integration
 
@@ -638,10 +638,10 @@ When a message contains widgets, the response follows this JSON structure:
 - Tenant support
 - als SASS Lösung bereitstellen
 
-## Warum ChatHistorie und Tracing in den AIHub integrieren
+## Warum ChatHistorie und Tracing in den unifiedui integrieren
 
-Eine zentrale konzeptionelle Frage ist, ob Chat-Historie und Tracings direkt in die AIHub-Datenbank integriert werden sollen oder ob stattdessen immer der Store der jeweiligen Agent-Plattform genutzt und Daten on-the-fly in die benötigte Struktur übersetzt werden sollen.
-### Pro-Argumente für die Integration in AIHub
+Eine zentrale konzeptionelle Frage ist, ob Chat-Historie und Tracings direkt in die unifiedui-Datenbank integriert werden sollen oder ob stattdessen immer der Store der jeweiligen Agent-Plattform genutzt und Daten on-the-fly in die benötigte Struktur übersetzt werden sollen.
+### Pro-Argumente für die Integration in unifiedui
 
 1. **Heterogene Store-Qualität**: Nicht jedes Agent-System bietet einen ausgereiften Conversation Store mit vergleichbaren Funktionen und Leistungsmerkmalen.
 
@@ -657,50 +657,50 @@ Eine zentrale konzeptionelle Frage ist, ob Chat-Historie und Tracings direkt in 
 
 7. **Einheitliche Datenstruktur**: Eine vordefinierte JSON-Struktur ermöglicht konsistentes Querying, Auswertung und Visualisierung über alle Agent-Systeme hinweg.
 
-8. **Integration autonomer Logs**: Logs aus autonomen Agents (z.B. Azure Functions) lassen sich ohne zusätzliche externe Logging-Infrastruktur direkt in AIHub aufbereiten und anzeigen.
+8. **Integration autonomer Logs**: Logs aus autonomen Agents (z.B. Azure Functions) lassen sich ohne zusätzliche externe Logging-Infrastruktur direkt in unifiedui aufbereiten und anzeigen.
 
-9. **Zukunftssicherheit**: AIHub kann über ein reines Chat-UI hinauswachsen – z.B. durch Dev-Komponenten, direktes Entwickeln und Deployen von Custom Widgets innerhalb der Plattform.
+9. **Zukunftssicherheit**: unifiedui kann über ein reines Chat-UI hinauswachsen – z.B. durch Dev-Komponenten, direktes Entwickeln und Deployen von Custom Widgets innerhalb der Plattform.
 
 10. **Unified-UI Vision**: Ein zentraler Datenstore ermöglicht ein konsistentes, einheitliches UI-Erlebnis und erlaubt dem Entwicklerteam, sich auf Backend-Innovation zu konzentrieren.
 
-### Contra-Argumente für die Integration in AIHub
+### Contra-Argumente für die Integration in unifiedui
 
-1. **Doppelte Datenhaltung**: Daten werden sowohl im Agent-Store als auch im AIHub gespeichert, was zu Redundanz und potenziellem Synchronisationsbedarf führt.
+1. **Doppelte Datenhaltung**: Daten werden sowohl im Agent-Store als auch im unifiedui gespeichert, was zu Redundanz und potenziellem Synchronisationsbedarf führt.
 
-2. **Erhöhte Infrastrukturkosten**: Zusätzliche Speicher- und Datenbankressourcen in AIHub erhöhen die Betriebskosten.
+2. **Erhöhte Infrastrukturkosten**: Zusätzliche Speicher- und Datenbankressourcen in unifiedui erhöhen die Betriebskosten.
 
 3. **Wartungsaufwand**: Zusätzliche Microservices (z.B. Tracing Consumer) und Datenbankschemata erfordern kontinuierliche Wartung und Updates.
 
 ### Entscheidungsmatrix
 
-| **Kategorie** | **Kriterium** | **Integration in AIHub** | **On-the-fly Übersetzung** | **Gewichtung** | **Bewertung (1-5)** |
+| **Kategorie** | **Kriterium** | **Integration in unifiedui** | **On-the-fly Übersetzung** | **Gewichtung** | **Bewertung (1-5)** |
 |---------------|---------------|---------------------------|----------------------------|----------------|---------------------|
-| **Funktionalität** | Erweiterte Suchfunktionen (Semantic Search) | ✅ Nativ möglich | ⚠️ Abhängig von externen Stores | Hoch | AIHub: 5, Extern: 2 |
-| **Funktionalität** | Support für Custom Agents ohne Store | ✅ Vollständig unterstützt | ❌ Nicht möglich | Hoch | AIHub: 5, Extern: 1 |
-| **Funktionalität** | Einheitliche Datenstruktur | ✅ Garantiert | ⚠️ Übersetzungsaufwand | Mittel | AIHub: 5, Extern: 3 |
-| **Funktionalität** | Innovative Features (Chat with Traces) | ✅ Einfach umsetzbar | ❌ Technisch komplex | Hoch | AIHub: 5, Extern: 2 |
-| **Skalierbarkeit** | Unterstützung für autonome Agents | ✅ Zentralisiert | ⚠️ Verteilte Datenquellen | Hoch | AIHub: 5, Extern: 3 |
-| **Kosten** | Infrastrukturkosten | ⚠️ Höhere Speicherkosten | ✅ Niedrigere Kosten | Mittel | AIHub: 3, Extern: 5 |
-| **Kosten** | Entwicklungs- und Wartungsaufwand | ⚠️ Zusätzliche Services | ✅ Geringer | Mittel | AIHub: 3, Extern: 4 |
-| **Komplexität** | Datensynchronisation | ⚠️ Erforderlich | ✅ Nicht erforderlich | Mittel | AIHub: 3, Extern: 5 |
-| **Flexibilität** | Plattformübergreifende Features | ✅ Unabhängig | ❌ Limitiert | Hoch | AIHub: 5, Extern: 2 |
-| **Flexibilität** | Zukunftssicherheit (neue Features) | ✅ Volle Kontrolle | ⚠️ Eingeschränkt | Hoch | AIHub: 5, Extern: 3 |
+| **Funktionalität** | Erweiterte Suchfunktionen (Semantic Search) | ✅ Nativ möglich | ⚠️ Abhängig von externen Stores | Hoch | unifiedui: 5, Extern: 2 |
+| **Funktionalität** | Support für Custom Agents ohne Store | ✅ Vollständig unterstützt | ❌ Nicht möglich | Hoch | unifiedui: 5, Extern: 1 |
+| **Funktionalität** | Einheitliche Datenstruktur | ✅ Garantiert | ⚠️ Übersetzungsaufwand | Mittel | unifiedui: 5, Extern: 3 |
+| **Funktionalität** | Innovative Features (Chat with Traces) | ✅ Einfach umsetzbar | ❌ Technisch komplex | Hoch | unifiedui: 5, Extern: 2 |
+| **Skalierbarkeit** | Unterstützung für autonome Agents | ✅ Zentralisiert | ⚠️ Verteilte Datenquellen | Hoch | unifiedui: 5, Extern: 3 |
+| **Kosten** | Infrastrukturkosten | ⚠️ Höhere Speicherkosten | ✅ Niedrigere Kosten | Mittel | unifiedui: 3, Extern: 5 |
+| **Kosten** | Entwicklungs- und Wartungsaufwand | ⚠️ Zusätzliche Services | ✅ Geringer | Mittel | unifiedui: 3, Extern: 4 |
+| **Komplexität** | Datensynchronisation | ⚠️ Erforderlich | ✅ Nicht erforderlich | Mittel | unifiedui: 3, Extern: 5 |
+| **Flexibilität** | Plattformübergreifende Features | ✅ Unabhängig | ❌ Limitiert | Hoch | unifiedui: 5, Extern: 2 |
+| **Flexibilität** | Zukunftssicherheit (neue Features) | ✅ Volle Kontrolle | ⚠️ Eingeschränkt | Hoch | unifiedui: 5, Extern: 3 |
 
 ### Gewichtete Gesamtbewertung
 
-**Integration in AIHub**: **4.5/5** (gewichtet nach Priorität für Funktionalität und Flexibilität)  
+**Integration in unifiedui**: **4.5/5** (gewichtet nach Priorität für Funktionalität und Flexibilität)  
 **On-the-fly Übersetzung**: **2.9/5** (gewichtet nach Priorität für Funktionalität und Flexibilität)
 
 ### Empfehlung
 
-Die Integration von Chat-Historie und Tracings direkt in AIHub wird **stark empfohlen**, da:
+Die Integration von Chat-Historie und Tracings direkt in unifiedui wird **stark empfohlen**, da:
 
 1. Die Vision eines **Unified-UI für AI** zentrale Datenhaltung erfordert
 2. Innovative Features wie **Semantic Search** und **Chat with Traces** nur so effektiv umsetzbar sind
 3. Die **Flexibilität** für zukünftige Features und Custom-Agent-Integration höher gewichtet wird als Infrastrukturkosten
 4. Die **Heterogenität externer Agent-Stores** eine konsistente UX nur über zentrale Datenhaltung ermöglicht
 
-Die erhöhten Infrastrukturkosten und der Wartungsaufwand sind durch die strategischen Vorteile gerechtfertigt, insbesondere wenn AIHub als langfristige Plattform für AI-Integration positioniert wird.
+Die erhöhten Infrastrukturkosten und der Wartungsaufwand sind durch die strategischen Vorteile gerechtfertigt, insbesondere wenn unifiedui als langfristige Plattform für AI-Integration positioniert wird.
 
 ## TODOs
 
@@ -715,7 +715,7 @@ Use the experience of our „Unified-UI for your AI“ to integrate various of A
 Welches Problem wird gelöst?
 - Wenn ich verschiedene Agentsysteme verwende, habe ich verschiedene Chat-experiences und je nach Technologie ggf. gar kein UI
 - Integration verschiedener Agentsysteme in ein UI
-- Plattformunabhänig. Sowohl die Agentsysteme können überall entwickelt werden, als auch der AIHub selbst kann auf den verschiedenen Cloud-Platzformen (Azure, AWS, GCP) deploed werden
+- Plattformunabhänig. Sowohl die Agentsysteme können überall entwickelt werden, als auch der unifiedui selbst kann auf den verschiedenen Cloud-Platzformen (Azure, AWS, GCP) deploed werden
 
 Was ist mit agents, die keine. Store haben? Man will nen Langgraph Multi-Agent bauen und dediziert deployen.
-Dieser hat keinen Store oder müsste extra implementiert werden: hier kann man dann einfach über unser aihub-SDK simpel auch diesen Agent einbinden (Thema: Custom Lösungen
+Dieser hat keinen Store oder müsste extra implementiert werden: hier kann man dann einfach über unser unifiedui-SDK simpel auch diesen Agent einbinden (Thema: Custom Lösungen

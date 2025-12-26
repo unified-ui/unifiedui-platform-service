@@ -2,9 +2,9 @@
 from typing import Optional, List
 from urllib.parse import quote
 
-from aihub.schema.responses.tenants import TenantResponse
-from aihub.logger import get_logger
-from aihub.core.caching.client import BaseCacheClient
+from unifiedui.schema.responses.tenants import TenantResponse
+from unifiedui.logger import get_logger
+from unifiedui.core.caching.client import BaseCacheClient
 
 logger = get_logger(__name__)
 

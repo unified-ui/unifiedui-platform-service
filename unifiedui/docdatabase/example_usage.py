@@ -17,13 +17,13 @@ Environment Variables Required:
 -------------------------------
 - DOCUMENT_DATABASE: "MONGO_DB" or "COSMOS_DB"
 - MONGODB_CONNECTION_STRING: MongoDB connection string (if using MongoDB)
-- MONGODB_DATABASE_NAME: Name of the database (optional, defaults to "aihub")
+- MONGODB_DATABASE_NAME: Name of the database (optional, defaults to "unifiedui")
 
 Example Usage:
 -------------
 
 # Option 1: Using environment variables
-from aihub.database.client import get_database_client
+from unifiedui.database.client import get_database_client
 
 # Get the DatabaseClient wrapper (singleton)
 db_client = get_database_client()
@@ -36,7 +36,7 @@ tenant = db_client.tenants.get("some-tenant-id")
 tenants = db_client.tenants.get_list(filters={"name": "My Tenant"}, limit=10)
 
 # Create a new tenant
-from aihub.core.database.models.tenants import TenantModel
+from unifiedui.core.database.models.tenants import TenantModel
 
 new_tenant = TenantModel(
     name="New Tenant",
@@ -62,13 +62,13 @@ db_client.disconnect()
 
 
 # Option 2: Explicitly specify database type
-from aihub.docdatabase.client import DatabaseClientFactory
-from aihub.database.enums import DocumentDatabaseTypeEnum
+from unifiedui.docdatabase.client import DatabaseClientFactory
+from unifiedui.database.enums import DocumentDatabaseTypeEnum
 
 db_client = DatabaseClientFactory.create(
     db_type=DocumentDatabaseTypeEnum.MONGO_DB,
     connection_string="mongodb://localhost:27017",
-    database_name="aihub"
+    database_name="unifiedui"
 )
 
 # Use the client as shown above

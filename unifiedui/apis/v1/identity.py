@@ -1,14 +1,14 @@
 from fastapi import APIRouter, Request, status, Query
 
-from aihub.core.middleware.apis.v1.auth import authenticate
-from aihub.core.identity.users import ContextIdentityUser
-from aihub.schema.responses.identity import (
+from unifiedui.core.middleware.apis.v1.auth import authenticate
+from unifiedui.core.identity.users import ContextIdentityUser
+from unifiedui.schema.responses.identity import (
     IdentityUserResponse,
     IdentityGroupResponse,
     IdentityUsersResponse,
     IdentityGroupsResponse
 )
-from aihub.utils.api_query import APIFilterQuery
+from unifiedui.utils.api_query import APIFilterQuery
 
 
 router = APIRouter()

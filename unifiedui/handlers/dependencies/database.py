@@ -1,8 +1,8 @@
 """Database dependency for FastAPI handlers."""
 import os
 
-from aihub.core.database.client import SQLAlchemyClient
-from aihub.core.database.config import DatabaseConfig
+from unifiedui.core.database.client import SQLAlchemyClient
+from unifiedui.core.database.config import DatabaseConfig
 
 # Global SQLAlchemy client instance
 _db_client: SQLAlchemyClient | None = None

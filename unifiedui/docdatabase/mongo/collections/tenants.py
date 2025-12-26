@@ -2,9 +2,9 @@ from typing import Optional, List
 from pymongo.database import Database
 from pymongo.collection import Collection
 
-from aihub.core.docdatabase.collections.tenants import TenantsCollection
-from aihub.core.docdatabase.models.tenants import TenantModel
-from aihub.utils.default_factory_functions import current_iso_datetime
+from unifiedui.core.docdatabase.collections.tenants import TenantsCollection
+from unifiedui.core.docdatabase.models.tenants import TenantModel
+from unifiedui.utils.default_factory_functions import current_iso_datetime
 
 
 class MongoDBTenantsCollection(TenantsCollection):

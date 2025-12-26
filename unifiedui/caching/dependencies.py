@@ -2,9 +2,9 @@
 from functools import lru_cache
 from typing import Optional
 
-from aihub.caching.client import CacheClient, get_cache_client as create_cache_client
-from aihub.core.config import settings
-from aihub.logger import get_logger
+from unifiedui.caching.client import CacheClient, get_cache_client as create_cache_client
+from unifiedui.core.config import settings
+from unifiedui.logger import get_logger
 
 logger = get_logger(__name__)
 

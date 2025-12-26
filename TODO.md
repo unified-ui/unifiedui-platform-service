@@ -115,16 +115,16 @@
         - integration testen
 - alle tests bauen
 
-- bauen tests für /aihub/utils/*
+- bauen tests für /unifiedui/utils/*
 - bauen mir nun unit tests für:
-    - /aihub/core/caching
-        - + /aihub/caching
-    - /aihub/core/identity
-        - + /aihub/identity
-    - /aihub/core/middleware
-        - + /aihub/middleware
-    - /aihub/core/vault
-        - + /aihub/vault
+    - /unifiedui/core/caching
+        - + /unifiedui/caching
+    - /unifiedui/core/identity
+        - + /unifiedui/identity
+    - /unifiedui/core/middleware
+        - + /unifiedui/middleware
+    - /unifiedui/core/vault
+        - + /unifiedui/vault
 - schreibe mir eine CI GitHub Action pipeline, welche die tests auf github ausführt
     - wichtig: das projekt nutzt uv -> also install, tests etc mit uv (pytest) ausführen
 ## TODO

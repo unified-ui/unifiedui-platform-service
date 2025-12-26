@@ -4,20 +4,20 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from aihub.apis.v1 import health, identity, tenants, custom_groups, credentials, applications, conversations, autonomous_agents, development_platforms, chat_widgets, tags, user_favorites
-from aihub.exc.autonomous_agents import AutonomousAgentNotFoundError
-from aihub.exc.custom_groups import CustomGroupNotFoundError, CustomGroupError
-from aihub.exc.applications import ApplicationNotFoundError
-from aihub.exc.credentials import CredentialNotFoundError
-from aihub.exc.conversations import ConversationNotFoundError
-from aihub.exc.development_platforms import DevelopmentPlatformNotFoundError
-from aihub.exc.chat_widgets import ChatWidgetNotFoundError
-from aihub.exc.tags import TagNotFoundError, TagDeleteNotAllowedError
+from unifiedui.apis.v1 import health, identity, tenants, custom_groups, credentials, applications, conversations, autonomous_agents, development_platforms, chat_widgets, tags, user_favorites
+from unifiedui.exc.autonomous_agents import AutonomousAgentNotFoundError
+from unifiedui.exc.custom_groups import CustomGroupNotFoundError, CustomGroupError
+from unifiedui.exc.applications import ApplicationNotFoundError
+from unifiedui.exc.credentials import CredentialNotFoundError
+from unifiedui.exc.conversations import ConversationNotFoundError
+from unifiedui.exc.development_platforms import DevelopmentPlatformNotFoundError
+from unifiedui.exc.chat_widgets import ChatWidgetNotFoundError
+from unifiedui.exc.tags import TagNotFoundError, TagDeleteNotAllowedError
 
-from aihub.core.config import settings
-from aihub.exc.tenants import TenantNotFoundError, TenantError
-from aihub.exc.permissions import PermissionDeniedError
-from aihub.logger import setup_logging, get_logger
+from unifiedui.core.config import settings
+from unifiedui.exc.tenants import TenantNotFoundError, TenantError
+from unifiedui.exc.permissions import PermissionDeniedError
+from unifiedui.logger import setup_logging, get_logger
 
 
 # Configure logging

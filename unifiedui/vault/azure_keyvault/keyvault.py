@@ -4,8 +4,8 @@ from typing import Optional, Dict, Any
 from azure.keyvault.secrets import SecretClient
 from azure.identity import DefaultAzureCredential
 
-from aihub.core.vault.vault import BaseVault
-from aihub.logger import get_logger
+from unifiedui.core.vault.vault import BaseVault
+from unifiedui.logger import get_logger
 
 logger = get_logger(__name__)
 

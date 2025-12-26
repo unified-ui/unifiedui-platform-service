@@ -1,7 +1,7 @@
 """Request schemas for application permissions."""
 from pydantic import BaseModel, Field
 
-from aihub.core.database.enums import PermissionActionEnum, PrincipalTypeEnum
+from unifiedui.core.database.enums import PermissionActionEnum, PrincipalTypeEnum
 
 
 class SetApplicationPermissionRequest(BaseModel):

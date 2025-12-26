@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 
-from aihub.utils.dataclasses import to_dict
+from unifiedui.utils.dataclasses import to_dict
 
 
 @to_dict

@@ -1,8 +1,8 @@
-"""Unit tests for aihub/caching/enums.py - CacheTypeEnum."""
+"""Unit tests for unifiedui/caching/enums.py - CacheTypeEnum."""
 import pytest
 from enum import Enum
 
-from aihub.caching.enums import CacheTypeEnum
+from unifiedui.caching.enums import CacheTypeEnum
 
 
 class TestCacheTypeEnum:

@@ -4,21 +4,21 @@ from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Query
 from fastapi.responses import Response
 
-from aihub.core.identity.users import ContextIdentityUser
-from aihub.handlers.autonomous_agents import AutonomousAgentHandler
-from aihub.handlers.dependencies import get_autonomous_agent_handler
-from aihub.schema.requests.autonomous_agents import CreateAutonomousAgentRequest, UpdateAutonomousAgentRequest
-from aihub.schema.requests.autonomous_agent_permissions import SetAutonomousAgentPermissionRequest
-from aihub.schema.responses.autonomous_agents import AutonomousAgentResponse
-from aihub.schema.responses.autonomous_agent_permissions import (
+from unifiedui.core.identity.users import ContextIdentityUser
+from unifiedui.handlers.autonomous_agents import AutonomousAgentHandler
+from unifiedui.handlers.dependencies import get_autonomous_agent_handler
+from unifiedui.schema.requests.autonomous_agents import CreateAutonomousAgentRequest, UpdateAutonomousAgentRequest
+from unifiedui.schema.requests.autonomous_agent_permissions import SetAutonomousAgentPermissionRequest
+from unifiedui.schema.responses.autonomous_agents import AutonomousAgentResponse
+from unifiedui.schema.responses.autonomous_agent_permissions import (
     AutonomousAgentPermissionResponse,
     AutonomousAgentPrincipalsResponse,
     PrincipalPermissionsResponse
 )
-from aihub.exc.autonomous_agents import AutonomousAgentNotFoundError, AutonomousAgentPermissionNotFoundError
-from aihub.core.middleware.apis.v1.auth import authenticate, check_permissions
-from aihub.core.database.enums import TenantRolesEnum, PermissionActionEnum, OrderDirectionEnum
-from aihub.logger import get_logger
+from unifiedui.exc.autonomous_agents import AutonomousAgentNotFoundError, AutonomousAgentPermissionNotFoundError
+from unifiedui.core.middleware.apis.v1.auth import authenticate, check_permissions
+from unifiedui.core.database.enums import TenantRolesEnum, PermissionActionEnum, OrderDirectionEnum
+from unifiedui.logger import get_logger
 
 logger = get_logger(__name__)
 

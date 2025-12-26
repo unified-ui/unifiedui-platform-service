@@ -1,9 +1,9 @@
-"""Centralized logging configuration for AIHub."""
+"""Centralized logging configuration for unifiedui."""
 import logging
 import sys
 from typing import Optional
 
-from aihub.core.config import settings
+from unifiedui.core.config import settings
 
 
 class ColoredFormatter(logging.Formatter):

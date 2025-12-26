@@ -1,16 +1,16 @@
-"""Unit tests for aihub/caching/redis/client.py - RedisCacheClient."""
+"""Unit tests for unifiedui/caching/redis/client.py - RedisCacheClient."""
 import pytest
 from unittest.mock import Mock, patch
 
-from aihub.caching.redis.client import RedisCacheClient
-from aihub.core.caching.client import BaseCacheClient
-from aihub.core.caching.cache import BaseCache
+from unifiedui.caching.redis.client import RedisCacheClient
+from unifiedui.core.caching.client import BaseCacheClient
+from unifiedui.core.caching.cache import BaseCache
 
 
 class TestRedisCacheClient:
     """Test suite for RedisCacheClient."""
     
-    @patch('aihub.caching.redis.client.RedisCache')
+    @patch('unifiedui.caching.redis.client.RedisCache')
     def test_initialization_with_defaults(self, mock_redis_cache_class):
         """Test initialization with default parameters."""
         mock_cache = Mock()
@@ -26,7 +26,7 @@ class TestRedisCacheClient:
             default_ttl=3600
         )
     
-    @patch('aihub.caching.redis.client.RedisCache')
+    @patch('unifiedui.caching.redis.client.RedisCache')
     def test_initialization_with_custom_params(self, mock_redis_cache_class):
         """Test initialization with custom parameters."""
         mock_cache = Mock()
@@ -48,13 +48,13 @@ class TestRedisCacheClient:
             default_ttl=7200
         )
     
-    @patch('aihub.caching.redis.client.RedisCache')
+    @patch('unifiedui.caching.redis.client.RedisCache')
     def test_is_base_cache_client_implementation(self, mock_redis_cache_class):
         """Test that RedisCacheClient implements BaseCacheClient."""
         client = RedisCacheClient()
         assert isinstance(client, BaseCacheClient)
     
-    @patch('aihub.caching.redis.client.RedisCache')
+    @patch('unifiedui.caching.redis.client.RedisCache')
     def test_get_cache_returns_redis_cache(self, mock_redis_cache_class):
         """Test get_cache returns RedisCache instance."""
         mock_cache = Mock(spec=BaseCache)
@@ -65,7 +65,7 @@ class TestRedisCacheClient:
         
         assert result is mock_cache
     
-    @patch('aihub.caching.redis.client.RedisCache')
+    @patch('unifiedui.caching.redis.client.RedisCache')
     def test_inherits_base_client_methods(self, mock_redis_cache_class):
         """Test that inherited methods from BaseCacheClient work."""
         mock_cache = Mock()
@@ -101,7 +101,7 @@ class TestRedisCacheClient:
         client.close()
         mock_cache.close.assert_called_once()
     
-    @patch('aihub.caching.redis.client.RedisCache')
+    @patch('unifiedui.caching.redis.client.RedisCache')
     def test_multiple_clients_have_separate_caches(self, mock_redis_cache_class):
         """Test that multiple clients have separate cache instances."""
         mock_cache1 = Mock()
@@ -113,7 +113,7 @@ class TestRedisCacheClient:
         
         assert client1.get_cache() is not client2.get_cache()
     
-    @patch('aihub.caching.redis.client.RedisCache')
+    @patch('unifiedui.caching.redis.client.RedisCache')
     def test_password_param_is_optional(self, mock_redis_cache_class):
         """Test that password parameter is optional."""
         mock_cache = Mock()
@@ -130,7 +130,7 @@ class TestRedisCacheClient:
         call_kwargs = mock_redis_cache_class.call_args[1]
         assert call_kwargs['password'] == "secret"
     
-    @patch('aihub.caching.redis.client.RedisCache')
+    @patch('unifiedui.caching.redis.client.RedisCache')
     def test_default_ttl_configuration(self, mock_redis_cache_class):
         """Test default TTL configuration."""
         mock_cache = Mock()

@@ -3,13 +3,13 @@ from typing import Optional
 
 from fastapi import Depends
 
-from aihub.core.database.client import SQLAlchemyClient
-from aihub.handlers.credentials import CredentialHandler
-from aihub.core.vault.client import BaseVaultClient
-from aihub.caching.client import CacheClient
-from aihub.handlers.dependencies.database import get_db_client
-from aihub.handlers.dependencies.cache import get_cache_client
-from aihub.handlers.dependencies.vault import get_vault_client
+from unifiedui.core.database.client import SQLAlchemyClient
+from unifiedui.handlers.credentials import CredentialHandler
+from unifiedui.core.vault.client import BaseVaultClient
+from unifiedui.caching.client import CacheClient
+from unifiedui.handlers.dependencies.database import get_db_client
+from unifiedui.handlers.dependencies.cache import get_cache_client
+from unifiedui.handlers.dependencies.vault import get_vault_client
 
 
 def get_credential_handler(

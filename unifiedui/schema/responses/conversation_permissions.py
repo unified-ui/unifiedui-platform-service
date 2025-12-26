@@ -3,7 +3,7 @@ from typing import List
 from datetime import datetime
 from pydantic import BaseModel, Field, ConfigDict
 
-from aihub.core.database.enums import PermissionActionEnum, PrincipalTypeEnum
+from unifiedui.core.database.enums import PermissionActionEnum, PrincipalTypeEnum
 
 
 class ConversationPermissionResponse(BaseModel):

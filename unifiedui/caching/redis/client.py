@@ -1,10 +1,10 @@
 """Redis cache client implementation."""
 from typing import Optional
 
-from aihub.core.caching.client import BaseCacheClient
-from aihub.core.caching.cache import BaseCache
-from aihub.caching.redis.cache import RedisCache
-from aihub.logger import get_logger
+from unifiedui.core.caching.client import BaseCacheClient
+from unifiedui.core.caching.cache import BaseCache
+from unifiedui.caching.redis.cache import RedisCache
+from unifiedui.logger import get_logger
 
 logger = get_logger(__name__)
 

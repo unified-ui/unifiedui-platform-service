@@ -1,8 +1,8 @@
-"""Unit tests for aihub/schema/requests/custom_groups.py - Custom Groups Request Schemas."""
+"""Unit tests for unifiedui/schema/requests/custom_groups.py - Custom Groups Request Schemas."""
 import pytest
 from pydantic import ValidationError
 
-from aihub.schema.requests.custom_groups import (
+from unifiedui.schema.requests.custom_groups import (
     CreateCustomGroupRequest,
     UpdateCustomGroupRequest,
     SetPrincipalRoleRequest,

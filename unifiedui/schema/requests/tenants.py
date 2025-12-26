@@ -2,7 +2,7 @@
 from pydantic import BaseModel, Field, field_validator
 from typing import Optional
 
-from aihub.core.database.enums import TenantRolesEnum, PrincipalTypeEnum
+from unifiedui.core.database.enums import TenantRolesEnum, PrincipalTypeEnum
 
 
 class CreateTenantRequest(BaseModel):

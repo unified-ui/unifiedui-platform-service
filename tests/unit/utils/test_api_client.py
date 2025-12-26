@@ -1,7 +1,7 @@
-"""Unit tests for aihub/utils/api_client.py"""
+"""Unit tests for unifiedui/utils/api_client.py"""
 import pytest
 
-from aihub.utils.api_client import APIJSONBearerClient
+from unifiedui.utils.api_client import APIJSONBearerClient
 
 
 class TestAPIJSONBearerClient:

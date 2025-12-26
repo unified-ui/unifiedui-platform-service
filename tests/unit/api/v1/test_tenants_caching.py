@@ -4,7 +4,7 @@ from typing import Any
 from fastapi import status
 from starlette.testclient import TestClient
 
-from aihub.core.database.enums import TenantRolesEnum, PrincipalTypeEnum
+from unifiedui.core.database.enums import TenantRolesEnum, PrincipalTypeEnum
 from tests.conftest import create_auth_headers
 
 
@@ -216,7 +216,7 @@ class TestTenantCaching:
     
     def test_custom_group_permission_grant_invalidates_member_cache(self, test_client: TestClient, fake_redis_client: Any) -> None:
         """Test that granting permission to a custom group invalidates member caches."""
-        from aihub.core.database.models import CustomGroup, CustomGroupMember, TenantMember, TenantMemberRole
+        from unifiedui.core.database.models import CustomGroup, CustomGroupMember, TenantMember, TenantMemberRole
         
         # Admin creates tenant
         admin_token = test_client.create_test_user("cache-admin-3", "Cache Admin 3")

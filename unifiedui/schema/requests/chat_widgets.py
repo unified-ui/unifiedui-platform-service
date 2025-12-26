@@ -2,7 +2,7 @@
 from typing import Optional
 from pydantic import BaseModel, Field
 
-from aihub.core.database.enums import ChatWidgetTypeEnum
+from unifiedui.core.database.enums import ChatWidgetTypeEnum
 
 
 class CreateChatWidgetRequest(BaseModel):
