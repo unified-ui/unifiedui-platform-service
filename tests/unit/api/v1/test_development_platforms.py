@@ -75,6 +75,7 @@ class TestDevelopmentPlatformRoutes:
         assert data["type"] == dp_data["type"]
         assert data["iframe_url"] == dp_data["iframe_url"]
         assert data["config"] == dp_data["config"]
+        assert data["is_active"] == False
         assert "id" in data
         assert data["tenant_id"] == tenant_id
         assert "created_at" in data
@@ -448,27 +449,88 @@ class TestDevelopmentPlatformRoutes:
         
         # Create a development platform
         dp_data = {"name": "Original", "description": "Description", "iframe_url": "https://original.com", "type": "IDE"}
+    
+    def test_update_development_platform_is_active(self, test_client: TestClient, test_user_token: Any) -> None:
+        """Test updating development platform is_active status."""
+        tenant_id = create_tenant_for_user(test_client, test_user_token)
+        headers = create_auth_headers(test_user_token, use_cache=False)
+        
+        # Create development platform (default is_active=False)
         create_response = test_client.post(
             ENDPOINT_DEVELOPMENT_PLATFORMS.format(tenant_id=tenant_id),
-            json=dp_data,
+            json={"name": "Test Platform", "description": "Test", "iframe_url": "https://test.com"},
             headers=headers
         )
         dp_id = create_response.json()["id"]
+        assert create_response.json()["is_active"] == False
         
-        # Update only name
+        # Update to active
         update_response = test_client.patch(
             ENDPOINT_DEVELOPMENT_PLATFORM_DETAIL.format(tenant_id=tenant_id, development_platform_id=dp_id),
-            json={"name": "Only Name Updated"},
+            json={"is_active": True},
             headers=headers
         )
         
         assert update_response.status_code == status.HTTP_200_OK
-        data = update_response.json()
+        assert update_response.json()["is_active"] == True
         
-        assert data["name"] == "Only Name Updated"
-        assert data["description"] == dp_data["description"]  # Should remain unchanged
-        assert data["iframe_url"] == dp_data["iframe_url"]  # Should remain unchanged
-        assert data["type"] == dp_data["type"]  # Should remain unchanged
+        # Update back to inactive
+        update_response2 = test_client.patch(
+            ENDPOINT_DEVELOPMENT_PLATFORM_DETAIL.format(tenant_id=tenant_id, development_platform_id=dp_id),
+            json={"is_active": False},
+            headers=headers
+        )
+        
+        assert update_response2.status_code == status.HTTP_200_OK
+        assert update_response2.json()["is_active"] == False
+    
+    def test_update_development_platform_type(self, test_client: TestClient, test_user_token: Any) -> None:
+        """Test updating development platform type."""
+        tenant_id = create_tenant_for_user(test_client, test_user_token)
+        headers = create_auth_headers(test_user_token, use_cache=False)
+        
+        # Create platform with IDE type
+        create_response = test_client.post(
+            ENDPOINT_DEVELOPMENT_PLATFORMS.format(tenant_id=tenant_id),
+            json={"name": "Test Platform", "description": "Test", "iframe_url": "https://test.com", "type": "IDE"},
+            headers=headers
+        )
+        dp_id = create_response.json()["id"]
+        assert create_response.json()["type"] == "IDE"
+        
+        # Update type to NOTEBOOK
+        update_response = test_client.patch(
+            ENDPOINT_DEVELOPMENT_PLATFORM_DETAIL.format(tenant_id=tenant_id, development_platform_id=dp_id),
+            json={"type": "NOTEBOOK"},
+            headers=headers
+        )
+        
+        assert update_response.status_code == status.HTTP_200_OK
+        assert update_response.json()["type"] == "NOTEBOOK"
+    
+    def test_update_development_platform_config(self, test_client: TestClient, test_user_token: Any) -> None:
+        """Test updating development platform config."""
+        tenant_id = create_tenant_for_user(test_client, test_user_token)
+        headers = create_auth_headers(test_user_token, use_cache=False)
+        
+        # Create platform with initial config
+        create_response = test_client.post(
+            ENDPOINT_DEVELOPMENT_PLATFORMS.format(tenant_id=tenant_id),
+            json={"name": "Test Platform", "description": "Test", "iframe_url": "https://test.com", "config": {"theme": "dark"}},
+            headers=headers
+        )
+        dp_id = create_response.json()["id"]
+        assert create_response.json()["config"] == {"theme": "dark"}
+        
+        # Update config
+        update_response = test_client.patch(
+            ENDPOINT_DEVELOPMENT_PLATFORM_DETAIL.format(tenant_id=tenant_id, development_platform_id=dp_id),
+            json={"config": {"theme": "light", "fontSize": 14}},
+            headers=headers
+        )
+        
+        assert update_response.status_code == status.HTTP_200_OK
+        assert update_response.json()["config"] == {"theme": "light", "fontSize": 14}
     
     def test_delete_development_platform_success(self, test_client: TestClient, test_user_token: Any) -> None:
         """Test successful development platform deletion."""

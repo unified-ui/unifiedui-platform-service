@@ -74,6 +74,7 @@ class TestApplicationRoutes:
         assert data["description"] == app_data["description"]
         assert data["type"] == app_data["type"]
         assert data["config"] == app_data["config"]
+        assert data["is_active"] == False
         assert "id" in data
         assert data["tenant_id"] == tenant_id
         assert "created_at" in data
@@ -583,6 +584,91 @@ class TestApplicationRoutes:
         
         assert data["name"] == "Only Name Updated"
         assert data["description"] == app_data["description"]  # Should remain unchanged
+    
+    def test_update_application_is_active(self, test_client: TestClient, test_user_token: Any) -> None:
+        """Test updating application is_active status."""
+        tenant_id = create_tenant_for_user(test_client, test_user_token)
+        headers = create_auth_headers(test_user_token, use_cache=False)
+        
+        # Create an application (default is_active=False)
+        app_data = {"name": "Test App", "description": "Test", "type": "N8N"}
+        create_response = test_client.post(
+            ENDPOINT_APPLICATIONS.format(tenant_id=tenant_id),
+            json=app_data,
+            headers=headers
+        )
+        app_id = create_response.json()["id"]
+        assert create_response.json()["is_active"] == False
+        
+        # Update to active
+        update_response = test_client.patch(
+            ENDPOINT_APPLICATION_DETAIL.format(tenant_id=tenant_id, application_id=app_id),
+            json={"is_active": True},
+            headers=headers
+        )
+        
+        assert update_response.status_code == status.HTTP_200_OK
+        assert update_response.json()["is_active"] == True
+        
+        # Update back to inactive
+        update_response2 = test_client.patch(
+            ENDPOINT_APPLICATION_DETAIL.format(tenant_id=tenant_id, application_id=app_id),
+            json={"is_active": False},
+            headers=headers
+        )
+        
+        assert update_response2.status_code == status.HTTP_200_OK
+        assert update_response2.json()["is_active"] == False
+    
+    def test_update_application_type(self, test_client: TestClient, test_user_token: Any) -> None:
+        """Test updating application type."""
+        tenant_id = create_tenant_for_user(test_client, test_user_token)
+        headers = create_auth_headers(test_user_token, use_cache=False)
+        
+        # Create application with N8N type
+        create_response = test_client.post(
+            ENDPOINT_APPLICATIONS.format(tenant_id=tenant_id),
+            json={"name": "Test App", "description": "Test", "type": "N8N"},
+            headers=headers
+        )
+        app_id = create_response.json()["id"]
+        assert create_response.json()["type"] == "N8N"
+        
+        # Update to REST_API type
+        update_response = test_client.patch(
+            ENDPOINT_APPLICATION_DETAIL.format(tenant_id=tenant_id, application_id=app_id),
+            json={"type": "REST_API"},
+            headers=headers
+        )
+        
+        if update_response.status_code != status.HTTP_200_OK:
+            print(f"Status: {update_response.status_code}, Body: {update_response.json()}")
+        assert update_response.status_code == status.HTTP_200_OK
+        assert update_response.json()["type"] == "REST_API"
+    
+    def test_update_application_config(self, test_client: TestClient, test_user_token: Any) -> None:
+        """Test updating application config."""
+        tenant_id = create_tenant_for_user(test_client, test_user_token)
+        headers = create_auth_headers(test_user_token, use_cache=False)
+        
+        # Create application with initial config
+        create_response = test_client.post(
+            ENDPOINT_APPLICATIONS.format(tenant_id=tenant_id),
+            json={"name": "Test App", "description": "Test", "type": "N8N", "config": {"key1": "value1"}},
+            headers=headers
+        )
+        app_id = create_response.json()["id"]
+        assert create_response.json()["config"] == {"key1": "value1"}
+        
+        # Update config
+        update_response = test_client.patch(
+            ENDPOINT_APPLICATION_DETAIL.format(tenant_id=tenant_id, application_id=app_id),
+            json={"config": {"key2": "value2", "nested": {"prop": "test"}}},
+            headers=headers
+        )
+        
+        assert update_response.status_code == status.HTTP_200_OK
+        assert update_response.json()["config"] == {"key2": "value2", "nested": {"prop": "test"}}
     
     def test_delete_application_success(self, test_client: TestClient, test_user_token: Any) -> None:
         """Test successful application deletion."""

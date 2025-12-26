@@ -71,6 +71,7 @@ class TestAutonomousAgentRoutes:
         assert data["name"] == agent_data["name"]
         assert data["description"] == agent_data["description"]
         assert data["config"] == agent_data["config"]
+        assert data["is_active"] == False
         assert "id" in data
         assert data["tenant_id"] == tenant_id
         assert "created_at" in data
@@ -418,6 +419,41 @@ class TestAutonomousAgentRoutes:
             json=agent_data,
             headers=headers
         )
+    
+    def test_update_autonomous_agent_is_active(self, test_client: TestClient, test_user_token: Any) -> None:
+        """Test updating autonomous agent is_active status."""
+        tenant_id = create_tenant_for_user(test_client, test_user_token)
+        headers = create_auth_headers(test_user_token, use_cache=False)
+        
+        # Create an autonomous agent (default is_active=False)
+        agent_data = {"name": "Test Agent", "description": "Test", "config": {}}
+        create_response = test_client.post(
+            ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id),
+            json=agent_data,
+            headers=headers
+        )
+        agent_id = create_response.json()["id"]
+        assert create_response.json()["is_active"] == False
+        
+        # Update to active
+        update_response = test_client.patch(
+            ENDPOINT_AUTONOMOUS_AGENT_DETAIL.format(tenant_id=tenant_id, autonomous_agent_id=agent_id),
+            json={"is_active": True},
+            headers=headers
+        )
+        
+        assert update_response.status_code == status.HTTP_200_OK
+        assert update_response.json()["is_active"] == True
+        
+        # Update back to inactive
+        update_response2 = test_client.patch(
+            ENDPOINT_AUTONOMOUS_AGENT_DETAIL.format(tenant_id=tenant_id, autonomous_agent_id=agent_id),
+            json={"is_active": False},
+            headers=headers
+        )
+        
+        assert update_response2.status_code == status.HTTP_200_OK
+        assert update_response2.json()["is_active"] == False
         agent_id = create_response.json()["id"]
         
         # Update only the name

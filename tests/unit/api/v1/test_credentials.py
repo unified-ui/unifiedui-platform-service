@@ -76,6 +76,8 @@ class TestCredentialRoutes:
         assert data["name"] == credential_data["name"]
         assert data["description"] == credential_data["description"]
         assert data["type"] == credential_data["credential_type"]
+        assert data["source"] == credential_data["source"]
+        assert data["is_active"] == False
         assert "id" in data
         assert data["tenant_id"] == tenant_id
         assert "created_at" in data
@@ -478,6 +480,45 @@ class TestCredentialRoutes:
     def test_update_credential_partial(self, test_client: TestClient, test_user_token: Any) -> None:
         """Test partial credential update."""
         tenant_id = create_tenant_for_user(test_client, test_user_token)
+    
+    def test_update_credential_is_active(self, test_client: TestClient, test_user_token: Any) -> None:
+        """Test updating credential is_active status."""
+        tenant_id = create_tenant_for_user(test_client, test_user_token)
+        headers = create_auth_headers(test_user_token, use_cache=False)
+        
+        # Create credential (default is_active=False)
+        create_response = test_client.post(
+            ENDPOINT_CREDENTIALS.format(tenant_id=tenant_id),
+            json={
+                "name": "Test Credential",
+                "description": "Test",
+                "credential_type": "API_KEY",
+                "secret_value": "secret"
+            },
+            headers=headers
+        )
+        credential_id = create_response.json()["id"]
+        assert create_response.json()["is_active"] == False
+        
+        # Update to active
+        update_response = test_client.patch(
+            ENDPOINT_CREDENTIAL_DETAIL.format(tenant_id=tenant_id, credential_id=credential_id),
+            json={"is_active": True},
+            headers=headers
+        )
+        
+        assert update_response.status_code == status.HTTP_200_OK
+        assert update_response.json()["is_active"] == True
+        
+        # Update back to inactive
+        update_response2 = test_client.patch(
+            ENDPOINT_CREDENTIAL_DETAIL.format(tenant_id=tenant_id, credential_id=credential_id),
+            json={"is_active": False},
+            headers=headers
+        )
+        
+        assert update_response2.status_code == status.HTTP_200_OK
+        assert update_response2.json()["is_active"] == False
         headers = create_auth_headers(test_user_token, use_cache=False)
         
         # Create credential

@@ -345,6 +345,8 @@ class ConversationHandler:
                 conversation.name = request.name
             if request.description is not None:
                 conversation.description = request.description
+            if request.is_active is not None:
+                conversation.is_active = request.is_active
             
             conversation.updated_by = user_id
             
