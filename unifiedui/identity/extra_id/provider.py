@@ -194,6 +194,28 @@ class ExtraIDIdentityProvider(BaseIdentityProvider, APIJSONBearerClient):
             display_name=data["displayName"]
         )
 
+    def get_principal_name(self, principal_id: str, principal_type: str) -> str:
+        """
+        Get the principal name for a user or group.
+        
+        For users, returns userPrincipalName (e.g., user@domain.com).
+        For groups, returns the display name.
+        
+        Args:
+            principal_id: The ID of the principal
+            principal_type: The type of principal (IDENTITY_USER or IDENTITY_GROUP)
+            
+        Returns:
+            The principal name string
+        """
+        if principal_type == "IDENTITY_USER":
+            user = self.get_user_by_id(principal_id)
+            # Prefer userPrincipalName, fallback to mail, then display_name
+            return user.user_principal_name or user.mail or user.display_name
+        else:  # IDENTITY_GROUP
+            group = self.get_group_by_id(principal_id)
+            return group.display_name
+
     def _parse_users_response(self, data: dict) -> list[IdentityUserResponse]:
         """Parse Microsoft Graph API users response."""
         return [

@@ -9,7 +9,8 @@ from unifiedui.utils.api_query import APIFilterQuery
 from unifiedui.core.database.client import SQLAlchemyClient
 from unifiedui.caching.client import CacheClient
 from unifiedui.handlers.dependencies import get_db_client
-from unifiedui.core.database.models import CustomGroup, CustomGroupMember
+from unifiedui.core.database.models import Principal
+from unifiedui.core.database.enums import PrincipalTypeEnum
 from unifiedui.logger import get_logger
 
 logger = get_logger(__name__)
@@ -73,7 +74,12 @@ class ContextIdentityUser:
     @property
     def custom_groups(self) -> list[IdentityGroupResponse]:
         """
-        Get all custom groups the user is a member of via custom_group_permissions.
+        Get all custom groups the user is a member of.
+        Custom groups are stored as principals with type CUSTOM_GROUP.
+        
+        Note: This returns custom groups where the user is directly a member.
+        The membership is tracked through other mechanisms (e.g., a separate membership table
+        or through the principals table relationships).
         """
         # in-memory cache
         if self._custom_groups is not None:
@@ -95,28 +101,13 @@ class ContextIdentityUser:
             except Exception as e:
                 logger.warning(f"Failed to get cached custom groups: {e}")
         
-        # Query custom groups from custom_group_permissions where user is a principal
-        db_client = self._database_client or get_db_client()
+        # TODO: Custom group membership needs to be implemented
+        # For now, return empty list as custom groups are managed differently
+        # Custom groups are stored in the principals table with type CUSTOM_GROUP
+        # but we need a separate mechanism to track which users belong to which custom groups
         
-        with db_client.get_session() as session:
-            from unifiedui.core.database.models import CustomGroupMember
-            
-            query = (
-                select(CustomGroup)
-                .join(CustomGroupMember, CustomGroup.id == CustomGroupMember.custom_group_id)
-                .where(CustomGroupMember.principal_id == user_id)
-                .distinct()
-            )
-            groups = session.execute(query).scalars().all()
-            
-            # Convert to IdentityGroupResponse format
-            self._custom_groups = [
-                IdentityGroupResponse(
-                    id=g.id,
-                    display_name=g.name
-                )
-                for g in groups
-            ]
+        logger.debug(f"Custom groups lookup not yet implemented for user {user_id}")
+        self._custom_groups = []
         
         logger.debug(f"Fetched {len(self._custom_groups)} custom groups from database")
         

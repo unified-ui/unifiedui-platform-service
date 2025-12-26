@@ -106,3 +106,20 @@ class BaseIdentityProvider(ABC):
     def get_group_by_id(self, group_id: str) -> IdentityGroupResponse:
         """Get a specific group by ID."""
         pass
+
+    @abstractmethod
+    def get_principal_name(self, principal_id: str, principal_type: str) -> str:
+        """
+        Get the principal name for a user or group.
+        
+        For users, this typically returns the userPrincipalName or mail.
+        For groups, this returns the display name.
+        
+        Args:
+            principal_id: The ID of the principal
+            principal_type: The type of principal (IDENTITY_USER or IDENTITY_GROUP)
+            
+        Returns:
+            The principal name string
+        """
+        pass

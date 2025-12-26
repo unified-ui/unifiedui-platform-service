@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Request, status, Query
+from fastapi import APIRouter, Request, status, Query, Depends
 
 from unifiedui.core.middleware.apis.v1.auth import authenticate
 from unifiedui.core.identity.users import ContextIdentityUser
@@ -8,6 +8,10 @@ from unifiedui.schema.responses.identity import (
     IdentityUsersResponse,
     IdentityGroupsResponse
 )
+from unifiedui.schema.requests.principals import RefreshPrincipalRequest
+from unifiedui.schema.responses.principals import PrincipalResponse
+from unifiedui.handlers.principals import PrincipalHandler
+from unifiedui.handlers.dependencies import get_db_client, get_cache_client
 from unifiedui.utils.api_query import APIFilterQuery
 
 
@@ -154,4 +158,44 @@ async def get_group_by_id(
     """
     user: ContextIdentityUser = request.state.user
     return user.idp.get_group_by_id(group_id)
+
+
+@router.put(
+    "/principals/{principal_id}/refresh",
+    response_model=PrincipalResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Refresh Principal",
+    description="Fetches a principal (user or group) from the identity provider and updates or creates the principal record in the database"
+)
+@authenticate
+async def refresh_principal(
+    request: Request,
+    principal_id: str,
+    body: RefreshPrincipalRequest
+) -> PrincipalResponse:
+    """
+    Refresh a principal from the identity provider.
+    
+    Fetches the user or group from the identity provider and updates or creates
+    the principal record in the database for the specified tenant.
+    
+    Args:
+        request: FastAPI request object (contains user in request.state)
+        principal_id: The ID of the principal to refresh
+        body: Request body with tenant_id and type (IDENTITY_USER or IDENTITY_GROUP)
+    
+    Returns:
+        PrincipalResponse: The refreshed principal data
+    """
+    user: ContextIdentityUser = request.state.user
+    db_client = get_db_client()
+    cache_client = get_cache_client()
+    
+    handler = PrincipalHandler(db_client=db_client, cache_client=cache_client)
+    return handler.refresh_principal(
+        tenant_id=body.tenant_id,
+        principal_id=principal_id,
+        principal_type=body.type,
+        user=user
+    )
 

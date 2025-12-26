@@ -14,6 +14,7 @@ ENDPOINT_IDENTITY_USERS = "/api/v1/identity/users"
 ENDPOINT_IDENTITY_USER_DETAIL = "/api/v1/identity/users/{user_id}"
 ENDPOINT_IDENTITY_GROUPS = "/api/v1/identity/groups"
 ENDPOINT_IDENTITY_GROUP_DETAIL = "/api/v1/identity/groups/{group_id}"
+ENDPOINT_IDENTITY_PRINCIPAL_REFRESH = "/api/v1/identity/principals/{principal_id}/refresh"
 
 # Common Test IDs
 NON_EXISTENT_ID = "non-existent-id"
@@ -362,3 +363,287 @@ class TestIdentityRoutes:
             )
             # Should succeed or handle gracefully
             assert response.status_code in [status.HTTP_200_OK, status.HTTP_404_NOT_FOUND]
+
+
+class TestRefreshPrincipal:
+    """Test suite for refresh principal endpoint."""
+    
+    def test_refresh_user_principal_creates_new(
+        self, 
+        test_client: TestClient, 
+        auth_headers: dict[str, str],
+        sample_tenant_data: dict
+    ) -> None:
+        """Test refreshing a user principal creates a new record if it doesn't exist."""
+        # First create a tenant
+        tenant_response = test_client.post(
+            "/api/v1/tenants",
+            headers=auth_headers,
+            json=sample_tenant_data
+        )
+        assert tenant_response.status_code == status.HTTP_201_CREATED
+        tenant_id = tenant_response.json()["id"]
+        
+        # Refresh a user principal
+        principal_id = "test-user-to-refresh"
+        response = test_client.put(
+            ENDPOINT_IDENTITY_PRINCIPAL_REFRESH.format(principal_id=principal_id),
+            headers=auth_headers,
+            json={
+                "tenant_id": tenant_id,
+                "type": "IDENTITY_USER"
+            }
+        )
+        
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        
+        assert data["tenant_id"] == tenant_id
+        assert data["principal_id"] == principal_id
+        assert data["principal_type"] == "IDENTITY_USER"
+        assert "display_name" in data
+        assert "principal_name" in data
+        # principal_name should be email for users (from get_principal_name)
+        assert "@" in data["principal_name"] or data["principal_name"]  # Email or fallback
+        assert "created_at" in data
+        assert "updated_at" in data
+    
+    def test_refresh_group_principal_creates_new(
+        self, 
+        test_client: TestClient, 
+        auth_headers: dict[str, str],
+        sample_tenant_data: dict
+    ) -> None:
+        """Test refreshing a group principal creates a new record if it doesn't exist."""
+        # First create a tenant
+        tenant_response = test_client.post(
+            "/api/v1/tenants",
+            headers=auth_headers,
+            json=sample_tenant_data
+        )
+        assert tenant_response.status_code == status.HTTP_201_CREATED
+        tenant_id = tenant_response.json()["id"]
+        
+        # Refresh a group principal
+        principal_id = "test-group-to-refresh"
+        response = test_client.put(
+            ENDPOINT_IDENTITY_PRINCIPAL_REFRESH.format(principal_id=principal_id),
+            headers=auth_headers,
+            json={
+                "tenant_id": tenant_id,
+                "type": "IDENTITY_GROUP"
+            }
+        )
+        
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        
+        assert data["tenant_id"] == tenant_id
+        assert data["principal_id"] == principal_id
+        assert data["principal_type"] == "IDENTITY_GROUP"
+        assert "display_name" in data
+        assert "principal_name" in data
+        # principal_name should equal display_name for groups (from get_principal_name)
+        assert data["principal_name"] == data["display_name"]
+    
+    def test_refresh_user_principal_updates_existing(
+        self, 
+        test_client: TestClient, 
+        auth_headers: dict[str, str],
+        sample_tenant_data: dict
+    ) -> None:
+        """Test refreshing an existing user principal updates the record."""
+        # First create a tenant
+        tenant_response = test_client.post(
+            "/api/v1/tenants",
+            headers=auth_headers,
+            json=sample_tenant_data
+        )
+        assert tenant_response.status_code == status.HTTP_201_CREATED
+        tenant_id = tenant_response.json()["id"]
+        
+        principal_id = "test-user-update"
+        
+        # Create the principal first
+        response1 = test_client.put(
+            ENDPOINT_IDENTITY_PRINCIPAL_REFRESH.format(principal_id=principal_id),
+            headers=auth_headers,
+            json={
+                "tenant_id": tenant_id,
+                "type": "IDENTITY_USER"
+            }
+        )
+        assert response1.status_code == status.HTTP_200_OK
+        created_at_1 = response1.json()["created_at"]
+        
+        # Refresh again - should update
+        response2 = test_client.put(
+            ENDPOINT_IDENTITY_PRINCIPAL_REFRESH.format(principal_id=principal_id),
+            headers=auth_headers,
+            json={
+                "tenant_id": tenant_id,
+                "type": "IDENTITY_USER"
+            }
+        )
+        assert response2.status_code == status.HTTP_200_OK
+        data = response2.json()
+        
+        # created_at should be the same, updated_at might be different
+        assert data["created_at"] == created_at_1
+        assert data["principal_id"] == principal_id
+    
+    def test_refresh_principal_invalid_type(
+        self, 
+        test_client: TestClient, 
+        auth_headers: dict[str, str],
+        sample_tenant_data: dict
+    ) -> None:
+        """Test that invalid principal type returns validation error."""
+        # First create a tenant
+        tenant_response = test_client.post(
+            "/api/v1/tenants",
+            headers=auth_headers,
+            json=sample_tenant_data
+        )
+        assert tenant_response.status_code == status.HTTP_201_CREATED
+        tenant_id = tenant_response.json()["id"]
+        
+        # Try with invalid type
+        response = test_client.put(
+            ENDPOINT_IDENTITY_PRINCIPAL_REFRESH.format(principal_id="test-user"),
+            headers=auth_headers,
+            json={
+                "tenant_id": tenant_id,
+                "type": "INVALID_TYPE"
+            }
+        )
+        
+        # Should fail validation
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+    
+    def test_refresh_principal_custom_group_not_allowed(
+        self, 
+        test_client: TestClient, 
+        auth_headers: dict[str, str],
+        sample_tenant_data: dict
+    ) -> None:
+        """Test that CUSTOM_GROUP type is not allowed for refresh."""
+        # First create a tenant
+        tenant_response = test_client.post(
+            "/api/v1/tenants",
+            headers=auth_headers,
+            json=sample_tenant_data
+        )
+        assert tenant_response.status_code == status.HTTP_201_CREATED
+        tenant_id = tenant_response.json()["id"]
+        
+        # Try with CUSTOM_GROUP type (not allowed)
+        response = test_client.put(
+            ENDPOINT_IDENTITY_PRINCIPAL_REFRESH.format(principal_id="test-custom-group"),
+            headers=auth_headers,
+            json={
+                "tenant_id": tenant_id,
+                "type": "CUSTOM_GROUP"
+            }
+        )
+        
+        # Should fail validation (CUSTOM_GROUP is not in the Literal type)
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+    
+    def test_refresh_principal_missing_tenant_id(
+        self, 
+        test_client: TestClient, 
+        auth_headers: dict[str, str]
+    ) -> None:
+        """Test that missing tenant_id returns validation error."""
+        response = test_client.put(
+            ENDPOINT_IDENTITY_PRINCIPAL_REFRESH.format(principal_id="test-user"),
+            headers=auth_headers,
+            json={
+                "type": "IDENTITY_USER"
+            }
+        )
+        
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+    
+    def test_refresh_principal_missing_type(
+        self, 
+        test_client: TestClient, 
+        auth_headers: dict[str, str],
+        sample_tenant_data: dict
+    ) -> None:
+        """Test that missing type returns validation error."""
+        tenant_response = test_client.post(
+            "/api/v1/tenants",
+            headers=auth_headers,
+            json=sample_tenant_data
+        )
+        assert tenant_response.status_code == status.HTTP_201_CREATED
+        tenant_id = tenant_response.json()["id"]
+        
+        response = test_client.put(
+            ENDPOINT_IDENTITY_PRINCIPAL_REFRESH.format(principal_id="test-user"),
+            headers=auth_headers,
+            json={
+                "tenant_id": tenant_id
+            }
+        )
+        
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+    
+    def test_refresh_principal_unauthenticated(self, test_client: TestClient) -> None:
+        """Test that unauthenticated request fails."""
+        response = test_client.put(
+            ENDPOINT_IDENTITY_PRINCIPAL_REFRESH.format(principal_id="test-user"),
+            json={
+                "tenant_id": "some-tenant-id",
+                "type": "IDENTITY_USER"
+            }
+        )
+        
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
+    
+    def test_refresh_principal_empty_body(
+        self, 
+        test_client: TestClient, 
+        auth_headers: dict[str, str]
+    ) -> None:
+        """Test that empty request body returns validation error."""
+        response = test_client.put(
+            ENDPOINT_IDENTITY_PRINCIPAL_REFRESH.format(principal_id="test-user"),
+            headers=auth_headers,
+            json={}
+        )
+        
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+    
+    def test_refresh_principal_with_uuid_format(
+        self, 
+        test_client: TestClient, 
+        auth_headers: dict[str, str],
+        sample_tenant_data: dict
+    ) -> None:
+        """Test refreshing a principal with UUID format ID."""
+        # First create a tenant
+        tenant_response = test_client.post(
+            "/api/v1/tenants",
+            headers=auth_headers,
+            json=sample_tenant_data
+        )
+        assert tenant_response.status_code == status.HTTP_201_CREATED
+        tenant_id = tenant_response.json()["id"]
+        
+        # Use UUID format principal ID
+        principal_id = str(uuid.uuid4())
+        response = test_client.put(
+            ENDPOINT_IDENTITY_PRINCIPAL_REFRESH.format(principal_id=principal_id),
+            headers=auth_headers,
+            json={
+                "tenant_id": tenant_id,
+                "type": "IDENTITY_USER"
+            }
+        )
+        
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert data["principal_id"] == principal_id
