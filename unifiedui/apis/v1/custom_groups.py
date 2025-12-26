@@ -127,7 +127,7 @@ async def create_custom_group(
     user: ContextIdentityUser = request.state.user
     user_id = user.identity.get_id()
     
-    return handler.create_custom_group(tenant_id, group_data, user_id)
+    return handler.create_custom_group(tenant_id, group_data, user_id, user)
 
 
 @router.patch(
@@ -301,7 +301,8 @@ async def set_principal_permission(
         principal_id=role_data.principal_id,
         principal_type=role_data.principal_type,
         role=role_data.role,
-        user_id=user_id
+        user_id=user_id,
+        user=user
     )
     return PrincipalsResponse(**result)
 

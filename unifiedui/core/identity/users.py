@@ -28,6 +28,8 @@ class ContextIdentityUser:
         self.idp = IdentityProviderFactory.create(self.identity)
         self._use_cache = use_cache
         self._groups = None
+        self._custom_groups = None
+        self._identity_groups = None
         self._idp_group_ids = None
         self._tenants = None
         self._cache = cache_client
@@ -163,6 +165,28 @@ class ContextIdentityUser:
                 logger.warning(f"Failed to cache groups: {e}")
         
         return self._groups
+
+    @property
+    def custom_groups(self) -> List[IdentityGroupResponse]:
+        """
+        Get custom groups the user is a member of (CUSTOM_GROUP only).
+        This is a filtered view of the groups property.
+        """
+        if self._custom_groups is not None:
+            return self._custom_groups
+        self._custom_groups = [g for g in self.groups if g.principal_type == PrincipalTypeEnum.CUSTOM_GROUP.value]
+        return self._custom_groups
+
+    @property
+    def identity_groups(self) -> List[IdentityGroupResponse]:
+        """
+        Get identity groups the user is a member of (IDENTITY_GROUP only).
+        This is a filtered view of the groups property.
+        """
+        if self._identity_groups is not None:
+            return self._identity_groups
+        self._identity_groups = [g for g in self.groups if g.principal_type == PrincipalTypeEnum.IDENTITY_GROUP.value]
+        return self._identity_groups
 
     @property
     def tenants(self) -> list[dict]:

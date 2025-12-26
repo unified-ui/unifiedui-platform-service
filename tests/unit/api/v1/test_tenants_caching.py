@@ -216,7 +216,7 @@ class TestTenantCaching:
     
     def test_custom_group_permission_grant_invalidates_member_cache(self, test_client: TestClient, fake_redis_client: Any) -> None:
         """Test that granting permission to a custom group invalidates member caches."""
-        from unifiedui.core.database.models import Principal, CustomGroupMember, TenantMember, TenantMemberRole
+        from unifiedui.core.database.models import Principal, CustomGroupMember, TenantMemberRole
         from unifiedui.core.database.enums import PrincipalTypeEnum
         
         # Admin creates tenant

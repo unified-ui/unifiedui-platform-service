@@ -158,7 +158,8 @@ async def create_application(
         return handler.create_application(
             tenant_id=tenant_id,
             request=create_request,
-            user_id=user.identity.get_id()
+            user_id=user.identity.get_id(),
+            user=user
         )
     except Exception as e:
         logger.error(f"Failed to create application: {e}")
@@ -556,7 +557,8 @@ async def set_application_permission(
             tenant_id=tenant_id,
             application_id=application_id,
             request=permission_request,
-            user_id=user.identity.get_id()
+            user_id=user.identity.get_id(),
+            user=user
         )
     except ApplicationNotFoundError as e:
         logger.warning(f"Application not found: {e}")

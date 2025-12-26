@@ -157,7 +157,8 @@ async def create_development_platform(
         return handler.create_development_platform(
             tenant_id=tenant_id,
             request=create_request,
-            user_id=user.identity.get_id()
+            user_id=user.identity.get_id(),
+            user=user
         )
     except Exception as e:
         logger.error(f"Failed to create development platform: {e}")
@@ -555,7 +556,8 @@ async def set_development_platform_permission(
             tenant_id=tenant_id,
             development_platform_id=development_platform_id,
             request=permission_request,
-            user_id=user.identity.get_id()
+            user_id=user.identity.get_id(),
+            user=user
         )
     except DevelopmentPlatformNotFoundError as e:
         logger.warning(f"Development platform not found: {e}")

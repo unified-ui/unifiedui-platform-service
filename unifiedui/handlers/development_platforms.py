@@ -25,6 +25,7 @@ from unifiedui.schema.responses.development_platform_permissions import (
     PrincipalPermissionsResponse
 )
 from unifiedui.exc.development_platforms import DevelopmentPlatformNotFoundError
+from unifiedui.handlers.principals_helper import ensure_principal_exists
 from unifiedui.logger import get_logger
 
 logger = get_logger(__name__)
@@ -262,7 +263,8 @@ class DevelopmentPlatformHandler:
         self,
         tenant_id: str,
         request: CreateDevelopmentPlatformRequest,
-        user_id: str
+        user_id: str,
+        user: ContextIdentityUser
     ) -> DevelopmentPlatformResponse:
         """
         Create a new development platform.
@@ -271,6 +273,7 @@ class DevelopmentPlatformHandler:
             tenant_id: The ID of the tenant
             request: Development platform creation data
             user_id: The ID of the user creating the development platform
+            user: The authenticated user context (for IDP access)
             
         Returns:
             Created development platform response
@@ -294,6 +297,15 @@ class DevelopmentPlatformHandler:
             )
             session.add(development_platform)
             
+            # Ensure principal exists (fetches from IDP if needed)
+            ensure_principal_exists(
+                session=session,
+                tenant_id=tenant_id,
+                principal_id=user_id,
+                principal_type=PrincipalTypeEnum.IDENTITY_USER.value,
+                user=user
+            )
+            
             # Add creator as admin member
             member_id = str(uuid.uuid4())
             member = DevelopmentPlatformMember(
@@ -301,7 +313,6 @@ class DevelopmentPlatformHandler:
                 tenant_id=tenant_id,
                 development_platform_id=development_platform_id,
                 principal_id=user_id,
-                principal_type=PrincipalTypeEnum.IDENTITY_USER,
                 role=PermissionActionEnum.ADMIN,
                 created_by=user_id,
                 updated_by=user_id
@@ -500,11 +511,11 @@ class DevelopmentPlatformHandler:
             # Group roles by principal
             principals_dict = {}
             for member in members:
-                key = (member.principal_id, member.principal_type)
+                key = (member.principal_id, member.principal.principal_type)
                 if key not in principals_dict:
                     principals_dict[key] = {
                         "principal_id": member.principal_id,
-                        "principal_type": member.principal_type,
+                        "principal_type": member.principal.principal_type,
                         "roles": []
                     }
                 
@@ -587,7 +598,7 @@ class DevelopmentPlatformHandler:
             
             # Collect all roles and get principal_type from first member
             permissions = []
-            principal_type = members[0].principal_type
+            principal_type = members[0].principal.principal_type
             for member in members:
                 if member.role not in permissions:
                     permissions.append(member.role)
@@ -605,7 +616,8 @@ class DevelopmentPlatformHandler:
         tenant_id: str,
         development_platform_id: str,
         request: SetDevelopmentPlatformPermissionRequest,
-        user_id: str
+        user_id: str,
+        user: ContextIdentityUser
     ) -> DevelopmentPlatformPermissionResponse:
         """
         Set or update a permission for a principal on a development platform.
@@ -642,6 +654,15 @@ class DevelopmentPlatformHandler:
             if not development_platform:
                 raise DevelopmentPlatformNotFoundError(development_platform_id)
             
+            # Ensure principal exists (fetches from IDP if needed)
+            ensure_principal_exists(
+                session=session,
+                tenant_id=tenant_id,
+                principal_id=request.principal_id,
+                principal_type=request.principal_type.value,
+                user=user
+            )
+            
             # Find or create member with this role
             # Note: A principal can only have ONE role per development platform (enforced by unique constraint)
             # So we need to update or insert
@@ -649,8 +670,7 @@ class DevelopmentPlatformHandler:
                 select(DevelopmentPlatformMember)
                 .where(
                     DevelopmentPlatformMember.development_platform_id == development_platform_id,
-                    DevelopmentPlatformMember.principal_id == request.principal_id,
-                    DevelopmentPlatformMember.principal_type == request.principal_type.value
+                    DevelopmentPlatformMember.principal_id == request.principal_id
                 )
             )
             member = session.execute(member_query).scalar_one_or_none()
@@ -663,7 +683,6 @@ class DevelopmentPlatformHandler:
                     tenant_id=tenant_id,
                     development_platform_id=development_platform_id,
                     principal_id=request.principal_id,
-                    principal_type=request.principal_type,
                     role=request.role,
                     created_by=user_id,
                     updated_by=user_id
@@ -760,7 +779,6 @@ class DevelopmentPlatformHandler:
                 .where(
                     DevelopmentPlatformMember.development_platform_id == development_platform_id,
                     DevelopmentPlatformMember.principal_id == principal_id,
-                    DevelopmentPlatformMember.principal_type == principal_type,
                     DevelopmentPlatformMember.role == permission
                 )
             )

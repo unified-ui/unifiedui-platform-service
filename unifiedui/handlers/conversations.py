@@ -23,6 +23,7 @@ from unifiedui.schema.responses.conversation_permissions import (
     PrincipalPermissionsResponse
 )
 from unifiedui.exc.conversations import ConversationNotFoundError
+from unifiedui.handlers.principals_helper import ensure_principal_exists
 from unifiedui.logger import get_logger
 
 logger = get_logger(__name__)
@@ -242,7 +243,8 @@ class ConversationHandler:
         self,
         tenant_id: str,
         request: CreateConversationRequest,
-        user_id: str
+        user_id: str,
+        user: ContextIdentityUser
     ) -> ConversationResponse:
         """
         Create a new conversation.
@@ -251,6 +253,7 @@ class ConversationHandler:
             tenant_id: The ID of the tenant
             request: Conversation creation data
             user_id: The ID of the user creating the conversation
+            user: The authenticated user context (for IDP access)
             
         Returns:
             Created conversation response
@@ -271,6 +274,15 @@ class ConversationHandler:
             )
             session.add(conversation)
             
+            # Ensure principal exists (fetches from IDP if needed)
+            ensure_principal_exists(
+                session=session,
+                tenant_id=tenant_id,
+                principal_id=user_id,
+                principal_type=PrincipalTypeEnum.IDENTITY_USER.value,
+                user=user
+            )
+            
             # Add creator as admin member
             member_id = str(uuid.uuid4())
             member = ConversationMember(
@@ -278,7 +290,6 @@ class ConversationHandler:
                 tenant_id=tenant_id,
                 conversation_id=conversation_id,
                 principal_id=user_id,
-                principal_type=PrincipalTypeEnum.IDENTITY_USER.value,
                 role=PermissionActionEnum.ADMIN.value,
                 created_by=user_id,
                 updated_by=user_id
@@ -459,11 +470,11 @@ class ConversationHandler:
             # Group roles by principal
             principals_dict = {}
             for member in members:
-                key = (member.principal_id, member.principal_type)
+                key = (member.principal_id, member.principal.principal_type)
                 if key not in principals_dict:
                     principals_dict[key] = {
                         "principal_id": member.principal_id,
-                        "principal_type": member.principal_type,
+                        "principal_type": member.principal.principal_type,
                         "roles": []
                     }
                 
@@ -546,7 +557,7 @@ class ConversationHandler:
             
             # Collect all roles and get principal_type from first member
             roles = []
-            principal_type = members[0].principal_type
+            principal_type = members[0].principal.principal_type
             for member in members:
                 if member.role not in roles:
                     roles.append(member.role)
@@ -564,7 +575,8 @@ class ConversationHandler:
         tenant_id: str,
         conversation_id: str,
         request: SetConversationPermissionRequest,
-        user_id: str
+        user_id: str,
+        user: ContextIdentityUser
     ) -> ConversationPermissionResponse:
         """
         Set or update a permission for a principal on a conversation.
@@ -601,13 +613,21 @@ class ConversationHandler:
             if not conversation:
                 raise ConversationNotFoundError(conversation_id)
             
+            # Ensure principal exists (fetches from IDP if needed)
+            ensure_principal_exists(
+                session=session,
+                tenant_id=tenant_id,
+                principal_id=request.principal_id,
+                principal_type=request.principal_type.value,
+                user=user
+            )
+            
             # Check if member exists (without role filter)
             member_query = (
                 select(ConversationMember)
                 .where(
                     ConversationMember.conversation_id == conversation_id,
-                    ConversationMember.principal_id == request.principal_id,
-                    ConversationMember.principal_type == request.principal_type.value
+                    ConversationMember.principal_id == request.principal_id
                 )
             )
             member = session.execute(member_query).scalar_one_or_none()
@@ -621,7 +641,6 @@ class ConversationHandler:
                     tenant_id=tenant_id,
                     conversation_id=conversation_id,
                     principal_id=request.principal_id,
-                    principal_type=request.principal_type.value,
                     role=request.role.value,
                     created_by=user_id,
                     updated_by=user_id
@@ -716,7 +735,6 @@ class ConversationHandler:
                 .where(
                     ConversationMember.conversation_id == conversation_id,
                     ConversationMember.principal_id == principal_id,
-                    ConversationMember.principal_type == principal_type,
                     ConversationMember.role == role
                 )
             )

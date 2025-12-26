@@ -141,7 +141,8 @@ async def create_conversation(
         return handler.create_conversation(
             tenant_id=tenant_id,
             request=create_request,
-            user_id=user.identity.get_id()
+            user_id=user.identity.get_id(),
+            user=user
         )
     except Exception as e:
         logger.error(f"Failed to create conversation: {e}")
@@ -539,7 +540,8 @@ async def set_conversation_permission(
             tenant_id=tenant_id,
             conversation_id=conversation_id,
             request=permission_request,
-            user_id=user.identity.get_id()
+            user_id=user.identity.get_id(),
+            user=user
         )
     except ConversationNotFoundError as e:
         logger.warning(f"Conversation not found: {e}")

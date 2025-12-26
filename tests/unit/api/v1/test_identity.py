@@ -493,8 +493,10 @@ class TestRefreshPrincipal:
         assert response2.status_code == status.HTTP_200_OK
         data = response2.json()
         
-        # created_at should be the same, updated_at might be different
-        assert data["created_at"] == created_at_1
+        # Normalize datetime strings by removing trailing 'Z' for comparison
+        # (JSON serialization may vary between naive and timezone-aware datetimes)
+        normalize_ts = lambda ts: ts.rstrip('Z') if ts else ts
+        assert normalize_ts(data["created_at"]) == normalize_ts(created_at_1)
         assert data["principal_id"] == principal_id
     
     def test_refresh_principal_invalid_type(
@@ -524,7 +526,7 @@ class TestRefreshPrincipal:
         )
         
         # Should fail validation
-        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
     
     def test_refresh_principal_custom_group_not_allowed(
         self, 
@@ -553,7 +555,7 @@ class TestRefreshPrincipal:
         )
         
         # Should fail validation (CUSTOM_GROUP is not in the Literal type)
-        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
     
     def test_refresh_principal_missing_tenant_id(
         self, 
@@ -569,7 +571,7 @@ class TestRefreshPrincipal:
             }
         )
         
-        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
     
     def test_refresh_principal_missing_type(
         self, 
@@ -594,7 +596,7 @@ class TestRefreshPrincipal:
             }
         )
         
-        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
     
     def test_refresh_principal_unauthenticated(self, test_client: TestClient) -> None:
         """Test that unauthenticated request fails."""
@@ -620,7 +622,7 @@ class TestRefreshPrincipal:
             json={}
         )
         
-        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
     
     def test_refresh_principal_with_uuid_format(
         self, 

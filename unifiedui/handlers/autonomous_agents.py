@@ -25,6 +25,7 @@ from unifiedui.schema.responses.autonomous_agent_permissions import (
     PrincipalPermissionsResponse
 )
 from unifiedui.exc.autonomous_agents import AutonomousAgentNotFoundError, AutonomousAgentPermissionNotFoundError
+from unifiedui.handlers.principals_helper import ensure_principal_exists
 from unifiedui.logger import get_logger
 
 logger = get_logger(__name__)
@@ -176,22 +177,19 @@ class AutonomousAgentHandler:
                 
                 # User permission
                 permission_filters.append(
-                    (AutonomousAgentMember.principal_id == user_id) &
-                    (AutonomousAgentMember.principal_type == PrincipalTypeEnum.IDENTITY_USER.value)
+                    (AutonomousAgentMember.principal_id == user_id)
                 )
                 
                 # Identity group permissions
                 if identity_group_ids:
                     permission_filters.append(
-                        (AutonomousAgentMember.principal_id.in_(identity_group_ids)) &
-                        (AutonomousAgentMember.principal_type == PrincipalTypeEnum.IDENTITY_GROUP.value)
+                        (AutonomousAgentMember.principal_id.in_(identity_group_ids))
                     )
                 
                 # Custom group permissions
                 if custom_group_ids:
                     permission_filters.append(
-                        (AutonomousAgentMember.principal_id.in_(custom_group_ids)) &
-                        (AutonomousAgentMember.principal_type == PrincipalTypeEnum.CUSTOM_GROUP.value)
+                        (AutonomousAgentMember.principal_id.in_(custom_group_ids))
                     )
                 
                 query = query.where(or_(*permission_filters))
@@ -303,7 +301,8 @@ class AutonomousAgentHandler:
         self,
         tenant_id: str,
         request: CreateAutonomousAgentRequest,
-        user_id: str
+        user_id: str,
+        user: ContextIdentityUser
     ) -> AutonomousAgentResponse:
         """
         Create a new autonomous agent.
@@ -312,6 +311,7 @@ class AutonomousAgentHandler:
             tenant_id: The ID of the tenant
             request: Autonomous agent creation data
             user_id: ID of the user creating the autonomous agent
+            user: The authenticated user context (for IDP access)
             
         Returns:
             Created autonomous agent response
@@ -335,13 +335,21 @@ class AutonomousAgentHandler:
             )
             session.add(autonomous_agent)
             
+            # Ensure principal exists (fetches from IDP if needed)
+            ensure_principal_exists(
+                session=session,
+                tenant_id=tenant_id,
+                principal_id=user_id,
+                principal_type=PrincipalTypeEnum.IDENTITY_USER.value,
+                user=user
+            )
+            
             # Add creator as ADMIN member
             member = AutonomousAgentMember(
                 id=member_id,
                 tenant_id=tenant_id,
                 autonomous_agent_id=autonomous_agent_id,
                 principal_id=user_id,
-                principal_type=PrincipalTypeEnum.IDENTITY_USER,
                 role=PermissionActionEnum.ADMIN,
                 created_by=user_id,
                 updated_by=user_id
@@ -535,13 +543,13 @@ class AutonomousAgentHandler:
             # Group roles by principal
             principals_dict = {}
             for member in members:
-                key = (member.principal_id, member.principal_type)
+                key = (member.principal_id, member.principal.principal_type)
                 if key not in principals_dict:
                     principals_dict[key] = {
                         "autonomous_agent_id": autonomous_agent_id,
                         "tenant_id": tenant_id,
                         "principal_id": member.principal_id,
-                        "principal_type": member.principal_type,
+                        "principal_type": member.principal.principal_type,
                         "roles": []
                     }
                 principals_dict[key]["roles"].append(member.role)
@@ -622,7 +630,7 @@ class AutonomousAgentHandler:
                 )
             
             # Get principal type from first member
-            principal_type = members[0].principal_type
+            principal_type = members[0].principal.principal_type
             roles = [member.role for member in members]
             
             return PrincipalPermissionsResponse(
@@ -638,7 +646,8 @@ class AutonomousAgentHandler:
         tenant_id: str,
         autonomous_agent_id: str,
         request: SetAutonomousAgentPermissionRequest,
-        user_id: str
+        user_id: str,
+        user: ContextIdentityUser
     ) -> AutonomousAgentPermissionResponse:
         """
         Set or update a permission for a principal on an autonomous agent.
@@ -674,11 +683,19 @@ class AutonomousAgentHandler:
             if not autonomous_agent:
                 raise AutonomousAgentNotFoundError(autonomous_agent_id)
             
+            # Ensure principal exists (fetches from IDP if needed)
+            ensure_principal_exists(
+                session=session,
+                tenant_id=tenant_id,
+                principal_id=request.principal_id,
+                principal_type=request.principal_type.value,
+                user=user
+            )
+            
             # Check if member exists
             query = select(AutonomousAgentMember).where(
                 AutonomousAgentMember.autonomous_agent_id == autonomous_agent_id,
-                AutonomousAgentMember.principal_id == request.principal_id,
-                AutonomousAgentMember.principal_type == request.principal_type
+                AutonomousAgentMember.principal_id == request.principal_id
             )
             member = session.execute(query).scalar_one_or_none()
             
@@ -690,7 +707,6 @@ class AutonomousAgentHandler:
                     tenant_id=tenant_id,
                     autonomous_agent_id=autonomous_agent_id,
                     principal_id=request.principal_id,
-                    principal_type=request.principal_type.value,
                     role=request.role,
                     created_by=user_id,
                     updated_by=user_id
@@ -779,7 +795,6 @@ class AutonomousAgentHandler:
             query = select(AutonomousAgentMember).where(
                 AutonomousAgentMember.autonomous_agent_id == autonomous_agent_id,
                 AutonomousAgentMember.principal_id == principal_id,
-                AutonomousAgentMember.principal_type == principal_type,
                 AutonomousAgentMember.role == role
             )
             member = session.execute(query).scalar_one_or_none()
@@ -811,11 +826,11 @@ class AutonomousAgentHandler:
         """Helper to group permissions by principal."""
         principals_dict = {}
         for member, permission in results:
-            key = (member.principal_id, member.principal_type)
+            key = (member.principal_id, member.principal.principal_type)
             if key not in principals_dict:
                 principals_dict[key] = {
                     "principal_id": member.principal_id,
-                    "principal_type": member.principal_type,
+                    "principal_type": member.principal.principal_type,
                     "roles": []
                 }
             principals_dict[key]["roles"].append(permission.permission)

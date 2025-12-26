@@ -25,6 +25,7 @@ from unifiedui.schema.responses.application_permissions import (
     PrincipalPermissionsResponse
 )
 from unifiedui.exc.applications import ApplicationNotFoundError
+from unifiedui.handlers.principals_helper import ensure_principal_exists
 from unifiedui.logger import get_logger
 
 logger = get_logger(__name__)
@@ -256,7 +257,8 @@ class ApplicationHandler:
         self,
         tenant_id: str,
         request: CreateApplicationRequest,
-        user_id: str
+        user_id: str,
+        user: ContextIdentityUser
     ) -> ApplicationResponse:
         """
         Create a new application.
@@ -265,6 +267,7 @@ class ApplicationHandler:
             tenant_id: The ID of the tenant
             request: Application creation data
             user_id: The ID of the user creating the application
+            user: The authenticated user context (for IDP access)
             
         Returns:
             Created application response
@@ -288,6 +291,15 @@ class ApplicationHandler:
             )
             session.add(application)
             
+            # Ensure principal exists (fetches from IDP if needed)
+            ensure_principal_exists(
+                session=session,
+                tenant_id=tenant_id,
+                principal_id=user_id,
+                principal_type=PrincipalTypeEnum.IDENTITY_USER.value,
+                user=user
+            )
+            
             # Add creator as admin member
             member_id = str(uuid.uuid4())
             member = ApplicationMember(
@@ -295,7 +307,6 @@ class ApplicationHandler:
                 tenant_id=tenant_id,
                 application_id=application_id,
                 principal_id=user_id,
-                principal_type=PrincipalTypeEnum.IDENTITY_USER,
                 role=PermissionActionEnum.ADMIN,
                 created_by=user_id,
                 updated_by=user_id
@@ -492,11 +503,11 @@ class ApplicationHandler:
             # Group roles by principal
             principals_dict = {}
             for member in members:
-                key = (member.principal_id, member.principal_type)
+                key = (member.principal_id, member.principal.principal_type)
                 if key not in principals_dict:
                     principals_dict[key] = {
                         "principal_id": member.principal_id,
-                        "principal_type": member.principal_type,
+                        "principal_type": member.principal.principal_type,
                         "roles": []
                     }
                 
@@ -579,7 +590,7 @@ class ApplicationHandler:
             
             # Collect all roles and get principal_type from first member
             permissions = []
-            principal_type = members[0].principal_type
+            principal_type = members[0].principal.principal_type
             for member in members:
                 if member.role not in permissions:
                     permissions.append(member.role)
@@ -597,7 +608,8 @@ class ApplicationHandler:
         tenant_id: str,
         application_id: str,
         request: SetApplicationPermissionRequest,
-        user_id: str
+        user_id: str,
+        user: ContextIdentityUser
     ) -> ApplicationPermissionResponse:
         """
         Set or update a permission for a principal on an application.
@@ -634,6 +646,15 @@ class ApplicationHandler:
             if not application:
                 raise ApplicationNotFoundError(application_id)
             
+            # Ensure principal exists (fetches from IDP if needed)
+            ensure_principal_exists(
+                session=session,
+                tenant_id=tenant_id,
+                principal_id=request.principal_id,
+                principal_type=request.principal_type.value,
+                user=user
+            )
+            
             # Find or create member with this role
             # Note: A principal can only have ONE role per application (enforced by unique constraint)
             # So we need to update or insert
@@ -641,8 +662,7 @@ class ApplicationHandler:
                 select(ApplicationMember)
                 .where(
                     ApplicationMember.application_id == application_id,
-                    ApplicationMember.principal_id == request.principal_id,
-                    ApplicationMember.principal_type == request.principal_type.value
+                    ApplicationMember.principal_id == request.principal_id
                 )
             )
             member = session.execute(member_query).scalar_one_or_none()
@@ -655,7 +675,6 @@ class ApplicationHandler:
                     tenant_id=tenant_id,
                     application_id=application_id,
                     principal_id=request.principal_id,
-                    principal_type=request.principal_type,
                     role=request.role,
                     created_by=user_id,
                     updated_by=user_id
@@ -752,7 +771,6 @@ class ApplicationHandler:
                 .where(
                     ApplicationMember.application_id == application_id,
                     ApplicationMember.principal_id == principal_id,
-                    ApplicationMember.principal_type == principal_type,
                     ApplicationMember.role == permission
                 )
             )

@@ -160,7 +160,8 @@ async def create_credential(
         return handler.create_credential(
             tenant_id=tenant_id,
             request=create_request,
-            user_id=user.identity.get_id()
+            user_id=user.identity.get_id(),
+            user=user
         )
     except Exception as e:
         logger.error(f"Failed to create credential: {e}")
@@ -545,7 +546,8 @@ async def set_credential_permission(
             tenant_id=tenant_id,
             credential_id=credential_id,
             request=permission_request,
-            user_id=user.identity.get_id()
+            user_id=user.identity.get_id(),
+            user=user
         )
     except CredentialNotFoundError as e:
         logger.warning(f"Credential not found: {e}")

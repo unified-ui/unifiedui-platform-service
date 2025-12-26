@@ -166,7 +166,7 @@ class ExtraIDIdentityProvider(BaseIdentityProvider, APIJSONBearerClient):
             firstname=data.get("givenName"),
             lastname=data.get("surname"),
             mail=data.get("mail"),
-            user_principal_name=data.get("userPrincipalName")
+            principal_name=data.get("userPrincipalName")
         )
 
     def get_group_by_id(self, group_id: str) -> IdentityGroupResponse:
@@ -198,7 +198,7 @@ class ExtraIDIdentityProvider(BaseIdentityProvider, APIJSONBearerClient):
         """
         Get the principal name for a user or group.
         
-        For users, returns userPrincipalName (e.g., user@domain.com).
+        For users, returns principal_name (e.g., user@domain.com).
         For groups, returns the display name.
         
         Args:
@@ -210,8 +210,8 @@ class ExtraIDIdentityProvider(BaseIdentityProvider, APIJSONBearerClient):
         """
         if principal_type == "IDENTITY_USER":
             user = self.get_user_by_id(principal_id)
-            # Prefer userPrincipalName, fallback to mail, then display_name
-            return user.user_principal_name or user.mail or user.display_name
+            # Prefer principal_name, fallback to mail, then display_name
+            return user.principal_name or user.mail or user.display_name
         else:  # IDENTITY_GROUP
             group = self.get_group_by_id(principal_id)
             return group.display_name
@@ -223,7 +223,7 @@ class ExtraIDIdentityProvider(BaseIdentityProvider, APIJSONBearerClient):
                 id=item["id"],
                 identity_provider=self.identity_token.get_identity_provider(),
                 display_name=item.get("displayName", item.get("userPrincipalName", "")),
-                user_principal_name=item.get("userPrincipalName")
+                principal_name=item.get("userPrincipalName")
             )
             for item in data.get("value", [])
         ]

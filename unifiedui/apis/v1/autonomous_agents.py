@@ -143,7 +143,8 @@ async def create_autonomous_agent(
         return handler.create_autonomous_agent(
             tenant_id=tenant_id,
             request=create_request,
-            user_id=user_id
+            user_id=user_id,
+            user=user
         )
     except Exception as e:
         logger.error(f"Failed to create autonomous agent: {e}", exc_info=True)
@@ -483,7 +484,8 @@ async def set_autonomous_agent_permission(
             tenant_id=tenant_id,
             autonomous_agent_id=autonomous_agent_id,
             request=permission_request,
-            user_id=user_id
+            user_id=user_id,
+            user=user
         )
     except AutonomousAgentNotFoundError as e:
         raise HTTPException(

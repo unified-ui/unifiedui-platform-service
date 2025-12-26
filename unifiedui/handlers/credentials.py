@@ -25,6 +25,7 @@ from unifiedui.schema.responses.credential_permissions import (
     PrincipalPermissionsResponse
 )
 from unifiedui.exc.credentials import CredentialNotFoundError
+from unifiedui.handlers.principals_helper import ensure_principal_exists
 from unifiedui.logger import get_logger
 
 logger = get_logger(__name__)
@@ -297,7 +298,8 @@ class CredentialHandler:
         self,
         tenant_id: str,
         request: CreateCredentialRequest,
-        user_id: str
+        user_id: str,
+        user: ContextIdentityUser
     ) -> CredentialResponse:
         """
         Create a new credential and store secret in vault.
@@ -306,6 +308,7 @@ class CredentialHandler:
             tenant_id: The ID of the tenant
             request: Credential creation data
             user_id: ID of the user creating the credential
+            user: The authenticated user context (for IDP access)
             
         Returns:
             Created credential response
@@ -342,13 +345,21 @@ class CredentialHandler:
             session.add(credential)
             session.flush()  # Flush to get auto-generated timestamps
             
+            # Ensure principal exists (fetches from IDP if needed)
+            ensure_principal_exists(
+                session=session,
+                tenant_id=tenant_id,
+                principal_id=user_id,
+                principal_type=PrincipalTypeEnum.IDENTITY_USER.value,
+                user=user
+            )
+            
             # Add creator as member with ADMIN role
             member = CredentialMember(
                 id=str(uuid.uuid4()),
                 tenant_id=tenant_id,
                 credential_id=credential_id,
                 principal_id=user_id,
-                principal_type=PrincipalTypeEnum.IDENTITY_USER,
                 role=PermissionActionEnum.ADMIN,
                 created_by=user_id,
                 updated_by=user_id
@@ -593,7 +604,7 @@ class CredentialHandler:
                         "credential_id": credential_id,
                         "tenant_id": tenant_id,
                         "principal_id": member.principal_id,
-                        "principal_type": member.principal_type,
+                        "principal_type": member.principal.principal_type,
                         "roles": []  # Changed from "permissions" to "roles"
                     }
                 
@@ -683,7 +694,7 @@ class CredentialHandler:
                 credential_id=credential_id,
                 tenant_id=tenant_id,
                 principal_id=members[0].principal_id,
-                principal_type=members[0].principal_type,
+                principal_type=members[0].principal.principal_type,
                 roles=permission_list  # Changed from "permissions" to "roles"
             )
 
@@ -692,7 +703,8 @@ class CredentialHandler:
         tenant_id: str,
         credential_id: str,
         request: SetCredentialPermissionRequest,
-        user_id: str
+        user_id: str,
+        user: ContextIdentityUser
     ) -> CredentialPermissionResponse:
         """
         Set or update a credential permission.
@@ -725,12 +737,20 @@ class CredentialHandler:
             if not credential:
                 raise CredentialNotFoundError(credential_id)
             
+            # Ensure principal exists (fetches from IDP if needed)
+            ensure_principal_exists(
+                session=session,
+                tenant_id=tenant_id,
+                principal_id=request.principal_id,
+                principal_type=request.principal_type.value,
+                user=user
+            )
+            
             # Check if member already exists (without filtering by role)
             member_query = select(CredentialMember).where(
                 CredentialMember.credential_id == credential_id,
                 CredentialMember.tenant_id == tenant_id,
-                CredentialMember.principal_id == request.principal_id,
-                CredentialMember.principal_type == request.principal_type
+                CredentialMember.principal_id == request.principal_id
             )
             member = session.execute(member_query).scalar_one_or_none()
             
@@ -741,7 +761,6 @@ class CredentialHandler:
                     tenant_id=tenant_id,
                     credential_id=credential_id,
                     principal_id=request.principal_id,
-                    principal_type=request.principal_type,
                     role=request.role,  # Changed from request.permission
                     created_by=user_id,
                     updated_by=user_id
@@ -811,7 +830,6 @@ class CredentialHandler:
                 CredentialMember.credential_id == credential_id,
                 CredentialMember.tenant_id == tenant_id,
                 CredentialMember.principal_id == principal_id,
-                CredentialMember.principal_type == principal_type,
                 CredentialMember.role == permission
             )
             member = session.execute(member_query).scalar_one_or_none()
@@ -833,7 +851,7 @@ class CredentialHandler:
             credential_id=member.credential_id,
             tenant_id=member.tenant_id,
             principal_id=member.principal_id,
-            principal_type=member.principal_type,
+            principal_type=member.principal.principal_type,
             role=member.role,  # Changed from action to role
             created_at=member.created_at,
             updated_at=member.updated_at

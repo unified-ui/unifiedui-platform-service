@@ -65,7 +65,6 @@ def create_application_in_db(test_client: TestClient, tenant_id: str, user_id: s
             tenant_id=tenant_id,
             application_id=app_id,
             principal_id=user_id,
-            principal_type=PrincipalTypeEnum.IDENTITY_USER,
             role=PermissionActionEnum.ADMIN,
             created_by=user_id,
             updated_by=user_id
@@ -90,7 +89,6 @@ def add_user_to_application_in_db(
             tenant_id=tenant_id,
             application_id=app_id,
             principal_id=user_id,
-            principal_type=PrincipalTypeEnum.IDENTITY_USER,
             role=role,
             created_by=admin_id,
             updated_by=admin_id

@@ -6,7 +6,7 @@ from sqlalchemy import select
 
 from unifiedui.core.identity.users import ContextIdentityUser
 from unifiedui.handlers.dependencies import get_db_client
-from unifiedui.core.database.enums import TenantRolesEnum, PermissionActionEnum, UserPermissionEnum
+from unifiedui.core.database.enums import TenantRolesEnum, PermissionActionEnum, UserPermissionEnum, PrincipalTypeEnum
 from unifiedui.core.database.models import (
     ApplicationMember,
     CredentialMember,
@@ -366,12 +366,19 @@ def check_permissions(
                     if entity_admin and entity_admin in user_tenant_permissions:
                         return await func(*args, **kwargs)
                 
-                # Get user's principal IDs (cache property access)
+                # Get user's principal IDs (user + all groups from groups property)
                 user_id = user.identity.get_id()
-                user_groups = user.groups  # Cache property
-                user_custom_groups = user.custom_groups  # Cache property
-                identity_group_ids = [group.id for group in user_groups]
-                custom_group_ids = [group.id for group in user_custom_groups]
+                user_groups = user.groups  # Contains both IDENTITY_GROUPs and CUSTOM_GROUPs
+                
+                # Extract group IDs (groups property now contains both types)
+                identity_group_ids = [
+                    g.id for g in user_groups 
+                    if g.principal_type == PrincipalTypeEnum.IDENTITY_GROUP.value
+                ]
+                custom_group_ids = [
+                    g.id for g in user_groups 
+                    if g.principal_type == PrincipalTypeEnum.CUSTOM_GROUP.value
+                ]
                 all_principal_ids = [user_id] + identity_group_ids + custom_group_ids
                 
                 # Query member with role directly - NO JOIN needed anymore

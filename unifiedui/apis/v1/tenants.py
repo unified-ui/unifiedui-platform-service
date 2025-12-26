@@ -119,7 +119,7 @@ async def create_tenant(
     user: ContextIdentityUser = request.state.user
     user_id = user.identity.get_id()
     
-    return handler.create_tenant(tenant_data, user_id)
+    return handler.create_tenant(tenant_data, user_id, user)
 
 
 @router.patch(
@@ -290,7 +290,8 @@ async def set_principal_permission(
         principal_id=role_data.principal_id,
         principal_type=role_data.principal_type,
         permission=role_data.role,
-        user_id=user_id
+        user_id=user_id,
+        user=user
     )
     return PrincipalsResponse(**result)
 

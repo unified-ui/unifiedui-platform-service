@@ -25,6 +25,7 @@ from unifiedui.schema.responses.chat_widget_permissions import (
     PrincipalPermissionsResponse
 )
 from unifiedui.exc.chat_widgets import ChatWidgetNotFoundError
+from unifiedui.handlers.principals_helper import ensure_principal_exists
 from unifiedui.logger import get_logger
 
 logger = get_logger(__name__)
@@ -262,7 +263,8 @@ class ChatWidgetHandler:
         self,
         tenant_id: str,
         request: CreateChatWidgetRequest,
-        user_id: str
+        user_id: str,
+        user: ContextIdentityUser
     ) -> ChatWidgetResponse:
         """
         Create a new chat widget.
@@ -271,6 +273,7 @@ class ChatWidgetHandler:
             tenant_id: The ID of the tenant
             request: Chat widget creation data
             user_id: The ID of the user creating the chat widget
+            user: The authenticated user context (for IDP access)
             
         Returns:
             Created chat widget response
@@ -293,6 +296,15 @@ class ChatWidgetHandler:
             )
             session.add(chat_widget)
             
+            # Ensure principal exists (fetches from IDP if needed)
+            ensure_principal_exists(
+                session=session,
+                tenant_id=tenant_id,
+                principal_id=user_id,
+                principal_type=PrincipalTypeEnum.IDENTITY_USER.value,
+                user=user
+            )
+            
             # Add creator as admin member
             member_id = str(uuid.uuid4())
             member = ChatWidgetMember(
@@ -300,7 +312,6 @@ class ChatWidgetHandler:
                 tenant_id=tenant_id,
                 chat_widget_id=chat_widget_id,
                 principal_id=user_id,
-                principal_type=PrincipalTypeEnum.IDENTITY_USER,
                 role=PermissionActionEnum.ADMIN,
                 created_by=user_id,
                 updated_by=user_id
@@ -497,11 +508,11 @@ class ChatWidgetHandler:
             # Group roles by principal
             principals_dict = {}
             for member in members:
-                key = (member.principal_id, member.principal_type)
+                key = (member.principal_id, member.principal.principal_type)
                 if key not in principals_dict:
                     principals_dict[key] = {
                         "principal_id": member.principal_id,
-                        "principal_type": member.principal_type,
+                        "principal_type": member.principal.principal_type,
                         "roles": []
                     }
                 
@@ -584,7 +595,7 @@ class ChatWidgetHandler:
             
             # Collect all roles and get principal_type from first member
             permissions = []
-            principal_type = members[0].principal_type
+            principal_type = members[0].principal.principal_type
             for member in members:
                 if member.role not in permissions:
                     permissions.append(member.role)
@@ -602,7 +613,8 @@ class ChatWidgetHandler:
         tenant_id: str,
         chat_widget_id: str,
         request: SetChatWidgetPermissionRequest,
-        user_id: str
+        user_id: str,
+        user: ContextIdentityUser
     ) -> ChatWidgetPermissionResponse:
         """
         Set or update a permission for a principal on a chat widget.
@@ -639,6 +651,15 @@ class ChatWidgetHandler:
             if not chat_widget:
                 raise ChatWidgetNotFoundError(chat_widget_id)
             
+            # Ensure principal exists (fetches from IDP if needed)
+            ensure_principal_exists(
+                session=session,
+                tenant_id=tenant_id,
+                principal_id=request.principal_id,
+                principal_type=request.principal_type.value,
+                user=user
+            )
+            
             # Find or create member with this role
             # Note: A principal can only have ONE role per chat widget (enforced by unique constraint)
             # So we need to update or insert
@@ -646,8 +667,7 @@ class ChatWidgetHandler:
                 select(ChatWidgetMember)
                 .where(
                     ChatWidgetMember.chat_widget_id == chat_widget_id,
-                    ChatWidgetMember.principal_id == request.principal_id,
-                    ChatWidgetMember.principal_type == request.principal_type.value
+                    ChatWidgetMember.principal_id == request.principal_id
                 )
             )
             member = session.execute(member_query).scalar_one_or_none()
@@ -660,7 +680,6 @@ class ChatWidgetHandler:
                     tenant_id=tenant_id,
                     chat_widget_id=chat_widget_id,
                     principal_id=request.principal_id,
-                    principal_type=request.principal_type,
                     role=request.role,
                     created_by=user_id,
                     updated_by=user_id
@@ -757,7 +776,6 @@ class ChatWidgetHandler:
                 .where(
                     ChatWidgetMember.chat_widget_id == chat_widget_id,
                     ChatWidgetMember.principal_id == principal_id,
-                    ChatWidgetMember.principal_type == principal_type,
                     ChatWidgetMember.role == permission
                 )
             )

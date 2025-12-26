@@ -1,6 +1,8 @@
 """Business logic handlers for custom group operations using SQLAlchemy."""
+from __future__ import annotations
+
 import uuid
-from typing import Optional, List
+from typing import TYPE_CHECKING, Optional, List
 from datetime import datetime, UTC
 
 from sqlalchemy import select, and_, or_
@@ -10,6 +12,7 @@ from unifiedui.core.database.client import SQLAlchemyClient
 from unifiedui.core.database.models import Principal, CustomGroupMember
 from unifiedui.core.database.enums import PrincipalTypeEnum, PermissionActionEnum
 from unifiedui.caching.client import CacheClient
+from unifiedui.handlers.principals_helper import ensure_principal_exists
 from unifiedui.schema.requests.custom_groups import (
     CreateCustomGroupRequest,
     UpdateCustomGroupRequest,
@@ -23,6 +26,9 @@ from unifiedui.schema.responses.custom_groups import (
 )
 from unifiedui.exc.custom_groups import CustomGroupNotFoundError
 from unifiedui.logger import get_logger
+
+if TYPE_CHECKING:
+    from unifiedui.core.identity.users import ContextIdentityUser
 
 logger = get_logger(__name__)
 
@@ -189,7 +195,8 @@ class CustomGroupHandler:
         self,
         tenant_id: str,
         request: CreateCustomGroupRequest,
-        user_id: str
+        user_id: str,
+        user: ContextIdentityUser
     ) -> CustomGroupResponse:
         """
         Create a new custom group and assign the creator as ADMIN member.
@@ -199,6 +206,7 @@ class CustomGroupHandler:
             tenant_id: The ID of the tenant
             request: Custom group creation data
             user_id: ID of the user creating the group (principal_id)
+            user: The authenticated user context (for IDP access)
             
         Returns:
             Created custom group response
@@ -220,6 +228,15 @@ class CustomGroupHandler:
             )
             session.add(group)
             session.flush()
+            
+            # Ensure creator principal exists (fetches from IDP if needed)
+            ensure_principal_exists(
+                session=session,
+                tenant_id=tenant_id,
+                principal_id=user_id,
+                principal_type=PrincipalTypeEnum.IDENTITY_USER.value,
+                user=user
+            )
             
             # Create membership for the creator with ADMIN role
             member_id = str(uuid.uuid4())
@@ -495,8 +512,10 @@ class CustomGroupHandler:
         tenant_id: str,
         custom_group_id: str,
         principal_id: str,
+        principal_type: str,
         role: str,
-        user_id: str
+        user_id: str,
+        user: ContextIdentityUser
     ) -> dict:
         """
         Add or update a member's role in a custom group.
@@ -505,8 +524,10 @@ class CustomGroupHandler:
             tenant_id: The ID of the tenant
             custom_group_id: The ID of the custom group
             principal_id: The ID of the principal to add/update
+            principal_type: The type of principal (IDENTITY_USER, IDENTITY_GROUP, CUSTOM_GROUP)
             role: The role to assign (READ, WRITE, ADMIN)
             user_id: The ID of the user making the change
+            user: The authenticated user context (for IDP access)
             
         Returns:
             Dict with custom_group_id, principal_id, and updated role
@@ -529,6 +550,15 @@ class CustomGroupHandler:
             group = session.execute(group_query).scalar_one_or_none()
             if not group:
                 raise CustomGroupNotFoundError(custom_group_id)
+            
+            # Ensure principal exists (fetches from IDP if needed)
+            ensure_principal_exists(
+                session=session,
+                tenant_id=tenant_id,
+                principal_id=principal_id,
+                principal_type=principal_type,
+                user=user
+            )
             
             # Find or create membership
             query = select(CustomGroupMember).where(
@@ -638,8 +668,24 @@ class CustomGroupHandler:
         tenant_id: str,
         custom_group_id: str
     ) -> dict:
-        """Alias for list_custom_group_members for backwards compatibility."""
-        return self.list_custom_group_members(tenant_id, custom_group_id)
+        """Alias for list_custom_group_members for backwards compatibility.
+        
+        Returns data in the format expected by CustomGroupPrincipalsResponse.
+        """
+        result = self.list_custom_group_members(tenant_id, custom_group_id)
+        # Convert 'members' to 'principals' format with roles list
+        principals = []
+        for member in result.get("members", []):
+            principals.append({
+                "principal_id": member["principal_id"],
+                "principal_type": member.get("principal_type"),
+                "roles": [member["role"]] if member.get("role") else []
+            })
+        return {
+            "custom_group_id": result["custom_group_id"],
+            "tenant_id": result["tenant_id"],
+            "principals": principals
+        }
     
     def get_principal_permissions(
         self,
@@ -647,16 +693,60 @@ class CustomGroupHandler:
         custom_group_id: str,
         principal_id: str
     ) -> dict:
-        """Alias for get_member_role for backwards compatibility."""
-        result = self.get_member_role(tenant_id, custom_group_id, principal_id)
-        # Convert to old format with roles list
-        return {
-            "custom_group_id": result["custom_group_id"],
-            "tenant_id": result["tenant_id"],
-            "principal_id": result["principal_id"],
-            "principal_type": None,  # Not stored separately anymore
-            "roles": [result["role"]] if result["role"] else []
-        }
+        """Get permissions for a specific principal on a custom group."""
+        logger.info(
+            "Getting principal permissions",
+            extra={"tenant_id": tenant_id, "custom_group_id": custom_group_id, "principal_id": principal_id}
+        )
+        
+        with self.db_client.get_session() as session:
+            # Verify group exists
+            group_query = select(Principal).where(
+                Principal.tenant_id == tenant_id,
+                Principal.principal_id == custom_group_id,
+                Principal.principal_type == PrincipalTypeEnum.CUSTOM_GROUP.value
+            )
+            group = session.execute(group_query).scalar_one_or_none()
+            if not group:
+                raise CustomGroupNotFoundError(custom_group_id)
+            
+            # Get member with principal info
+            query = (
+                select(CustomGroupMember, Principal)
+                .join(
+                    Principal,
+                    and_(
+                        CustomGroupMember.tenant_id == Principal.tenant_id,
+                        CustomGroupMember.principal_id == Principal.principal_id
+                    )
+                )
+                .where(
+                    CustomGroupMember.tenant_id == tenant_id,
+                    CustomGroupMember.custom_group_id == custom_group_id,
+                    CustomGroupMember.principal_id == principal_id
+                )
+            )
+            
+            result = session.execute(query).first()
+            
+            if not result:
+                # Member not found in this group
+                return {
+                    "custom_group_id": custom_group_id,
+                    "tenant_id": tenant_id,
+                    "principal_id": principal_id,
+                    "principal_type": None,
+                    "roles": []
+                }
+            
+            member, principal = result
+            return {
+                "custom_group_id": custom_group_id,
+                "tenant_id": tenant_id,
+                "principal_id": principal_id,
+                "principal_type": principal.principal_type,
+                "roles": [member.role] if member.role else []
+            }
     
     def set_principal_permission(
         self,
@@ -665,10 +755,11 @@ class CustomGroupHandler:
         principal_id: str,
         principal_type: str,
         role: str,
-        user_id: str
+        user_id: str,
+        user: ContextIdentityUser
     ) -> dict:
         """Alias for set_member_role for backwards compatibility."""
-        result = self.set_member_role(tenant_id, custom_group_id, principal_id, role, user_id)
+        result = self.set_member_role(tenant_id, custom_group_id, principal_id, principal_type, role, user_id, user)
         return {
             "custom_group_id": result["custom_group_id"],
             "tenant_id": result["tenant_id"],

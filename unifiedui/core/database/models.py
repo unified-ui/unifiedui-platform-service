@@ -119,7 +119,7 @@ class TenantScopedMixin:
 class Tenant(Base, IdNameDescriptionMixin):
     __tablename__ = "tenants"
 
-    members: Mapped[list["TenantMember"]] = relationship(
+    member_roles: Mapped[list["TenantMemberRole"]] = relationship(
         back_populates="tenant", cascade="all, delete-orphan"
     )
     principals: Mapped[list["Principal"]] = relationship(
@@ -127,25 +127,24 @@ class Tenant(Base, IdNameDescriptionMixin):
     )
 
 
-class TenantMember(Base, IdMixin, AuditMixin):
+class TenantMemberRole(Base, IdMixin, AuditMixin):
     """
-    Tenant membership table.
-    Tracks which principals (users, identity groups, custom groups) are members of a tenant.
+    Roles for tenant members.
+    Links directly to Principals via (tenant_id, principal_id).
     """
-    __tablename__ = "tenant_members"
+    __tablename__ = "tenant_member_roles"
 
     tenant_id: Mapped[str] = mapped_column(
         String(36), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False
     )
     principal_id: Mapped[str] = mapped_column(String(50), nullable=False)
+    role: Mapped[str] = mapped_column(TenantPermissionSAEnum, nullable=False)
 
-    tenant: Mapped["Tenant"] = relationship(back_populates="members")
+    tenant: Mapped["Tenant"] = relationship(back_populates="member_roles")
     principal: Mapped["Principal"] = relationship(
-        foreign_keys="[TenantMember.tenant_id, TenantMember.principal_id]",
-        primaryjoin="and_(TenantMember.tenant_id == Principal.tenant_id, TenantMember.principal_id == Principal.principal_id)"
-    )
-    roles: Mapped[list["TenantMemberRole"]] = relationship(
-        back_populates="tenant_member", cascade="all, delete-orphan"
+        foreign_keys="[TenantMemberRole.tenant_id, TenantMemberRole.principal_id]",
+        primaryjoin="and_(TenantMemberRole.tenant_id == Principal.tenant_id, TenantMemberRole.principal_id == Principal.principal_id)",
+        overlaps="member_roles,tenant"
     )
 
     __table_args__ = (
@@ -153,31 +152,11 @@ class TenantMember(Base, IdMixin, AuditMixin):
             ["tenant_id", "principal_id"],
             ["principals.tenant_id", "principals.principal_id"],
             ondelete="CASCADE",
-            name="fk_tenant_members_principal"
+            name="fk_tenant_member_roles_principal"
         ),
-        UniqueConstraint("tenant_id", "principal_id", name="uq_tenant_members"),
-        Index("ix_tenant_members_tenant", "tenant_id"),
-        Index("ix_tenant_members_principal", "principal_id"),
-    )
-
-
-class TenantMemberRole(Base, IdMixin, AuditMixin):
-    """
-    Roles for tenant members.
-    Defines what roles a tenant member has.
-    """
-    __tablename__ = "tenant_member_roles"
-
-    tenant_member_id: Mapped[str] = mapped_column(
-        String(36), ForeignKey("tenant_members.id", ondelete="CASCADE"), nullable=False
-    )
-    role: Mapped[str] = mapped_column(TenantPermissionSAEnum, nullable=False)
-
-    tenant_member: Mapped["TenantMember"] = relationship(back_populates="roles")
-
-    __table_args__ = (
-        UniqueConstraint("tenant_member_id", "role", name="uq_tenant_member_roles"),
-        Index("ix_tmr_tenant_member", "tenant_member_id"),
+        UniqueConstraint("tenant_id", "principal_id", "role", name="uq_tenant_member_roles"),
+        Index("ix_tmr_tenant", "tenant_id"),
+        Index("ix_tmr_principal", "principal_id"),
     )
 
 
@@ -245,7 +224,8 @@ class CustomGroupMember(Base, IdMixin, AuditMixin):
     )
     member_principal: Mapped["Principal"] = relationship(
         foreign_keys="[CustomGroupMember.tenant_id, CustomGroupMember.principal_id]",
-        primaryjoin="and_(CustomGroupMember.tenant_id == Principal.tenant_id, CustomGroupMember.principal_id == Principal.principal_id)"
+        primaryjoin="and_(CustomGroupMember.tenant_id == Principal.tenant_id, CustomGroupMember.principal_id == Principal.principal_id)",
+        overlaps="custom_group,custom_group_members"
     )
 
     __table_args__ = (

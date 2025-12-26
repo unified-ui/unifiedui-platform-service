@@ -53,7 +53,7 @@ class MockIdentityProvider(BaseIdentityProvider):
             firstname="Mock",
             lastname="User",
             mail=f"{user_id}@test.com",
-            user_principal_name=f"{user_id}@test.com"
+            principal_name=f"{user_id}@test.com"
         )
     
     def get_group_by_id(self, group_id: str) -> IdentityGroupResponse:
@@ -68,7 +68,7 @@ class MockIdentityProvider(BaseIdentityProvider):
         """
         Get the principal name for a user or group.
         
-        For users, returns the email (user_principal_name).
+        For users, returns the email (principal_name).
         For groups, returns the display name.
         
         Args:
@@ -80,7 +80,7 @@ class MockIdentityProvider(BaseIdentityProvider):
         """
         if principal_type == "IDENTITY_USER":
             user = self.get_user_by_id(principal_id)
-            return user.user_principal_name or user.mail or user.display_name
+            return user.principal_name or user.mail or user.display_name
         else:  # IDENTITY_GROUP
             group = self.get_group_by_id(principal_id)
             return group.display_name

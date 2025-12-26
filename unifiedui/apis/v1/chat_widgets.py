@@ -157,7 +157,8 @@ async def create_chat_widget(
         return handler.create_chat_widget(
             tenant_id=tenant_id,
             request=create_request,
-            user_id=user.identity.get_id()
+            user_id=user.identity.get_id(),
+            user=user
         )
     except Exception as e:
         logger.error(f"Failed to create chat widget: {e}")
@@ -555,7 +556,8 @@ async def set_chat_widget_permission(
             tenant_id=tenant_id,
             chat_widget_id=chat_widget_id,
             request=permission_request,
-            user_id=user.identity.get_id()
+            user_id=user.identity.get_id(),
+            user=user
         )
     except ChatWidgetNotFoundError as e:
         logger.warning(f"Chat widget not found: {e}")
