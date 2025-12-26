@@ -14,6 +14,9 @@ services:
       - ../../../unifiedui:/app/unifiedui:ro
       - ../../../alembic:/app/alembic:ro
       - ../../../alembic.ini:/app/alembic.ini:ro
+      # Mount uv files for dependency updates
+      - ../../../pyproject.toml:/app/pyproject.toml:ro
+      - ../../../uv.lock:/app/uv.lock:ro
     environment:
       # PostgreSQL Configuration
       - DATABASE_URL=postgresql://unifiedui:unifiedui_password@unifiedui-database:5432/unifiedui
@@ -55,7 +58,7 @@ services:
       - LOG_LEVEL=DEBUG
       
       # CORS (allow frontend)
-      - CORS_ORIGINS=["http://localhost:5173","http://localhost:3000","http://localhost:8000"]
+      # - CORS_ORIGINS=["http://localhost:5173","http://localhost:3000","http://localhost:8000"]
     networks:
       - unifiedui_network
     depends_on:
