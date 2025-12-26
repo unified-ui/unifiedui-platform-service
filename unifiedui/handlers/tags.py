@@ -490,10 +490,12 @@ class TagHandler:
                 tag = self.get_or_create_tag(session, tenant_id, name.strip(), user_id)
                 tags.append(tag)
                 
-                # Create association
+                # Create association with audit fields
                 association = tag_model(
                     tenant_id=tenant_id,
                     tag_id=tag.id,
+                    created_by=user_id,
+                    updated_by=user_id,
                     **{id_field: resource_id}
                 )
                 session.add(association)
