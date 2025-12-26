@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import uuid
-from typing import TYPE_CHECKING, Optional, List
+from typing import TYPE_CHECKING, Optional, List, Union
 
 from sqlalchemy import select, or_
 from sqlalchemy.orm import selectinload
@@ -18,6 +18,7 @@ if TYPE_CHECKING:
 from unifiedui.schema.requests.applications import CreateApplicationRequest, UpdateApplicationRequest
 from unifiedui.schema.requests.application_permissions import SetApplicationPermissionRequest
 from unifiedui.schema.responses.applications import ApplicationResponse
+from unifiedui.schema.responses.common import QuickListItemResponse
 from unifiedui.schema.responses.tags import TagSummary
 from unifiedui.schema.responses.application_permissions import (
     ApplicationPermissionResponse,
@@ -60,8 +61,9 @@ class ApplicationHandler:
         tag_ids: Optional[List[int]] = None,
         order_by: Optional[str] = None,
         order_direction: Optional[str] = None,
+        view: Optional[str] = None,
         use_cache: bool = True
-    ) -> List[ApplicationResponse]:
+    ) -> Union[List[ApplicationResponse], List[QuickListItemResponse]]:
         """
         Get a list of applications for a tenant (filtered by permissions).
         
@@ -109,7 +111,8 @@ class ApplicationHandler:
             custom_group_ids = [g.id for g in user.custom_groups]
         
         # Build cache key (without filters - caching only for unfiltered results)
-        cache_key = f"applications:list:tenant:{tenant_id}:user:{user_id}:skip:{skip}:limit:{limit}"
+        view_key = view or "full"
+        cache_key = f"applications:list:tenant:{tenant_id}:user:{user_id}:skip:{skip}:limit:{limit}:view:{view_key}"
         
         # Check if any filters are applied
         has_filters = name_filter is not None or is_active is not None or tag_ids is not None or order_by is not None
@@ -120,6 +123,8 @@ class ApplicationHandler:
                 cached_data = self.cache_client.client.get(cache_key)
                 if cached_data is not None:
                     logger.debug(f"Returning cached application list")
+                    if view == "quick-list":
+                        return [QuickListItemResponse(**item) for item in cached_data]
                     return [ApplicationResponse(**item) for item in cached_data]
             except Exception as e:
                 logger.warning(f"Failed to get cached application list: {e}")
@@ -181,6 +186,11 @@ class ApplicationHandler:
             applications = session.execute(query).scalars().all()
             
             logger.info("Retrieved applications", extra={"count": len(applications)})
+            
+            # Return quick-list format if requested
+            if view == "quick-list":
+                return [QuickListItemResponse(id=app.id, name=app.name) for app in applications]
+            
             result = [self._model_to_response(app) for app in applications]
             
             # Cache the result (only when no filters are applied)

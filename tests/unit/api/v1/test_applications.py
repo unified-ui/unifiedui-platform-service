@@ -317,6 +317,48 @@ class TestApplicationRoutes:
         assert len(data) == 1
         assert data[0]["name"] == "Production App"
     
+    def test_list_applications_with_quick_list_view(self, test_client: TestClient, test_user_token: Any) -> None:
+        """Test listing applications with quick-list view returns only id and name."""
+        tenant_id = create_tenant_for_user(test_client, test_user_token)
+        headers = create_auth_headers(test_user_token, use_cache=False)
+        
+        # Create applications
+        test_client.post(
+            ENDPOINT_APPLICATIONS.format(tenant_id=tenant_id),
+            json={"name": "App One", "description": "First app", "type": "N8N", "config": {"key": "value"}},
+            headers=headers
+        )
+        test_client.post(
+            ENDPOINT_APPLICATIONS.format(tenant_id=tenant_id),
+            json={"name": "App Two", "description": "Second app", "type": "N8N"},
+            headers=headers
+        )
+        
+        # Get with quick-list view
+        response = test_client.get(
+            f"{ENDPOINT_APPLICATIONS.format(tenant_id=tenant_id)}?view=quick-list",
+            headers=headers
+        )
+        
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert len(data) == 2
+        
+        # Verify only id and name are returned
+        for item in data:
+            assert "id" in item
+            assert "name" in item
+            # These fields should NOT be present in quick-list view
+            assert "description" not in item
+            assert "config" not in item
+            assert "tenant_id" not in item
+            assert "created_at" not in item
+            assert "updated_at" not in item
+            assert "created_by" not in item
+            assert "updated_by" not in item
+            assert "is_active" not in item
+            assert "type" not in item
+    
     def test_list_applications_with_order_by_name_asc(self, test_client: TestClient, test_user_token: Any) -> None:
         """Test listing applications ordered by name ascending."""
         tenant_id = create_tenant_for_user(test_client, test_user_token)

@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import uuid
-from typing import TYPE_CHECKING, Optional, List
+from typing import TYPE_CHECKING, Optional, List, Union
 
 from sqlalchemy import select, or_
 from sqlalchemy.orm import selectinload
@@ -18,6 +18,7 @@ if TYPE_CHECKING:
 from unifiedui.schema.requests.autonomous_agents import CreateAutonomousAgentRequest, UpdateAutonomousAgentRequest
 from unifiedui.schema.requests.autonomous_agent_permissions import SetAutonomousAgentPermissionRequest
 from unifiedui.schema.responses.autonomous_agents import AutonomousAgentResponse
+from unifiedui.schema.responses.common import QuickListItemResponse
 from unifiedui.schema.responses.tags import TagSummary
 from unifiedui.schema.responses.autonomous_agent_permissions import (
     AutonomousAgentPermissionResponse,
@@ -60,8 +61,9 @@ class AutonomousAgentHandler:
         tag_ids: Optional[List[int]] = None,
         order_by: Optional[str] = None,
         order_direction: Optional[str] = None,
+        view: Optional[str] = None,
         use_cache: bool = True
-    ) -> List[AutonomousAgentResponse]:
+    ) -> Union[List[AutonomousAgentResponse], List[QuickListItemResponse]]:
         """
         Get a list of autonomous agents for a tenant (filtered by permissions).
         
@@ -115,7 +117,8 @@ class AutonomousAgentHandler:
             ]
         
         # Build cache key (without filters - caching only for unfiltered results)
-        cache_key = f"autonomous_agents:list:tenant:{tenant_id}:user:{user_id}:skip:{skip}:limit:{limit}"
+        view_key = view or "full"
+        cache_key = f"autonomous_agents:list:tenant:{tenant_id}:user:{user_id}:skip:{skip}:limit:{limit}:view:{view_key}"
         
         # Check if any filters are applied
         has_filters = name_filter is not None or is_active is not None or tag_ids is not None or order_by is not None
@@ -126,6 +129,8 @@ class AutonomousAgentHandler:
                 cached_data = self.cache_client.client.get(cache_key)
                 if cached_data is not None:
                     logger.debug(f"Returning cached autonomous agents for tenant {tenant_id}, user {user_id}")
+                    if view == "quick-list":
+                        return [QuickListItemResponse(**item) for item in cached_data]
                     return [AutonomousAgentResponse(**item) for item in cached_data]
             except Exception as e:
                 logger.warning(f"Failed to get cached autonomous agents: {e}")
@@ -223,6 +228,10 @@ class AutonomousAgentHandler:
                 
                 query = query.distinct().offset(skip).limit(limit)
                 autonomous_agents = session.execute(query).scalars().all()
+            
+            # Return quick-list format if requested
+            if view == "quick-list":
+                return [QuickListItemResponse(id=agent.id, name=agent.name) for agent in autonomous_agents]
             
             # Convert to response models
             responses = [self._model_to_response(agent) for agent in autonomous_agents]

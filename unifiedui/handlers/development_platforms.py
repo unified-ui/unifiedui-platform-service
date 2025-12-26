@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import uuid
-from typing import TYPE_CHECKING, Optional, List
+from typing import TYPE_CHECKING, Optional, List, Union
 
 from sqlalchemy import select, or_
 from sqlalchemy.orm import selectinload
@@ -18,6 +18,7 @@ if TYPE_CHECKING:
 from unifiedui.schema.requests.development_platforms import CreateDevelopmentPlatformRequest, UpdateDevelopmentPlatformRequest
 from unifiedui.schema.requests.development_platform_permissions import SetDevelopmentPlatformPermissionRequest
 from unifiedui.schema.responses.development_platforms import DevelopmentPlatformResponse
+from unifiedui.schema.responses.common import QuickListItemResponse
 from unifiedui.schema.responses.tags import TagSummary
 from unifiedui.schema.responses.development_platform_permissions import (
     DevelopmentPlatformPermissionResponse,
@@ -60,8 +61,9 @@ class DevelopmentPlatformHandler:
         tag_ids: Optional[List[int]] = None,
         order_by: Optional[str] = None,
         order_direction: Optional[str] = None,
+        view: Optional[str] = None,
         use_cache: bool = True
-    ) -> List[DevelopmentPlatformResponse]:
+    ) -> Union[List[DevelopmentPlatformResponse], List[QuickListItemResponse]]:
         """
         Get a list of development platforms for a tenant (filtered by permissions).
         
@@ -116,7 +118,8 @@ class DevelopmentPlatformHandler:
             ]
         
         # Build cache key (without filters - caching only for unfiltered results)
-        cache_key = f"development_platforms:list:tenant:{tenant_id}:user:{user_id}:skip:{skip}:limit:{limit}"
+        view_key = view or "full"
+        cache_key = f"development_platforms:list:tenant:{tenant_id}:user:{user_id}:skip:{skip}:limit:{limit}:view:{view_key}"
         
         # Check if any filters are applied
         has_filters = name_filter is not None or is_active is not None or tag_ids is not None or order_by is not None
@@ -127,6 +130,8 @@ class DevelopmentPlatformHandler:
                 cached_data = self.cache_client.client.get(cache_key)
                 if cached_data is not None:
                     logger.debug(f"Returning cached development platform list")
+                    if view == "quick-list":
+                        return [QuickListItemResponse(**item) for item in cached_data]
                     return [DevelopmentPlatformResponse(**item) for item in cached_data]
             except Exception as e:
                 logger.warning(f"Failed to get cached development platform list: {e}")
@@ -187,6 +192,11 @@ class DevelopmentPlatformHandler:
             development_platforms = session.execute(query).scalars().all()
             
             logger.info("Retrieved development platforms", extra={"count": len(development_platforms)})
+            
+            # Return quick-list format if requested
+            if view == "quick-list":
+                return [QuickListItemResponse(id=dp.id, name=dp.name) for dp in development_platforms]
+            
             result = [self._model_to_response(dp) for dp in development_platforms]
             
             # Cache the result (only when no filters are applied)

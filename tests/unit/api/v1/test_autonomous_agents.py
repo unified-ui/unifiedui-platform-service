@@ -323,6 +323,47 @@ class TestAutonomousAgentRoutes:
         assert "Development Agent" in names
         assert "Testing Bot" not in names
     
+    def test_list_autonomous_agents_with_quick_list_view(self, test_client: TestClient, test_user_token: Any) -> None:
+        """Test listing autonomous agents with quick-list view returns only id and name."""
+        tenant_id = create_tenant_for_user(test_client, test_user_token)
+        headers = create_auth_headers(test_user_token, use_cache=False)
+        
+        # Create agents
+        test_client.post(
+            ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id),
+            json={"name": "Agent One", "description": "First agent", "config": {"key": "value"}},
+            headers=headers
+        )
+        test_client.post(
+            ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id),
+            json={"name": "Agent Two", "description": "Second agent", "config": {}},
+            headers=headers
+        )
+        
+        # Get with quick-list view
+        response = test_client.get(
+            f"{ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id)}?view=quick-list",
+            headers=headers
+        )
+        
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert len(data) == 2
+        
+        # Verify only id and name are returned
+        for item in data:
+            assert "id" in item
+            assert "name" in item
+            # These fields should NOT be present in quick-list view
+            assert "description" not in item
+            assert "config" not in item
+            assert "tenant_id" not in item
+            assert "created_at" not in item
+            assert "updated_at" not in item
+            assert "created_by" not in item
+            assert "updated_by" not in item
+            assert "is_active" not in item
+    
     def test_update_autonomous_agent_success(self, test_client: TestClient, test_user_token: Any) -> None:
         """Test successful autonomous agent update."""
         tenant_id = create_tenant_for_user(test_client, test_user_token)

@@ -434,7 +434,7 @@ Certain tenant roles bypass resource-level checks:
 ## Development Workflow
 - Feature branches: `feature/{feature-name}`
 - Run tests before committing
-- Use pytest for all tests
+- Use pytest with parallel execution: `pytest tests/{*} -n auto`
 - Code coverage minimum: 80%
 
 ## Performance Considerations

@@ -73,3 +73,12 @@ class OrderDirectionEnum(str, Enum):
 
     def all() -> list[str]:
         return [direction.value for direction in OrderDirectionEnum]
+
+
+class ListViewEnum(str, Enum):
+    """Enum for list view types."""
+    FULL = "full"
+    QUICK_LIST = "quick-list"
+
+    def all() -> list[str]:
+        return [view.value for view in ListViewEnum]

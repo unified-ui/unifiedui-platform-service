@@ -17,7 +17,7 @@ from unifiedui.schema.responses.credential_permissions import (
 )
 from unifiedui.exc.credentials import CredentialNotFoundError
 from unifiedui.core.middleware.apis.v1.auth import authenticate, check_permissions
-from unifiedui.core.database.enums import TenantRolesEnum, PermissionActionEnum, OrderDirectionEnum
+from unifiedui.core.database.enums import TenantRolesEnum, PermissionActionEnum, OrderDirectionEnum, ListViewEnum
 from unifiedui.logger import get_logger
 
 logger = get_logger(__name__)
@@ -29,9 +29,8 @@ router = APIRouter(
 
 @router.get(
     "",
-    response_model=List[CredentialResponse],
     summary="List credentials",
-    description="Get a paginated list of credentials for the current tenant"
+    description="Get a paginated list of credentials for the current tenant. Use view=quick-list to get only id and name."
 )
 @authenticate
 async def list_credentials(
@@ -44,8 +43,9 @@ async def list_credentials(
     tags: Optional[str] = Query(None, description="Comma-separated list of tag IDs to filter by (e.g., '10001,10002,10003')"),
     order_by: Optional[str] = Query(None, description="Column name to order by (e.g., 'name', 'created_at', 'updated_at')"),
     order_direction: Optional[OrderDirectionEnum] = Query(None, description="Sort direction: 'asc' or 'desc'"),
+    view: Optional[ListViewEnum] = Query(None, description="View type: 'full' (default) or 'quick-list' (returns only id and name)"),
     handler: CredentialHandler = Depends(get_credential_handler)
-) -> List[CredentialResponse]:
+):
     """
     List credentials for a tenant.
     
@@ -98,7 +98,8 @@ async def list_credentials(
             user=user,
             tag_ids=tag_ids,
             order_by=order_by,
-            order_direction=order_direction.value if order_direction else None
+            order_direction=order_direction.value if order_direction else None,
+            view=view.value if view else None
         )
     except HTTPException:
         raise
