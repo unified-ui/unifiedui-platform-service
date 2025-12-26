@@ -1,11 +1,11 @@
-"""Unit tests for aihub/core/middleware/apis/v1/auth.py - Authentication middleware."""
+"""Unit tests for unifiedui/core/middleware/apis/v1/auth.py - Authentication middleware."""
 import pytest
 from unittest.mock import Mock, MagicMock, AsyncMock, patch
 from fastapi import Request, HTTPException, status
 
-from aihub.core.middleware.apis.v1.auth import authenticate, check_permissions
-from aihub.core.identity.users import ContextIdentityUser
-from aihub.core.database.enums import TenantRolesEnum, PermissionActionEnum
+from unifiedui.core.middleware.apis.v1.auth import authenticate, check_permissions
+from unifiedui.core.identity.users import ContextIdentityUser
+from unifiedui.core.database.enums import TenantRolesEnum, PermissionActionEnum
 
 
 class TestAuthenticateDecorator:
@@ -29,9 +29,9 @@ class TestAuthenticateDecorator:
         async def test_handler(request: Request):
             return "success"
         
-        with patch('aihub.core.middleware.apis.v1.auth.ContextIdentityUser', return_value=mock_user):
-            with patch('aihub.core.middleware.apis.v1.auth.get_db_client'):
-                with patch('aihub.core.middleware.apis.v1.auth.get_cache_client'):
+        with patch('unifiedui.core.middleware.apis.v1.auth.ContextIdentityUser', return_value=mock_user):
+            with patch('unifiedui.core.middleware.apis.v1.auth.get_db_client'):
+                with patch('unifiedui.core.middleware.apis.v1.auth.get_cache_client'):
                     result = await test_handler(mock_request)
         
         assert result == "success"
@@ -106,9 +106,9 @@ class TestAuthenticateDecorator:
         async def test_handler(request: Request):
             return "success"
         
-        with patch('aihub.core.middleware.apis.v1.auth.ContextIdentityUser', return_value=mock_user) as mock_user_class:
-            with patch('aihub.core.middleware.apis.v1.auth.get_db_client'):
-                with patch('aihub.core.middleware.apis.v1.auth.get_cache_client'):
+        with patch('unifiedui.core.middleware.apis.v1.auth.ContextIdentityUser', return_value=mock_user) as mock_user_class:
+            with patch('unifiedui.core.middleware.apis.v1.auth.get_db_client'):
+                with patch('unifiedui.core.middleware.apis.v1.auth.get_cache_client'):
                     await test_handler(mock_request)
         
         # Check that use_cache=False was passed
@@ -133,9 +133,9 @@ class TestAuthenticateDecorator:
         async def test_handler(request: Request):
             return "success"
         
-        with patch('aihub.core.middleware.apis.v1.auth.ContextIdentityUser', return_value=mock_user):
-            with patch('aihub.core.middleware.apis.v1.auth.get_db_client'):
-                with patch('aihub.core.middleware.apis.v1.auth.get_cache_client'):
+        with patch('unifiedui.core.middleware.apis.v1.auth.ContextIdentityUser', return_value=mock_user):
+            with patch('unifiedui.core.middleware.apis.v1.auth.get_db_client'):
+                with patch('unifiedui.core.middleware.apis.v1.auth.get_cache_client'):
                     with pytest.raises(HTTPException) as exc_info:
                         await test_handler(mock_request)
         
@@ -161,9 +161,9 @@ class TestAuthenticateDecorator:
         async def test_handler(request: Request):
             return "success"
         
-        with patch('aihub.core.middleware.apis.v1.auth.ContextIdentityUser', return_value=mock_user):
-            with patch('aihub.core.middleware.apis.v1.auth.get_db_client'):
-                with patch('aihub.core.middleware.apis.v1.auth.get_cache_client'):
+        with patch('unifiedui.core.middleware.apis.v1.auth.ContextIdentityUser', return_value=mock_user):
+            with patch('unifiedui.core.middleware.apis.v1.auth.get_db_client'):
+                with patch('unifiedui.core.middleware.apis.v1.auth.get_cache_client'):
                     result = await test_handler(mock_request)
         
         assert result == "success"
@@ -179,9 +179,9 @@ class TestAuthenticateDecorator:
         async def test_handler(request: Request):
             return "success"
         
-        with patch('aihub.core.middleware.apis.v1.auth.ContextIdentityUser', side_effect=ValueError("Invalid token")):
-            with patch('aihub.core.middleware.apis.v1.auth.get_db_client'):
-                with patch('aihub.core.middleware.apis.v1.auth.get_cache_client'):
+        with patch('unifiedui.core.middleware.apis.v1.auth.ContextIdentityUser', side_effect=ValueError("Invalid token")):
+            with patch('unifiedui.core.middleware.apis.v1.auth.get_db_client'):
+                with patch('unifiedui.core.middleware.apis.v1.auth.get_cache_client'):
                     with pytest.raises(HTTPException) as exc_info:
                         await test_handler(mock_request)
         

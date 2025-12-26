@@ -4,7 +4,7 @@ from typing import Any
 from fastapi import status
 from starlette.testclient import TestClient
 
-from aihub.core.database.enums import TenantRolesEnum, PrincipalTypeEnum
+from unifiedui.core.database.enums import TenantRolesEnum, PrincipalTypeEnum
 from tests.conftest import create_auth_headers
 
 
@@ -216,7 +216,8 @@ class TestTenantCaching:
     
     def test_custom_group_permission_grant_invalidates_member_cache(self, test_client: TestClient, fake_redis_client: Any) -> None:
         """Test that granting permission to a custom group invalidates member caches."""
-        from aihub.core.database.models import CustomGroup, CustomGroupMember, TenantMember, TenantMemberRole
+        from unifiedui.core.database.models import Principal, CustomGroupMember, TenantMemberRole
+        from unifiedui.core.database.enums import PrincipalTypeEnum
         
         # Admin creates tenant
         admin_token = test_client.create_test_user("cache-admin-3", "Cache Admin 3")
@@ -236,22 +237,34 @@ class TestTenantCaching:
         user_headers = create_auth_headers(user_token)
         
         with test_client.db_client.get_session() as session:
-            custom_group = CustomGroup(
-                id=custom_group_id,
-                name="Test Custom Group",
-                description="Test",
-                tenant_id=tenant_id,  # Custom groups must belong to a tenant
-                created_by=admin_token.get_id()
+            # Create custom group as Principal
+            custom_group = Principal(
+                tenant_id=tenant_id,
+                principal_id=custom_group_id,
+                principal_type=PrincipalTypeEnum.CUSTOM_GROUP.value,
+                display_name="Test Custom Group",
+                principal_name="Test Custom Group",
+                description="Test"
             )
             session.add(custom_group)
+            
+            # Also need the user as a Principal
+            user_principal = Principal(
+                tenant_id=tenant_id,
+                principal_id=user_id,
+                principal_type=PrincipalTypeEnum.IDENTITY_USER.value,
+                display_name="Cache CG User 1",
+                principal_name="cache-cg-user-1@test.com"
+            )
+            session.add(user_principal)
+            session.flush()
             
             group_member = CustomGroupMember(
                 id=str(uuid.uuid4()),
                 custom_group_id=custom_group_id,
                 principal_id=user_id,
-                principal_type=PRINCIPAL_TYPE_USER,
-                tenant_id=tenant_id,  # Members also need tenant_id
-                role="READ"  # Members need a role
+                tenant_id=tenant_id,
+                role="READ"
             )
             session.add(group_member)
             session.commit()

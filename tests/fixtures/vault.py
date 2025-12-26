@@ -3,8 +3,8 @@ import pytest
 from typing import Dict, Optional
 from unittest.mock import Mock
 
-from aihub.core.vault.client import BaseVaultClient
-from aihub.core.vault.vault import BaseVault
+from unifiedui.core.vault.client import BaseVaultClient
+from unifiedui.core.vault.vault import BaseVault
 
 
 class MockVault(BaseVault):

@@ -1,10 +1,10 @@
-"""Unit tests for aihub/utils/default_factory_functions.py"""
+"""Unit tests for unifiedui/utils/default_factory_functions.py"""
 import pytest
 from datetime import datetime, timezone
 import uuid
 import re
 
-from aihub.utils.default_factory_functions import current_iso_datetime, generate_id
+from unifiedui.utils.default_factory_functions import current_iso_datetime, generate_id
 
 
 class TestCurrentIsoDatetime:

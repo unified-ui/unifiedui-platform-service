@@ -8,9 +8,9 @@ from sqlalchemy import create_engine, inspect
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import sessionmaker, Session
 
-from aihub.core.database.models import Base
-from aihub.core.database.client import SQLAlchemyClient
-from aihub.core.database.config import DatabaseConfig
+from unifiedui.core.database.models import Base
+from unifiedui.core.database.client import SQLAlchemyClient
+from unifiedui.core.database.config import DatabaseConfig
 
 logger = logging.getLogger(__name__)
 

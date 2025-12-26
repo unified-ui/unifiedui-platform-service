@@ -4,8 +4,8 @@ from typing import Any
 from fastapi import status
 from starlette.testclient import TestClient
 
-from aihub.core.database.enums import PermissionActionEnum, PrincipalTypeEnum
-from aihub.core.database.models import (
+from unifiedui.core.database.enums import PermissionActionEnum
+from unifiedui.core.database.models import (
     Application, ApplicationMember,
     AutonomousAgent, AutonomousAgentMember,
     ChatWidget, ChatWidgetMember,
@@ -67,7 +67,6 @@ def create_application_in_db(test_client: TestClient, tenant_id: str, user_id: s
             tenant_id=tenant_id,
             application_id=app_id,
             principal_id=user_id,
-            principal_type=PrincipalTypeEnum.IDENTITY_USER,
             role=PermissionActionEnum.ADMIN,
             created_by=user_id,
             updated_by=user_id
@@ -99,7 +98,6 @@ def create_autonomous_agent_in_db(test_client: TestClient, tenant_id: str, user_
             tenant_id=tenant_id,
             autonomous_agent_id=agent_id,
             principal_id=user_id,
-            principal_type=PrincipalTypeEnum.IDENTITY_USER,
             role=PermissionActionEnum.ADMIN,
             created_by=user_id,
             updated_by=user_id
@@ -132,7 +130,6 @@ def create_chat_widget_in_db(test_client: TestClient, tenant_id: str, user_id: s
             tenant_id=tenant_id,
             chat_widget_id=widget_id,
             principal_id=user_id,
-            principal_type=PrincipalTypeEnum.IDENTITY_USER,
             role=PermissionActionEnum.ADMIN,
             created_by=user_id,
             updated_by=user_id
@@ -166,7 +163,6 @@ def create_credential_in_db(test_client: TestClient, tenant_id: str, user_id: st
             tenant_id=tenant_id,
             credential_id=cred_id,
             principal_id=user_id,
-            principal_type=PrincipalTypeEnum.IDENTITY_USER,
             role=PermissionActionEnum.ADMIN,
             created_by=user_id,
             updated_by=user_id
@@ -200,7 +196,6 @@ def create_development_platform_in_db(test_client: TestClient, tenant_id: str, u
             tenant_id=tenant_id,
             development_platform_id=platform_id,
             principal_id=user_id,
-            principal_type=PrincipalTypeEnum.IDENTITY_USER,
             role=PermissionActionEnum.ADMIN,
             created_by=user_id,
             updated_by=user_id

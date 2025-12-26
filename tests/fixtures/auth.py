@@ -3,7 +3,7 @@ import uuid
 import logging
 import pytest
 
-from aihub.identity.mock import MockIdentityToken
+from unifiedui.identity.mock import MockIdentityToken
 
 logger = logging.getLogger(__name__)
 

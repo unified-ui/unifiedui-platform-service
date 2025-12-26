@@ -3,7 +3,7 @@ from typing import Any
 from fastapi import status
 from starlette.testclient import TestClient
 
-from aihub.core.database.enums import PermissionActionEnum, PrincipalTypeEnum
+from unifiedui.core.database.enums import PermissionActionEnum, PrincipalTypeEnum
 from tests.conftest import create_auth_headers
 
 
@@ -76,6 +76,8 @@ class TestCredentialRoutes:
         assert data["name"] == credential_data["name"]
         assert data["description"] == credential_data["description"]
         assert data["type"] == credential_data["credential_type"]
+        assert data["source"] == credential_data["source"]
+        assert data["is_active"] == False
         assert "id" in data
         assert data["tenant_id"] == tenant_id
         assert "created_at" in data
@@ -376,6 +378,57 @@ class TestCredentialRoutes:
         assert len(data) >= 1
         assert any(cred["name"] == "Development Token" for cred in data)
     
+    def test_list_credentials_with_quick_list_view(self, test_client: TestClient, test_user_token: Any) -> None:
+        """Test listing credentials with quick-list view returns only id and name."""
+        tenant_id = create_tenant_for_user(test_client, test_user_token)
+        headers = create_auth_headers(test_user_token, use_cache=False)
+        
+        # Create credentials
+        test_client.post(
+            ENDPOINT_CREDENTIALS.format(tenant_id=tenant_id),
+            json={
+                "name": "API Key One",
+                "description": "First credential",
+                "credential_type": "API_KEY",
+                "secret_value": "secret-1"
+            },
+            headers=headers
+        )
+        test_client.post(
+            ENDPOINT_CREDENTIALS.format(tenant_id=tenant_id),
+            json={
+                "name": "Token Two",
+                "description": "Second credential",
+                "credential_type": "TOKEN",
+                "secret_value": "secret-2"
+            },
+            headers=headers
+        )
+        
+        # Get with quick-list view
+        response = test_client.get(
+            f"{ENDPOINT_CREDENTIALS.format(tenant_id=tenant_id)}?view=quick-list",
+            headers=headers
+        )
+        
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert len(data) == 2
+        
+        # Verify only id and name are returned
+        for item in data:
+            assert "id" in item
+            assert "name" in item
+            # These fields should NOT be present in quick-list view
+            assert "description" not in item
+            assert "credential_type" not in item
+            assert "tenant_id" not in item
+            assert "created_at" not in item
+            assert "updated_at" not in item
+            assert "created_by" not in item
+            assert "updated_by" not in item
+            assert "is_active" not in item
+    
     def test_update_credential_success(self, test_client: TestClient, test_user_token: Any) -> None:
         """Test successful credential update."""
         tenant_id = create_tenant_for_user(test_client, test_user_token)
@@ -427,6 +480,45 @@ class TestCredentialRoutes:
     def test_update_credential_partial(self, test_client: TestClient, test_user_token: Any) -> None:
         """Test partial credential update."""
         tenant_id = create_tenant_for_user(test_client, test_user_token)
+    
+    def test_update_credential_is_active(self, test_client: TestClient, test_user_token: Any) -> None:
+        """Test updating credential is_active status."""
+        tenant_id = create_tenant_for_user(test_client, test_user_token)
+        headers = create_auth_headers(test_user_token, use_cache=False)
+        
+        # Create credential (default is_active=False)
+        create_response = test_client.post(
+            ENDPOINT_CREDENTIALS.format(tenant_id=tenant_id),
+            json={
+                "name": "Test Credential",
+                "description": "Test",
+                "credential_type": "API_KEY",
+                "secret_value": "secret"
+            },
+            headers=headers
+        )
+        credential_id = create_response.json()["id"]
+        assert create_response.json()["is_active"] == False
+        
+        # Update to active
+        update_response = test_client.patch(
+            ENDPOINT_CREDENTIAL_DETAIL.format(tenant_id=tenant_id, credential_id=credential_id),
+            json={"is_active": True},
+            headers=headers
+        )
+        
+        assert update_response.status_code == status.HTTP_200_OK
+        assert update_response.json()["is_active"] == True
+        
+        # Update back to inactive
+        update_response2 = test_client.patch(
+            ENDPOINT_CREDENTIAL_DETAIL.format(tenant_id=tenant_id, credential_id=credential_id),
+            json={"is_active": False},
+            headers=headers
+        )
+        
+        assert update_response2.status_code == status.HTTP_200_OK
+        assert update_response2.json()["is_active"] == False
         headers = create_auth_headers(test_user_token, use_cache=False)
         
         # Create credential

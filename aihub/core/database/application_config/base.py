@@ -1,8 +1,0 @@
-from abc import ABC, abstractmethod
-
-from aihub.utils.dataclasses import to_dict
-
-
-@to_dict
-class BaseApplicationConfig:
-    type: str = "NotSpecified"

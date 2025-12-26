@@ -2,7 +2,7 @@
 applyTo: 'tests/**'
 ---
 
-# AIHub Testing Specifications
+# unifiedui Testing Specifications
 
 ## Testing Philosophy
 - Write tests BEFORE or alongside production code
@@ -530,7 +530,7 @@ tests/
 ### FastAPI TestClient
 ```python
 from fastapi.testclient import TestClient
-from aihub.app import app
+from unifiedui.app import app
 
 client = TestClient(app)
 
@@ -589,7 +589,7 @@ def test_endpoint():
 pytest
 
 # Run with coverage
-pytest --cov=aihub --cov-report=html
+pytest --cov=unifiedui --cov-report=html
 
 # Run specific test file
 pytest tests/unit/test_tenants.py

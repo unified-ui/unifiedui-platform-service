@@ -1,11 +1,11 @@
-"""Unit tests for aihub/caching/redis/cache.py - RedisCache."""
+"""Unit tests for unifiedui/caching/redis/cache.py - RedisCache."""
 import pytest
 import json
 from datetime import datetime
 from unittest.mock import Mock, MagicMock, patch
 
-from aihub.caching.redis.cache import RedisCache, DateTimeEncoder
-from aihub.core.caching.cache import BaseCache
+from unifiedui.caching.redis.cache import RedisCache, DateTimeEncoder
+from unifiedui.core.caching.cache import BaseCache
 
 
 class TestDateTimeEncoder:
@@ -39,7 +39,7 @@ class TestDateTimeEncoder:
 class TestRedisCache:
     """Test suite for RedisCache implementation."""
     
-    @patch('aihub.caching.redis.cache.redis.Redis')
+    @patch('unifiedui.caching.redis.cache.redis.Redis')
     def test_initialization_with_defaults(self, mock_redis_class):
         """Test RedisCache initialization with default parameters."""
         mock_client = Mock()
@@ -56,7 +56,7 @@ class TestRedisCache:
         )
         assert cache.default_ttl == 3600
     
-    @patch('aihub.caching.redis.cache.redis.Redis')
+    @patch('unifiedui.caching.redis.cache.redis.Redis')
     def test_initialization_with_custom_params(self, mock_redis_class):
         """Test RedisCache initialization with custom parameters."""
         mock_client = Mock()
@@ -79,13 +79,13 @@ class TestRedisCache:
         )
         assert cache.default_ttl == 7200
     
-    @patch('aihub.caching.redis.cache.redis.Redis')
+    @patch('unifiedui.caching.redis.cache.redis.Redis')
     def test_is_base_cache_implementation(self, mock_redis_class):
         """Test that RedisCache implements BaseCache."""
         cache = RedisCache()
         assert isinstance(cache, BaseCache)
     
-    @patch('aihub.caching.redis.cache.redis.Redis')
+    @patch('unifiedui.caching.redis.cache.redis.Redis')
     def test_get_returns_deserialized_value(self, mock_redis_class):
         """Test get method returns deserialized JSON value."""
         mock_client = Mock()
@@ -98,7 +98,7 @@ class TestRedisCache:
         mock_client.get.assert_called_once_with("test_key")
         assert result == {"key": "value"}
     
-    @patch('aihub.caching.redis.cache.redis.Redis')
+    @patch('unifiedui.caching.redis.cache.redis.Redis')
     def test_get_returns_none_when_key_missing(self, mock_redis_class):
         """Test get returns None when key doesn't exist."""
         mock_client = Mock()
@@ -110,7 +110,7 @@ class TestRedisCache:
         
         assert result is None
     
-    @patch('aihub.caching.redis.cache.redis.Redis')
+    @patch('unifiedui.caching.redis.cache.redis.Redis')
     def test_get_handles_json_decode_error(self, mock_redis_class):
         """Test get handles JSON decode errors gracefully."""
         mock_client = Mock()
@@ -122,7 +122,7 @@ class TestRedisCache:
         
         assert result is None
     
-    @patch('aihub.caching.redis.cache.redis.Redis')
+    @patch('unifiedui.caching.redis.cache.redis.Redis')
     def test_set_with_default_ttl(self, mock_redis_class):
         """Test set method uses default TTL when not specified."""
         mock_client = Mock()
@@ -137,7 +137,7 @@ class TestRedisCache:
         assert call_args[0][1] == 3600
         assert json.loads(call_args[0][2]) == {"data": "value"}
     
-    @patch('aihub.caching.redis.cache.redis.Redis')
+    @patch('unifiedui.caching.redis.cache.redis.Redis')
     def test_set_with_custom_ttl(self, mock_redis_class):
         """Test set method with custom TTL."""
         mock_client = Mock()
@@ -150,7 +150,7 @@ class TestRedisCache:
         call_args = mock_client.setex.call_args
         assert call_args[0][1] == 120
     
-    @patch('aihub.caching.redis.cache.redis.Redis')
+    @patch('unifiedui.caching.redis.cache.redis.Redis')
     def test_set_serializes_datetime(self, mock_redis_class):
         """Test set method serializes datetime objects."""
         mock_client = Mock()
@@ -164,7 +164,7 @@ class TestRedisCache:
         serialized = call_args[0][2]
         assert "2025-12-21T10:30:00" in serialized
     
-    @patch('aihub.caching.redis.cache.redis.Redis')
+    @patch('unifiedui.caching.redis.cache.redis.Redis')
     def test_set_handles_serialization_error(self, mock_redis_class):
         """Test set handles serialization errors gracefully."""
         mock_client = Mock()
@@ -175,7 +175,7 @@ class TestRedisCache:
         # Should not raise exception
         cache.set("key1", "value1")
     
-    @patch('aihub.caching.redis.cache.redis.Redis')
+    @patch('unifiedui.caching.redis.cache.redis.Redis')
     def test_delete_existing_key(self, mock_redis_class):
         """Test delete method for existing key."""
         mock_client = Mock()
@@ -188,7 +188,7 @@ class TestRedisCache:
         mock_client.delete.assert_called_once_with("key1")
         assert result is True
     
-    @patch('aihub.caching.redis.cache.redis.Redis')
+    @patch('unifiedui.caching.redis.cache.redis.Redis')
     def test_delete_nonexistent_key(self, mock_redis_class):
         """Test delete method for non-existent key."""
         mock_client = Mock()
@@ -200,7 +200,7 @@ class TestRedisCache:
         
         assert result is False
     
-    @patch('aihub.caching.redis.cache.redis.Redis')
+    @patch('unifiedui.caching.redis.cache.redis.Redis')
     def test_delete_handles_error(self, mock_redis_class):
         """Test delete handles errors gracefully."""
         mock_client = Mock()
@@ -212,7 +212,7 @@ class TestRedisCache:
         
         assert result is False
     
-    @patch('aihub.caching.redis.cache.redis.Redis')
+    @patch('unifiedui.caching.redis.cache.redis.Redis')
     def test_delete_pattern_matches_keys(self, mock_redis_class):
         """Test delete_pattern deletes matching keys."""
         mock_client = Mock()
@@ -227,7 +227,7 @@ class TestRedisCache:
         mock_client.delete.assert_called_once_with("user:1", "user:2", "user:3")
         assert count == 3
     
-    @patch('aihub.caching.redis.cache.redis.Redis')
+    @patch('unifiedui.caching.redis.cache.redis.Redis')
     def test_delete_pattern_no_matches(self, mock_redis_class):
         """Test delete_pattern with no matching keys."""
         mock_client = Mock()
@@ -240,7 +240,7 @@ class TestRedisCache:
         assert count == 0
         mock_client.delete.assert_not_called()
     
-    @patch('aihub.caching.redis.cache.redis.Redis')
+    @patch('unifiedui.caching.redis.cache.redis.Redis')
     def test_delete_pattern_handles_error(self, mock_redis_class):
         """Test delete_pattern handles errors gracefully."""
         mock_client = Mock()
@@ -252,7 +252,7 @@ class TestRedisCache:
         
         assert count == 0
     
-    @patch('aihub.caching.redis.cache.redis.Redis')
+    @patch('unifiedui.caching.redis.cache.redis.Redis')
     def test_ping_success(self, mock_redis_class):
         """Test ping returns True when connection is alive."""
         mock_client = Mock()
@@ -265,7 +265,7 @@ class TestRedisCache:
         mock_client.ping.assert_called_once()
         assert result is True
     
-    @patch('aihub.caching.redis.cache.redis.Redis')
+    @patch('unifiedui.caching.redis.cache.redis.Redis')
     def test_ping_failure(self, mock_redis_class):
         """Test ping returns False when connection fails."""
         mock_client = Mock()
@@ -277,7 +277,7 @@ class TestRedisCache:
         
         assert result is False
     
-    @patch('aihub.caching.redis.cache.redis.Redis')
+    @patch('unifiedui.caching.redis.cache.redis.Redis')
     def test_close_connection(self, mock_redis_class):
         """Test close method closes Redis connection."""
         mock_client = Mock()
@@ -288,7 +288,7 @@ class TestRedisCache:
         
         mock_client.close.assert_called_once()
     
-    @patch('aihub.caching.redis.cache.redis.Redis')
+    @patch('unifiedui.caching.redis.cache.redis.Redis')
     def test_close_handles_error(self, mock_redis_class):
         """Test close handles errors gracefully."""
         mock_client = Mock()
@@ -299,7 +299,7 @@ class TestRedisCache:
         # Should not raise exception
         cache.close()
     
-    @patch('aihub.caching.redis.cache.redis.Redis')
+    @patch('unifiedui.caching.redis.cache.redis.Redis')
     def test_full_cache_workflow(self, mock_redis_class):
         """Test complete cache workflow."""
         mock_client = Mock()

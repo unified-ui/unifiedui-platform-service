@@ -1,12 +1,12 @@
-# AIHub
+# unifiedui
 
-[![CI](https://github.com/enricogoerlitz/aihub-backend/actions/workflows/ci.yml/badge.svg)](https://github.com/enricogoerlitz/aihub-backend/actions/workflows/ci.yml)
+[![CI](https://github.com/enricogoerlitz/unifiedui-backend/actions/workflows/ci.yml/badge.svg)](https://github.com/enricogoerlitz/unifiedui-backend/actions/workflows/ci.yml)
 
 > **Unified-UI for your AI** — One interface for all your AI agents, regardless of origin.
 
 ## Overview
 
-**AIHub** is a unified integration platform that transforms the complexity of managing multiple AI systems into a single, cohesive experience. Organizations today deploy agents across diverse platforms—Microsoft Foundry, n8n, LangGraph, Copilot, and custom solutions—resulting in fragmented user experiences, inconsistent monitoring, and operational silos. AIHub eliminates these challenges by providing a unified interface where every agent converges into one platform.
+**unifiedui** is a unified integration platform that transforms the complexity of managing multiple AI systems into a single, cohesive experience. Organizations today deploy agents across diverse platforms—Microsoft Foundry, n8n, LangGraph, Copilot, and custom solutions—resulting in fragmented user experiences, inconsistent monitoring, and operational silos. unifiedui eliminates these challenges by providing a unified interface where every agent converges into one platform.
 
 ### Key Features
 
@@ -18,7 +18,7 @@
 - 🌍 **Cloud-Agnostic** — Deploy on Azure, AWS, GCP, or on-premises
 - 🚀 **Autonomous Agent Support** — Background agents with centralized tracing
 
-## The Problem AIHub Solves
+## The Problem unifiedui Solves
 
 ### Fragmented AI Experiences
 - **Inconsistent interfaces**: Each platform has its own chat experience
@@ -32,7 +32,7 @@
 
 ### Rapid Technology Obsolescence
 - Agent frameworks evolve quickly; today's tools may be tomorrow's legacy
-- **AIHub decouples agent frameworks from user experience**
+- **unifiedui decouples agent frameworks from user experience**
 - Integrate legacy and modern systems simultaneously
 - Seamless transitions without disrupting end users
 
@@ -51,7 +51,7 @@
 ### Project Structure
 
 ```
-aihub/
+unifiedui/
 ├── app.py              # FastAPI application entry point
 ├── logger.py           # Centralized logging
 ├── apis/v1/            # API route definitions
@@ -78,8 +78,8 @@ aihub/
 **Factory Pattern**: Extensive use for agent systems, infrastructure components (databases, caches, vaults, identity providers)
 
 **Interface-Based Architecture**:
-- `/aihub/core/`: Interfaces and abstract base classes (WHAT components must do)
-- `/aihub/`: Concrete implementations (HOW components work)
+- `/unifiedui/core/`: Interfaces and abstract base classes (WHAT components must do)
+- `/unifiedui/`: Concrete implementations (HOW components work)
 
 **Dependency Injection**: All handlers receive clients via constructor injection
 
@@ -97,8 +97,8 @@ aihub/
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/enricogoerlitz/aihub-backend.git
-   cd aihub-backend
+   git clone https://github.com/enricogoerlitz/unifiedui-backend.git
+   cd unifiedui-backend
    ```
 
 2. **Set up Python environment**
@@ -127,7 +127,7 @@ aihub/
 
 6. **Start the application**
    ```bash
-   uvicorn aihub.app:app --reload
+   uvicorn unifiedui.app:app --reload
    ```
 
 The API will be available at `http://localhost:8000`
@@ -139,7 +139,7 @@ The API will be available at `http://localhost:8000`
 pytest
 
 # Run with coverage
-pytest --cov=aihub --cov-report=html
+pytest --cov=unifiedui --cov-report=html
 
 # Run in parallel
 pytest -n auto
@@ -149,7 +149,7 @@ pytest -n auto
 
 ### User Authentication
 
-AIHub uses **identity provider integration** for authentication:
+unifiedui uses **identity provider integration** for authentication:
 
 ```http
 Authorization: Bearer <jwt-token>
@@ -162,7 +162,7 @@ Authorization: Bearer <jwt-token>
 
 ### Permission Model
 
-AIHub uses a two-tier permission system:
+unifiedui uses a two-tier permission system:
 
 #### Tenant-Level Permissions
 Assigned via `TenantMemberRole` table, multiple roles per member:
@@ -185,7 +185,7 @@ Assigned via `{Resource}Member` tables (Applications, Conversations, Credentials
 #### Principal Types
 - `IDENTITY_USER` — Individual user from identity provider
 - `IDENTITY_GROUP` — Group from identity provider (Azure AD, etc.)
-- `CUSTOM_GROUP` — Custom group defined in AIHub
+- `CUSTOM_GROUP` — Custom group defined in unifiedui
 
 **Permission Hierarchy**: ADMIN > WRITE > READ
 
@@ -301,7 +301,7 @@ Run entirely within your data center for maximum security and compliance.
 
 ## Widget System
 
-AIHub supports custom UI components embedded into chat conversations:
+unifiedui supports custom UI components embedded into chat conversations:
 
 **Widget Delimiter**: `$%_WIDGET_%$`
 
@@ -372,4 +372,4 @@ For questions or support, please open an issue or contact the maintainers.
 
 ---
 
-**AIHub** — Integrate your AI landscape. Unify your experience. Accelerate your innovation.
+**unifiedui** — Integrate your AI landscape. Unify your experience. Accelerate your innovation.

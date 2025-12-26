@@ -1,9 +1,9 @@
-"""Unit tests for aihub/handlers/dependencies/database.py - Database dependency."""
+"""Unit tests for unifiedui/handlers/dependencies/database.py - Database dependency."""
 import pytest
 import os
 from unittest.mock import patch, Mock
 
-from aihub.handlers.dependencies.database import get_db_client
+from unifiedui.handlers.dependencies.database import get_db_client
 
 
 class TestGetDbClient:
@@ -11,11 +11,11 @@ class TestGetDbClient:
 
     def teardown_method(self):
         """Reset global _db_client after each test."""
-        import aihub.handlers.dependencies.database
-        aihub.handlers.dependencies.database._db_client = None
+        import unifiedui.handlers.dependencies.database
+        unifiedui.handlers.dependencies.database._db_client = None
 
-    @patch('aihub.handlers.dependencies.database.SQLAlchemyClient')
-    @patch('aihub.handlers.dependencies.database.DatabaseConfig.from_env')
+    @patch('unifiedui.handlers.dependencies.database.SQLAlchemyClient')
+    @patch('unifiedui.handlers.dependencies.database.DatabaseConfig.from_env')
     @patch.dict(os.environ, {"DATABASE_URL": "postgresql://localhost/test"})
     def test_get_db_client_success(self, mock_config, mock_client_class):
         """Test successful database client initialization."""
@@ -30,8 +30,8 @@ class TestGetDbClient:
         mock_config.assert_called_once()
         mock_client_class.assert_called_once_with(config=mock_config_instance)
 
-    @patch('aihub.handlers.dependencies.database.SQLAlchemyClient')
-    @patch('aihub.handlers.dependencies.database.DatabaseConfig.from_env')
+    @patch('unifiedui.handlers.dependencies.database.SQLAlchemyClient')
+    @patch('unifiedui.handlers.dependencies.database.DatabaseConfig.from_env')
     @patch.dict(os.environ, {"DATABASE_URL": "postgresql://localhost/test"})
     def test_get_db_client_cached(self, mock_config, mock_client_class):
         """Test that database client is cached."""
@@ -58,8 +58,8 @@ class TestGetDbClient:
         assert "DATABASE_URL" in str(exc_info.value)
         assert "DB_HOST" in str(exc_info.value)
 
-    @patch('aihub.handlers.dependencies.database.SQLAlchemyClient')
-    @patch('aihub.handlers.dependencies.database.DatabaseConfig.from_env')
+    @patch('unifiedui.handlers.dependencies.database.SQLAlchemyClient')
+    @patch('unifiedui.handlers.dependencies.database.DatabaseConfig.from_env')
     @patch.dict(os.environ, {"DB_HOST": "localhost", "DB_PORT": "5432"})
     def test_get_db_client_init_failure(self, mock_config, mock_client_class):
         """Test handling of database client initialization failure."""
@@ -72,8 +72,8 @@ class TestGetDbClient:
         assert "Failed to initialize database client" in str(exc_info.value)
         assert "Connection failed" in str(exc_info.value)
 
-    @patch('aihub.handlers.dependencies.database.SQLAlchemyClient')
-    @patch('aihub.handlers.dependencies.database.DatabaseConfig.from_env')
+    @patch('unifiedui.handlers.dependencies.database.SQLAlchemyClient')
+    @patch('unifiedui.handlers.dependencies.database.DatabaseConfig.from_env')
     @patch.dict(os.environ, {"DB_HOST": "localhost"})
     def test_get_db_client_with_db_host(self, mock_config, mock_client_class):
         """Test database client initialization with DB_HOST."""

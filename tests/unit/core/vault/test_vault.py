@@ -1,8 +1,8 @@
-"""Unit tests for aihub/core/vault/vault.py - BaseVault abstract class."""
+"""Unit tests for unifiedui/core/vault/vault.py - BaseVault abstract class."""
 import pytest
 from abc import ABC
 
-from aihub.core.vault.vault import BaseVault
+from unifiedui.core.vault.vault import BaseVault
 
 
 class MockVault(BaseVault):

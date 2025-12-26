@@ -1,8 +1,8 @@
-"""Unit tests for aihub/core/identity/enums.py"""
+"""Unit tests for unifiedui/core/identity/enums.py"""
 import pytest
 from enum import Enum
 
-from aihub.core.identity.enums import IdenityProviderEnum
+from unifiedui.core.identity.enums import IdenityProviderEnum
 
 
 class TestIdenityProviderEnum:

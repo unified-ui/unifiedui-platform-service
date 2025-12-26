@@ -1,8 +1,8 @@
-"""Unit tests for aihub/utils/dataclasses.py"""
+"""Unit tests for unifiedui/utils/dataclasses.py"""
 import pytest
 from dataclasses import dataclass, asdict as dataclasses_asdict
 
-from aihub.utils.dataclasses import to_dict
+from unifiedui.utils.dataclasses import to_dict
 
 
 class TestToDictDecorator:

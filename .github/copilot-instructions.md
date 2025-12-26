@@ -28,7 +28,7 @@ applyTo: '**'
 
 ### Project Structure
 ```
-aihub/
+unifiedui/
 ├── app.py              # FastAPI application entry point
 ├── logger.py           # Centralized logging
 ├── apis/v1/            # API route definitions (NO business logic!)
@@ -51,11 +51,11 @@ aihub/
 ```
 
 ### Core vs Implementation Pattern
-- **/aihub/core/**: Interfaces, abstract base classes, core models
+- **/unifiedui/core/**: Interfaces, abstract base classes, core models
   - Defines **WHAT** components must do
   - Database-agnostic, infrastructure-agnostic
   - Example: `core/vault/interface.py` defines `IVaultClient`
-- **/aihub/**: Concrete implementations
+- **/unifiedui/**: Concrete implementations
   - Defines **HOW** components work
   - Same folder structure as `core/`
   - Example: `vault/keyvault.py` implements `IVaultClient` for Azure Key Vault
@@ -245,7 +245,7 @@ Used for ALL resources except Tenants:
 #### Principal Types (PrincipalTypeEnum)
 - **USER**: Individual user from identity provider
 - **IDENTITY_GROUP**: Group from identity provider (Azure AD, Okta, etc.)
-- **CUSTOM_GROUP**: Custom group defined in AIHub
+- **CUSTOM_GROUP**: Custom group defined in unifiedui
 
 #### Permission Check Pattern
 ```python
@@ -336,7 +336,7 @@ async def list_applications(
 class ContextIdentityUser:
     identity: IdentityUser        # User ID, email, tenant ID from token
     groups: list[IdentityGroupResponse]      # Identity provider groups (cached)
-    custom_groups: list[CustomGroupResponse] # AIHub custom groups (cached)
+    custom_groups: list[CustomGroupResponse] # unifiedui custom groups (cached)
     tenants: list[TenantResponse]            # User's tenants with roles (cached)
 ```
 
@@ -434,7 +434,7 @@ Certain tenant roles bypass resource-level checks:
 ## Development Workflow
 - Feature branches: `feature/{feature-name}`
 - Run tests before committing
-- Use pytest for all tests
+- Use pytest with parallel execution: `pytest tests/{*} -n auto`
 - Code coverage minimum: 80%
 
 ## Performance Considerations

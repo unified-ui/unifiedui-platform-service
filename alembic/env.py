@@ -7,7 +7,7 @@ from sqlalchemy import pool
 from alembic import context
 
 # Import the Base from models to get metadata
-from aihub.core.database.models import Base
+from unifiedui.core.database.models import Base
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

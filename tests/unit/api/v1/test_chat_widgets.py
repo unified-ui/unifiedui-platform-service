@@ -3,7 +3,7 @@ from typing import Any
 from fastapi import status
 from starlette.testclient import TestClient
 
-from aihub.core.database.enums import PermissionActionEnum, PrincipalTypeEnum, ChatWidgetTypeEnum
+from unifiedui.core.database.enums import PermissionActionEnum, PrincipalTypeEnum, ChatWidgetTypeEnum
 from tests.conftest import create_auth_headers
 
 
@@ -73,6 +73,7 @@ class TestChatWidgetRoutes:
         assert data["description"] == cw_data["description"]
         assert data["type"] == cw_data["type"]
         assert data["config"] == cw_data["config"]
+        assert data["is_active"] == False
         assert "id" in data
         assert data["tenant_id"] == tenant_id
         assert "created_at" in data
@@ -379,6 +380,47 @@ class TestChatWidgetRoutes:
         assert len(data) == 1
         assert data[0]["name"] == "Production Widget"
     
+    def test_list_chat_widgets_with_quick_list_view(self, test_client: TestClient, test_user_token: Any) -> None:
+        """Test listing chat widgets with quick-list view returns only id and name."""
+        tenant_id = create_tenant_for_user(test_client, test_user_token)
+        headers = create_auth_headers(test_user_token, use_cache=False)
+        
+        # Create chat widgets
+        test_client.post(
+            ENDPOINT_CHAT_WIDGETS.format(tenant_id=tenant_id),
+            json={"name": "Widget One", "description": "First widget", "config": {"key": "value"}},
+            headers=headers
+        )
+        test_client.post(
+            ENDPOINT_CHAT_WIDGETS.format(tenant_id=tenant_id),
+            json={"name": "Widget Two", "description": "Second widget", "config": {}},
+            headers=headers
+        )
+        
+        # Get with quick-list view
+        response = test_client.get(
+            f"{ENDPOINT_CHAT_WIDGETS.format(tenant_id=tenant_id)}?view=quick-list",
+            headers=headers
+        )
+        
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert len(data) == 2
+        
+        # Verify only id and name are returned
+        for item in data:
+            assert "id" in item
+            assert "name" in item
+            # These fields should NOT be present in quick-list view
+            assert "description" not in item
+            assert "config" not in item
+            assert "tenant_id" not in item
+            assert "created_at" not in item
+            assert "updated_at" not in item
+            assert "created_by" not in item
+            assert "updated_by" not in item
+            assert "is_active" not in item
+    
     def test_update_chat_widget_success(self, test_client: TestClient, test_user_token: Any) -> None:
         """Test successful chat widget update."""
         tenant_id = create_tenant_for_user(test_client, test_user_token)
@@ -449,6 +491,40 @@ class TestChatWidgetRoutes:
         """Test partial chat widget update."""
         tenant_id = create_tenant_for_user(test_client, test_user_token)
         headers = create_auth_headers(test_user_token, use_cache=False)
+    
+    def test_update_chat_widget_is_active(self, test_client: TestClient, test_user_token: Any) -> None:
+        """Test updating chat widget is_active status."""
+        tenant_id = create_tenant_for_user(test_client, test_user_token)
+        headers = create_auth_headers(test_user_token, use_cache=False)
+        
+        # Create chat widget (default is_active=False)
+        create_response = test_client.post(
+            ENDPOINT_CHAT_WIDGETS.format(tenant_id=tenant_id),
+            json={"name": "Test Widget", "description": "Test", "config": {}},
+            headers=headers
+        )
+        cw_id = create_response.json()["id"]
+        assert create_response.json()["is_active"] == False
+        
+        # Update to active
+        update_response = test_client.patch(
+            ENDPOINT_CHAT_WIDGET_DETAIL.format(tenant_id=tenant_id, chat_widget_id=cw_id),
+            json={"is_active": True},
+            headers=headers
+        )
+        
+        assert update_response.status_code == status.HTTP_200_OK
+        assert update_response.json()["is_active"] == True
+        
+        # Update back to inactive
+        update_response2 = test_client.patch(
+            ENDPOINT_CHAT_WIDGET_DETAIL.format(tenant_id=tenant_id, chat_widget_id=cw_id),
+            json={"is_active": False},
+            headers=headers
+        )
+        
+        assert update_response2.status_code == status.HTTP_200_OK
+        assert update_response2.json()["is_active"] == False
         
         # Create a chat widget
         cw_data = {"name": "Original", "description": "Description", "config": {"key": "value"}}

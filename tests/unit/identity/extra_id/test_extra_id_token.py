@@ -1,9 +1,9 @@
-"""Unit tests for aihub/identity/extra_id/token.py - ExtraID Identity Token."""
+"""Unit tests for unifiedui/identity/extra_id/token.py - ExtraID Identity Token."""
 import pytest
 
-from aihub.identity.extra_id.token import ExtraIDIdentityTokenSerializer
-from aihub.core.identity.providers import BaseIdentityToken
-from aihub.core.identity.enums import IdenityProviderEnum
+from unifiedui.identity.extra_id.token import ExtraIDIdentityTokenSerializer
+from unifiedui.core.identity.providers import BaseIdentityToken
+from unifiedui.core.identity.enums import IdenityProviderEnum
 
 
 class TestExtraIDIdentityTokenSerializer:

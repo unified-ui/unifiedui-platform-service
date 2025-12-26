@@ -4,9 +4,9 @@ import pytest
 from typing import Generator
 import fakeredis
 
-from aihub.caching.redis.cache import RedisCache
-from aihub.caching.redis.client import RedisCacheClient
-from aihub.caching.client import CacheClient
+from unifiedui.caching.redis.cache import RedisCache
+from unifiedui.caching.redis.client import RedisCacheClient
+from unifiedui.caching.client import CacheClient
 
 logger = logging.getLogger(__name__)
 
