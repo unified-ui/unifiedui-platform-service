@@ -6,6 +6,8 @@ class IdentityGroupResponse(BaseModel):
     """Identity group response model."""
     id: str
     display_name: str
+    principal_name: str | None = None
+    principal_type: str | None = None  # IDENTITY_GROUP or CUSTOM_GROUP
 
 
 class IdentityUserResponse(BaseModel):
@@ -14,12 +16,12 @@ class IdentityUserResponse(BaseModel):
     identity_provider: str
     identity_tenant_id: str | None = None
     display_name: str
+    principal_name: str | None = None
     firstname: str | None = None
     lastname: str | None = None
     mail: str | None = None
     tenants: list[dict] | None = None
     groups: list[IdentityGroupResponse] | None = None
-    custom_groups: list[IdentityGroupResponse] | None = None
 
 
 T = TypeVar('T')

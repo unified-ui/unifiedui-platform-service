@@ -7,7 +7,8 @@ from sqlalchemy import select, and_, or_
 from sqlalchemy.orm import Session
 
 from unifiedui.core.database.client import SQLAlchemyClient
-from unifiedui.core.database.models import CustomGroup, CustomGroupMember
+from unifiedui.core.database.models import Principal, CustomGroupMember
+from unifiedui.core.database.enums import PrincipalTypeEnum, PermissionActionEnum
 from unifiedui.caching.client import CacheClient
 from unifiedui.schema.requests.custom_groups import (
     CreateCustomGroupRequest,
@@ -27,7 +28,11 @@ logger = get_logger(__name__)
 
 
 class CustomGroupHandler:
-    """Handler class for custom group business logic using SQLAlchemy."""
+    """Handler class for custom group business logic using SQLAlchemy.
+    
+    Custom groups are stored as Principal entries with principal_type=CUSTOM_GROUP.
+    Custom group membership is tracked via CustomGroupMember table.
+    """
     
     def __init__(self, db_client: SQLAlchemyClient, cache_client: Optional[CacheClient] = None):
         """
@@ -52,6 +57,7 @@ class CustomGroupHandler:
     ) -> List[CustomGroupResponse]:
         """
         Get a list of custom groups in a tenant.
+        Custom groups are Principals with principal_type=CUSTOM_GROUP.
         
         Args:
             tenant_id: The ID of the tenant
@@ -84,14 +90,23 @@ class CustomGroupHandler:
                 logger.warning(f"Failed to get cached custom group list: {e}")
         
         with self.db_client.get_session() as session:
-            query = select(CustomGroup).where(CustomGroup.tenant_id == tenant_id)
+            query = select(Principal).where(
+                Principal.tenant_id == tenant_id,
+                Principal.principal_type == PrincipalTypeEnum.CUSTOM_GROUP.value
+            )
             
             if name_filter:
-                query = query.where(CustomGroup.name.ilike(f"%{name_filter}%"))
+                query = query.where(Principal.display_name.ilike(f"%{name_filter}%"))
             
-            # Apply ordering if specified
-            if order_by and hasattr(CustomGroup, order_by):
-                column = getattr(CustomGroup, order_by)
+            # Apply ordering if specified - map custom group field names to Principal fields
+            field_mapping = {
+                "name": "display_name",
+                "display_name": "display_name",
+                "created_at": "created_at",
+                "updated_at": "updated_at"
+            }
+            if order_by and order_by in field_mapping:
+                column = getattr(Principal, field_mapping[order_by])
                 if order_direction == "desc":
                     query = query.order_by(column.desc())
                 else:
@@ -101,7 +116,7 @@ class CustomGroupHandler:
             groups = session.execute(query).scalars().all()
             
             logger.info("Retrieved custom groups", extra={"count": len(groups)})
-            result = [self._model_to_response(group) for group in groups]
+            result = [self._principal_to_response(group) for group in groups]
             
             # Cache the result (only when no filters are applied)
             if self.cache_client and not has_filters:
@@ -117,10 +132,11 @@ class CustomGroupHandler:
     def get_custom_group(self, tenant_id: str, custom_group_id: str, use_cache: bool = True) -> CustomGroupResponse:
         """
         Get a specific custom group by ID.
+        Custom group is a Principal with principal_type=CUSTOM_GROUP.
         
         Args:
             tenant_id: The ID of the tenant
-            custom_group_id: The ID of the custom group
+            custom_group_id: The ID of the custom group (principal_id)
             use_cache: Whether to use caching (default: True)
             
         Returns:
@@ -145,9 +161,10 @@ class CustomGroupHandler:
                 logger.warning(f"Failed to get cached custom group: {e}")
         
         with self.db_client.get_session() as session:
-            query = select(CustomGroup).where(
-                CustomGroup.id == custom_group_id,
-                CustomGroup.tenant_id == tenant_id
+            query = select(Principal).where(
+                Principal.tenant_id == tenant_id,
+                Principal.principal_id == custom_group_id,
+                Principal.principal_type == PrincipalTypeEnum.CUSTOM_GROUP.value
             )
             group = session.execute(query).scalar_one_or_none()
             
@@ -156,7 +173,7 @@ class CustomGroupHandler:
                 raise CustomGroupNotFoundError(custom_group_id)
             
             logger.info("Custom group retrieved", extra={"custom_group_id": custom_group_id})
-            result = self._model_to_response(group)
+            result = self._principal_to_response(group)
             
             # Cache the result
             if self.cache_client:
@@ -175,7 +192,8 @@ class CustomGroupHandler:
         user_id: str
     ) -> CustomGroupResponse:
         """
-        Create a new custom group and assign the creator as ADMIN.
+        Create a new custom group and assign the creator as ADMIN member.
+        Custom group is created as a Principal with principal_type=CUSTOM_GROUP.
         
         Args:
             tenant_id: The ID of the tenant
@@ -190,27 +208,27 @@ class CustomGroupHandler:
         group_id = str(uuid.uuid4())
         
         with self.db_client.get_session() as session:
-            # Create custom group
-            group = CustomGroup(
-                id=group_id,
+            # Create custom group as Principal
+            group = Principal(
                 tenant_id=tenant_id,
-                name=request.name,
+                principal_id=group_id,
+                principal_type=PrincipalTypeEnum.CUSTOM_GROUP.value,
+                display_name=request.name,
+                principal_name=request.name,  # For custom groups, name and principal_name are the same
                 description=request.description,
-                created_by=user_id,
-                updated_by=user_id
+                mail=None  # Custom groups don't have email
             )
             session.add(group)
             session.flush()
             
-            # Create group member for the creator with ADMIN role
+            # Create membership for the creator with ADMIN role
             member_id = str(uuid.uuid4())
             group_member = CustomGroupMember(
                 id=member_id,
                 tenant_id=tenant_id,
                 custom_group_id=group_id,
                 principal_id=user_id,
-                principal_type="IDENTITY_USER",
-                role="ADMIN",
+                role=PermissionActionEnum.ADMIN.value,
                 created_by=user_id,
                 updated_by=user_id
             )
@@ -232,7 +250,7 @@ class CustomGroupHandler:
                     logger.warning(f"Failed to invalidate cache: {e}")
             
             logger.info("Custom group created", extra={"custom_group_id": group_id})
-            return self._model_to_response(group)
+            return self._principal_to_response(group)
     
     def update_custom_group(
         self,
@@ -259,9 +277,10 @@ class CustomGroupHandler:
         logger.info("Updating custom group", extra={"tenant_id": tenant_id, "custom_group_id": custom_group_id, "user_id": user_id})
         
         with self.db_client.get_session() as session:
-            query = select(CustomGroup).where(
-                CustomGroup.id == custom_group_id,
-                CustomGroup.tenant_id == tenant_id
+            query = select(Principal).where(
+                Principal.tenant_id == tenant_id,
+                Principal.principal_id == custom_group_id,
+                Principal.principal_type == PrincipalTypeEnum.CUSTOM_GROUP.value
             )
             group = session.execute(query).scalar_one_or_none()
             
@@ -270,11 +289,11 @@ class CustomGroupHandler:
                 raise CustomGroupNotFoundError(custom_group_id)
             
             if request.name is not None:
-                group.name = request.name
+                group.display_name = request.name
+                group.principal_name = request.name
             if request.description is not None:
                 group.description = request.description
             
-            group.updated_by = user_id
             group.updated_at = datetime.now(UTC)
             
             session.commit()
@@ -292,11 +311,12 @@ class CustomGroupHandler:
                     logger.warning(f"Failed to invalidate cache: {e}")
             
             logger.info("Custom group updated", extra={"custom_group_id": custom_group_id})
-            return self._model_to_response(group)
+            return self._principal_to_response(group)
     
     def delete_custom_group(self, tenant_id: str, custom_group_id: str) -> None:
         """
         Delete a custom group by ID.
+        This also deletes all CustomGroupMember entries via cascade.
         
         Args:
             tenant_id: The ID of the tenant
@@ -308,9 +328,10 @@ class CustomGroupHandler:
         logger.info("Deleting custom group", extra={"tenant_id": tenant_id, "custom_group_id": custom_group_id})
         
         with self.db_client.get_session() as session:
-            query = select(CustomGroup).where(
-                CustomGroup.id == custom_group_id,
-                CustomGroup.tenant_id == tenant_id
+            query = select(Principal).where(
+                Principal.tenant_id == tenant_id,
+                Principal.principal_id == custom_group_id,
+                Principal.principal_type == PrincipalTypeEnum.CUSTOM_GROUP.value
             )
             group = session.execute(query).scalar_one_or_none()
             
@@ -337,61 +358,288 @@ class CustomGroupHandler:
             
             logger.info("Custom group deleted", extra={"custom_group_id": custom_group_id})
     
-    def list_custom_group_principals(
+    def list_custom_group_members(
         self,
         tenant_id: str,
         custom_group_id: str
     ) -> dict:
         """
-        Get all principals and their permissions for a specific custom group.
+        Get all members and their roles for a specific custom group.
         
         Args:
             tenant_id: The ID of the tenant
             custom_group_id: The ID of the custom group
             
         Returns:
-            Dict with custom_group_id and list of principals with their permissions
+            Dict with custom_group_id and list of members with their roles
             
         Raises:
             CustomGroupNotFoundError: If custom group not found
         """
-        logger.info("Listing all principals for custom group", extra={"tenant_id": tenant_id, "custom_group_id": custom_group_id})
+        logger.info("Listing members for custom group", extra={"tenant_id": tenant_id, "custom_group_id": custom_group_id})
         
         with self.db_client.get_session() as session:
             # Verify group exists
-            group = session.get(CustomGroup, custom_group_id)
-            if not group or group.tenant_id != tenant_id:
+            group_query = select(Principal).where(
+                Principal.tenant_id == tenant_id,
+                Principal.principal_id == custom_group_id,
+                Principal.principal_type == PrincipalTypeEnum.CUSTOM_GROUP.value
+            )
+            group = session.execute(group_query).scalar_one_or_none()
+            if not group:
                 raise CustomGroupNotFoundError(custom_group_id)
             
-            # Get all members and their roles
+            # Get all members with their info from Principal table
             query = (
-                select(CustomGroupMember)
-                .where(CustomGroupMember.custom_group_id == custom_group_id)
-                .order_by(CustomGroupMember.principal_id, CustomGroupMember.role)
+                select(CustomGroupMember, Principal)
+                .join(
+                    Principal,
+                    and_(
+                        CustomGroupMember.tenant_id == Principal.tenant_id,
+                        CustomGroupMember.principal_id == Principal.principal_id
+                    )
+                )
+                .where(
+                    CustomGroupMember.tenant_id == tenant_id,
+                    CustomGroupMember.custom_group_id == custom_group_id
+                )
+                .order_by(CustomGroupMember.principal_id)
             )
             
-            members = session.execute(query).scalars().all()
+            results = session.execute(query).all()
             
-            # Group by principal
-            principals_dict = {}
-            for member in members:
-                if member.principal_id not in principals_dict:
-                    principals_dict[member.principal_id] = {
-                        "principal_id": member.principal_id,
-                        "principal_type": member.principal_type,
-                        "roles": []
-                    }
-                principals_dict[member.principal_id]["roles"].append(member.role)
+            members = []
+            for member, principal in results:
+                members.append({
+                    "principal_id": member.principal_id,
+                    "principal_type": principal.principal_type,
+                    "display_name": principal.display_name,
+                    "principal_name": principal.principal_name,
+                    "mail": principal.mail,
+                    "role": member.role,
+                    "created_at": member.created_at.isoformat() if member.created_at else None,
+                    "updated_at": member.updated_at.isoformat() if member.updated_at else None
+                })
             
-            principals = list(principals_dict.values())
-            
-            logger.info("Retrieved custom group principals", extra={"custom_group_id": custom_group_id, "principal_count": len(principals)})
+            logger.info("Retrieved custom group members", extra={"custom_group_id": custom_group_id, "member_count": len(members)})
             
             return {
                 "custom_group_id": custom_group_id,
                 "tenant_id": tenant_id,
-                "principals": principals
+                "members": members
             }
+    
+    def get_member_role(
+        self,
+        tenant_id: str,
+        custom_group_id: str,
+        principal_id: str
+    ) -> dict:
+        """
+        Get the role for a specific member in a custom group.
+        
+        Args:
+            tenant_id: The ID of the tenant
+            custom_group_id: The ID of the custom group
+            principal_id: The ID of the member principal
+            
+        Returns:
+            Dict with custom_group_id, principal_id, and role
+            
+        Raises:
+            CustomGroupNotFoundError: If custom group not found
+        """
+        logger.info(
+            "Getting member role",
+            extra={"tenant_id": tenant_id, "custom_group_id": custom_group_id, "principal_id": principal_id}
+        )
+        
+        with self.db_client.get_session() as session:
+            # Verify group exists
+            group_query = select(Principal).where(
+                Principal.tenant_id == tenant_id,
+                Principal.principal_id == custom_group_id,
+                Principal.principal_type == PrincipalTypeEnum.CUSTOM_GROUP.value
+            )
+            group = session.execute(group_query).scalar_one_or_none()
+            if not group:
+                raise CustomGroupNotFoundError(custom_group_id)
+            
+            # Get member
+            query = select(CustomGroupMember).where(
+                CustomGroupMember.tenant_id == tenant_id,
+                CustomGroupMember.custom_group_id == custom_group_id,
+                CustomGroupMember.principal_id == principal_id
+            )
+            
+            member = session.execute(query).scalar_one_or_none()
+            
+            if not member:
+                # Member not found in this group
+                return {
+                    "custom_group_id": custom_group_id,
+                    "tenant_id": tenant_id,
+                    "principal_id": principal_id,
+                    "role": None
+                }
+            
+            return {
+                "custom_group_id": custom_group_id,
+                "tenant_id": tenant_id,
+                "principal_id": principal_id,
+                "role": member.role
+            }
+    
+    def set_member_role(
+        self,
+        tenant_id: str,
+        custom_group_id: str,
+        principal_id: str,
+        role: str,
+        user_id: str
+    ) -> dict:
+        """
+        Add or update a member's role in a custom group.
+        
+        Args:
+            tenant_id: The ID of the tenant
+            custom_group_id: The ID of the custom group
+            principal_id: The ID of the principal to add/update
+            role: The role to assign (READ, WRITE, ADMIN)
+            user_id: The ID of the user making the change
+            
+        Returns:
+            Dict with custom_group_id, principal_id, and updated role
+            
+        Raises:
+            CustomGroupNotFoundError: If custom group not found
+        """
+        logger.info(
+            "Setting member role",
+            extra={"tenant_id": tenant_id, "custom_group_id": custom_group_id, "principal_id": principal_id, "role": role}
+        )
+        
+        with self.db_client.get_session() as session:
+            # Verify group exists
+            group_query = select(Principal).where(
+                Principal.tenant_id == tenant_id,
+                Principal.principal_id == custom_group_id,
+                Principal.principal_type == PrincipalTypeEnum.CUSTOM_GROUP.value
+            )
+            group = session.execute(group_query).scalar_one_or_none()
+            if not group:
+                raise CustomGroupNotFoundError(custom_group_id)
+            
+            # Find or create membership
+            query = select(CustomGroupMember).where(
+                CustomGroupMember.tenant_id == tenant_id,
+                CustomGroupMember.custom_group_id == custom_group_id,
+                CustomGroupMember.principal_id == principal_id
+            )
+            member = session.execute(query).scalar_one_or_none()
+            
+            if not member:
+                # Create new membership
+                member_id = str(uuid.uuid4())
+                member = CustomGroupMember(
+                    id=member_id,
+                    tenant_id=tenant_id,
+                    custom_group_id=custom_group_id,
+                    principal_id=principal_id,
+                    role=role,
+                    created_by=user_id,
+                    updated_by=user_id
+                )
+                session.add(member)
+                logger.info(f"Created new membership with role {role} for {principal_id}")
+            elif member.role != role:
+                # Update existing membership role
+                member.role = role
+                member.updated_by = user_id
+                logger.info(f"Updated membership role from {member.role} to {role} for {principal_id}")
+            else:
+                logger.info(f"Membership with role {role} already exists for {principal_id}")
+            
+            session.commit()
+            
+            # Invalidate user cache
+            if self.cache_client:
+                try:
+                    self.cache_client.clear_cache_for_user(principal_id)
+                    self.cache_client.clear_cache_for_user(user_id)
+                    logger.debug(f"Cleared cache for user {principal_id} after membership change")
+                except Exception as e:
+                    logger.warning(f"Failed to clear user cache: {e}")
+            
+            logger.info(f"Set {role} role for {principal_id} in custom group {custom_group_id}")
+            
+            return self.get_member_role(tenant_id, custom_group_id, principal_id)
+    
+    def delete_member(
+        self,
+        tenant_id: str,
+        custom_group_id: str,
+        principal_id: str
+    ) -> None:
+        """
+        Remove a member from a custom group.
+        
+        Args:
+            tenant_id: The ID of the tenant
+            custom_group_id: The ID of the custom group
+            principal_id: The ID of the principal to remove
+            
+        Raises:
+            CustomGroupNotFoundError: If custom group not found
+        """
+        logger.info(
+            "Deleting member",
+            extra={"tenant_id": tenant_id, "custom_group_id": custom_group_id, "principal_id": principal_id}
+        )
+        
+        with self.db_client.get_session() as session:
+            # Verify group exists
+            group_query = select(Principal).where(
+                Principal.tenant_id == tenant_id,
+                Principal.principal_id == custom_group_id,
+                Principal.principal_type == PrincipalTypeEnum.CUSTOM_GROUP.value
+            )
+            group = session.execute(group_query).scalar_one_or_none()
+            if not group:
+                raise CustomGroupNotFoundError(custom_group_id)
+            
+            # Find and delete membership
+            query = select(CustomGroupMember).where(
+                CustomGroupMember.tenant_id == tenant_id,
+                CustomGroupMember.custom_group_id == custom_group_id,
+                CustomGroupMember.principal_id == principal_id
+            )
+            member = session.execute(query).scalar_one_or_none()
+            
+            if member:
+                session.delete(member)
+                session.commit()
+                
+                # Invalidate user cache
+                if self.cache_client:
+                    try:
+                        self.cache_client.clear_cache_for_user(principal_id)
+                        logger.debug(f"Cleared cache for user {principal_id} after membership removal")
+                    except Exception as e:
+                        logger.warning(f"Failed to clear user cache: {e}")
+                
+                logger.info(f"Deleted membership for {principal_id} in custom group {custom_group_id}")
+            else:
+                logger.info(f"No membership found for {principal_id} in custom group {custom_group_id}")
+    
+    # Legacy method names for backwards compatibility with routes
+    def list_custom_group_principals(
+        self,
+        tenant_id: str,
+        custom_group_id: str
+    ) -> dict:
+        """Alias for list_custom_group_members for backwards compatibility."""
+        return self.list_custom_group_members(tenant_id, custom_group_id)
     
     def get_principal_permissions(
         self,
@@ -399,62 +647,16 @@ class CustomGroupHandler:
         custom_group_id: str,
         principal_id: str
     ) -> dict:
-        """
-        Get all permissions for a specific principal on a custom group.
-        
-        Args:
-            tenant_id: The ID of the tenant
-            custom_group_id: The ID of the custom group
-            principal_id: The ID of the principal
-            
-        Returns:
-            Dict with custom_group_id, principal_id, and permissions list
-            
-        Raises:
-            CustomGroupNotFoundError: If custom group not found
-        """
-        logger.info(
-            "Getting principal permissions",
-            extra={"tenant_id": tenant_id, "custom_group_id": custom_group_id, "principal_id": principal_id}
-        )
-        
-        with self.db_client.get_session() as session:
-            # Verify group exists
-            group = session.get(CustomGroup, custom_group_id)
-            if not group or group.tenant_id != tenant_id:
-                raise CustomGroupNotFoundError(custom_group_id)
-            
-            # Get members and permissions
-            query = (
-                select(CustomGroupMember)
-                .where(
-                    CustomGroupMember.custom_group_id == custom_group_id,
-                    CustomGroupMember.principal_id == principal_id
-                )
-            )
-            
-            members = session.execute(query).scalars().all()
-            
-            if not members:
-                # Principal has no permissions on this group
-                return {
-                    "custom_group_id": custom_group_id,
-                    "tenant_id": tenant_id,
-                    "principal_id": principal_id,
-                    "principal_type": None,
-                    "roles": []
-                }
-            
-            principal_type = members[0].principal_type
-            roles = [member.role for member in members]
-            
-            return {
-                "custom_group_id": custom_group_id,
-                "tenant_id": tenant_id,
-                "principal_id": principal_id,
-                "principal_type": principal_type,
-                "roles": roles
-            }
+        """Alias for get_member_role for backwards compatibility."""
+        result = self.get_member_role(tenant_id, custom_group_id, principal_id)
+        # Convert to old format with roles list
+        return {
+            "custom_group_id": result["custom_group_id"],
+            "tenant_id": result["tenant_id"],
+            "principal_id": result["principal_id"],
+            "principal_type": None,  # Not stored separately anymore
+            "roles": [result["role"]] if result["role"] else []
+        }
     
     def set_principal_permission(
         self,
@@ -465,83 +667,15 @@ class CustomGroupHandler:
         role: str,
         user_id: str
     ) -> dict:
-        """
-        Add or update a permission for a principal on a custom group.
-        
-        Args:
-            tenant_id: The ID of the tenant
-            custom_group_id: The ID of the custom group
-            principal_id: The ID of the principal
-            principal_type: The type of principal (IDENTITY_USER, IDENTITY_GROUP, CUSTOM_GROUP)
-            role: The role to assign
-            user_id: The ID of the user making the change
-            
-        Returns:
-            Dict with custom_group_id, principal_id, and updated permissions list
-            
-        Raises:
-            CustomGroupNotFoundError: If custom group not found
-        """
-        logger.info(
-            "Setting principal permission",
-            extra={"tenant_id": tenant_id, "custom_group_id": custom_group_id, "principal_id": principal_id, "role": role}
-        )
-        
-        with self.db_client.get_session() as session:
-            # Verify group exists
-            group = session.get(CustomGroup, custom_group_id)
-            if not group or group.tenant_id != tenant_id:
-                raise CustomGroupNotFoundError(custom_group_id)
-            
-            # Find or create member with this role
-            # Note: A principal can only have ONE role per group (enforced by unique constraint)
-            # So we need to update or insert
-            query = select(CustomGroupMember).where(
-                CustomGroupMember.custom_group_id == custom_group_id,
-                CustomGroupMember.principal_id == principal_id,
-                CustomGroupMember.principal_type == principal_type
-            )
-            member = session.execute(query).scalar_one_or_none()
-            
-            if not member:
-                # Create new member with role
-                member_id = str(uuid.uuid4())
-                member = CustomGroupMember(
-                    id=member_id,
-                    tenant_id=tenant_id,
-                    custom_group_id=custom_group_id,
-                    principal_id=principal_id,
-                    principal_type=principal_type,
-                    role=role,
-                    created_by=user_id,
-                    updated_by=user_id
-                )
-                session.add(member)
-                logger.info(f"Created new member with role {role} for {principal_id}")
-            elif member.role != role:
-                # Update existing member's role
-                member.role = role
-                member.updated_by = user_id
-                logger.info(f"Updated member role from {member.role} to {role} for {principal_id}")
-            else:
-                logger.info(f"Member with role {role} already exists for {principal_id}")
-            
-            session.commit()
-            
-            # Invalidate user cache if this is a user principal
-            if self.cache_client:
-                try:
-                    if principal_type == "IDENTITY_USER":
-                        self.cache_client.clear_cache_for_user(principal_id)
-                        logger.debug(f"Cleared cache for user {principal_id} after permission change")
-                    # Also clear cache for the user making the change
-                    self.cache_client.clear_cache_for_user(user_id)
-                except Exception as e:
-                    logger.warning(f"Failed to clear user cache: {e}")
-            
-            logger.info(f"Set {role} permission for {principal_id} on custom group {custom_group_id}")
-            
-            return self.get_principal_permissions(tenant_id, custom_group_id, principal_id)
+        """Alias for set_member_role for backwards compatibility."""
+        result = self.set_member_role(tenant_id, custom_group_id, principal_id, role, user_id)
+        return {
+            "custom_group_id": result["custom_group_id"],
+            "tenant_id": result["tenant_id"],
+            "principal_id": result["principal_id"],
+            "principal_type": principal_type,
+            "roles": [result["role"]] if result["role"] else []
+        }
     
     def delete_principal_permission(
         self,
@@ -551,70 +685,20 @@ class CustomGroupHandler:
         principal_type: str,
         role: str
     ) -> dict:
-        """
-        Remove a specific permission from a principal on a custom group.
-        
-        Args:
-            tenant_id: The ID of the tenant
-            custom_group_id: The ID of the custom group
-            principal_id: The ID of the principal
-            principal_type: The type of principal
-            role: The role to remove
-            
-        Returns:
-            Dict with custom_group_id, principal_id, and remaining permissions list
-            
-        Raises:
-            CustomGroupNotFoundError: If custom group not found
-        """
-        logger.info(
-            "Deleting principal permission",
-            extra={"tenant_id": tenant_id, "custom_group_id": custom_group_id, "principal_id": principal_id, "role": role}
-        )
-        
-        with self.db_client.get_session() as session:
-            # Verify group exists
-            group = session.get(CustomGroup, custom_group_id)
-            if not group or group.tenant_id != tenant_id:
-                raise CustomGroupNotFoundError(custom_group_id)
-            
-            # Find member with this specific role
-            query = select(CustomGroupMember).where(
-                CustomGroupMember.custom_group_id == custom_group_id,
-                CustomGroupMember.principal_id == principal_id,
-                CustomGroupMember.principal_type == principal_type,
-                CustomGroupMember.role == role
-            )
-            member = session.execute(query).scalar_one_or_none()
-            
-            if member:
-                # Delete the member
-                session.delete(member)
-                session.commit()
-                
-                # Invalidate user cache if this is a user principal
-                if self.cache_client:
-                    try:
-                        if principal_type == "IDENTITY_USER":
-                            self.cache_client.clear_cache_for_user(principal_id)
-                            logger.debug(f"Cleared cache for user {principal_id} after permission removal")
-                    except Exception as e:
-                        logger.warning(f"Failed to clear user cache: {e}")
-                
-                logger.info(f"Deleted {role} permission for {principal_id} on custom group {custom_group_id}")
-            
-            return self.get_principal_permissions(tenant_id, custom_group_id, principal_id)
+        """Alias for delete_member for backwards compatibility."""
+        self.delete_member(tenant_id, custom_group_id, principal_id)
+        return self.get_principal_permissions(tenant_id, custom_group_id, principal_id)
     
     @staticmethod
-    def _model_to_response(group: CustomGroup) -> CustomGroupResponse:
-        """Convert CustomGroup model to response."""
+    def _principal_to_response(principal: Principal) -> CustomGroupResponse:
+        """Convert Principal model (CUSTOM_GROUP type) to CustomGroupResponse."""
         return CustomGroupResponse(
-            id=group.id,
-            tenant_id=group.tenant_id,
-            name=group.name,
-            description=group.description,
-            created_at=group.created_at,
-            updated_at=group.updated_at,
-            created_by=group.created_by,
-            updated_by=group.updated_by
+            id=principal.principal_id,
+            tenant_id=principal.tenant_id,
+            name=principal.display_name,
+            description=principal.description,
+            created_at=principal.created_at,
+            updated_at=principal.updated_at,
+            created_by=None,  # Principal doesn't track created_by
+            updated_by=None   # Principal doesn't track updated_by
         )

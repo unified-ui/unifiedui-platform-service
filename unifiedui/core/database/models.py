@@ -207,12 +207,64 @@ class Principal(Base):
 
     # Relationships
     tenant: Mapped["Tenant"] = relationship(back_populates="principals")
+    custom_group_members: Mapped[list["CustomGroupMember"]] = relationship(
+        back_populates="custom_group",
+        foreign_keys="[CustomGroupMember.tenant_id, CustomGroupMember.custom_group_id]",
+        primaryjoin="and_(Principal.tenant_id == CustomGroupMember.tenant_id, Principal.principal_id == CustomGroupMember.custom_group_id)",
+        cascade="all, delete-orphan"
+    )
 
     __table_args__ = (
         Index("ix_principals_tenant", "tenant_id"),
         Index("ix_principals_principal_type", "principal_type"),
         Index("ix_principals_mail", "mail"),
         Index("ix_principals_display_name", "display_name"),
+    )
+
+
+class CustomGroupMember(Base, IdMixin, AuditMixin):
+    """
+    Custom group membership table.
+    Tracks which principals (users, identity groups) are members of custom groups.
+    Custom groups themselves are stored in the principals table with type CUSTOM_GROUP.
+    """
+    __tablename__ = "custom_group_members"
+
+    tenant_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False
+    )
+    custom_group_id: Mapped[str] = mapped_column(String(50), nullable=False)
+    principal_id: Mapped[str] = mapped_column(String(50), nullable=False)
+    role: Mapped[str] = mapped_column(PermissionActionSAEnum, nullable=False)
+
+    # Relationships
+    custom_group: Mapped["Principal"] = relationship(
+        back_populates="custom_group_members",
+        foreign_keys="[CustomGroupMember.tenant_id, CustomGroupMember.custom_group_id]",
+        primaryjoin="and_(CustomGroupMember.tenant_id == Principal.tenant_id, CustomGroupMember.custom_group_id == Principal.principal_id)"
+    )
+    member_principal: Mapped["Principal"] = relationship(
+        foreign_keys="[CustomGroupMember.tenant_id, CustomGroupMember.principal_id]",
+        primaryjoin="and_(CustomGroupMember.tenant_id == Principal.tenant_id, CustomGroupMember.principal_id == Principal.principal_id)"
+    )
+
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["tenant_id", "custom_group_id"],
+            ["principals.tenant_id", "principals.principal_id"],
+            ondelete="CASCADE",
+            name="fk_custom_group_members_custom_group"
+        ),
+        ForeignKeyConstraint(
+            ["tenant_id", "principal_id"],
+            ["principals.tenant_id", "principals.principal_id"],
+            ondelete="CASCADE",
+            name="fk_custom_group_members_principal"
+        ),
+        UniqueConstraint("tenant_id", "custom_group_id", "principal_id", name="uq_custom_group_members"),
+        Index("ix_cgm_tenant", "tenant_id"),
+        Index("ix_cgm_custom_group", "custom_group_id"),
+        Index("ix_cgm_principal", "principal_id"),
     )
 
 

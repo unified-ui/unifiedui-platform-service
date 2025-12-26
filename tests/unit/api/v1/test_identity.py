@@ -47,8 +47,10 @@ class TestIdentityRoutes:
         assert data["identity_provider"] == test_user_token.get_identity_provider()
         assert data["identity_tenant_id"] == test_user_token.get_identity_tenant_id()
         assert "display_name" in data
+        assert "principal_name" in data
         assert "mail" in data
         assert "tenants" in data or data["tenants"] is not None
+        assert "groups" in data
     
     def test_get_current_user_unauthenticated(self, test_client: TestClient) -> None:
         """Test that unauthenticated request fails."""
@@ -278,8 +280,11 @@ class TestIdentityRoutes:
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         
-        # User should have their groups
-        assert "groups" in data or data["id"] == "user-with-groups"
+        # User should have groups property (may be empty if not in principals table)
+        assert "groups" in data
+        assert isinstance(data["groups"], list)
+        # Should have principal_name
+        assert "principal_name" in data
     
     def test_endpoint_requires_authentication(self, test_client: TestClient) -> None:
         """Test that all identity endpoints require authentication."""

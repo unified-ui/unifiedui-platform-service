@@ -104,8 +104,15 @@ class DevelopmentPlatformHandler:
         identity_group_ids = None
         custom_group_ids = None
         if not is_admin:
-            identity_group_ids = [g.id for g in user.groups]
-            custom_group_ids = [g.id for g in user.custom_groups]
+            # groups now contains both IDENTITY_GROUP and CUSTOM_GROUP with principal_type attribute
+            identity_group_ids = [
+                g.id for g in user.groups 
+                if g.principal_type == PrincipalTypeEnum.IDENTITY_GROUP.value
+            ]
+            custom_group_ids = [
+                g.id for g in user.groups 
+                if g.principal_type == PrincipalTypeEnum.CUSTOM_GROUP.value
+            ]
         
         # Build cache key (without filters - caching only for unfiltered results)
         cache_key = f"development_platforms:list:tenant:{tenant_id}:user:{user_id}:skip:{skip}:limit:{limit}"

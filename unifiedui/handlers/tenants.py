@@ -7,7 +7,7 @@ from sqlalchemy import select, and_, or_
 from sqlalchemy.orm import Session
 
 from unifiedui.core.database.client import SQLAlchemyClient
-from unifiedui.core.database.models import Tenant, TenantMember, TenantMemberRole, CustomGroupMember
+from unifiedui.core.database.models import Tenant, TenantMember, TenantMemberRole, Principal
 from unifiedui.schema.requests.tenants import CreateTenantRequest, UpdateTenantRequest
 from unifiedui.schema.responses.tenants import TenantResponse
 from unifiedui.exc.tenants import TenantNotFoundError
@@ -335,43 +335,25 @@ class TenantHandler:
             return cached_data
         
         with self.db_client.get_session() as session:
-            # Build conditions for all principal types
-            conditions = []
+            # Build conditions for all principal IDs
+            # We now use the Principal table via JOIN to filter by principal_type
+            all_principal_ids = [user_id] + identity_group_ids + custom_group_ids
             
-            # Add user condition
-            conditions.append(
-                and_(
-                    TenantMember.principal_id == user_id,
-                    TenantMember.principal_type == "IDENTITY_USER"
-                )
-            )
+            if not all_principal_ids:
+                return []
             
-            # Add identity group conditions
-            if identity_group_ids:
-                for group_id in identity_group_ids:
-                    conditions.append(
-                        and_(
-                            TenantMember.principal_id == group_id,
-                            TenantMember.principal_type == "IDENTITY_GROUP"
-                        )
-                    )
-            
-            # Add custom group conditions
-            if custom_group_ids:
-                for group_id in custom_group_ids:
-                    conditions.append(
-                        and_(
-                            TenantMember.principal_id == group_id,
-                            TenantMember.principal_type == "CUSTOM_GROUP"
-                        )
-                    )
-            
-            # Query to get all tenant members and their roles matching any condition
+            # Query to get all tenant members and their roles
+            # JOIN with Principal to access principal_type for filtering
             query = (
                 select(Tenant, TenantMemberRole)
                 .join(TenantMember, Tenant.id == TenantMember.tenant_id)
+                .join(
+                    Principal,
+                    (TenantMember.tenant_id == Principal.tenant_id) &
+                    (TenantMember.principal_id == Principal.principal_id)
+                )
                 .join(TenantMemberRole, TenantMember.id == TenantMemberRole.tenant_member_id)
-                .where(or_(*conditions))
+                .where(TenantMember.principal_id.in_(all_principal_ids))
                 .order_by(Tenant.name, TenantMemberRole.role)
             )
             

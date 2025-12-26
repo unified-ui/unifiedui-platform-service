@@ -514,7 +514,8 @@ class TestTenantRBAC:
     
     def test_custom_group_grants_permissions_to_members(self, test_client: TestClient, fake_redis_client: Any) -> None:
         """Test that users in a custom group inherit the group's permissions."""
-        from unifiedui.core.database.models import CustomGroup, CustomGroupMember
+        from unifiedui.core.database.models import Principal, CustomGroupMember
+        from unifiedui.core.database.enums import PrincipalTypeEnum
         import uuid
         
         # Admin creates tenant (use unique user ID to avoid conflicts)
@@ -533,13 +534,14 @@ class TestTenantRBAC:
         
         # Use test_client.db_client to write to the SAME DB that the API reads from!
         with test_client.db_client.get_session() as session:
-            custom_group = CustomGroup(
-                id=custom_group_id,
+            # Create custom group as Principal
+            custom_group = Principal(
                 tenant_id=tenant_id,
-                name="Admins Group",
-                description="Group of administrators",
-                created_by=admin_token.get_id(),
-                updated_by=admin_token.get_id()
+                principal_id=custom_group_id,
+                principal_type=PrincipalTypeEnum.CUSTOM_GROUP.value,
+                display_name="Admins Group",
+                principal_name="Admins Group",
+                description="Group of administrators"
             )
             session.add(custom_group)
             session.commit()
@@ -562,12 +564,22 @@ class TestTenantRBAC:
         
         # Use test_client.db_client to write to the SAME DB that the API reads from!
         with test_client.db_client.get_session() as session:
+            # First ensure user is in principals table
+            user_principal = Principal(
+                tenant_id=tenant_id,
+                principal_id=regular_user_id,
+                principal_type=PrincipalTypeEnum.IDENTITY_USER.value,
+                display_name="CG User",
+                principal_name="cg-user@test.com"
+            )
+            session.add(user_principal)
+            session.flush()
+            
             member = CustomGroupMember(
                 id=str(uuid.uuid4()),
                 tenant_id=tenant_id,
                 custom_group_id=custom_group_id,
                 principal_id=regular_user_id,  # Use actual user ID
-                principal_type=PRINCIPAL_TYPE_USER,
                 role="READ",
                 created_by=admin_token.get_id(),
                 updated_by=admin_token.get_id()
@@ -637,7 +649,8 @@ class TestTenantRBAC:
     
     def test_custom_group_with_reader_role_limits_members(self, test_client: TestClient, fake_redis_client: Any) -> None:
         """Test that custom group with READER role limits member capabilities."""
-        from unifiedui.core.database.models import CustomGroup, CustomGroupMember
+        from unifiedui.core.database.models import Principal, CustomGroupMember
+        from unifiedui.core.database.enums import PrincipalTypeEnum
         import uuid
         
         # Admin creates tenant
@@ -656,13 +669,14 @@ class TestTenantRBAC:
         
         # Use test_client.db_client to write to the SAME DB that the API reads from!
         with test_client.db_client.get_session() as session:
-            custom_group = CustomGroup(
-                id=custom_group_id,
+            # Create custom group as Principal
+            custom_group = Principal(
                 tenant_id=tenant_id,
-                name="Readers Group",
-                description="Read-only users",
-                created_by="cg-reader-admin",
-                updated_by="cg-reader-admin"
+                principal_id=custom_group_id,
+                principal_type=PrincipalTypeEnum.CUSTOM_GROUP.value,
+                display_name="Readers Group",
+                principal_name="Readers Group",
+                description="Read-only users"
             )
             session.add(custom_group)
             session.commit()
@@ -677,12 +691,22 @@ class TestTenantRBAC:
         
         # Use test_client.db_client to write to the SAME DB that the API reads from!
         with test_client.db_client.get_session() as session:
+            # First ensure user is in principals table
+            user_principal = Principal(
+                tenant_id=tenant_id,
+                principal_id=reader_user_id,
+                principal_type=PrincipalTypeEnum.IDENTITY_USER.value,
+                display_name="CG Reader User",
+                principal_name="cg-reader-user@test.com"
+            )
+            session.add(user_principal)
+            session.flush()
+            
             member = CustomGroupMember(
                 id=str(uuid.uuid4()),
                 tenant_id=tenant_id,
                 custom_group_id=custom_group_id,
                 principal_id=reader_user_id,  # Use actual user ID
-                principal_type=PRINCIPAL_TYPE_USER,
                 role="READ",
                 created_by="cg-reader-admin",
                 updated_by="cg-reader-admin"
@@ -751,7 +775,8 @@ class TestTenantRBAC:
     
     def test_user_not_in_custom_group_has_no_group_permissions(self, test_client: TestClient, fake_redis_client: Any) -> None:
         """Test that users who are NOT in a custom group do not get the group's permissions."""
-        from unifiedui.core.database.models import CustomGroup, CustomGroupMember
+        from unifiedui.core.database.models import Principal, CustomGroupMember
+        from unifiedui.core.database.enums import PrincipalTypeEnum
         import uuid
         
         # Admin creates tenant
@@ -770,13 +795,14 @@ class TestTenantRBAC:
         
         # Use test_client.db_client to write to the SAME DB that the API reads from!
         with test_client.db_client.get_session() as session:
-            custom_group = CustomGroup(
-                id=custom_group_id,
+            # Create custom group as Principal
+            custom_group = Principal(
                 tenant_id=tenant_id,
-                name="Privileged Group",
-                description="Only for select users",
-                created_by="cg-isolation-admin",
-                updated_by="cg-isolation-admin"
+                principal_id=custom_group_id,
+                principal_type=PrincipalTypeEnum.CUSTOM_GROUP.value,
+                display_name="Privileged Group",
+                principal_name="Privileged Group",
+                description="Only for select users"
             )
             session.add(custom_group)
             session.commit()
@@ -792,12 +818,22 @@ class TestTenantRBAC:
         
         # Use test_client.db_client to write to the SAME DB that the API reads from!
         with test_client.db_client.get_session() as session:
+            # First ensure user is in principals table
+            user_principal = Principal(
+                tenant_id=tenant_id,
+                principal_id=member_user_id,
+                principal_type=PrincipalTypeEnum.IDENTITY_USER.value,
+                display_name="CG Member",
+                principal_name="cg-member@test.com"
+            )
+            session.add(user_principal)
+            session.flush()
+            
             member = CustomGroupMember(
                 id=str(uuid.uuid4()),
                 tenant_id=tenant_id,
                 custom_group_id=custom_group_id,
                 principal_id=member_user_id,  # Use actual user ID
-                principal_type=PRINCIPAL_TYPE_USER,
                 role="READ",
                 created_by="cg-isolation-admin",
                 updated_by="cg-isolation-admin"
