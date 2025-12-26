@@ -113,12 +113,14 @@ class CredentialHandler:
             identity_group_ids = [g.id for g in user.groups]
             custom_group_ids = [g.id for g in user.custom_groups]
         
-        # Build cache key (without filters - caching only for unfiltered results)
+        # Build cache key with order and is_active parameters
         view_key = view or "full"
-        cache_key = f"credentials:list:tenant:{tenant_id}:user:{user_id}:skip:{skip}:limit:{limit}:view:{view_key}"
+        order_key = f"{order_by or 'default'}:{order_direction or 'asc'}"
+        is_active_key = "all" if is_active is None else str(is_active)
+        cache_key = f"credentials:list:tenant:{tenant_id}:user:{user_id}:skip:{skip}:limit:{limit}:view:{view_key}:order:{order_key}:active:{is_active_key}"
         
-        # Check if any filters are applied
-        has_filters = name_filter is not None or is_active is not None or tag_ids is not None or order_by is not None
+        # Check if any filters are applied (name_filter and tag_ids disable caching)
+        has_filters = name_filter is not None or tag_ids is not None
         
         # Check cache (disable caching when any filters are applied)
         if use_cache and self.cache_client and not has_filters:
@@ -449,6 +451,8 @@ class CredentialHandler:
                 credential.description = request.description
             if request.credential_type is not None:
                 credential.type = request.credential_type
+            if request.is_active is not None:
+                credential.is_active = request.is_active
             if request.metadata is not None:
                 # Metadata is stored as part of the vault secret, not in DB
                 pass

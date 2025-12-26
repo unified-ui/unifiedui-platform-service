@@ -628,3 +628,125 @@ class TestAutonomousAgentTagCacheInvalidation:
         tag_names = [t["name"] for t in response2.json()["tags"]]
         assert "new-tag-1" in tag_names
         assert "new-tag-2" in tag_names
+
+
+class TestAutonomousAgentListCaching:
+    """Test suite for autonomous agent list caching with order_by, order_direction, and is_active."""
+    
+    def test_list_cached_with_order_by(self, test_client: TestClient, fake_redis_client: Any) -> None:
+        """Test that list responses are cached correctly with order_by parameter."""
+        user_token = test_client.create_test_user("agent-list-cache-order", "Agent List Cache Order")
+        headers = create_auth_headers(user_token)
+        tenant_id = create_tenant_for_user(test_client, user_token)
+        
+        # Create agents
+        agent_data_a = {"name": "Agent A", "description": "Test", "config": {}}
+        agent_data_b = {"name": "Agent B", "description": "Test", "config": {}}
+        test_client.post(ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id), json=agent_data_a, headers=headers)
+        test_client.post(ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id), json=agent_data_b, headers=headers)
+        
+        # First request with order_by=name asc
+        response1 = test_client.get(
+            ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id),
+            params={"order_by": "name", "order_direction": "asc"},
+            headers=headers
+        )
+        assert response1.status_code == status.HTTP_200_OK
+        assert len(response1.json()) == 2
+        assert response1.json()[0]["name"] == "Agent A"
+        
+        # Second request with same params - should use cache
+        response2 = test_client.get(
+            ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id),
+            params={"order_by": "name", "order_direction": "asc"},
+            headers=headers
+        )
+        assert response2.status_code == status.HTTP_200_OK
+        assert response2.json() == response1.json()
+        
+        # Request with different order_direction - different cache key
+        response3 = test_client.get(
+            ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id),
+            params={"order_by": "name", "order_direction": "desc"},
+            headers=headers
+        )
+        assert response3.status_code == status.HTTP_200_OK
+        assert response3.json()[0]["name"] == "Agent B"
+    
+    def test_list_cached_with_is_active(self, test_client: TestClient, fake_redis_client: Any) -> None:
+        """Test that list responses work correctly with is_active parameter and different values use different cache keys."""
+        user_token = test_client.create_test_user("agent-list-cache-active", "Agent List Cache Active")
+        headers = create_auth_headers(user_token, use_cache=False)
+        tenant_id = create_tenant_for_user(test_client, user_token)
+        
+        # Create two agents (default is_active=False)
+        agent_data_1 = {"name": "Agent Inactive", "description": "Test", "config": {}}
+        test_client.post(ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id), json=agent_data_1, headers=headers)
+        
+        agent_data_2 = {"name": "Agent Active", "description": "Test", "config": {}}
+        response = test_client.post(ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id), json=agent_data_2, headers=headers)
+        agent_id_2 = response.json()["id"]
+        
+        # Activate second agent
+        test_client.patch(
+            ENDPOINT_AUTONOMOUS_AGENT_DETAIL.format(tenant_id=tenant_id, autonomous_agent_id=agent_id_2),
+            json={"is_active": True},
+            headers=headers
+        )
+        
+        # Test is_active=1 (only active)
+        response_active = test_client.get(
+            ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id),
+            params={"is_active": 1},
+            headers=headers
+        )
+        assert response_active.status_code == status.HTTP_200_OK
+        assert len(response_active.json()) == 1
+        assert response_active.json()[0]["name"] == "Agent Active"
+        
+        # Test is_active=0 (only inactive)
+        response_inactive = test_client.get(
+            ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id),
+            params={"is_active": 0},
+            headers=headers
+        )
+        assert response_inactive.status_code == status.HTTP_200_OK
+        assert len(response_inactive.json()) == 1
+        assert response_inactive.json()[0]["name"] == "Agent Inactive"
+        
+        # Test without is_active (all agents)
+        response_all = test_client.get(
+            ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id),
+            headers=headers
+        )
+        assert response_all.status_code == status.HTTP_200_OK
+        assert len(response_all.json()) == 2
+    
+    def test_list_cache_key_includes_all_params(self, test_client: TestClient, fake_redis_client: Any) -> None:
+        """Test that cache keys correctly differentiate based on all parameters."""
+        user_token = test_client.create_test_user("agent-list-cache-params", "Agent List Cache Params")
+        headers = create_auth_headers(user_token)
+        tenant_id = create_tenant_for_user(test_client, user_token)
+        
+        agent_data = {"name": "Test Agent", "description": "Test", "config": {}}
+        test_client.post(ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id), json=agent_data, headers=headers)
+        
+        # Different parameter combinations should return results
+        combos = [
+            {},
+            {"order_by": "name"},
+            {"order_by": "name", "order_direction": "desc"},
+            {"is_active": 1},
+            {"is_active": 0},
+            {"order_by": "created_at", "is_active": 1},
+            {"view": "quick-list"},
+            {"view": "quick-list", "is_active": 1},
+        ]
+        
+        for params in combos:
+            response = test_client.get(
+                ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id),
+                params=params,
+                headers=headers
+            )
+            assert response.status_code == status.HTTP_200_OK

@@ -33,6 +33,12 @@ services:
       - mongo_data:/data/db
     networks:
       - unifiedui_network
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
   unifiedui-cache:
     image: redis:8.4
@@ -46,6 +52,12 @@ services:
       - redis_data:/data
     networks:
       - unifiedui_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "admin", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
 
   unifiedui-message-broker:
     image: rabbitmq:4.2-management
@@ -60,6 +72,12 @@ services:
       - rabbitmq_data:/var/lib/rabbitmq
     networks:
       - unifiedui_network
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
 
   unifiedui-vault:
     image: hashicorp/vault:1.18
@@ -75,6 +93,12 @@ services:
     command: vault server -dev
     networks:
       - unifiedui_network
+    healthcheck:
+      test: ["CMD", "vault", "status"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
   
 volumes:
   mongo_data:

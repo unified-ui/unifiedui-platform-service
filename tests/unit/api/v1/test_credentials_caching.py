@@ -621,3 +621,118 @@ class TestCredentialTagCacheInvalidation:
         tag_names = [t["name"] for t in response2.json()["tags"]]
         assert "new-tag-1" in tag_names
         assert "new-tag-2" in tag_names
+
+
+class TestCredentialListCaching:
+    """Test suite for credential list caching with order_by, order_direction, and is_active."""
+    
+    def test_list_cached_with_order_by(self, test_client: TestClient, fake_redis_client: Any) -> None:
+        """Test that list responses are cached correctly with order_by parameter."""
+        user_token = test_client.create_test_user("cred-list-cache-order", "Cred List Cache Order")
+        headers = create_auth_headers(user_token)
+        tenant_id = create_tenant_for_user(test_client, user_token)
+        
+        # Create credentials
+        create_credential(test_client, tenant_id, headers, "Cred A")
+        create_credential(test_client, tenant_id, headers, "Cred B")
+        
+        # First request with order_by=name asc
+        response1 = test_client.get(
+            ENDPOINT_CREDENTIALS.format(tenant_id=tenant_id),
+            params={"order_by": "name", "order_direction": "asc"},
+            headers=headers
+        )
+        assert response1.status_code == status.HTTP_200_OK
+        assert len(response1.json()) == 2
+        assert response1.json()[0]["name"] == "Cred A"
+        
+        # Second request with same params - should use cache
+        response2 = test_client.get(
+            ENDPOINT_CREDENTIALS.format(tenant_id=tenant_id),
+            params={"order_by": "name", "order_direction": "asc"},
+            headers=headers
+        )
+        assert response2.status_code == status.HTTP_200_OK
+        assert response2.json() == response1.json()
+        
+        # Request with different order_direction - different cache key
+        response3 = test_client.get(
+            ENDPOINT_CREDENTIALS.format(tenant_id=tenant_id),
+            params={"order_by": "name", "order_direction": "desc"},
+            headers=headers
+        )
+        assert response3.status_code == status.HTTP_200_OK
+        assert response3.json()[0]["name"] == "Cred B"
+    
+    def test_list_cached_with_is_active(self, test_client: TestClient, fake_redis_client: Any) -> None:
+        """Test that list responses work correctly with is_active parameter and different values use different cache keys."""
+        user_token = test_client.create_test_user("cred-list-cache-active", "Cred List Cache Active")
+        headers = create_auth_headers(user_token, use_cache=False)
+        tenant_id = create_tenant_for_user(test_client, user_token)
+        
+        # Create two credentials (default is_active=False)
+        create_credential(test_client, tenant_id, headers, "Cred Inactive")
+        cred_id_2 = create_credential(test_client, tenant_id, headers, "Cred Active")
+        
+        # Activate second credential
+        test_client.patch(
+            ENDPOINT_CREDENTIAL_DETAIL.format(tenant_id=tenant_id, credential_id=cred_id_2),
+            json={"is_active": True},
+            headers=headers
+        )
+        
+        # Test is_active=1 (only active)
+        response_active = test_client.get(
+            ENDPOINT_CREDENTIALS.format(tenant_id=tenant_id),
+            params={"is_active": 1},
+            headers=headers
+        )
+        assert response_active.status_code == status.HTTP_200_OK
+        assert len(response_active.json()) == 1
+        assert response_active.json()[0]["name"] == "Cred Active"
+        
+        # Test is_active=0 (only inactive)
+        response_inactive = test_client.get(
+            ENDPOINT_CREDENTIALS.format(tenant_id=tenant_id),
+            params={"is_active": 0},
+            headers=headers
+        )
+        assert response_inactive.status_code == status.HTTP_200_OK
+        assert len(response_inactive.json()) == 1
+        assert response_inactive.json()[0]["name"] == "Cred Inactive"
+        
+        # Test without is_active (all credentials)
+        response_all = test_client.get(
+            ENDPOINT_CREDENTIALS.format(tenant_id=tenant_id),
+            headers=headers
+        )
+        assert response_all.status_code == status.HTTP_200_OK
+        assert len(response_all.json()) == 2
+    
+    def test_list_cache_key_includes_all_params(self, test_client: TestClient, fake_redis_client: Any) -> None:
+        """Test that cache keys correctly differentiate based on all parameters."""
+        user_token = test_client.create_test_user("cred-list-cache-params", "Cred List Cache Params")
+        headers = create_auth_headers(user_token)
+        tenant_id = create_tenant_for_user(test_client, user_token)
+        
+        create_credential(test_client, tenant_id, headers, "Test Cred")
+        
+        # Different parameter combinations should return results
+        combos = [
+            {},
+            {"order_by": "name"},
+            {"order_by": "name", "order_direction": "desc"},
+            {"is_active": 1},
+            {"is_active": 0},
+            {"order_by": "created_at", "is_active": 1},
+            {"view": "quick-list"},
+            {"view": "quick-list", "is_active": 1},
+        ]
+        
+        for params in combos:
+            response = test_client.get(
+                ENDPOINT_CREDENTIALS.format(tenant_id=tenant_id),
+                params=params,
+                headers=headers
+            )
+            assert response.status_code == status.HTTP_200_OK
