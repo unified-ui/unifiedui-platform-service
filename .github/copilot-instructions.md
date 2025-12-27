@@ -295,6 +295,109 @@ async def list_applications(
 - Return Pydantic schemas
 - Handle exceptions and convert to HTTP responses
 
+#### Central Handlers (Reusable Pattern)
+
+##### ResourcePermissionsHandler
+**Location**: `handlers/resource_permissions.py`
+
+Central handler for ALL resource permission operations. Eliminates duplicate code across entity handlers.
+
+**Supported Resource Types**:
+- `application`, `autonomous_agent`, `chat_widget`, `conversation`
+- `credential`, `development_platform`, `custom_group`
+
+**Key Methods**:
+```python
+# List all principals with permissions on a resource
+await handler.list_permissions(tenant_id, resource_type, resource_id, skip, limit)
+
+# Get specific principal's permission
+await handler.get_permission(tenant_id, resource_type, resource_id, principal_id)
+
+# Set/update permission (creates if not exists)
+await handler.set_permission(tenant_id, resource_type, resource_id, principal_id, principal_type, role, user)
+
+# Delete permission
+await handler.delete_permission(tenant_id, resource_type, resource_id, principal_id, user)
+
+# Check if user has required role (respects role hierarchy)
+await handler.check_user_permission(tenant_id, resource_type, resource_id, user, required_role)
+
+# Check if user is ADMIN on resource
+await handler.is_user_admin(tenant_id, resource_type, resource_id, user)
+
+# Add creator as ADMIN when creating new resource
+await handler.add_creator_permission(tenant_id, resource_type, resource_id, user)
+```
+
+**Usage in Entity Handlers**:
+```python
+class ApplicationHandler:
+    def __init__(self, db, cache, permissions_handler: ResourcePermissionsHandler):
+        self.permissions = permissions_handler
+    
+    async def list_principals(self, tenant_id, app_id, skip, limit):
+        return await self.permissions.list_permissions(
+            tenant_id, "application", app_id, skip, limit
+        )
+```
+
+##### ResourceTagsHandler
+**Location**: `handlers/resource_tags.py`
+
+Central handler for ALL resource tag operations. Eliminates duplicate tag logic across entity handlers.
+
+**Supported Resource Types**:
+- `application`, `autonomous_agent`, `chat_widget`
+- `credential`, `development_platform`
+
+**Key Methods**:
+```python
+# Get all tags for a resource
+await handler.get_resource_tags(tenant_id, resource_type, resource_id)
+
+# Set tags (replace all existing tags)
+await handler.set_resource_tags(tenant_id, resource_type, resource_id, tag_names)
+
+# Add single tag (idempotent)
+await handler.add_resource_tag(tenant_id, resource_type, resource_id, tag_name)
+
+# Remove single tag
+await handler.remove_resource_tag(tenant_id, resource_type, resource_id, tag_name)
+```
+
+**Usage in Entity Handlers**:
+```python
+class ApplicationHandler:
+    def __init__(self, db, cache, tags_handler: ResourceTagsHandler):
+        self.tags = tags_handler
+    
+    async def add_tag(self, tenant_id, app_id, tag_name):
+        return await self.tags.add_resource_tag(
+            tenant_id, "application", app_id, tag_name
+        )
+```
+
+##### Configuration Pattern
+Both handlers use a configuration dictionary mapping resource types to their models:
+
+```python
+RESOURCE_PERMISSION_CONFIG = {
+    "application": {
+        "model": Application,
+        "member_model": ApplicationMember,
+        "id_field": "application_id",
+        "cache_prefix": "app",
+        "tenant_admin_role": TenantPermissionEnum.APPLICATIONS_ADMIN,
+    },
+    # ... other resources
+}
+```
+
+**Adding New Resource Types**:
+1. Add entry to `RESOURCE_PERMISSION_CONFIG` or `RESOURCE_TAG_CONFIG`
+2. No additional code changes required - handler automatically supports the new resource
+
 ### Schemas (`schema/`)
 - Use Pydantic models for all request/response data
 - Separate schemas for:
