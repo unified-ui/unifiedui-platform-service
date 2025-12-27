@@ -97,7 +97,7 @@ class DevelopmentPlatformHandler:
             limit: Maximum number of items to return
             name_filter: Optional filter by development platform name
             is_active: Optional filter by active status (None=all, 1=active, 0=inactive)
-            tag_ids: Optional list of tag IDs to filter by (platforms must have ALL specified tags)
+            tag_ids: Optional list of tag IDs to filter by (platforms must have AT LEAST ONE of the tags - OR logic)
             order_by: Optional column name to order by
             order_direction: Optional sort direction ('asc' or 'desc')
             use_cache: Whether to use caching
@@ -193,17 +193,17 @@ class DevelopmentPlatformHandler:
             if is_active is not None:
                 query = query.where(DevelopmentPlatform.is_active == bool(is_active))
             
-            # Filter by tags (platforms must have ALL specified tags)
+            # Filter by tags (platforms must have AT LEAST ONE of the specified tags - OR logic)
             if tag_ids:
-                for tag_id in tag_ids:
-                    tag_subquery = (
-                        select(DevelopmentPlatformTag.development_platform_id)
-                        .where(
-                            DevelopmentPlatformTag.tenant_id == tenant_id,
-                            DevelopmentPlatformTag.tag_id == tag_id
-                        )
+                tag_subquery = (
+                    select(DevelopmentPlatformTag.development_platform_id)
+                    .where(
+                        DevelopmentPlatformTag.tenant_id == tenant_id,
+                        DevelopmentPlatformTag.tag_id.in_(tag_ids)
                     )
-                    query = query.where(DevelopmentPlatform.id.in_(tag_subquery))
+                    .distinct()
+                )
+                query = query.where(DevelopmentPlatform.id.in_(tag_subquery))
             
             # Apply ordering if specified
             if order_by and hasattr(DevelopmentPlatform, order_by):

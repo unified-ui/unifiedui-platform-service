@@ -97,7 +97,7 @@ class ApplicationHandler:
             limit: Maximum number of items to return
             name_filter: Optional filter by application name
             is_active: Optional filter by active status (None=all, 1=active, 0=inactive)
-            tag_ids: Optional list of tag IDs to filter by (applications must have ALL specified tags)
+            tag_ids: Optional list of tag IDs to filter by (applications must have AT LEAST ONE of the tags - OR logic)
             order_by: Optional column name to order by
             order_direction: Optional sort direction ('asc' or 'desc')
             use_cache: Whether to use caching
@@ -187,17 +187,17 @@ class ApplicationHandler:
             if is_active is not None:
                 query = query.where(Application.is_active == bool(is_active))
             
-            # Filter by tags (applications must have ALL specified tags)
+            # Filter by tags (applications must have AT LEAST ONE of the specified tags - OR logic)
             if tag_ids:
-                for tag_id in tag_ids:
-                    tag_subquery = (
-                        select(ApplicationTag.application_id)
-                        .where(
-                            ApplicationTag.tenant_id == tenant_id,
-                            ApplicationTag.tag_id == tag_id
-                        )
+                tag_subquery = (
+                    select(ApplicationTag.application_id)
+                    .where(
+                        ApplicationTag.tenant_id == tenant_id,
+                        ApplicationTag.tag_id.in_(tag_ids)
                     )
-                    query = query.where(Application.id.in_(tag_subquery))
+                    .distinct()
+                )
+                query = query.where(Application.id.in_(tag_subquery))
             
             # Apply ordering if specified
             if order_by and hasattr(Application, order_by):

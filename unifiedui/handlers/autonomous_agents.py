@@ -97,7 +97,7 @@ class AutonomousAgentHandler:
             limit: Maximum number of items to return
             name_filter: Optional filter by autonomous agent name
             is_active: Optional filter by active status (None=all, 1=active, 0=inactive)
-            tag_ids: Optional list of tag IDs to filter by (agents must have ALL specified tags)
+            tag_ids: Optional list of tag IDs to filter by (agents must have AT LEAST ONE of the tags - OR logic)
             order_by: Optional column name to order by
             order_direction: Optional sort direction ('asc' or 'desc')
             use_cache: Whether to use caching
@@ -231,17 +231,17 @@ class AutonomousAgentHandler:
                 if is_active is not None:
                     query = query.where(AutonomousAgent.is_active == bool(is_active))
                 
-                # Filter by tags (agents must have ALL specified tags)
+                # Filter by tags (agents must have AT LEAST ONE of the specified tags - OR logic)
                 if tag_ids:
-                    for tag_id in tag_ids:
-                        tag_subquery = (
-                            select(AutonomousAgentTag.autonomous_agent_id)
-                            .where(
-                                AutonomousAgentTag.tenant_id == tenant_id,
-                                AutonomousAgentTag.tag_id == tag_id
-                            )
+                    tag_subquery = (
+                        select(AutonomousAgentTag.autonomous_agent_id)
+                        .where(
+                            AutonomousAgentTag.tenant_id == tenant_id,
+                            AutonomousAgentTag.tag_id.in_(tag_ids)
                         )
-                        query = query.where(AutonomousAgent.id.in_(tag_subquery))
+                        .distinct()
+                    )
+                    query = query.where(AutonomousAgent.id.in_(tag_subquery))
                 
                 # Apply ordering if specified
                 if order_by and hasattr(AutonomousAgent, order_by):

@@ -97,7 +97,7 @@ class ChatWidgetHandler:
             limit: Maximum number of items to return
             name_filter: Optional filter by chat widget name
             is_active: Optional filter by active status (None=all, 1=active, 0=inactive)
-            tag_ids: Optional list of tag IDs to filter by (chat widgets must have ALL specified tags)
+            tag_ids: Optional list of tag IDs to filter by (chat widgets must have AT LEAST ONE of the tags - OR logic)
             order_by: Optional column name to order by
             order_direction: Optional sort direction ('asc' or 'desc')
             use_cache: Whether to use caching
@@ -193,17 +193,17 @@ class ChatWidgetHandler:
             if is_active is not None:
                 query = query.where(ChatWidget.is_active == bool(is_active))
             
-            # Filter by tags (chat widgets must have ALL specified tags)
+            # Filter by tags (chat widgets must have AT LEAST ONE of the specified tags - OR logic)
             if tag_ids:
-                for tag_id in tag_ids:
-                    tag_subquery = (
-                        select(ChatWidgetTag.chat_widget_id)
-                        .where(
-                            ChatWidgetTag.tenant_id == tenant_id,
-                            ChatWidgetTag.tag_id == tag_id
-                        )
+                tag_subquery = (
+                    select(ChatWidgetTag.chat_widget_id)
+                    .where(
+                        ChatWidgetTag.tenant_id == tenant_id,
+                        ChatWidgetTag.tag_id.in_(tag_ids)
                     )
-                    query = query.where(ChatWidget.id.in_(tag_subquery))
+                    .distinct()
+                )
+                query = query.where(ChatWidget.id.in_(tag_subquery))
             
             # Apply ordering if specified
             if order_by and hasattr(ChatWidget, order_by):

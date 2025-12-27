@@ -652,7 +652,7 @@ class TestApplicationListFilterByTags:
         test_client: TestClient, 
         test_user_token: Any
     ) -> None:
-        """Test filtering applications by multiple tags (AND logic)."""
+        """Test filtering applications by multiple tags (OR logic)."""
         tenant_id = create_tenant_for_user(test_client, test_user_token)
         headers = create_auth_headers(test_user_token, use_cache=False)
         
@@ -660,21 +660,31 @@ class TestApplicationListFilterByTags:
         app1_id = create_application_in_db(test_client, tenant_id, test_user_token.get_id(), "App 1")
         app2_id = create_application_in_db(test_client, tenant_id, test_user_token.get_id(), "App 2")
         app3_id = create_application_in_db(test_client, tenant_id, test_user_token.get_id(), "App 3")
+        app4_id = create_application_in_db(test_client, tenant_id, test_user_token.get_id(), "App 4")
         
         # Set tags
+        # App 1: only "production"
         test_client.put(
             ENDPOINT_APPLICATION_TAGS.format(tenant_id=tenant_id, application_id=app1_id),
             json={"tags": ["production"]},
             headers=headers
         )
+        # App 2: both "production" and "critical"
         test_client.put(
             ENDPOINT_APPLICATION_TAGS.format(tenant_id=tenant_id, application_id=app2_id),
             json={"tags": ["production", "critical"]},
             headers=headers
         )
+        # App 3: only "critical"
         test_client.put(
             ENDPOINT_APPLICATION_TAGS.format(tenant_id=tenant_id, application_id=app3_id),
-            json={"tags": ["staging", "critical"]},
+            json={"tags": ["critical"]},
+            headers=headers
+        )
+        # App 4: only "staging" (should NOT be returned)
+        test_client.put(
+            ENDPOINT_APPLICATION_TAGS.format(tenant_id=tenant_id, application_id=app4_id),
+            json={"tags": ["staging"]},
             headers=headers
         )
         
@@ -687,7 +697,7 @@ class TestApplicationListFilterByTags:
         prod_tag_id = next(t["id"] for t in tags_data if t["name"] == "production")
         critical_tag_id = next(t["id"] for t in tags_data if t["name"] == "critical")
         
-        # Filter by both production AND critical tags
+        # Filter by production OR critical tags (should return App 1, App 2, App 3)
         response = test_client.get(
             ENDPOINT_APPLICATIONS.format(tenant_id=tenant_id) + f"?tags={prod_tag_id},{critical_tag_id}",
             headers=headers
@@ -695,8 +705,14 @@ class TestApplicationListFilterByTags:
         
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
-        assert len(data) == 1
-        assert data[0]["name"] == "App 2"
+        assert len(data) == 3, f"Expected 3 applications with production OR critical tags, got {len(data)}"
+        
+        # Verify all three apps are returned
+        app_names = {app["name"] for app in data}
+        assert app_names == {"App 1", "App 2", "App 3"}, f"Expected App 1, App 2, App 3, got {app_names}"
+        
+        # Verify App 4 (with only staging tag) is NOT returned
+        assert "App 4" not in app_names
     
     def test_list_applications_invalid_tags_format(
         self, 
