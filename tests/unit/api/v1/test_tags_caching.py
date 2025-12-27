@@ -167,8 +167,8 @@ class TestTagCaching:
         tenant_id = create_tenant_for_user(test_client, user_token)
         
         # Create tags
-        create_tag(test_client, tenant_id, headers, "tag1")
-        create_tag(test_client, tenant_id, headers, "tag2")
+        create_tag(test_client, tenant_id, headers, "TAG1")
+        create_tag(test_client, tenant_id, headers, "TAG2")
         
         # First access - should cache
         response1 = test_client.get(
@@ -176,7 +176,7 @@ class TestTagCaching:
             headers=headers
         )
         assert response1.status_code == status.HTTP_200_OK
-        assert response1.json()["total"] == 2
+        assert len(response1.json()["tags"]) == 2
         
         # Second access - should use cache
         response2 = test_client.get(
@@ -184,7 +184,7 @@ class TestTagCaching:
             headers=headers
         )
         assert response2.status_code == status.HTTP_200_OK
-        assert response2.json()["total"] == 2
+        assert len(response2.json()["tags"]) == 2
     
     def test_tag_creation_invalidates_list_cache(self, test_client: TestClient, fake_redis_client: Any) -> None:
         """Test that creating a tag invalidates the list cache."""
@@ -198,7 +198,7 @@ class TestTagCaching:
             ENDPOINT_TAGS.format(tenant_id=tenant_id),
             headers=headers
         )
-        assert response1.json()["total"] == 1
+        assert len(response1.json()["tags"]) == 1
         
         # Create another tag (should invalidate cache)
         create_tag(test_client, tenant_id, headers, "new-tag")
@@ -208,7 +208,7 @@ class TestTagCaching:
             ENDPOINT_TAGS.format(tenant_id=tenant_id),
             headers=headers
         )
-        assert response2.json()["total"] == 2
+        assert len(response2.json()["tags"]) == 2
     
     def test_tag_deletion_invalidates_list_cache(self, test_client: TestClient, fake_redis_client: Any) -> None:
         """Test that deleting a tag invalidates the list cache."""
@@ -224,7 +224,7 @@ class TestTagCaching:
             ENDPOINT_TAGS.format(tenant_id=tenant_id),
             headers=headers
         )
-        assert response1.json()["total"] == 2
+        assert len(response1.json()["tags"]) == 2
         
         # Delete one tag
         test_client.delete(
@@ -237,7 +237,7 @@ class TestTagCaching:
             ENDPOINT_TAGS.format(tenant_id=tenant_id),
             headers=headers
         )
-        assert response2.json()["total"] == 1
+        assert len(response2.json()["tags"]) == 1
 
 
 class TestResourceTagCacheInvalidation:
@@ -261,7 +261,7 @@ class TestResourceTagCacheInvalidation:
         # Add tags to application
         test_client.put(
             ENDPOINT_APPLICATION_TAGS.format(tenant_id=tenant_id, application_id=app_id),
-            json={"tags": ["production", "critical"]},
+            json={"tags": ["PRODUCTION", "CRITICAL"]},
             headers=admin_headers
         )
         
@@ -283,7 +283,7 @@ class TestResourceTagCacheInvalidation:
         # Set initial tags
         test_client.put(
             ENDPOINT_APPLICATION_TAGS.format(tenant_id=tenant_id, application_id=app_id),
-            json={"tags": ["tag1", "tag2"]},
+            json={"tags": ["TAG1", "TAG2"]},
             headers=admin_headers
         )
         
@@ -317,7 +317,7 @@ class TestResourceTagCacheInvalidation:
         # Set initial tags
         test_client.put(
             ENDPOINT_APPLICATION_TAGS.format(tenant_id=tenant_id, application_id=app_id),
-            json={"tags": ["old-tag-1", "old-tag-2"]},
+            json={"tags": ["OLD-TAG-1", "OLD-TAG-2"]},
             headers=admin_headers
         )
         
@@ -327,13 +327,13 @@ class TestResourceTagCacheInvalidation:
             headers=admin_headers
         )
         tag_names1 = [t["name"] for t in response1.json()["tags"]]
-        assert "old-tag-1" in tag_names1
-        assert "old-tag-2" in tag_names1
+        assert "OLD-TAG-1" in tag_names1
+        assert "OLD-TAG-2" in tag_names1
         
         # Replace with new tags
         test_client.put(
             ENDPOINT_APPLICATION_TAGS.format(tenant_id=tenant_id, application_id=app_id),
-            json={"tags": ["new-tag-1", "new-tag-2", "new-tag-3"]},
+            json={"tags": ["NEW-TAG-1", "NEW-TAG-2", "NEW-TAG-3"]},
             headers=admin_headers
         )
         
@@ -344,10 +344,10 @@ class TestResourceTagCacheInvalidation:
         )
         tag_names2 = [t["name"] for t in response2.json()["tags"]]
         assert len(tag_names2) == 3
-        assert "new-tag-1" in tag_names2
-        assert "new-tag-2" in tag_names2
-        assert "new-tag-3" in tag_names2
-        assert "old-tag-1" not in tag_names2
+        assert "NEW-TAG-1" in tag_names2
+        assert "NEW-TAG-2" in tag_names2
+        assert "NEW-TAG-3" in tag_names2
+        assert "OLD-TAG-1" not in tag_names2
     
     def test_adding_tags_to_autonomous_agent_invalidates_cache(self, test_client: TestClient, fake_redis_client: Any) -> None:
         """Test that adding tags to an autonomous agent invalidates the agent cache."""
@@ -391,7 +391,7 @@ class TestResourceTagCacheInvalidation:
         # Set tags on app1
         test_client.put(
             ENDPOINT_APPLICATION_TAGS.format(tenant_id=tenant_id, application_id=app1_id),
-            json={"tags": ["production"]},
+            json={"tags": ["PRODUCTION"]},
             headers=admin_headers
         )
         
@@ -413,7 +413,7 @@ class TestResourceTagCacheInvalidation:
         # Add production tag to app2
         test_client.put(
             ENDPOINT_APPLICATION_TAGS.format(tenant_id=tenant_id, application_id=app2_id),
-            json={"tags": ["production"]},
+            json={"tags": ["PRODUCTION"]},
             headers=admin_headers
         )
         
@@ -447,7 +447,7 @@ class TestResourceTagCacheInvalidation:
         # Writer adds tags
         test_client.put(
             ENDPOINT_APPLICATION_TAGS.format(tenant_id=tenant_id, application_id=app_id),
-            json={"tags": ["writer-tag"]},
+            json={"tags": ["WRITER-TAG"]},
             headers=writer_headers
         )
         
@@ -457,7 +457,7 @@ class TestResourceTagCacheInvalidation:
             headers=admin_headers
         )
         assert len(response2.json()["tags"]) == 1
-        assert response2.json()["tags"][0]["name"] == "writer-tag"
+        assert response2.json()["tags"][0]["name"] == "WRITER-TAG"
     
     def test_deleting_tag_invalidates_resource_caches(self, test_client: TestClient, fake_redis_client: Any) -> None:
         """Test that deleting a tag invalidates caches of resources using that tag."""
@@ -469,7 +469,7 @@ class TestResourceTagCacheInvalidation:
         # Set tags on application
         test_client.put(
             ENDPOINT_APPLICATION_TAGS.format(tenant_id=tenant_id, application_id=app_id),
-            json={"tags": ["to-delete", "to-keep"]},
+            json={"tags": ["to-delete", "TO-KEEP"]},
             headers=admin_headers
         )
         
@@ -499,4 +499,4 @@ class TestResourceTagCacheInvalidation:
             headers=admin_headers
         )
         assert len(response2.json()["tags"]) == 1
-        assert response2.json()["tags"][0]["name"] == "to-keep"
+        assert response2.json()["tags"][0]["name"] == "TO-KEEP"

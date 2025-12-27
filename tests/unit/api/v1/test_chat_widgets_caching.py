@@ -379,7 +379,7 @@ class TestChatWidgetTagCacheInvalidation:
         # Set tags and cache
         test_client.put(
             ENDPOINT_CHAT_WIDGET_TAGS.format(tenant_id=tenant_id, chat_widget_id=widget_id),
-            json={"tags": ["tag1", "tag2"]},
+            json={"tags": ["TAG1", "TAG2"]},
             headers=admin_headers
         )
         
@@ -412,7 +412,7 @@ class TestChatWidgetTagCacheInvalidation:
         # Set initial tags
         test_client.put(
             ENDPOINT_CHAT_WIDGET_TAGS.format(tenant_id=tenant_id, chat_widget_id=widget_id),
-            json={"tags": ["old-1", "old-2"]},
+            json={"tags": ["OLD-1", "OLD-2"]},
             headers=admin_headers
         )
         
@@ -421,12 +421,12 @@ class TestChatWidgetTagCacheInvalidation:
             headers=admin_headers
         )
         tag_names1 = [t["name"] for t in response1.json()["tags"]]
-        assert "old-1" in tag_names1
+        assert "OLD-1" in tag_names1
         
         # Replace tags
         test_client.put(
             ENDPOINT_CHAT_WIDGET_TAGS.format(tenant_id=tenant_id, chat_widget_id=widget_id),
-            json={"tags": ["new-1", "new-2", "new-3"]},
+            json={"tags": ["NEW-1", "NEW-2", "NEW-3"]},
             headers=admin_headers
         )
         
@@ -437,8 +437,8 @@ class TestChatWidgetTagCacheInvalidation:
         )
         tag_names2 = [t["name"] for t in response2.json()["tags"]]
         assert len(tag_names2) == 3
-        assert "new-1" in tag_names2
-        assert "old-1" not in tag_names2
+        assert "NEW-1" in tag_names2
+        assert "OLD-1" not in tag_names2
 
 
 class TestChatWidgetListCaching:

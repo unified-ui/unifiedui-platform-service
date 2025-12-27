@@ -528,7 +528,7 @@ class TestAutonomousAgentTagCacheInvalidation:
         # Add tags to agent
         test_client.put(
             f"/api/v1/tenants/{tenant_id}/autonomous-agents/{agent_id}/tags",
-            json={"tags": ["production", "ml"]},
+            json={"tags": ["PRODUCTION", "ml"]},
             headers=headers
         )
         
@@ -557,7 +557,7 @@ class TestAutonomousAgentTagCacheInvalidation:
         # Set initial tags
         test_client.put(
             f"/api/v1/tenants/{tenant_id}/autonomous-agents/{agent_id}/tags",
-            json={"tags": ["tag1", "tag2"]},
+            json={"tags": ["TAG1", "TAG2"]},
             headers=headers
         )
         
@@ -599,7 +599,7 @@ class TestAutonomousAgentTagCacheInvalidation:
         # Set initial tags
         test_client.put(
             f"/api/v1/tenants/{tenant_id}/autonomous-agents/{agent_id}/tags",
-            json={"tags": ["old-tag"]},
+            json={"tags": ["OLD-TAG"]},
             headers=headers
         )
         
@@ -609,12 +609,12 @@ class TestAutonomousAgentTagCacheInvalidation:
             headers=headers
         )
         assert len(response1.json()["tags"]) == 1
-        assert response1.json()["tags"][0]["name"] == "old-tag"
+        assert response1.json()["tags"][0]["name"] == "OLD-TAG"
         
         # Replace with new tags
         test_client.put(
             f"/api/v1/tenants/{tenant_id}/autonomous-agents/{agent_id}/tags",
-            json={"tags": ["new-tag-1", "new-tag-2"]},
+            json={"tags": ["NEW-TAG-1", "NEW-TAG-2"]},
             headers=headers
         )
         
@@ -626,8 +626,8 @@ class TestAutonomousAgentTagCacheInvalidation:
         assert response2.status_code == status.HTTP_200_OK
         assert len(response2.json()["tags"]) == 2
         tag_names = [t["name"] for t in response2.json()["tags"]]
-        assert "new-tag-1" in tag_names
-        assert "new-tag-2" in tag_names
+        assert "NEW-TAG-1" in tag_names
+        assert "NEW-TAG-2" in tag_names
 
 
 class TestAutonomousAgentListCaching:

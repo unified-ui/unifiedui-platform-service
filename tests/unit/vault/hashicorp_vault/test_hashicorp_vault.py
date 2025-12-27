@@ -96,7 +96,7 @@ class TestHashiCorpVault:
         mock_client_class.return_value = mock_client
         
         vault = HashiCorpVault(url="http://localhost:8200", token="token")
-        metadata = {"env": "production", "owner": "admin"}
+        metadata = {"env": "PRODUCTION", "owner": "admin"}
         uri = vault.store_secret("db/password", "secret123", metadata=metadata)
         
         mock_client.secrets.kv.v2.create_or_update_secret.assert_called_once_with(

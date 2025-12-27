@@ -75,7 +75,7 @@ class TestAzureKeyVault:
         mock_client.set_secret.return_value = mock_secret
         
         vault = AzureKeyVault(vault_url="https://test.vault.azure.net/")
-        metadata = {"env": "production", "owner": "admin"}
+        metadata = {"env": "PRODUCTION", "owner": "admin"}
         uri = vault.store_secret("db_password", "secret123", metadata=metadata)
         
         mock_client.set_secret.assert_called_once_with("db-password", "secret123", tags=metadata)

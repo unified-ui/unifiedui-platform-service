@@ -145,11 +145,11 @@ class TestResourceTagsHandlerOperations:
             resource_type="application",
             tenant_id=data["tenant_id"],
             resource_id=data["application_id"],
-            tag_name="test-tag",
+            tag_name="TEST-TAG",
             user=mock_user
         )
         
-        assert result["name"] == "test-tag"
+        assert result["name"] == "TEST-TAG"
         assert result["id"] is not None
         
         # Verify tag is listed
@@ -161,7 +161,7 @@ class TestResourceTagsHandlerOperations:
         )
         
         assert len(tags_result["tags"]) == 1
-        assert tags_result["tags"][0]["name"] == "test-tag"
+        assert tags_result["tags"][0]["name"] == "TEST-TAG"
     
     def test_add_resource_tag_creates_new_tag(self, handler, setup_tenant_and_application, test_db_session):
         """Test that adding a tag creates the tag if it doesn't exist."""
@@ -184,7 +184,7 @@ class TestResourceTagsHandlerOperations:
         tag = test_db_session.execute(
             select(Tag).where(
                 Tag.tenant_id == data["tenant_id"],
-                Tag.name == "new-tag"
+                Tag.name == "NEW-TAG"  # Tag names are automatically converted to uppercase
             )
         ).scalar_one_or_none()
         
@@ -198,7 +198,7 @@ class TestResourceTagsHandlerOperations:
         # Create tag first
         tag = Tag(
             tenant_id=data["tenant_id"],
-            name="existing-tag",
+            name="EXISTING-TAG",
             created_by=data["user_id"],
             updated_by=data["user_id"]
         )
@@ -214,12 +214,12 @@ class TestResourceTagsHandlerOperations:
             resource_type="application",
             tenant_id=data["tenant_id"],
             resource_id=data["application_id"],
-            tag_name="existing-tag",
+            tag_name="EXISTING-TAG",
             user=mock_user
         )
         
         assert result["id"] == tag_id
-        assert result["name"] == "existing-tag"
+        assert result["name"] == "EXISTING-TAG"
     
     def test_add_resource_tag_idempotent(self, handler, setup_tenant_and_application):
         """Test that adding the same tag twice is idempotent."""
@@ -233,14 +233,14 @@ class TestResourceTagsHandlerOperations:
             resource_type="application",
             tenant_id=data["tenant_id"],
             resource_id=data["application_id"],
-            tag_name="idempotent-tag",
+            tag_name="IDEMPOTENT-TAG",
             user=mock_user
         )
         handler.add_resource_tag(
             resource_type="application",
             tenant_id=data["tenant_id"],
             resource_id=data["application_id"],
-            tag_name="idempotent-tag",
+            tag_name="IDEMPOTENT-TAG",
             user=mock_user
         )
         
@@ -266,14 +266,14 @@ class TestResourceTagsHandlerOperations:
             resource_type="application",
             tenant_id=data["tenant_id"],
             resource_id=data["application_id"],
-            tag_name="tag1",
+            tag_name="TAG1",
             user=mock_user
         )
         handler.add_resource_tag(
             resource_type="application",
             tenant_id=data["tenant_id"],
             resource_id=data["application_id"],
-            tag_name="tag2",
+            tag_name="TAG2",
             user=mock_user
         )
         
@@ -282,16 +282,16 @@ class TestResourceTagsHandlerOperations:
             resource_type="application",
             tenant_id=data["tenant_id"],
             resource_id=data["application_id"],
-            tag_names=["tag3", "tag4"],
+            tag_names=["TAG3", "TAG4"],
             user=mock_user
         )
         
         assert len(result["tags"]) == 2
         tag_names = [t["name"] for t in result["tags"]]
-        assert "tag3" in tag_names
-        assert "tag4" in tag_names
-        assert "tag1" not in tag_names
-        assert "tag2" not in tag_names
+        assert "TAG3" in tag_names
+        assert "TAG4" in tag_names
+        assert "TAG1" not in tag_names
+        assert "TAG2" not in tag_names
     
     def test_set_resource_tags_empty_clears_all(self, handler, setup_tenant_and_application):
         """Test that setting empty tag list clears all tags."""
@@ -469,11 +469,11 @@ class TestResourceTagsHandlerMultipleResourceTypes:
             resource_type="credential",
             tenant_id=data["tenant_id"],
             resource_id=data["credential_id"],
-            tag_name="credential-tag",
+            tag_name="CREDENTIAL-TAG",
             user=mock_user
         )
         
-        assert result["name"] == "credential-tag"
+        assert result["name"] == "CREDENTIAL-TAG"
         
         # Verify tag is listed
         tags_result = handler.get_resource_tags(
@@ -496,11 +496,11 @@ class TestResourceTagsHandlerMultipleResourceTypes:
             resource_type="autonomous_agent",
             tenant_id=data["tenant_id"],
             resource_id=data["agent_id"],
-            tag_name="agent-tag",
+            tag_name="AGENT-TAG",
             user=mock_user
         )
         
-        assert result["name"] == "agent-tag"
+        assert result["name"] == "AGENT-TAG"
     
     def test_same_tag_different_resources(self, handler, setup_tenant_with_resources):
         """Test that the same tag can be applied to different resource types."""
@@ -514,7 +514,7 @@ class TestResourceTagsHandlerMultipleResourceTypes:
             resource_type="credential",
             tenant_id=data["tenant_id"],
             resource_id=data["credential_id"],
-            tag_name="shared-tag",
+            tag_name="SHARED-TAG",
             user=mock_user
         )
         
@@ -522,13 +522,13 @@ class TestResourceTagsHandlerMultipleResourceTypes:
             resource_type="autonomous_agent",
             tenant_id=data["tenant_id"],
             resource_id=data["agent_id"],
-            tag_name="shared-tag",
+            tag_name="SHARED-TAG",
             user=mock_user
         )
         
         # Both should use the same tag ID
         assert cred_result["id"] == agent_result["id"]
-        assert cred_result["name"] == "shared-tag"
+        assert cred_result["name"] == "SHARED-TAG"
 
 
 class TestResourceTagsHandlerCaching:

@@ -463,17 +463,18 @@ class ResourceTagsHandler:
         Returns:
             Tag model instance
         """
+        # Query with uppercase name since @validates converts to uppercase
         tag = session.execute(
             select(Tag).where(
                 Tag.tenant_id == tenant_id,
-                Tag.name == name
+                Tag.name == name.upper()
             )
         ).scalar_one_or_none()
         
         if tag:
             return tag
         
-        # Create new tag
+        # Create new tag (name will be uppercased by @validates decorator)
         tag = Tag(
             tenant_id=tenant_id,
             name=name,
@@ -481,7 +482,20 @@ class ResourceTagsHandler:
             updated_by=user_id
         )
         session.add(tag)
-        session.flush()
+        try:
+            session.flush()
+        except Exception:
+            # If flush fails due to unique constraint (race condition),
+            # re-query for the tag (another request might have created it)
+            session.rollback()
+            tag = session.execute(
+                select(Tag).where(
+                    Tag.tenant_id == tenant_id,
+                    Tag.name == name.upper()  # Query with uppercase
+                )
+            ).scalar_one_or_none()
+            if not tag:
+                raise
         
         logger.info(f"Created new tag", extra={"tag_id": tag.id, "tag_name": name})
         

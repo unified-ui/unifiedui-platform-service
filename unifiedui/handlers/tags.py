@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import List, Optional, Type, TYPE_CHECKING
 
-from sqlalchemy import select, delete
+from sqlalchemy import select, delete, func
 from sqlalchemy.orm import Session
 
 from unifiedui.core.database.client import SQLAlchemyClient
@@ -83,6 +83,8 @@ class TagHandler:
         self,
         tenant_id: str,
         name_filter: Optional[str] = None,
+        skip: int = 0,
+        limit: int = 100,
         use_cache: bool = True
     ) -> TagListResponse:
         """
@@ -91,15 +93,17 @@ class TagHandler:
         Args:
             tenant_id: The ID of the tenant
             name_filter: Optional filter by tag name (disables caching)
-            use_cache: Whether to use caching (ignored if name_filter is set)
+            skip: Number of tags to skip (pagination)
+            limit: Maximum number of tags to return
+            use_cache: Whether to use caching (ignored if name_filter, skip, or limit are set)
             
         Returns:
-            TagListResponse with list of tags and total count
+            TagListResponse with list of tags (id and name only)
         """
-        logger.info("Listing tags", extra={"tenant_id": tenant_id, "name_filter": name_filter})
+        logger.info("Listing tags", extra={"tenant_id": tenant_id, "name_filter": name_filter, "skip": skip, "limit": limit})
         
-        # Disable cache when filtering by name
-        should_cache = use_cache and name_filter is None
+        # Disable cache when filtering by name or using pagination
+        should_cache = use_cache and name_filter is None and skip == 0 and limit == 100
         
         cache_key = f"tags:list:tenant:{tenant_id}"
         
@@ -109,37 +113,122 @@ class TagHandler:
                 cached_data = self.cache_client.client.get(cache_key)
                 if cached_data is not None:
                     logger.debug("Returning cached tag list")
-                    return TagListResponse(
-                        tags=[TagResponse(**item) for item in cached_data["tags"]],
-                        total=cached_data["total"]
-                    )
+                    return TagListResponse(tags=[TagSummary(**item) for item in cached_data])
             except Exception as e:
                 logger.warning(f"Failed to get cached tag list: {e}")
         
         with self.db_client.get_session() as session:
+            # Data query with pagination (no total count needed)
             query = select(Tag).where(Tag.tenant_id == tenant_id)
             
             if name_filter:
                 query = query.where(Tag.name.ilike(f"%{name_filter}%"))
             
-            query = query.order_by(Tag.name)
+            query = query.order_by(Tag.name).offset(skip).limit(limit)
             tags = session.execute(query).scalars().all()
             
             logger.info("Retrieved tags", extra={"count": len(tags)})
-            tag_responses = [self._model_to_response(tag) for tag in tags]
-            result = TagListResponse(tags=tag_responses, total=len(tag_responses))
+            tag_summaries = [TagSummary(id=tag.id, name=tag.name) for tag in tags]
+            result = TagListResponse(tags=tag_summaries)
             
-            # Cache the result (only if not filtering)
+            # Cache the result (only if default pagination and not filtering)
             if should_cache and self.cache_client:
                 try:
-                    data = {
-                        "tags": [t.model_dump() for t in tag_responses],
-                        "total": result.total
-                    }
+                    data = [t.model_dump() for t in tag_summaries]
                     self.cache_client.client.set(cache_key, data, ttl=300)
                     logger.debug("Cached tag list")
                 except Exception as e:
                     logger.warning(f"Failed to cache tag list: {e}")
+            
+            return result
+
+    def list_tags_for_resource(
+        self,
+        tenant_id: str,
+        resource_type: str,
+        name_filter: Optional[str] = None,
+        skip: int = 0,
+        limit: int = 100,
+        use_cache: bool = True
+    ) -> TagListResponse:
+        """
+        Get a list of tags that are applied to a specific resource type.
+        
+        Args:
+            tenant_id: The ID of the tenant
+            resource_type: Type of resource (application, autonomous_agent, etc.)
+            name_filter: Optional filter by tag name
+            skip: Number of tags to skip (pagination)
+            limit: Maximum number of tags to return
+            use_cache: Whether to use caching
+            
+        Returns:
+            TagListResponse with list of tags (id and name only)
+            
+        Raises:
+            ValueError: If resource_type is not supported
+        """
+        if resource_type not in RESOURCE_TAG_MAPPING:
+            raise ValueError(f"Unsupported resource type: {resource_type}")
+        
+        logger.info(
+            "Listing tags for resource type",
+            extra={
+                "tenant_id": tenant_id,
+                "resource_type": resource_type,
+                "name_filter": name_filter,
+                "skip": skip,
+                "limit": limit
+            }
+        )
+        
+        # Disable cache when filtering or paginating
+        should_cache = use_cache and name_filter is None and skip == 0 and limit == 100
+        
+        cache_key = f"tags:list:tenant:{tenant_id}:resource:{resource_type}"
+        
+        # Check cache
+        if should_cache and self.cache_client:
+            try:
+                cached_data = self.cache_client.client.get(cache_key)
+                if cached_data is not None:
+                    logger.debug("Returning cached resource tag list")
+                    return TagListResponse(tags=[TagSummary(**item) for item in cached_data])
+            except Exception as e:
+                logger.warning(f"Failed to get cached resource tag list: {e}")
+        
+        config = RESOURCE_TAG_MAPPING[resource_type]
+        tag_model = config["tag_model"]
+        
+        with self.db_client.get_session() as session:
+            # Data query (no total count needed)
+            query = (
+                select(Tag)
+                .join(tag_model, Tag.id == tag_model.tag_id)
+                .where(Tag.tenant_id == tenant_id)
+            )
+            
+            if name_filter:
+                query = query.where(Tag.name.ilike(f"%{name_filter}%"))
+            
+            query = query.order_by(Tag.name).distinct().offset(skip).limit(limit)
+            tags = session.execute(query).scalars().all()
+            
+            logger.info(
+                "Retrieved tags for resource type",
+                extra={"count": len(tags), "resource_type": resource_type}
+            )
+            tag_summaries = [TagSummary(id=tag.id, name=tag.name) for tag in tags]
+            result = TagListResponse(tags=tag_summaries)
+            
+            # Cache the result (only if default pagination and not filtering)
+            if should_cache and self.cache_client:
+                try:
+                    data = [t.model_dump() for t in tag_summaries]
+                    self.cache_client.client.set(cache_key, data, ttl=300)
+                    logger.debug("Cached resource tag list")
+                except Exception as e:
+                    logger.warning(f"Failed to cache resource tag list: {e}")
             
             return result
 

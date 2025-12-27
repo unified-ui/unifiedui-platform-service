@@ -508,7 +508,7 @@ class TestApplicationTagCacheInvalidation:
         # Add tags to application
         test_client.put(
             f"/api/v1/tenants/{tenant_id}/applications/{app_id}/tags",
-            json={"tags": ["production", "critical"]},
+            json={"tags": ["PRODUCTION", "CRITICAL"]},
             headers=admin_headers
         )
         
@@ -530,7 +530,7 @@ class TestApplicationTagCacheInvalidation:
         # Set initial tags
         test_client.put(
             f"/api/v1/tenants/{tenant_id}/applications/{app_id}/tags",
-            json={"tags": ["tag1", "tag2"]},
+            json={"tags": ["TAG1", "TAG2"]},
             headers=admin_headers
         )
         
@@ -565,7 +565,7 @@ class TestApplicationTagCacheInvalidation:
         # Set initial tags
         test_client.put(
             f"/api/v1/tenants/{tenant_id}/applications/{app_id}/tags",
-            json={"tags": ["old-tag"]},
+            json={"tags": ["OLD-TAG"]},
             headers=admin_headers
         )
         
@@ -575,12 +575,12 @@ class TestApplicationTagCacheInvalidation:
             headers=admin_headers
         )
         assert len(response1.json()["tags"]) == 1
-        assert response1.json()["tags"][0]["name"] == "old-tag"
+        assert response1.json()["tags"][0]["name"] == "OLD-TAG"
         
         # Replace with new tags
         test_client.put(
             f"/api/v1/tenants/{tenant_id}/applications/{app_id}/tags",
-            json={"tags": ["new-tag-1", "new-tag-2"]},
+            json={"tags": ["NEW-TAG-1", "NEW-TAG-2"]},
             headers=admin_headers
         )
         
@@ -592,8 +592,8 @@ class TestApplicationTagCacheInvalidation:
         assert response2.status_code == status.HTTP_200_OK
         assert len(response2.json()["tags"]) == 2
         tag_names = [t["name"] for t in response2.json()["tags"]]
-        assert "new-tag-1" in tag_names
-        assert "new-tag-2" in tag_names
+        assert "NEW-TAG-1" in tag_names
+        assert "NEW-TAG-2" in tag_names
 
 
 class TestApplicationListCaching:

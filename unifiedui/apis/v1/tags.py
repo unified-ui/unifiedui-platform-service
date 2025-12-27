@@ -32,6 +32,8 @@ async def list_tags(
     request: Request,
     tenant_id: str,
     name: Optional[str] = Query(None, description="Filter by tag name"),
+    skip: int = Query(0, ge=0, description="Number of tags to skip"),
+    limit: int = Query(100, ge=1, le=1000, description="Maximum number of tags to return"),
     handler: TagHandler = Depends(get_tag_handler)
 ) -> TagListResponse:
     """
@@ -41,6 +43,8 @@ async def list_tags(
         request: FastAPI request with user in state
         tenant_id: Tenant ID from path
         name: Optional filter by tag name (disables caching when used)
+        skip: Number of tags to skip for pagination
+        limit: Maximum number of tags to return
         handler: Tag handler dependency
         
     Returns:
@@ -55,13 +59,17 @@ async def list_tags(
             extra={
                 "tenant_id": tenant_id,
                 "user_id": user.identity.get_id(),
-                "name_filter": name
+                "name_filter": name,
+                "skip": skip,
+                "limit": limit
             }
         )
         
         return handler.list_tags(
             tenant_id=tenant_id,
             name_filter=name,
+            skip=skip,
+            limit=limit,
             use_cache=use_cache
         )
     except Exception as e:
@@ -122,6 +130,94 @@ async def create_tag(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to create tag"
+        )
+
+
+@router.get(
+    "/resources/{resource_type}",
+    response_model=TagListResponse,
+    summary="List tags for resource type",
+    description="Get all tags that are applied to a specific resource type (applications, autonomous-agents, etc.)"
+)
+@authenticate
+async def list_resource_type_tags(
+    request: Request,
+    tenant_id: str,
+    resource_type: str,
+    name: Optional[str] = Query(None, description="Filter by tag name"),
+    skip: int = Query(0, ge=0, description="Number of tags to skip"),
+    limit: int = Query(100, ge=1, le=1000, description="Maximum number of tags to return"),
+    handler: TagHandler = Depends(get_tag_handler)
+) -> TagListResponse:
+    """
+    List all tags that are applied to a specific resource type.
+    
+    Supported resource types: applications, autonomous-agents, chat-widgets, credentials, development-platforms
+    
+    Args:
+        request: FastAPI request with user in state
+        tenant_id: Tenant ID from path
+        resource_type: Resource type (applications, autonomous-agents, etc.)
+        name: Optional filter by tag name
+        skip: Number of tags to skip for pagination
+        limit: Maximum number of tags to return
+        handler: Tag handler dependency
+        
+    Returns:
+        List of tags with total count
+    """
+    try:
+        user: ContextIdentityUser = request.state.user
+        use_cache = request.headers.get("X-Use-Cache", "true").lower() == "true"
+        
+        # Map URL resource type to internal resource type
+        resource_type_mapping = {
+            "applications": "application",
+            "autonomous-agents": "autonomous_agent",
+            "chat-widgets": "chat_widget",
+            "credentials": "credential",
+            "development-platforms": "development_platform",
+        }
+        
+        internal_resource_type = resource_type_mapping.get(resource_type)
+        if not internal_resource_type:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid resource type: {resource_type}. Supported types: {', '.join(resource_type_mapping.keys())}"
+            )
+        
+        logger.info(
+            "API: List tags for resource type",
+            extra={
+                "tenant_id": tenant_id,
+                "user_id": user.identity.get_id(),
+                "resource_type": internal_resource_type,
+                "name_filter": name,
+                "skip": skip,
+                "limit": limit
+            }
+        )
+        
+        return handler.list_tags_for_resource(
+            tenant_id=tenant_id,
+            resource_type=internal_resource_type,
+            name_filter=name,
+            skip=skip,
+            limit=limit,
+            use_cache=use_cache
+        )
+    except HTTPException:
+        raise
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+    except Exception as e:
+        logger.error(f"Failed to list resource type tags: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to list resource type tags"
         )
 
 

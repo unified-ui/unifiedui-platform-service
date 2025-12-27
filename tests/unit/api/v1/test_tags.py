@@ -219,14 +219,14 @@ class TestTagRoutes:
         
         response = test_client.post(
             ENDPOINT_TAGS.format(tenant_id=tenant_id),
-            json={"name": "production"},
+            json={"name": "PRODUCTION"},
             headers=headers
         )
         
         assert response.status_code == status.HTTP_201_CREATED
         data = response.json()
         
-        assert data["name"] == "production"
+        assert data["name"] == "PRODUCTION"
         assert "id" in data
         assert data["tenant_id"] == tenant_id
         assert "created_at" in data
@@ -265,9 +265,7 @@ class TestTagRoutes:
         
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
-        assert data["tags"] == []
-        assert data["total"] == 0
-    
+        assert data["tags"] == []    
     def test_list_tags_with_data(
         self, 
         test_client: TestClient, 
@@ -280,17 +278,17 @@ class TestTagRoutes:
         # Create some tags
         test_client.post(
             ENDPOINT_TAGS.format(tenant_id=tenant_id),
-            json={"name": "production"},
+            json={"name": "PRODUCTION"},
             headers=headers
         )
         test_client.post(
             ENDPOINT_TAGS.format(tenant_id=tenant_id),
-            json={"name": "staging"},
+            json={"name": "STAGING"},
             headers=headers
         )
         test_client.post(
             ENDPOINT_TAGS.format(tenant_id=tenant_id),
-            json={"name": "development"},
+            json={"name": "DEVELOPMENT"},
             headers=headers
         )
         
@@ -301,13 +299,12 @@ class TestTagRoutes:
         
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
-        assert data["total"] == 3
         assert len(data["tags"]) == 3
         
         tag_names = [t["name"] for t in data["tags"]]
-        assert "production" in tag_names
-        assert "staging" in tag_names
-        assert "development" in tag_names
+        assert "PRODUCTION" in tag_names
+        assert "STAGING" in tag_names
+        assert "DEVELOPMENT" in tag_names
     
     def test_list_tags_with_name_filter(
         self, 
@@ -321,12 +318,12 @@ class TestTagRoutes:
         # Create some tags
         test_client.post(
             ENDPOINT_TAGS.format(tenant_id=tenant_id),
-            json={"name": "production"},
+            json={"name": "PRODUCTION"},
             headers=headers
         )
         test_client.post(
             ENDPOINT_TAGS.format(tenant_id=tenant_id),
-            json={"name": "staging"},
+            json={"name": "STAGING"},
             headers=headers
         )
         
@@ -337,8 +334,7 @@ class TestTagRoutes:
         
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
-        assert data["total"] == 1
-        assert data["tags"][0]["name"] == "production"
+        assert data["tags"][0]["name"] == "PRODUCTION"
     
     def test_delete_tag_success(
         self, 
@@ -370,7 +366,7 @@ class TestTagRoutes:
             ENDPOINT_TAGS.format(tenant_id=tenant_id),
             headers=headers
         )
-        assert list_response.json()["total"] == 0
+        assert len(list_response.json()["tags"]) == 0
     
     def test_delete_tag_not_found(
         self, 
@@ -449,7 +445,7 @@ class TestApplicationTagRoutes:
         # Set tags (should create new tags automatically)
         response = test_client.put(
             ENDPOINT_APPLICATION_TAGS.format(tenant_id=tenant_id, application_id=app_id),
-            json={"tags": ["production", "critical", "backend"]},
+            json={"tags": ["PRODUCTION", "CRITICAL", "BACKEND"]},
             headers=headers
         )
         
@@ -458,9 +454,9 @@ class TestApplicationTagRoutes:
         assert len(data["tags"]) == 3
         
         tag_names = [t["name"] for t in data["tags"]]
-        assert "production" in tag_names
-        assert "critical" in tag_names
-        assert "backend" in tag_names
+        assert "PRODUCTION" in tag_names
+        assert "CRITICAL" in tag_names
+        assert "BACKEND" in tag_names
     
     def test_set_application_tags_creates_new_tags(
         self, 
@@ -475,7 +471,7 @@ class TestApplicationTagRoutes:
         # Set tags with new tag names
         test_client.put(
             ENDPOINT_APPLICATION_TAGS.format(tenant_id=tenant_id, application_id=app_id),
-            json={"tags": ["new-tag-1", "new-tag-2"]},
+            json={"tags": ["NEW-TAG-1", "NEW-TAG-2"]},
             headers=headers
         )
         
@@ -485,12 +481,10 @@ class TestApplicationTagRoutes:
             headers=headers
         )
         
-        data = list_response.json()
-        assert data["total"] == 2
-        
+        data = list_response.json()        
         tag_names = [t["name"] for t in data["tags"]]
-        assert "new-tag-1" in tag_names
-        assert "new-tag-2" in tag_names
+        assert "NEW-TAG-1" in tag_names
+        assert "NEW-TAG-2" in tag_names
     
     def test_set_application_tags_replaces_existing(
         self, 
@@ -505,14 +499,14 @@ class TestApplicationTagRoutes:
         # Set initial tags
         test_client.put(
             ENDPOINT_APPLICATION_TAGS.format(tenant_id=tenant_id, application_id=app_id),
-            json={"tags": ["tag1", "tag2"]},
+            json={"tags": ["TAG1", "TAG2"]},
             headers=headers
         )
         
         # Replace with new tags
         response = test_client.put(
             ENDPOINT_APPLICATION_TAGS.format(tenant_id=tenant_id, application_id=app_id),
-            json={"tags": ["tag3", "tag4"]},
+            json={"tags": ["TAG3", "TAG4"]},
             headers=headers
         )
         
@@ -521,10 +515,10 @@ class TestApplicationTagRoutes:
         assert len(data["tags"]) == 2
         
         tag_names = [t["name"] for t in data["tags"]]
-        assert "tag3" in tag_names
-        assert "tag4" in tag_names
-        assert "tag1" not in tag_names
-        assert "tag2" not in tag_names
+        assert "TAG3" in tag_names
+        assert "TAG4" in tag_names
+        assert "TAG1" not in tag_names
+        assert "TAG2" not in tag_names
     
     def test_delete_application_tags(
         self, 
@@ -539,7 +533,7 @@ class TestApplicationTagRoutes:
         # Set tags
         test_client.put(
             ENDPOINT_APPLICATION_TAGS.format(tenant_id=tenant_id, application_id=app_id),
-            json={"tags": ["tag1", "tag2"]},
+            json={"tags": ["TAG1", "TAG2"]},
             headers=headers
         )
         
@@ -571,7 +565,7 @@ class TestApplicationTagRoutes:
         # Set tags
         test_client.put(
             ENDPOINT_APPLICATION_TAGS.format(tenant_id=tenant_id, application_id=app_id),
-            json={"tags": ["production", "backend"]},
+            json={"tags": ["PRODUCTION", "BACKEND"]},
             headers=headers
         )
         
@@ -587,8 +581,8 @@ class TestApplicationTagRoutes:
         assert len(data["tags"]) == 2
         
         tag_names = [t["name"] for t in data["tags"]]
-        assert "production" in tag_names
-        assert "backend" in tag_names
+        assert "PRODUCTION" in tag_names
+        assert "BACKEND" in tag_names
 
 
 class TestApplicationListFilterByTags:
@@ -611,17 +605,17 @@ class TestApplicationListFilterByTags:
         # Set tags
         test_client.put(
             ENDPOINT_APPLICATION_TAGS.format(tenant_id=tenant_id, application_id=app1_id),
-            json={"tags": ["production"]},
+            json={"tags": ["PRODUCTION"]},
             headers=headers
         )
         test_client.put(
             ENDPOINT_APPLICATION_TAGS.format(tenant_id=tenant_id, application_id=app2_id),
-            json={"tags": ["production", "critical"]},
+            json={"tags": ["PRODUCTION", "CRITICAL"]},
             headers=headers
         )
         test_client.put(
             ENDPOINT_APPLICATION_TAGS.format(tenant_id=tenant_id, application_id=app3_id),
-            json={"tags": ["staging"]},
+            json={"tags": ["STAGING"]},
             headers=headers
         )
         
@@ -663,28 +657,28 @@ class TestApplicationListFilterByTags:
         app4_id = create_application_in_db(test_client, tenant_id, test_user_token.get_id(), "App 4")
         
         # Set tags
-        # App 1: only "production"
+        # App 1: only "PRODUCTION"
         test_client.put(
             ENDPOINT_APPLICATION_TAGS.format(tenant_id=tenant_id, application_id=app1_id),
-            json={"tags": ["production"]},
+            json={"tags": ["PRODUCTION"]},
             headers=headers
         )
-        # App 2: both "production" and "critical"
+        # App 2: both "PRODUCTION" and "CRITICAL"
         test_client.put(
             ENDPOINT_APPLICATION_TAGS.format(tenant_id=tenant_id, application_id=app2_id),
-            json={"tags": ["production", "critical"]},
+            json={"tags": ["PRODUCTION", "CRITICAL"]},
             headers=headers
         )
-        # App 3: only "critical"
+        # App 3: only "CRITICAL"
         test_client.put(
             ENDPOINT_APPLICATION_TAGS.format(tenant_id=tenant_id, application_id=app3_id),
-            json={"tags": ["critical"]},
+            json={"tags": ["CRITICAL"]},
             headers=headers
         )
-        # App 4: only "staging" (should NOT be returned)
+        # App 4: only "STAGING" (should NOT be returned)
         test_client.put(
             ENDPOINT_APPLICATION_TAGS.format(tenant_id=tenant_id, application_id=app4_id),
-            json={"tags": ["staging"]},
+            json={"tags": ["STAGING"]},
             headers=headers
         )
         
@@ -694,8 +688,8 @@ class TestApplicationListFilterByTags:
             headers=headers
         )
         tags_data = tags_response.json()["tags"]
-        prod_tag_id = next(t["id"] for t in tags_data if t["name"] == "production")
-        critical_tag_id = next(t["id"] for t in tags_data if t["name"] == "critical")
+        prod_tag_id = next(t["id"] for t in tags_data if t["name"] == "PRODUCTION")
+        critical_tag_id = next(t["id"] for t in tags_data if t["name"] == "CRITICAL")
         
         # Filter by production OR critical tags (should return App 1, App 2, App 3)
         response = test_client.get(
@@ -752,7 +746,7 @@ class TestAutonomousAgentTagRoutes:
         # Set tags
         response = test_client.put(
             ENDPOINT_AUTONOMOUS_AGENT_TAGS.format(tenant_id=tenant_id, autonomous_agent_id=agent_id),
-            json={"tags": ["ai", "production"]},
+            json={"tags": ["ai", "PRODUCTION"]},
             headers=headers
         )
         
@@ -820,7 +814,7 @@ class TestCredentialTagRoutes:
         # Set tags
         response = test_client.put(
             ENDPOINT_CREDENTIAL_TAGS.format(tenant_id=tenant_id, credential_id=cred_id),
-            json={"tags": ["api-keys", "production"]},
+            json={"tags": ["api-keys", "PRODUCTION"]},
             headers=headers
         )
         
@@ -888,7 +882,7 @@ class TestTagCascadeDelete:
         # Set tags on application
         test_client.put(
             ENDPOINT_APPLICATION_TAGS.format(tenant_id=tenant_id, application_id=app_id),
-            json={"tags": ["to-delete", "keep-me"]},
+            json={"tags": ["to-delete", "KEEP-ME"]},
             headers=headers
         )
         
@@ -913,4 +907,4 @@ class TestTagCascadeDelete:
         
         tags = app_tags_response.json()["tags"]
         assert len(tags) == 1
-        assert tags[0]["name"] == "keep-me"
+        assert tags[0]["name"] == "KEEP-ME"

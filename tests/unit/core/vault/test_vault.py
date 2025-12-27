@@ -101,7 +101,7 @@ class TestMockVaultImplementation:
     def test_store_secret_with_metadata(self):
         """Test storing secret with metadata."""
         vault = MockVault()
-        metadata = {"owner": "admin", "env": "production"}
+        metadata = {"owner": "admin", "env": "PRODUCTION"}
         uri = vault.store_secret("db_password", "secret123", metadata=metadata)
         assert uri is not None
         assert vault.get_secret(uri) == "secret123"
