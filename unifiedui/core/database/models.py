@@ -17,7 +17,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects import postgresql, mssql
 from sqlalchemy.dialects.postgresql import TIMESTAMP as PG_TIMESTAMP
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, validates
 from sqlalchemy.types import JSON, TypeDecorator
 from sqlalchemy import Enum as SAEnum
 
@@ -585,6 +585,11 @@ class Tag(Base, AuditMixin):
     development_platform_tags: Mapped[list["DevelopmentPlatformTag"]] = relationship(
         back_populates="tag", cascade="all, delete-orphan"
     )
+
+    @validates('name')
+    def convert_upper(self, key, value):
+        """Convert tag name to uppercase."""
+        return value.upper() if value else value
 
     __table_args__ = (
         UniqueConstraint("tenant_id", "name", name="uq_tag_tenant_name"),
