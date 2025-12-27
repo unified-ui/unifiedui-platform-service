@@ -14,6 +14,8 @@ from unifiedui.caching.client import CacheClient
 
 if TYPE_CHECKING:
     from unifiedui.core.identity.users import ContextIdentityUser
+    from unifiedui.handlers.resource_permissions import ResourcePermissionsHandler
+    from unifiedui.handlers.resource_tags import ResourceTagsHandler
 
 from unifiedui.schema.requests.development_platforms import CreateDevelopmentPlatformRequest, UpdateDevelopmentPlatformRequest
 from unifiedui.schema.requests.development_platform_permissions import SetDevelopmentPlatformPermissionRequest
@@ -26,7 +28,6 @@ from unifiedui.schema.responses.development_platform_permissions import (
     PrincipalPermissionsResponse
 )
 from unifiedui.exc.development_platforms import DevelopmentPlatformNotFoundError
-from unifiedui.handlers.principals_helper import ensure_principal_exists
 from unifiedui.logger import get_logger
 
 logger = get_logger(__name__)
@@ -38,7 +39,9 @@ class DevelopmentPlatformHandler:
     def __init__(
         self,
         db_client: SQLAlchemyClient,
-        cache_client: Optional[CacheClient] = None
+        cache_client: Optional[CacheClient] = None,
+        permissions_handler: Optional[ResourcePermissionsHandler] = None,
+        tags_handler: Optional[ResourceTagsHandler] = None
     ):
         """
         Initialize the development platform handler.
@@ -46,9 +49,29 @@ class DevelopmentPlatformHandler:
         Args:
             db_client: SQLAlchemy database client instance
             cache_client: Optional cache client for Redis caching
+            permissions_handler: Optional central permissions handler
+            tags_handler: Optional central tags handler
         """
         self.db_client = db_client
         self.cache_client = cache_client
+        self._permissions_handler = permissions_handler
+        self._tags_handler = tags_handler
+
+    @property
+    def permissions_handler(self) -> ResourcePermissionsHandler:
+        """Get the permissions handler, creating one if needed."""
+        if self._permissions_handler is None:
+            from unifiedui.handlers.resource_permissions import ResourcePermissionsHandler
+            self._permissions_handler = ResourcePermissionsHandler(self.db_client, self.cache_client)
+        return self._permissions_handler
+
+    @property
+    def tags_handler(self) -> ResourceTagsHandler:
+        """Get the tags handler, creating one if needed."""
+        if self._tags_handler is None:
+            from unifiedui.handlers.resource_tags import ResourceTagsHandler
+            self._tags_handler = ResourceTagsHandler(self.db_client, self.cache_client)
+        return self._tags_handler
 
     def list_development_platforms(
         self,
@@ -309,27 +332,15 @@ class DevelopmentPlatformHandler:
             )
             session.add(development_platform)
             
-            # Ensure principal exists (fetches from IDP if needed)
-            ensure_principal_exists(
+            # Add creator as admin member using central handler
+            self.permissions_handler.add_creator_permission(
                 session=session,
+                resource_type="development_platform",
                 tenant_id=tenant_id,
-                principal_id=user_id,
-                principal_type=PrincipalTypeEnum.IDENTITY_USER.value,
+                resource_id=development_platform_id,
+                user_id=user_id,
                 user=user
             )
-            
-            # Add creator as admin member
-            member_id = str(uuid.uuid4())
-            member = DevelopmentPlatformMember(
-                id=member_id,
-                tenant_id=tenant_id,
-                development_platform_id=development_platform_id,
-                principal_id=user_id,
-                role=PermissionActionEnum.ADMIN,
-                created_by=user_id,
-                updated_by=user_id
-            )
-            session.add(member)
             
             session.commit()
             session.refresh(development_platform)
@@ -491,75 +502,33 @@ class DevelopmentPlatformHandler:
         """
         logger.info("Listing development platform permissions", extra={"tenant_id": tenant_id, "development_platform_id": development_platform_id})
         
-        # Build cache key
-        cache_key = f"development_platforms:permissions:tenant:{tenant_id}:dp:{development_platform_id}:list"
-        
-        # Check cache
-        if use_cache and self.cache_client:
-            try:
-                cached_data = self.cache_client.client.get(cache_key)
-                if cached_data is not None:
-                    logger.debug(f"Returning cached permissions list")
-                    return DevelopmentPlatformPrincipalsResponse(**cached_data)
-            except Exception as e:
-                logger.warning(f"Failed to get cached permissions: {e}")
-        
-        with self.db_client.get_session() as session:
-            # Verify development platform exists
-            dp_query = select(DevelopmentPlatform).where(
-                DevelopmentPlatform.id == development_platform_id,
-                DevelopmentPlatform.tenant_id == tenant_id
+        try:
+            result = self.permissions_handler.list_permissions(
+                resource_type="development_platform",
+                tenant_id=tenant_id,
+                resource_id=development_platform_id,
+                use_cache=use_cache
             )
-            development_platform = session.execute(dp_query).scalar_one_or_none()
-            
-            if not development_platform:
-                raise DevelopmentPlatformNotFoundError(development_platform_id)
-            
-            # Get all members and their roles
-            members_query = (
-                select(DevelopmentPlatformMember)
-                .where(DevelopmentPlatformMember.development_platform_id == development_platform_id)
-            )
-            members = session.execute(members_query).scalars().all()
-            
-            # Group roles by principal
-            principals_dict = {}
-            for member in members:
-                key = (member.principal_id, member.principal.principal_type)
-                if key not in principals_dict:
-                    principals_dict[key] = {
-                        "principal_id": member.principal_id,
-                        "principal_type": member.principal.principal_type,
-                        "roles": []
-                    }
-                
-                # Add role from member
-                principals_dict[key]["roles"].append(member.role)
-            
-            principals = [
-                PrincipalPermissionsResponse(
-                    development_platform_id=development_platform_id,
-                    tenant_id=tenant_id,
-                    **data
-                )
-                for data in principals_dict.values()
-            ]
-            
-            result = DevelopmentPlatformPrincipalsResponse(
+        except ValueError as e:
+            raise DevelopmentPlatformNotFoundError(development_platform_id) from e
+        
+        # Convert to response schema
+        principals = [
+            PrincipalPermissionsResponse(
                 development_platform_id=development_platform_id,
                 tenant_id=tenant_id,
-                principals=principals
+                principal_id=p["principal_id"],
+                principal_type=p["principal_type"],
+                roles=p["roles"]
             )
-            
-            # Cache the result
-            if use_cache and self.cache_client:
-                try:
-                    self.cache_client.client.set(cache_key, result.model_dump(), ttl=300)
-                    logger.debug(f"Cached permissions list")
-                except Exception as e:
-                    logger.warning(f"Failed to cache permissions: {e}")
-            
-            return result
+            for p in result["principals"]
+        ]
+        
+        return DevelopmentPlatformPrincipalsResponse(
+            development_platform_id=development_platform_id,
+            tenant_id=tenant_id,
+            principals=principals
+        )
 
     def get_development_platform_permission(
         self,
@@ -586,44 +555,23 @@ class DevelopmentPlatformHandler:
             extra={"tenant_id": tenant_id, "development_platform_id": development_platform_id, "principal_id": principal_id}
         )
         
-        with self.db_client.get_session() as session:
-            # Verify development platform exists
-            dp_query = select(DevelopmentPlatform).where(
-                DevelopmentPlatform.id == development_platform_id,
-                DevelopmentPlatform.tenant_id == tenant_id
-            )
-            development_platform = session.execute(dp_query).scalar_one_or_none()
-            
-            if not development_platform:
-                raise DevelopmentPlatformNotFoundError(development_platform_id)
-            
-            # Get member for this principal
-            member_query = (
-                select(DevelopmentPlatformMember)
-                .where(
-                    DevelopmentPlatformMember.development_platform_id == development_platform_id,
-                    DevelopmentPlatformMember.principal_id == principal_id
-                )
-            )
-            members = session.execute(member_query).scalars().all()
-            
-            if not members:
-                raise DevelopmentPlatformNotFoundError(f"No permissions found for principal {principal_id}")
-            
-            # Collect all roles and get principal_type from first member
-            permissions = []
-            principal_type = members[0].principal.principal_type
-            for member in members:
-                if member.role not in permissions:
-                    permissions.append(member.role)
-            
-            return PrincipalPermissionsResponse(
-                development_platform_id=development_platform_id,
+        try:
+            result = self.permissions_handler.get_permission(
+                resource_type="development_platform",
                 tenant_id=tenant_id,
-                principal_id=principal_id,
-                principal_type=principal_type,
-                roles=permissions
+                resource_id=development_platform_id,
+                principal_id=principal_id
             )
+        except ValueError as e:
+            raise DevelopmentPlatformNotFoundError(str(e)) from e
+        
+        return PrincipalPermissionsResponse(
+            development_platform_id=development_platform_id,
+            tenant_id=tenant_id,
+            principal_id=result["principal_id"],
+            principal_type=result["principal_type"],
+            roles=result["roles"]
+        )
 
     def set_development_platform_permission(
         self,
@@ -657,93 +605,30 @@ class DevelopmentPlatformHandler:
             }
         )
         
-        with self.db_client.get_session() as session:
-            # Verify development platform exists
-            dp_query = select(DevelopmentPlatform).where(
-                DevelopmentPlatform.id == development_platform_id,
-                DevelopmentPlatform.tenant_id == tenant_id
-            )
-            development_platform = session.execute(dp_query).scalar_one_or_none()
-            
-            if not development_platform:
-                raise DevelopmentPlatformNotFoundError(development_platform_id)
-            
-            # Ensure principal exists (fetches from IDP if needed)
-            ensure_principal_exists(
-                session=session,
+        try:
+            result = self.permissions_handler.set_permission(
+                resource_type="development_platform",
                 tenant_id=tenant_id,
+                resource_id=development_platform_id,
                 principal_id=request.principal_id,
                 principal_type=request.principal_type.value,
+                role=request.role,
+                user_id=user_id,
                 user=user
             )
-            
-            # Find or create member with this role
-            # Note: A principal can only have ONE role per development platform (enforced by unique constraint)
-            # So we need to update or insert
-            member_query = (
-                select(DevelopmentPlatformMember)
-                .where(
-                    DevelopmentPlatformMember.development_platform_id == development_platform_id,
-                    DevelopmentPlatformMember.principal_id == request.principal_id
-                )
-            )
-            member = session.execute(member_query).scalar_one_or_none()
-            
-            if not member:
-                # Create new member with role
-                member_id = str(uuid.uuid4())
-                member = DevelopmentPlatformMember(
-                    id=member_id,
-                    tenant_id=tenant_id,
-                    development_platform_id=development_platform_id,
-                    principal_id=request.principal_id,
-                    role=request.role,
-                    created_by=user_id,
-                    updated_by=user_id
-                )
-                session.add(member)
-                session.commit()
-                session.refresh(member)
-                
-                logger.info("Member with role created", extra={"member_id": member_id})
-            elif member.role != request.role:
-                # Update existing member's role
-                member.role = request.role
-                member.updated_by = user_id
-                session.commit()
-                session.refresh(member)
-                
-                logger.info("Member role updated", extra={"member_id": member.id})
-            else:
-                # Member with role already exists
-                logger.info("Member with role already exists", extra={"member_id": member.id})
-            
-            result = DevelopmentPlatformPermissionResponse(
-                id=member.id,
-                development_platform_id=development_platform_id,
-                tenant_id=tenant_id,
-                principal_id=request.principal_id,
-                principal_type=request.principal_type,
-                role=request.role,
-                created_at=member.created_at,
-                updated_at=member.updated_at
-            )
-            
-            # Invalidate cache
-            self._invalidate_permissions_cache(tenant_id, development_platform_id)
-            
-            # Invalidate user cache so list operations reflect new permissions
-            if self.cache_client:
-                try:
-                    if request.principal_type.value == "IDENTITY_USER":
-                        self.cache_client.clear_cache_for_user(request.principal_id)
-                        logger.debug(f"Cleared cache for user {request.principal_id} after permission change")
-                    # Also clear cache for the user making the change
-                    self.cache_client.clear_cache_for_user(user_id)
-                except Exception as e:
-                    logger.warning(f"Failed to clear user cache: {e}")
-            
-            return result
+        except ValueError as e:
+            raise DevelopmentPlatformNotFoundError(str(e)) from e
+        
+        return DevelopmentPlatformPermissionResponse(
+            id=result["id"],
+            development_platform_id=development_platform_id,
+            tenant_id=tenant_id,
+            principal_id=result["principal_id"],
+            principal_type=request.principal_type,
+            role=request.role,
+            created_at=result["created_at"],
+            updated_at=result["updated_at"]
+        )
 
     def delete_development_platform_permission(
         self,
@@ -776,47 +661,17 @@ class DevelopmentPlatformHandler:
             }
         )
         
-        with self.db_client.get_session() as session:
-            # Verify development platform exists
-            dp_query = select(DevelopmentPlatform).where(
-                DevelopmentPlatform.id == development_platform_id,
-                DevelopmentPlatform.tenant_id == tenant_id
+        try:
+            self.permissions_handler.delete_permission(
+                resource_type="development_platform",
+                tenant_id=tenant_id,
+                resource_id=development_platform_id,
+                principal_id=principal_id,
+                principal_type=principal_type,
+                role=permission
             )
-            development_platform = session.execute(dp_query).scalar_one_or_none()
-            
-            if not development_platform:
-                raise DevelopmentPlatformNotFoundError(development_platform_id)
-            
-            # Find member with this role
-            member_query = (
-                select(DevelopmentPlatformMember)
-                .where(
-                    DevelopmentPlatformMember.development_platform_id == development_platform_id,
-                    DevelopmentPlatformMember.principal_id == principal_id,
-                    DevelopmentPlatformMember.role == permission
-                )
-            )
-            member = session.execute(member_query).scalar_one_or_none()
-            
-            if not member:
-                raise DevelopmentPlatformNotFoundError(f"Member with role {permission} not found for principal {principal_id}")
-            
-            session.delete(member)
-            session.commit()
-            
-            logger.info("Member with role deleted")
-            
-            # Invalidate cache
-            self._invalidate_permissions_cache(tenant_id, development_platform_id)
-            
-            # Invalidate user cache so list operations reflect removed permissions
-            if self.cache_client:
-                try:
-                    if principal_type == "IDENTITY_USER":
-                        self.cache_client.clear_cache_for_user(principal_id)
-                        logger.debug(f"Cleared cache for user {principal_id} after permission removal")
-                except Exception as e:
-                    logger.warning(f"Failed to clear user cache: {e}")
+        except ValueError as e:
+            raise DevelopmentPlatformNotFoundError(str(e)) from e
 
     @staticmethod
     def _model_to_response(development_platform: DevelopmentPlatform) -> DevelopmentPlatformResponse:

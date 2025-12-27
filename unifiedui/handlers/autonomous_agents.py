@@ -14,6 +14,8 @@ from unifiedui.caching.client import CacheClient
 
 if TYPE_CHECKING:
     from unifiedui.core.identity.users import ContextIdentityUser
+    from unifiedui.handlers.resource_permissions import ResourcePermissionsHandler
+    from unifiedui.handlers.resource_tags import ResourceTagsHandler
 
 from unifiedui.schema.requests.autonomous_agents import CreateAutonomousAgentRequest, UpdateAutonomousAgentRequest
 from unifiedui.schema.requests.autonomous_agent_permissions import SetAutonomousAgentPermissionRequest
@@ -26,7 +28,6 @@ from unifiedui.schema.responses.autonomous_agent_permissions import (
     PrincipalPermissionsResponse
 )
 from unifiedui.exc.autonomous_agents import AutonomousAgentNotFoundError, AutonomousAgentPermissionNotFoundError
-from unifiedui.handlers.principals_helper import ensure_principal_exists
 from unifiedui.logger import get_logger
 
 logger = get_logger(__name__)
@@ -38,7 +39,9 @@ class AutonomousAgentHandler:
     def __init__(
         self,
         db_client: SQLAlchemyClient,
-        cache_client: Optional[CacheClient] = None
+        cache_client: Optional[CacheClient] = None,
+        permissions_handler: Optional[ResourcePermissionsHandler] = None,
+        tags_handler: Optional[ResourceTagsHandler] = None
     ):
         """
         Initialize the autonomous agent handler.
@@ -46,9 +49,29 @@ class AutonomousAgentHandler:
         Args:
             db_client: SQLAlchemy database client instance
             cache_client: Optional cache client for Redis caching
+            permissions_handler: Optional central permissions handler
+            tags_handler: Optional central tags handler
         """
         self.db_client = db_client
         self.cache_client = cache_client
+        self._permissions_handler = permissions_handler
+        self._tags_handler = tags_handler
+
+    @property
+    def permissions_handler(self) -> ResourcePermissionsHandler:
+        """Get the permissions handler, creating one if needed."""
+        if self._permissions_handler is None:
+            from unifiedui.handlers.resource_permissions import ResourcePermissionsHandler
+            self._permissions_handler = ResourcePermissionsHandler(self.db_client, self.cache_client)
+        return self._permissions_handler
+
+    @property
+    def tags_handler(self) -> ResourceTagsHandler:
+        """Get the tags handler, creating one if needed."""
+        if self._tags_handler is None:
+            from unifiedui.handlers.resource_tags import ResourceTagsHandler
+            self._tags_handler = ResourceTagsHandler(self.db_client, self.cache_client)
+        return self._tags_handler
 
     def list_autonomous_agents(
         self,
@@ -330,8 +353,6 @@ class AutonomousAgentHandler:
         logger.info("Creating autonomous agent", extra={"tenant_id": tenant_id, "agent_name": request.name, "user_id": user_id})
         
         autonomous_agent_id = str(uuid.uuid4())
-        member_id = str(uuid.uuid4())
-        permission_id = str(uuid.uuid4())
         
         with self.db_client.get_session() as session:
             # Create autonomous agent
@@ -346,37 +367,26 @@ class AutonomousAgentHandler:
             )
             session.add(autonomous_agent)
             
-            # Ensure principal exists (fetches from IDP if needed)
-            ensure_principal_exists(
+            # Add creator as ADMIN using the central permissions handler
+            self.permissions_handler.add_creator_permission(
                 session=session,
+                resource_type="autonomous_agent",
                 tenant_id=tenant_id,
-                principal_id=user_id,
-                principal_type=PrincipalTypeEnum.IDENTITY_USER.value,
+                resource_id=autonomous_agent_id,
+                user_id=user_id,
                 user=user
             )
-            
-            # Add creator as ADMIN member
-            member = AutonomousAgentMember(
-                id=member_id,
-                tenant_id=tenant_id,
-                autonomous_agent_id=autonomous_agent_id,
-                principal_id=user_id,
-                role=PermissionActionEnum.ADMIN,
-                created_by=user_id,
-                updated_by=user_id
-            )
-            session.add(member)
             
             session.commit()
             session.refresh(autonomous_agent)
             
             response = self._model_to_response(autonomous_agent)
-            
-            # Invalidate list cache
-            self._invalidate_list_cache(tenant_id)
-            
-            logger.info(f"Created autonomous agent {autonomous_agent_id}")
-            return response
+        
+        # Invalidate list cache
+        self._invalidate_list_cache(tenant_id)
+        
+        logger.info(f"Created autonomous agent {autonomous_agent_id}")
+        return response
 
     def update_autonomous_agent(
         self,
@@ -522,69 +532,33 @@ class AutonomousAgentHandler:
         """
         logger.info("Listing autonomous agent permissions", extra={"tenant_id": tenant_id, "autonomous_agent_id": autonomous_agent_id})
         
-        # Build cache key
-        cache_key = f"autonomous_agents:permissions:tenant:{tenant_id}:agent:{autonomous_agent_id}"
-        
-        # Check cache
-        if use_cache and self.cache_client:
-            try:
-                cached_data = self.cache_client.client.get(cache_key)
-                if cached_data is not None:
-                    logger.debug(f"Returning cached permissions for autonomous agent {autonomous_agent_id}")
-                    return AutonomousAgentPrincipalsResponse(**cached_data)
-            except Exception as e:
-                logger.warning(f"Failed to get cached permissions: {e}")
-        
-        with self.db_client.get_session() as session:
-            # Verify autonomous agent exists
-            query = select(AutonomousAgent).where(
-                AutonomousAgent.id == autonomous_agent_id,
-                AutonomousAgent.tenant_id == tenant_id
+        try:
+            result = self.permissions_handler.list_permissions(
+                resource_type="autonomous_agent",
+                tenant_id=tenant_id,
+                resource_id=autonomous_agent_id,
+                use_cache=use_cache
             )
-            autonomous_agent = session.execute(query).scalar_one_or_none()
-            
-            if not autonomous_agent:
-                raise AutonomousAgentNotFoundError(autonomous_agent_id)
-            
-            # Get all members and their roles
-            query = (
-                select(AutonomousAgentMember)
-                .where(AutonomousAgentMember.autonomous_agent_id == autonomous_agent_id)
-            )
-            members = session.execute(query).scalars().all()
-            
-            # Group roles by principal
-            principals_dict = {}
-            for member in members:
-                key = (member.principal_id, member.principal.principal_type)
-                if key not in principals_dict:
-                    principals_dict[key] = {
-                        "autonomous_agent_id": autonomous_agent_id,
-                        "tenant_id": tenant_id,
-                        "principal_id": member.principal_id,
-                        "principal_type": member.principal.principal_type,
-                        "roles": []
-                    }
-                principals_dict[key]["roles"].append(member.role)
-            
-            # Convert to response models
-            principals = [PrincipalPermissionsResponse(**data) for data in principals_dict.values()]
-            
-            response = AutonomousAgentPrincipalsResponse(
+        except ValueError as e:
+            raise AutonomousAgentNotFoundError(autonomous_agent_id) from e
+        
+        # Convert to response schema
+        principals = [
+            PrincipalPermissionsResponse(
                 autonomous_agent_id=autonomous_agent_id,
                 tenant_id=tenant_id,
-                principals=principals
+                principal_id=p["principal_id"],
+                principal_type=p["principal_type"],
+                roles=p["roles"]
             )
-            
-            # Cache the result
-            if use_cache and self.cache_client:
-                try:
-                    self.cache_client.client.set(cache_key, response.model_dump(), ttl=300)
-                    logger.debug(f"Cached permissions for autonomous agent {autonomous_agent_id}")
-                except Exception as e:
-                    logger.warning(f"Failed to cache permissions: {e}")
-            
-            return response
+            for p in result["principals"]
+        ]
+        
+        return AutonomousAgentPrincipalsResponse(
+            autonomous_agent_id=autonomous_agent_id,
+            tenant_id=tenant_id,
+            principals=principals
+        )
 
     def get_autonomous_agent_permission(
         self,
@@ -612,28 +586,16 @@ class AutonomousAgentHandler:
             "principal_id": principal_id
         })
         
-        with self.db_client.get_session() as session:
-            # Verify autonomous agent exists
-            query = select(AutonomousAgent).where(
-                AutonomousAgent.id == autonomous_agent_id,
-                AutonomousAgent.tenant_id == tenant_id
+        try:
+            result = self.permissions_handler.get_permission(
+                resource_type="autonomous_agent",
+                tenant_id=tenant_id,
+                resource_id=autonomous_agent_id,
+                principal_id=principal_id
             )
-            autonomous_agent = session.execute(query).scalar_one_or_none()
-            
-            if not autonomous_agent:
-                raise AutonomousAgentNotFoundError(autonomous_agent_id)
-            
-            # Get members and roles for the principal
-            query = (
-                select(AutonomousAgentMember)
-                .where(
-                    AutonomousAgentMember.autonomous_agent_id == autonomous_agent_id,
-                    AutonomousAgentMember.principal_id == principal_id
-                )
-            )
-            members = session.execute(query).scalars().all()
-            
-            if not members:
+        except ValueError as e:
+            # If permission not found, return empty response
+            if "No permissions found" in str(e):
                 return PrincipalPermissionsResponse(
                     autonomous_agent_id=autonomous_agent_id,
                     tenant_id=tenant_id,
@@ -641,18 +603,15 @@ class AutonomousAgentHandler:
                     principal_type="",
                     roles=[]
                 )
-            
-            # Get principal type from first member
-            principal_type = members[0].principal.principal_type
-            roles = [member.role for member in members]
-            
-            return PrincipalPermissionsResponse(
-                autonomous_agent_id=autonomous_agent_id,
-                tenant_id=tenant_id,
-                principal_id=principal_id,
-                principal_type=principal_type,
-                roles=roles
-            )
+            raise AutonomousAgentNotFoundError(str(e)) from e
+        
+        return PrincipalPermissionsResponse(
+            autonomous_agent_id=autonomous_agent_id,
+            tenant_id=tenant_id,
+            principal_id=result["principal_id"],
+            principal_type=result["principal_type"],
+            roles=result["roles"]
+        )
 
     def set_autonomous_agent_permission(
         self,
@@ -685,85 +644,30 @@ class AutonomousAgentHandler:
             "user_id": user_id
         })
         
-        with self.db_client.get_session() as session:
-            # Verify autonomous agent exists
-            query = select(AutonomousAgent).where(
-                AutonomousAgent.id == autonomous_agent_id,
-                AutonomousAgent.tenant_id == tenant_id
-            )
-            autonomous_agent = session.execute(query).scalar_one_or_none()
-            
-            if not autonomous_agent:
-                raise AutonomousAgentNotFoundError(autonomous_agent_id)
-            
-            # Ensure principal exists (fetches from IDP if needed)
-            ensure_principal_exists(
-                session=session,
+        try:
+            result = self.permissions_handler.set_permission(
+                resource_type="autonomous_agent",
                 tenant_id=tenant_id,
+                resource_id=autonomous_agent_id,
                 principal_id=request.principal_id,
                 principal_type=request.principal_type.value,
+                role=request.role,
+                user_id=user_id,
                 user=user
             )
-            
-            # Check if member exists
-            query = select(AutonomousAgentMember).where(
-                AutonomousAgentMember.autonomous_agent_id == autonomous_agent_id,
-                AutonomousAgentMember.principal_id == request.principal_id
-            )
-            member = session.execute(query).scalar_one_or_none()
-            
-            # Create or update member
-            if not member:
-                member_id = str(uuid.uuid4())
-                member = AutonomousAgentMember(
-                    id=member_id,
-                    tenant_id=tenant_id,
-                    autonomous_agent_id=autonomous_agent_id,
-                    principal_id=request.principal_id,
-                    role=request.role,
-                    created_by=user_id,
-                    updated_by=user_id
-                )
-                session.add(member)
-                session.flush()  # Get the member ID
-            else:
-                # Update existing member's role
-                member.role = request.role
-                member.updated_by = user_id
-                session.flush()
-            
-            session.commit()
-            session.refresh(member)
-            
-            # Build response
-            response = AutonomousAgentPermissionResponse(
-                id=member.id,
-                autonomous_agent_id=autonomous_agent_id,
-                tenant_id=tenant_id,
-                principal_id=request.principal_id,
-                principal_type=request.principal_type,
-                role=request.role,
-                created_at=member.created_at,
-                updated_at=member.updated_at
-            )
-            
-            # Invalidate caches
-            self._invalidate_permissions_cache(tenant_id, autonomous_agent_id)
-            self._invalidate_list_cache(tenant_id)
-            
-            # Invalidate user cache so list operations reflect new permissions
-            if self.cache_client:
-                try:
-                    if request.principal_type.value == "IDENTITY_USER":
-                        self.cache_client.clear_cache_for_user(request.principal_id)
-                        logger.debug(f"Cleared cache for user {request.principal_id} after permission change")
-                    # Also clear cache for the user making the change
-                    self.cache_client.clear_cache_for_user(user_id)
-                except Exception as e:
-                    logger.warning(f"Failed to clear user cache: {e}")
-            
-            logger.info(f"Set permission for principal {request.principal_id} on autonomous agent {autonomous_agent_id}")
-            return response
+        except ValueError as e:
+            raise AutonomousAgentNotFoundError(str(e)) from e
+        
+        return AutonomousAgentPermissionResponse(
+            id=result["id"],
+            autonomous_agent_id=autonomous_agent_id,
+            tenant_id=tenant_id,
+            principal_id=result["principal_id"],
+            principal_type=request.principal_type,
+            role=request.role,
+            created_at=result["created_at"],
+            updated_at=result["updated_at"]
+        )
 
     def delete_autonomous_agent_permission(
         self,
@@ -793,46 +697,19 @@ class AutonomousAgentHandler:
             "agent_role": role
         })
         
-        with self.db_client.get_session() as session:
-            # Verify autonomous agent exists
-            query = select(AutonomousAgent).where(
-                AutonomousAgent.id == autonomous_agent_id,
-                AutonomousAgent.tenant_id == tenant_id
+        try:
+            self.permissions_handler.delete_permission(
+                resource_type="autonomous_agent",
+                tenant_id=tenant_id,
+                resource_id=autonomous_agent_id,
+                principal_id=principal_id,
+                principal_type=principal_type,
+                role=role
             )
-            autonomous_agent = session.execute(query).scalar_one_or_none()
-            
-            if not autonomous_agent:
-                raise AutonomousAgentNotFoundError(autonomous_agent_id)
-            
-            # Get member with specific role
-            query = select(AutonomousAgentMember).where(
-                AutonomousAgentMember.autonomous_agent_id == autonomous_agent_id,
-                AutonomousAgentMember.principal_id == principal_id,
-                AutonomousAgentMember.role == role
-            )
-            member = session.execute(query).scalar_one_or_none()
-            
-            if not member:
-                raise AutonomousAgentPermissionNotFoundError(principal_id)
-            
-            # Delete the member
-            session.delete(member)
-            session.commit()
-            
-            # Invalidate caches
-            self._invalidate_permissions_cache(tenant_id, autonomous_agent_id)
-            self._invalidate_list_cache(tenant_id)
-            
-            # Invalidate user cache so list operations reflect new permissions
-            if self.cache_client:
-                try:
-                    if principal_type == "IDENTITY_USER":
-                        self.cache_client.clear_cache_for_user(principal_id)
-                        logger.debug(f"Cleared cache for user {principal_id} after permission deletion")
-                except Exception as e:
-                    logger.warning(f"Failed to clear user cache: {e}")
-            
-            logger.info(f"Deleted role {role} for principal {principal_id} on autonomous agent {autonomous_agent_id}")
+        except ValueError as e:
+            if "No permissions found" in str(e) or "not found" in str(e).lower():
+                raise AutonomousAgentPermissionNotFoundError(principal_id) from e
+            raise AutonomousAgentNotFoundError(str(e)) from e
 
     @staticmethod
     def _group_permissions_by_principal(results) -> list[dict]:
