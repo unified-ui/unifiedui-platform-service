@@ -265,7 +265,7 @@ class TestTagRoutes:
         
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
-        assert data["tags"] == []    
+        assert data == []    
     def test_list_tags_with_data(
         self, 
         test_client: TestClient, 
@@ -299,9 +299,9 @@ class TestTagRoutes:
         
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
-        assert len(data["tags"]) == 3
+        assert len(data) == 3
         
-        tag_names = [t["name"] for t in data["tags"]]
+        tag_names = [t["name"] for t in data]
         assert "PRODUCTION" in tag_names
         assert "STAGING" in tag_names
         assert "DEVELOPMENT" in tag_names
@@ -334,7 +334,7 @@ class TestTagRoutes:
         
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
-        assert data["tags"][0]["name"] == "PRODUCTION"
+        assert data[0]["name"] == "PRODUCTION"
     
     def test_delete_tag_success(
         self, 
@@ -366,7 +366,7 @@ class TestTagRoutes:
             ENDPOINT_TAGS.format(tenant_id=tenant_id),
             headers=headers
         )
-        assert len(list_response.json()["tags"]) == 0
+        assert len(list_response.json()) == 0
     
     def test_delete_tag_not_found(
         self, 
@@ -430,7 +430,7 @@ class TestApplicationTagRoutes:
         
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
-        assert data["tags"] == []
+        assert data == []
     
     def test_set_application_tags(
         self, 
@@ -451,9 +451,9 @@ class TestApplicationTagRoutes:
         
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
-        assert len(data["tags"]) == 3
+        assert len(data) == 3
         
-        tag_names = [t["name"] for t in data["tags"]]
+        tag_names = [t["name"] for t in data]
         assert "PRODUCTION" in tag_names
         assert "CRITICAL" in tag_names
         assert "BACKEND" in tag_names
@@ -482,7 +482,7 @@ class TestApplicationTagRoutes:
         )
         
         data = list_response.json()        
-        tag_names = [t["name"] for t in data["tags"]]
+        tag_names = [t["name"] for t in data]
         assert "NEW-TAG-1" in tag_names
         assert "NEW-TAG-2" in tag_names
     
@@ -512,9 +512,9 @@ class TestApplicationTagRoutes:
         
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
-        assert len(data["tags"]) == 2
+        assert len(data) == 2
         
-        tag_names = [t["name"] for t in data["tags"]]
+        tag_names = [t["name"] for t in data]
         assert "TAG3" in tag_names
         assert "TAG4" in tag_names
         assert "TAG1" not in tag_names
@@ -550,7 +550,7 @@ class TestApplicationTagRoutes:
             ENDPOINT_APPLICATION_TAGS.format(tenant_id=tenant_id, application_id=app_id),
             headers=headers
         )
-        assert get_response.json()["tags"] == []
+        assert get_response.json() == []
     
     def test_tags_included_in_application_response(
         self, 
@@ -624,7 +624,7 @@ class TestApplicationListFilterByTags:
             ENDPOINT_TAGS.format(tenant_id=tenant_id) + "?name=production",
             headers=headers
         )
-        prod_tag_id = tags_response.json()["tags"][0]["id"]
+        prod_tag_id = tags_response.json()[0]["id"]
         
         # Filter by production tag
         response = test_client.get(
@@ -687,7 +687,7 @@ class TestApplicationListFilterByTags:
             ENDPOINT_TAGS.format(tenant_id=tenant_id),
             headers=headers
         )
-        tags_data = tags_response.json()["tags"]
+        tags_data = tags_response.json()
         prod_tag_id = next(t["id"] for t in tags_data if t["name"] == "PRODUCTION")
         critical_tag_id = next(t["id"] for t in tags_data if t["name"] == "CRITICAL")
         
@@ -752,7 +752,7 @@ class TestAutonomousAgentTagRoutes:
         
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
-        assert len(data["tags"]) == 2
+        assert len(data) == 2
         
         # Get tags
         get_response = test_client.get(
@@ -761,7 +761,7 @@ class TestAutonomousAgentTagRoutes:
         )
         
         assert get_response.status_code == status.HTTP_200_OK
-        assert len(get_response.json()["tags"]) == 2
+        assert len(get_response.json()) == 2
 
 
 class TestChatWidgetTagRoutes:
@@ -786,7 +786,7 @@ class TestChatWidgetTagRoutes:
         
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
-        assert len(data["tags"]) == 2
+        assert len(data) == 2
         
         # Get tags
         get_response = test_client.get(
@@ -795,7 +795,7 @@ class TestChatWidgetTagRoutes:
         )
         
         assert get_response.status_code == status.HTTP_200_OK
-        assert len(get_response.json()["tags"]) == 2
+        assert len(get_response.json()) == 2
 
 
 class TestCredentialTagRoutes:
@@ -820,7 +820,7 @@ class TestCredentialTagRoutes:
         
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
-        assert len(data["tags"]) == 2
+        assert len(data) == 2
         
         # Get tags
         get_response = test_client.get(
@@ -829,7 +829,7 @@ class TestCredentialTagRoutes:
         )
         
         assert get_response.status_code == status.HTTP_200_OK
-        assert len(get_response.json()["tags"]) == 2
+        assert len(get_response.json()) == 2
 
 
 class TestDevelopmentPlatformTagRoutes:
@@ -854,7 +854,7 @@ class TestDevelopmentPlatformTagRoutes:
         
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
-        assert len(data["tags"]) == 2
+        assert len(data) == 2
         
         # Get tags
         get_response = test_client.get(
@@ -863,7 +863,7 @@ class TestDevelopmentPlatformTagRoutes:
         )
         
         assert get_response.status_code == status.HTTP_200_OK
-        assert len(get_response.json()["tags"]) == 2
+        assert len(get_response.json()) == 2
 
 
 class TestTagCascadeDelete:
@@ -891,7 +891,7 @@ class TestTagCascadeDelete:
             ENDPOINT_TAGS.format(tenant_id=tenant_id) + "?name=to-delete",
             headers=headers
         )
-        tag_id = tags_response.json()["tags"][0]["id"]
+        tag_id = tags_response.json()[0]["id"]
         
         # Delete the tag
         test_client.delete(
@@ -905,6 +905,6 @@ class TestTagCascadeDelete:
             headers=headers
         )
         
-        tags = app_tags_response.json()["tags"]
+        tags = app_tags_response.json()
         assert len(tags) == 1
         assert tags[0]["name"] == "KEEP-ME"

@@ -10,7 +10,7 @@ from tests.conftest import create_auth_headers
 # API Endpoints
 ENDPOINT_TENANTS = "/api/v1/tenants"
 ENDPOINT_TAGS = "/api/v1/tenants/{tenant_id}/tags"
-ENDPOINT_RESOURCE_TYPE_TAGS = "/api/v1/tenants/{tenant_id}/tags/resources/{resource_type}"
+ENDPOINT_RESOURCE_TYPE_TAGS = "/api/v1/tenants/{tenant_id}/{resource_type}/tags"
 
 
 def create_tenant_for_user(test_client: TestClient, user_token: Any, tenant_name: str = "Test Tenant") -> str:
@@ -62,7 +62,7 @@ class TestTagsPagination:
         # Verify
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
-        assert len(data["tags"]) == 5
+        assert len(data) == 5
     
     def test_list_tags_with_limit(
         self, 
@@ -88,7 +88,7 @@ class TestTagsPagination:
         # Verify
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
-        assert len(data["tags"]) == 5
+        assert len(data) == 5
     
     def test_list_tags_with_skip(
         self, 
@@ -115,9 +115,9 @@ class TestTagsPagination:
         # Verify
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
-        assert len(data["tags"]) == 3
+        assert len(data) == 3
         # Should return last 3 tags (CHERRY, DATE, ELDERBERRY)
-        returned_names = [tag["name"] for tag in data["tags"]]
+        returned_names = [tag["name"] for tag in data]
         assert "CHERRY" in returned_names
         assert "DATE" in returned_names
         assert "ELDERBERRY" in returned_names
@@ -146,7 +146,7 @@ class TestTagsPagination:
         # Verify
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
-        assert len(data["tags"]) == 4
+        assert len(data) == 4
     
     def test_list_tags_with_name_filter(
         self, 
@@ -174,8 +174,8 @@ class TestTagsPagination:
         # Verify
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
-        assert len(data["tags"]) == 2
-        names = [tag["name"] for tag in data["tags"]]
+        assert len(data) == 2
+        names = [tag["name"] for tag in data]
         assert "BACKEND" in names
         assert "BACKOFFICE" in names
     
@@ -205,7 +205,7 @@ class TestTagsPagination:
         # Verify
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
-        assert len(data["tags"]) == 3
+        assert len(data) == 3
     
     def test_list_tags_invalid_limit(
         self, 
@@ -271,7 +271,7 @@ class TestTagsPagination:
         # Verify
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
-        assert len(data["tags"]) == 0
+        assert len(data) == 0
 
 
 class TestResourceTypeTagsList:
@@ -323,8 +323,8 @@ class TestResourceTypeTagsList:
         # Verify
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
-        assert len(data["tags"]) == 2
-        tag_names = [tag["name"] for tag in data["tags"]]
+        assert len(data) == 2
+        tag_names = [tag["name"] for tag in data]
         assert "BACKEND" in tag_names
         assert "PRODUCTION" in tag_names
         assert "UNUSED" not in tag_names
@@ -371,7 +371,7 @@ class TestResourceTypeTagsList:
         # Verify
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
-        assert len(data["tags"]) == 2
+        assert len(data) == 2
     
     def test_list_resource_tags_with_name_filter(
         self, 
@@ -411,7 +411,7 @@ class TestResourceTypeTagsList:
         # Verify
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
-        names = [tag["name"] for tag in data["tags"]]
+        names = [tag["name"] for tag in data]
         assert "BACKEND" in names
         assert "BACKOFFICE" in names
     
@@ -454,27 +454,27 @@ class TestResourceTypeTagsList:
         # Verify
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
-        assert len(data["tags"]) == 4
+        assert len(data) == 4
     
     def test_list_resource_tags_invalid_resource_type(
         self, 
         test_client: TestClient, 
         test_user_token: Any
     ) -> None:
-        """Test listing tags with invalid resource type."""
+        """Test listing tags with invalid resource type returns 404 (no route exists)."""
         # Setup
         headers = create_auth_headers(test_user_token, use_cache=False)
         tenant_id = create_tenant_for_user(test_client, test_user_token)
         
-        # Test with invalid resource type
+        # Test with invalid resource type - since we have explicit routes for each
+        # resource type, an invalid type will return 404 (Not Found)
         response = test_client.get(
             ENDPOINT_RESOURCE_TYPE_TAGS.format(tenant_id=tenant_id, resource_type="invalid-type"),
             headers=headers
         )
         
-        # Verify
-        assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert "Invalid resource type" in response.json()["detail"]
+        # Verify - 404 because no route matches /invalid-type/tags
+        assert response.status_code == status.HTTP_404_NOT_FOUND
     
     def test_list_resource_tags_empty(
         self, 
@@ -499,4 +499,4 @@ class TestResourceTypeTagsList:
         # Verify
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
-        assert len(data["tags"]) == 0
+        assert len(data) == 0

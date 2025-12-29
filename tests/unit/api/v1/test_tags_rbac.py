@@ -359,7 +359,7 @@ class TestResourceTagRBAC:
             headers=reader_headers
         )
         assert response.status_code == status.HTTP_200_OK
-        assert len(response.json()["tags"]) == 2
+        assert len(response.json()) == 2
     
     def test_read_user_cannot_set_resource_tags(self, test_client: TestClient) -> None:
         """Test that READ permission does not allow setting resource tags."""
@@ -431,7 +431,7 @@ class TestResourceTagRBAC:
             headers=writer_headers
         )
         assert response.status_code == status.HTTP_200_OK
-        assert len(response.json()["tags"]) == 2
+        assert len(response.json()) == 2
     
     def test_write_user_can_delete_resource_tags(self, test_client: TestClient) -> None:
         """Test that WRITE permission allows deleting resource tags."""
@@ -569,7 +569,7 @@ class TestAutonomousAgentTagRBAC:
             headers=writer_headers
         )
         assert response.status_code == status.HTTP_200_OK
-        assert len(response.json()["tags"]) == 2
+        assert len(response.json()) == 2
     
     def test_read_user_cannot_set_agent_tags(self, test_client: TestClient) -> None:
         """Test that READ permission does not allow setting autonomous agent tags."""

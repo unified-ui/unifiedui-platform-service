@@ -16,7 +16,7 @@ from unifiedui.core.database.models import (
     DevelopmentPlatform, DevelopmentPlatformTag,
 )
 from unifiedui.caching.client import CacheClient
-from unifiedui.schema.responses.tags import TagResponse, TagListResponse, ResourceTagsResponse, TagSummary
+from unifiedui.schema.responses.tags import TagResponse, TagSummary
 from unifiedui.exc.tags import TagNotFoundError
 from unifiedui.logger import get_logger
 
@@ -86,7 +86,7 @@ class TagHandler:
         skip: int = 0,
         limit: int = 100,
         use_cache: bool = True
-    ) -> TagListResponse:
+    ) -> List[TagSummary]:
         """
         Get a list of tags for a tenant.
         
@@ -98,7 +98,7 @@ class TagHandler:
             use_cache: Whether to use caching (ignored if name_filter, skip, or limit are set)
             
         Returns:
-            TagListResponse with list of tags (id and name only)
+            List of TagSummary (id and name only)
         """
         logger.info("Listing tags", extra={"tenant_id": tenant_id, "name_filter": name_filter, "skip": skip, "limit": limit})
         
@@ -113,7 +113,7 @@ class TagHandler:
                 cached_data = self.cache_client.client.get(cache_key)
                 if cached_data is not None:
                     logger.debug("Returning cached tag list")
-                    return TagListResponse(tags=[TagSummary(**item) for item in cached_data])
+                    return [TagSummary(**item) for item in cached_data]
             except Exception as e:
                 logger.warning(f"Failed to get cached tag list: {e}")
         
@@ -129,7 +129,6 @@ class TagHandler:
             
             logger.info("Retrieved tags", extra={"count": len(tags)})
             tag_summaries = [TagSummary(id=tag.id, name=tag.name) for tag in tags]
-            result = TagListResponse(tags=tag_summaries)
             
             # Cache the result (only if default pagination and not filtering)
             if should_cache and self.cache_client:
@@ -140,7 +139,7 @@ class TagHandler:
                 except Exception as e:
                     logger.warning(f"Failed to cache tag list: {e}")
             
-            return result
+            return tag_summaries
 
     def list_tags_for_resource(
         self,
@@ -150,7 +149,7 @@ class TagHandler:
         skip: int = 0,
         limit: int = 100,
         use_cache: bool = True
-    ) -> TagListResponse:
+    ) -> List[TagSummary]:
         """
         Get a list of tags that are applied to a specific resource type.
         
@@ -163,7 +162,7 @@ class TagHandler:
             use_cache: Whether to use caching
             
         Returns:
-            TagListResponse with list of tags (id and name only)
+            List of TagSummary (id and name only)
             
         Raises:
             ValueError: If resource_type is not supported
@@ -193,7 +192,7 @@ class TagHandler:
                 cached_data = self.cache_client.client.get(cache_key)
                 if cached_data is not None:
                     logger.debug("Returning cached resource tag list")
-                    return TagListResponse(tags=[TagSummary(**item) for item in cached_data])
+                    return [TagSummary(**item) for item in cached_data]
             except Exception as e:
                 logger.warning(f"Failed to get cached resource tag list: {e}")
         
@@ -219,7 +218,6 @@ class TagHandler:
                 extra={"count": len(tags), "resource_type": resource_type}
             )
             tag_summaries = [TagSummary(id=tag.id, name=tag.name) for tag in tags]
-            result = TagListResponse(tags=tag_summaries)
             
             # Cache the result (only if default pagination and not filtering)
             if should_cache and self.cache_client:
@@ -230,7 +228,7 @@ class TagHandler:
                 except Exception as e:
                     logger.warning(f"Failed to cache resource tag list: {e}")
             
-            return result
+            return tag_summaries
 
     def get_tag(
         self,
@@ -456,7 +454,7 @@ class TagHandler:
         resource_type: str,
         resource_id: str,
         use_cache: bool = True
-    ) -> ResourceTagsResponse:
+    ) -> List[TagResponse]:
         """
         Get tags for a specific resource.
         
@@ -467,7 +465,7 @@ class TagHandler:
             use_cache: Whether to use caching
             
         Returns:
-            ResourceTagsResponse with list of tags
+            List of TagResponse objects
         """
         logger.info(
             "Getting resource tags",
@@ -486,9 +484,7 @@ class TagHandler:
                 cached_data = self.cache_client.client.get(cache_key)
                 if cached_data is not None:
                     logger.debug("Returning cached resource tags")
-                    return ResourceTagsResponse(
-                        tags=[TagResponse(**item) for item in cached_data]
-                    )
+                    return [TagResponse(**item) for item in cached_data]
             except Exception as e:
                 logger.warning(f"Failed to get cached resource tags: {e}")
         
@@ -509,7 +505,6 @@ class TagHandler:
             
             tags = session.execute(query).scalars().all()
             tag_responses = [self._model_to_response(tag) for tag in tags]
-            result = ResourceTagsResponse(tags=tag_responses)
             
             # Cache the result
             if use_cache and self.cache_client:
@@ -520,7 +515,7 @@ class TagHandler:
                 except Exception as e:
                     logger.warning(f"Failed to cache resource tags: {e}")
             
-            return result
+            return tag_responses
 
     def set_resource_tags(
         self,
@@ -529,7 +524,7 @@ class TagHandler:
         resource_id: str,
         tag_names: List[str],
         user: ContextIdentityUser
-    ) -> ResourceTagsResponse:
+    ) -> List[TagResponse]:
         """
         Set tags for a resource. Creates missing tags and replaces existing associations.
         
@@ -541,7 +536,7 @@ class TagHandler:
             user: ContextIdentityUser object
             
         Returns:
-            ResourceTagsResponse with the updated list of tags
+            List of TagResponse objects with the updated tags
         """
         logger.info(
             "Setting resource tags",
@@ -599,7 +594,7 @@ class TagHandler:
             self._invalidate_resource_detail_cache(tenant_id, resource_type, resource_id)
             self._invalidate_tag_list_cache(tenant_id)
             
-            return ResourceTagsResponse(tags=tag_responses)
+            return tag_responses
 
     def delete_resource_tags(
         self,

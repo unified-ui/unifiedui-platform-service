@@ -192,10 +192,24 @@ def create_app() -> FastAPI:
         tags=["Custom Groups"]
     )
     
+    # Resource type tags list routes - MUST be before resource routers to avoid path conflicts
+    # e.g., /applications/tags must be matched before /applications/{application_id}
+    app.include_router(
+        tags.credentials_tags_list_router,
+        prefix="/api/v1/tenants/{tenant_id}",
+        tags=["Tags"]
+    )
+    
     app.include_router(
         credentials.router,
         prefix="/api/v1/tenants/{tenant_id}",
         tags=["Credentials"]
+    )
+    
+    app.include_router(
+        tags.applications_tags_list_router,
+        prefix="/api/v1/tenants/{tenant_id}",
+        tags=["Tags"]
     )
     
     app.include_router(
@@ -211,15 +225,33 @@ def create_app() -> FastAPI:
     )
     
     app.include_router(
+        tags.autonomous_agents_tags_list_router,
+        prefix="/api/v1/tenants/{tenant_id}",
+        tags=["Tags"]
+    )
+    
+    app.include_router(
         autonomous_agents.router,
         prefix="/api/v1/tenants/{tenant_id}",
         tags=["Autonomous Agents"]
     )
     
     app.include_router(
+        tags.development_platforms_tags_list_router,
+        prefix="/api/v1/tenants/{tenant_id}",
+        tags=["Tags"]
+    )
+    
+    app.include_router(
         development_platforms.router,
         prefix="/api/v1/tenants/{tenant_id}",
         tags=["Development Platforms"]
+    )
+    
+    app.include_router(
+        tags.chat_widgets_tags_list_router,
+        prefix="/api/v1/tenants/{tenant_id}",
+        tags=["Tags"]
     )
     
     app.include_router(

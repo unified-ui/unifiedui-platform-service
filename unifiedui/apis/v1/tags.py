@@ -8,7 +8,7 @@ from unifiedui.core.identity.users import ContextIdentityUser
 from unifiedui.handlers.tags import TagHandler
 from unifiedui.handlers.dependencies import get_tag_handler
 from unifiedui.schema.requests.tags import CreateTagRequest, SetResourceTagsRequest
-from unifiedui.schema.responses.tags import TagResponse, TagListResponse, ResourceTagsResponse
+from unifiedui.schema.responses.tags import TagResponse, TagSummary
 from unifiedui.exc.tags import TagNotFoundError, TagDeleteNotAllowedError
 from unifiedui.core.middleware.apis.v1.auth import authenticate, check_permissions
 from unifiedui.core.database.enums import TenantRolesEnum, PermissionActionEnum, UserPermissionEnum
@@ -23,7 +23,7 @@ router = APIRouter(prefix="/tags")
 
 @router.get(
     "",
-    response_model=TagListResponse,
+    response_model=List[TagSummary],
     summary="List tags",
     description="Get a list of tags for the current tenant"
 )
@@ -35,7 +35,7 @@ async def list_tags(
     skip: int = Query(0, ge=0, description="Number of tags to skip"),
     limit: int = Query(100, ge=1, le=1000, description="Maximum number of tags to return"),
     handler: TagHandler = Depends(get_tag_handler)
-) -> TagListResponse:
+) -> List[TagSummary]:
     """
     List tags for a tenant.
     
@@ -48,7 +48,7 @@ async def list_tags(
         handler: Tag handler dependency
         
     Returns:
-        List of tags with total count
+        List of tags
     """
     try:
         user: ContextIdentityUser = request.state.user
@@ -133,65 +133,38 @@ async def create_tag(
         )
 
 
-@router.get(
-    "/resources/{resource_type}",
-    response_model=TagListResponse,
-    summary="List tags for resource type",
-    description="Get all tags that are applied to a specific resource type (applications, autonomous-agents, etc.)"
+# ========== Resource Type Tags Routers ==========
+# These routers expose tags per resource type at /{resource_type}/tags
+
+# Applications Tags Router
+applications_tags_list_router = APIRouter(prefix="/applications/tags")
+
+
+@applications_tags_list_router.get(
+    "",
+    response_model=List[TagSummary],
+    summary="List tags for applications",
+    description="Get all tags that are applied to applications"
 )
 @authenticate
-async def list_resource_type_tags(
+async def list_application_tags(
     request: Request,
     tenant_id: str,
-    resource_type: str,
     name: Optional[str] = Query(None, description="Filter by tag name"),
     skip: int = Query(0, ge=0, description="Number of tags to skip"),
     limit: int = Query(100, ge=1, le=1000, description="Maximum number of tags to return"),
     handler: TagHandler = Depends(get_tag_handler)
-) -> TagListResponse:
-    """
-    List all tags that are applied to a specific resource type.
-    
-    Supported resource types: applications, autonomous-agents, chat-widgets, credentials, development-platforms
-    
-    Args:
-        request: FastAPI request with user in state
-        tenant_id: Tenant ID from path
-        resource_type: Resource type (applications, autonomous-agents, etc.)
-        name: Optional filter by tag name
-        skip: Number of tags to skip for pagination
-        limit: Maximum number of tags to return
-        handler: Tag handler dependency
-        
-    Returns:
-        List of tags with total count
-    """
+) -> List[TagSummary]:
+    """List all tags that are applied to applications."""
     try:
         user: ContextIdentityUser = request.state.user
         use_cache = request.headers.get("X-Use-Cache", "true").lower() == "true"
         
-        # Map URL resource type to internal resource type
-        resource_type_mapping = {
-            "applications": "application",
-            "autonomous-agents": "autonomous_agent",
-            "chat-widgets": "chat_widget",
-            "credentials": "credential",
-            "development-platforms": "development_platform",
-        }
-        
-        internal_resource_type = resource_type_mapping.get(resource_type)
-        if not internal_resource_type:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Invalid resource type: {resource_type}. Supported types: {', '.join(resource_type_mapping.keys())}"
-            )
-        
         logger.info(
-            "API: List tags for resource type",
+            "API: List tags for applications",
             extra={
                 "tenant_id": tenant_id,
                 "user_id": user.identity.get_id(),
-                "resource_type": internal_resource_type,
                 "name_filter": name,
                 "skip": skip,
                 "limit": limit
@@ -200,7 +173,7 @@ async def list_resource_type_tags(
         
         return handler.list_tags_for_resource(
             tenant_id=tenant_id,
-            resource_type=internal_resource_type,
+            resource_type="application",
             name_filter=name,
             skip=skip,
             limit=limit,
@@ -214,10 +187,242 @@ async def list_resource_type_tags(
             detail=str(e)
         )
     except Exception as e:
-        logger.error(f"Failed to list resource type tags: {e}", exc_info=True)
+        logger.error(f"Failed to list application tags: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to list resource type tags"
+            detail="Failed to list application tags"
+        )
+
+
+# Autonomous Agents Tags Router
+autonomous_agents_tags_list_router = APIRouter(prefix="/autonomous-agents/tags")
+
+
+@autonomous_agents_tags_list_router.get(
+    "",
+    response_model=List[TagSummary],
+    summary="List tags for autonomous agents",
+    description="Get all tags that are applied to autonomous agents"
+)
+@authenticate
+async def list_autonomous_agent_tags(
+    request: Request,
+    tenant_id: str,
+    name: Optional[str] = Query(None, description="Filter by tag name"),
+    skip: int = Query(0, ge=0, description="Number of tags to skip"),
+    limit: int = Query(100, ge=1, le=1000, description="Maximum number of tags to return"),
+    handler: TagHandler = Depends(get_tag_handler)
+) -> List[TagSummary]:
+    """List all tags that are applied to autonomous agents."""
+    try:
+        user: ContextIdentityUser = request.state.user
+        use_cache = request.headers.get("X-Use-Cache", "true").lower() == "true"
+        
+        logger.info(
+            "API: List tags for autonomous agents",
+            extra={
+                "tenant_id": tenant_id,
+                "user_id": user.identity.get_id(),
+                "name_filter": name,
+                "skip": skip,
+                "limit": limit
+            }
+        )
+        
+        return handler.list_tags_for_resource(
+            tenant_id=tenant_id,
+            resource_type="autonomous_agent",
+            name_filter=name,
+            skip=skip,
+            limit=limit,
+            use_cache=use_cache
+        )
+    except HTTPException:
+        raise
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+    except Exception as e:
+        logger.error(f"Failed to list autonomous agent tags: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to list autonomous agent tags"
+        )
+
+
+# Chat Widgets Tags Router
+chat_widgets_tags_list_router = APIRouter(prefix="/chat-widgets/tags")
+
+
+@chat_widgets_tags_list_router.get(
+    "",
+    response_model=List[TagSummary],
+    summary="List tags for chat widgets",
+    description="Get all tags that are applied to chat widgets"
+)
+@authenticate
+async def list_chat_widget_tags(
+    request: Request,
+    tenant_id: str,
+    name: Optional[str] = Query(None, description="Filter by tag name"),
+    skip: int = Query(0, ge=0, description="Number of tags to skip"),
+    limit: int = Query(100, ge=1, le=1000, description="Maximum number of tags to return"),
+    handler: TagHandler = Depends(get_tag_handler)
+) -> List[TagSummary]:
+    """List all tags that are applied to chat widgets."""
+    try:
+        user: ContextIdentityUser = request.state.user
+        use_cache = request.headers.get("X-Use-Cache", "true").lower() == "true"
+        
+        logger.info(
+            "API: List tags for chat widgets",
+            extra={
+                "tenant_id": tenant_id,
+                "user_id": user.identity.get_id(),
+                "name_filter": name,
+                "skip": skip,
+                "limit": limit
+            }
+        )
+        
+        return handler.list_tags_for_resource(
+            tenant_id=tenant_id,
+            resource_type="chat_widget",
+            name_filter=name,
+            skip=skip,
+            limit=limit,
+            use_cache=use_cache
+        )
+    except HTTPException:
+        raise
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+    except Exception as e:
+        logger.error(f"Failed to list chat widget tags: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to list chat widget tags"
+        )
+
+
+# Credentials Tags Router
+credentials_tags_list_router = APIRouter(prefix="/credentials/tags")
+
+
+@credentials_tags_list_router.get(
+    "",
+    response_model=List[TagSummary],
+    summary="List tags for credentials",
+    description="Get all tags that are applied to credentials"
+)
+@authenticate
+async def list_credential_tags(
+    request: Request,
+    tenant_id: str,
+    name: Optional[str] = Query(None, description="Filter by tag name"),
+    skip: int = Query(0, ge=0, description="Number of tags to skip"),
+    limit: int = Query(100, ge=1, le=1000, description="Maximum number of tags to return"),
+    handler: TagHandler = Depends(get_tag_handler)
+) -> List[TagSummary]:
+    """List all tags that are applied to credentials."""
+    try:
+        user: ContextIdentityUser = request.state.user
+        use_cache = request.headers.get("X-Use-Cache", "true").lower() == "true"
+        
+        logger.info(
+            "API: List tags for credentials",
+            extra={
+                "tenant_id": tenant_id,
+                "user_id": user.identity.get_id(),
+                "name_filter": name,
+                "skip": skip,
+                "limit": limit
+            }
+        )
+        
+        return handler.list_tags_for_resource(
+            tenant_id=tenant_id,
+            resource_type="credential",
+            name_filter=name,
+            skip=skip,
+            limit=limit,
+            use_cache=use_cache
+        )
+    except HTTPException:
+        raise
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+    except Exception as e:
+        logger.error(f"Failed to list credential tags: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to list credential tags"
+        )
+
+
+# Development Platforms Tags Router
+development_platforms_tags_list_router = APIRouter(prefix="/development-platforms/tags")
+
+
+@development_platforms_tags_list_router.get(
+    "",
+    response_model=List[TagSummary],
+    summary="List tags for development platforms",
+    description="Get all tags that are applied to development platforms"
+)
+@authenticate
+async def list_development_platform_tags(
+    request: Request,
+    tenant_id: str,
+    name: Optional[str] = Query(None, description="Filter by tag name"),
+    skip: int = Query(0, ge=0, description="Number of tags to skip"),
+    limit: int = Query(100, ge=1, le=1000, description="Maximum number of tags to return"),
+    handler: TagHandler = Depends(get_tag_handler)
+) -> List[TagSummary]:
+    """List all tags that are applied to development platforms."""
+    try:
+        user: ContextIdentityUser = request.state.user
+        use_cache = request.headers.get("X-Use-Cache", "true").lower() == "true"
+        
+        logger.info(
+            "API: List tags for development platforms",
+            extra={
+                "tenant_id": tenant_id,
+                "user_id": user.identity.get_id(),
+                "name_filter": name,
+                "skip": skip,
+                "limit": limit
+            }
+        )
+        
+        return handler.list_tags_for_resource(
+            tenant_id=tenant_id,
+            resource_type="development_platform",
+            name_filter=name,
+            skip=skip,
+            limit=limit,
+            use_cache=use_cache
+        )
+    except HTTPException:
+        raise
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+    except Exception as e:
+        logger.error(f"Failed to list development platform tags: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to list development platform tags"
         )
 
 
@@ -289,7 +494,7 @@ application_tags_router = APIRouter(prefix="/applications/{application_id}/tags"
 
 @application_tags_router.get(
     "",
-    response_model=ResourceTagsResponse,
+    response_model=List[TagResponse],
     summary="Get application tags",
     description="Get tags for an application"
 )
@@ -309,7 +514,7 @@ async def get_application_tags(
     tenant_id: str,
     application_id: str,
     handler: TagHandler = Depends(get_tag_handler)
-) -> ResourceTagsResponse:
+) -> List[TagResponse]:
     """Get tags for an application."""
     try:
         user: ContextIdentityUser = request.state.user
@@ -340,7 +545,7 @@ async def get_application_tags(
 
 @application_tags_router.put(
     "",
-    response_model=ResourceTagsResponse,
+    response_model=List[TagResponse],
     summary="Set application tags",
     description="Set tags for an application (replaces existing tags)"
 )
@@ -360,7 +565,7 @@ async def set_application_tags(
     application_id: str,
     tags_request: SetResourceTagsRequest,
     handler: TagHandler = Depends(get_tag_handler)
-) -> ResourceTagsResponse:
+) -> List[TagResponse]:
     """Set tags for an application."""
     try:
         user: ContextIdentityUser = request.state.user
@@ -446,7 +651,7 @@ autonomous_agent_tags_router = APIRouter(prefix="/autonomous-agents/{autonomous_
 
 @autonomous_agent_tags_router.get(
     "",
-    response_model=ResourceTagsResponse,
+    response_model=List[TagResponse],
     summary="Get autonomous agent tags",
     description="Get tags for an autonomous agent"
 )
@@ -466,7 +671,7 @@ async def get_autonomous_agent_tags(
     tenant_id: str,
     autonomous_agent_id: str,
     handler: TagHandler = Depends(get_tag_handler)
-) -> ResourceTagsResponse:
+) -> List[TagResponse]:
     """Get tags for an autonomous agent."""
     try:
         user: ContextIdentityUser = request.state.user
@@ -497,7 +702,7 @@ async def get_autonomous_agent_tags(
 
 @autonomous_agent_tags_router.put(
     "",
-    response_model=ResourceTagsResponse,
+    response_model=List[TagResponse],
     summary="Set autonomous agent tags",
     description="Set tags for an autonomous agent (replaces existing tags)"
 )
@@ -517,7 +722,7 @@ async def set_autonomous_agent_tags(
     autonomous_agent_id: str,
     tags_request: SetResourceTagsRequest,
     handler: TagHandler = Depends(get_tag_handler)
-) -> ResourceTagsResponse:
+) -> List[TagResponse]:
     """Set tags for an autonomous agent."""
     try:
         user: ContextIdentityUser = request.state.user
@@ -603,7 +808,7 @@ chat_widget_tags_router = APIRouter(prefix="/chat-widgets/{chat_widget_id}/tags"
 
 @chat_widget_tags_router.get(
     "",
-    response_model=ResourceTagsResponse,
+    response_model=List[TagResponse],
     summary="Get chat widget tags",
     description="Get tags for a chat widget"
 )
@@ -623,7 +828,7 @@ async def get_chat_widget_tags(
     tenant_id: str,
     chat_widget_id: str,
     handler: TagHandler = Depends(get_tag_handler)
-) -> ResourceTagsResponse:
+) -> List[TagResponse]:
     """Get tags for a chat widget."""
     try:
         user: ContextIdentityUser = request.state.user
@@ -654,7 +859,7 @@ async def get_chat_widget_tags(
 
 @chat_widget_tags_router.put(
     "",
-    response_model=ResourceTagsResponse,
+    response_model=List[TagResponse],
     summary="Set chat widget tags",
     description="Set tags for a chat widget (replaces existing tags)"
 )
@@ -674,7 +879,7 @@ async def set_chat_widget_tags(
     chat_widget_id: str,
     tags_request: SetResourceTagsRequest,
     handler: TagHandler = Depends(get_tag_handler)
-) -> ResourceTagsResponse:
+) -> List[TagResponse]:
     """Set tags for a chat widget."""
     try:
         user: ContextIdentityUser = request.state.user
@@ -760,7 +965,7 @@ credential_tags_router = APIRouter(prefix="/credentials/{credential_id}/tags")
 
 @credential_tags_router.get(
     "",
-    response_model=ResourceTagsResponse,
+    response_model=List[TagResponse],
     summary="Get credential tags",
     description="Get tags for a credential"
 )
@@ -780,7 +985,7 @@ async def get_credential_tags(
     tenant_id: str,
     credential_id: str,
     handler: TagHandler = Depends(get_tag_handler)
-) -> ResourceTagsResponse:
+) -> List[TagResponse]:
     """Get tags for a credential."""
     try:
         user: ContextIdentityUser = request.state.user
@@ -811,7 +1016,7 @@ async def get_credential_tags(
 
 @credential_tags_router.put(
     "",
-    response_model=ResourceTagsResponse,
+    response_model=List[TagResponse],
     summary="Set credential tags",
     description="Set tags for a credential (replaces existing tags)"
 )
@@ -831,7 +1036,7 @@ async def set_credential_tags(
     credential_id: str,
     tags_request: SetResourceTagsRequest,
     handler: TagHandler = Depends(get_tag_handler)
-) -> ResourceTagsResponse:
+) -> List[TagResponse]:
     """Set tags for a credential."""
     try:
         user: ContextIdentityUser = request.state.user
@@ -917,7 +1122,7 @@ development_platform_tags_router = APIRouter(prefix="/development-platforms/{dev
 
 @development_platform_tags_router.get(
     "",
-    response_model=ResourceTagsResponse,
+    response_model=List[TagResponse],
     summary="Get development platform tags",
     description="Get tags for a development platform"
 )
@@ -937,7 +1142,7 @@ async def get_development_platform_tags(
     tenant_id: str,
     development_platform_id: str,
     handler: TagHandler = Depends(get_tag_handler)
-) -> ResourceTagsResponse:
+) -> List[TagResponse]:
     """Get tags for a development platform."""
     try:
         user: ContextIdentityUser = request.state.user
@@ -968,7 +1173,7 @@ async def get_development_platform_tags(
 
 @development_platform_tags_router.put(
     "",
-    response_model=ResourceTagsResponse,
+    response_model=List[TagResponse],
     summary="Set development platform tags",
     description="Set tags for a development platform (replaces existing tags)"
 )
@@ -988,7 +1193,7 @@ async def set_development_platform_tags(
     development_platform_id: str,
     tags_request: SetResourceTagsRequest,
     handler: TagHandler = Depends(get_tag_handler)
-) -> ResourceTagsResponse:
+) -> List[TagResponse]:
     """Set tags for a development platform."""
     try:
         user: ContextIdentityUser = request.state.user
