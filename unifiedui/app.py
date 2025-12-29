@@ -197,7 +197,7 @@ def create_app() -> FastAPI:
     app.include_router(
         tags.credentials_tags_list_router,
         prefix="/api/v1/tenants/{tenant_id}",
-        tags=["Tags"]
+        tags=["Credentials"]
     )
     
     app.include_router(
@@ -209,7 +209,7 @@ def create_app() -> FastAPI:
     app.include_router(
         tags.applications_tags_list_router,
         prefix="/api/v1/tenants/{tenant_id}",
-        tags=["Tags"]
+        tags=["Applications"]
     )
     
     app.include_router(
@@ -227,7 +227,7 @@ def create_app() -> FastAPI:
     app.include_router(
         tags.autonomous_agents_tags_list_router,
         prefix="/api/v1/tenants/{tenant_id}",
-        tags=["Tags"]
+        tags=["Autonomous Agents"]
     )
     
     app.include_router(
@@ -239,7 +239,7 @@ def create_app() -> FastAPI:
     app.include_router(
         tags.development_platforms_tags_list_router,
         prefix="/api/v1/tenants/{tenant_id}",
-        tags=["Tags"]
+        tags=["Development Platforms"]
     )
     
     app.include_router(
@@ -251,7 +251,7 @@ def create_app() -> FastAPI:
     app.include_router(
         tags.chat_widgets_tags_list_router,
         prefix="/api/v1/tenants/{tenant_id}",
-        tags=["Tags"]
+        tags=["Chat Widgets"]
     )
     
     app.include_router(
