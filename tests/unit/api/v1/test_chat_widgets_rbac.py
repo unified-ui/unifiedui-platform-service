@@ -145,7 +145,7 @@ class TestChatWidgetRBAC:
         )
         
         assert add_response.status_code == status.HTTP_200_OK
-        assert add_response.json()["role"] == ROLE_READ
+        assert ROLE_READ in add_response.json()["roles"]
         
         # Remove the role
         delete_response = test_client.request(

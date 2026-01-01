@@ -22,10 +22,9 @@ from unifiedui.schema.requests.development_platform_permissions import SetDevelo
 from unifiedui.schema.responses.development_platforms import DevelopmentPlatformResponse
 from unifiedui.schema.responses.common import QuickListItemResponse
 from unifiedui.schema.responses.tags import TagSummary
-from unifiedui.schema.responses.development_platform_permissions import (
-    DevelopmentPlatformPermissionResponse,
-    DevelopmentPlatformPrincipalsResponse,
-    PrincipalPermissionsResponse
+from unifiedui.schema.responses.principals import (
+    PrincipalWithRolesResponse,
+    ResourcePrincipalsResponse
 )
 from unifiedui.exc.development_platforms import DevelopmentPlatformNotFoundError
 from unifiedui.logger import get_logger
@@ -514,18 +513,21 @@ class DevelopmentPlatformHandler:
         
         # Convert to response schema
         principals = [
-            PrincipalPermissionsResponse(
-                development_platform_id=development_platform_id,
-                tenant_id=tenant_id,
+            PrincipalWithRolesResponse(
                 principal_id=p["principal_id"],
                 principal_type=p["principal_type"],
-                roles=p["roles"]
+                roles=p["roles"],
+                mail=p.get("mail"),
+                display_name=p.get("display_name"),
+                principal_name=p.get("principal_name"),
+                description=p.get("description")
             )
             for p in result["principals"]
         ]
         
-        return DevelopmentPlatformPrincipalsResponse(
-            development_platform_id=development_platform_id,
+        return ResourcePrincipalsResponse(
+            resource_id=development_platform_id,
+            resource_type="development_platform",
             tenant_id=tenant_id,
             principals=principals
         )
@@ -535,7 +537,7 @@ class DevelopmentPlatformHandler:
         tenant_id: str,
         development_platform_id: str,
         principal_id: str
-    ) -> PrincipalPermissionsResponse:
+    ) -> PrincipalWithRolesResponse:
         """
         Get all permissions for a specific principal on a development platform.
         
@@ -565,12 +567,14 @@ class DevelopmentPlatformHandler:
         except ValueError as e:
             raise DevelopmentPlatformNotFoundError(str(e)) from e
         
-        return PrincipalPermissionsResponse(
-            development_platform_id=development_platform_id,
-            tenant_id=tenant_id,
+        return PrincipalWithRolesResponse(
             principal_id=result["principal_id"],
             principal_type=result["principal_type"],
-            roles=result["roles"]
+            roles=result["roles"],
+            mail=result.get("mail"),
+            display_name=result.get("display_name"),
+            principal_name=result.get("principal_name"),
+            description=result.get("description")
         )
 
     def set_development_platform_permission(
@@ -580,7 +584,7 @@ class DevelopmentPlatformHandler:
         request: SetDevelopmentPlatformPermissionRequest,
         user_id: str,
         user: ContextIdentityUser
-    ) -> DevelopmentPlatformPermissionResponse:
+    ) -> PrincipalWithRolesResponse:
         """
         Set or update a permission for a principal on a development platform.
         
@@ -606,7 +610,7 @@ class DevelopmentPlatformHandler:
         )
         
         try:
-            result = self.permissions_handler.set_permission(
+            self.permissions_handler.set_permission(
                 resource_type="development_platform",
                 tenant_id=tenant_id,
                 resource_id=development_platform_id,
@@ -619,15 +623,11 @@ class DevelopmentPlatformHandler:
         except ValueError as e:
             raise DevelopmentPlatformNotFoundError(str(e)) from e
         
-        return DevelopmentPlatformPermissionResponse(
-            id=result["id"],
-            development_platform_id=development_platform_id,
+        # Fetch and return the enriched principal data
+        return self.get_development_platform_permission(
             tenant_id=tenant_id,
-            principal_id=result["principal_id"],
-            principal_type=request.principal_type,
-            role=request.role,
-            created_at=result["created_at"],
-            updated_at=result["updated_at"]
+            development_platform_id=development_platform_id,
+            principal_id=request.principal_id
         )
 
     def delete_development_platform_permission(

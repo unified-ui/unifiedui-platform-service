@@ -10,10 +10,9 @@ from unifiedui.handlers.dependencies import get_chat_widget_handler
 from unifiedui.schema.requests.chat_widgets import CreateChatWidgetRequest, UpdateChatWidgetRequest
 from unifiedui.schema.requests.chat_widget_permissions import SetChatWidgetPermissionRequest
 from unifiedui.schema.responses.chat_widgets import ChatWidgetResponse
-from unifiedui.schema.responses.chat_widget_permissions import (
-    ChatWidgetPermissionResponse,
-    ChatWidgetPrincipalsResponse,
-    PrincipalPermissionsResponse
+from unifiedui.schema.responses.principals import (
+    PrincipalWithRolesResponse,
+    ResourcePrincipalsResponse
 )
 from unifiedui.exc.chat_widgets import ChatWidgetNotFoundError
 from unifiedui.core.middleware.apis.v1.auth import authenticate, check_permissions
@@ -373,7 +372,7 @@ async def delete_chat_widget(
 
 @router.get(
     "/{chat_widget_id}/principals",
-    response_model=ChatWidgetPrincipalsResponse,
+    response_model=ResourcePrincipalsResponse,
     summary="List chat widget permissions",
     description="Get all principals with permissions for a chat widget"
 )
@@ -393,7 +392,7 @@ async def list_chat_widget_permissions(
     tenant_id: str,
     chat_widget_id: str,
     handler: ChatWidgetHandler = Depends(get_chat_widget_handler)
-) -> ChatWidgetPrincipalsResponse:
+) -> ResourcePrincipalsResponse:
     """
     List all permissions for a chat widget.
     
@@ -438,7 +437,7 @@ async def list_chat_widget_permissions(
 
 @router.get(
     "/{chat_widget_id}/principals/{principal_id}",
-    response_model=PrincipalPermissionsResponse,
+    response_model=PrincipalWithRolesResponse,
     summary="Get chat widget permissions for principal",
     description="Get all permissions for a specific principal on a chat widget"
 )
@@ -459,7 +458,7 @@ async def get_chat_widget_permission(
     chat_widget_id: str,
     principal_id: str,
     handler: ChatWidgetHandler = Depends(get_chat_widget_handler)
-) -> PrincipalPermissionsResponse:
+) -> PrincipalWithRolesResponse:
     """
     Get all permissions for a specific principal on a chat widget.
     
@@ -507,7 +506,7 @@ async def get_chat_widget_permission(
 
 @router.put(
     "/{chat_widget_id}/principals",
-    response_model=ChatWidgetPermissionResponse,
+    response_model=PrincipalWithRolesResponse,
     summary="Set chat widget permission",
     description="Set or update a principal's permission for a chat widget"
 )
@@ -526,7 +525,7 @@ async def set_chat_widget_permission(
     chat_widget_id: str,
     permission_request: SetChatWidgetPermissionRequest,
     handler: ChatWidgetHandler = Depends(get_chat_widget_handler)
-) -> ChatWidgetPermissionResponse:
+) -> PrincipalWithRolesResponse:
     """
     Set or update a chat widget permission.
     

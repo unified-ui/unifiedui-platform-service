@@ -540,7 +540,9 @@ class TestAutonomousAgentPrincipalRoutes:
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         
-        assert "autonomous_agent_id" in data
+        assert "resource_id" in data
+        assert "resource_type" in data
+        assert data["resource_type"] == "autonomous_agent"
         assert "principals" in data
         assert len(data["principals"]) >= 1  # At least the creator
         
@@ -614,7 +616,7 @@ class TestAutonomousAgentPrincipalRoutes:
         data = response.json()
         
         assert data["principal_id"] == "other-user"
-        assert data["role"] == ROLE_READ
+        assert ROLE_READ in data["roles"]
     
     def test_set_principal_permission_update_existing(self, test_client: TestClient, test_user_token: Any) -> None:
         """Test updating an existing principal's permission."""
@@ -656,7 +658,7 @@ class TestAutonomousAgentPrincipalRoutes:
         data = update_response.json()
         
         assert data["principal_id"] == "other-user"
-        assert data["role"] == ROLE_WRITE
+        assert ROLE_WRITE in data["roles"]
     
     def test_set_principal_permission_missing_principal_id(self, test_client: TestClient, test_user_token: Any) -> None:
         """Test setting permission with missing principal_id."""

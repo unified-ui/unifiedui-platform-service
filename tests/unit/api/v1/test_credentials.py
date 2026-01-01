@@ -624,6 +624,9 @@ class TestCredentialPrincipalRoutes:
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         
+        assert "resource_id" in data
+        assert "resource_type" in data
+        assert data["resource_type"] == "credential"
         assert "principals" in data
         assert len(data["principals"]) == 1
         assert data["principals"][0]["principal_id"] == test_user_token.get_id()
@@ -694,7 +697,7 @@ class TestCredentialPrincipalRoutes:
         data = response.json()
         
         assert data["principal_id"] == "other-user"
-        assert data["role"] == ROLE_READ  # Changed from 'roles' to 'role'
+        assert ROLE_READ in data["roles"]
     
     def test_set_principal_permission_update_existing(self, test_client: TestClient, test_user_token: Any) -> None:
         """Test updating permission for existing principal."""
@@ -739,7 +742,7 @@ class TestCredentialPrincipalRoutes:
         data = response.json()
         
         assert data["principal_id"] == "other-user"
-        assert data["role"] == ROLE_WRITE  # Changed from 'roles' to 'role'
+        assert ROLE_WRITE in data["roles"]
     
     def test_set_principal_permission_missing_principal_id(self, test_client: TestClient, test_user_token: Any) -> None:
         """Test setting permission with missing principal_id."""

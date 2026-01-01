@@ -10,10 +10,9 @@ from unifiedui.handlers.dependencies import get_autonomous_agent_handler
 from unifiedui.schema.requests.autonomous_agents import CreateAutonomousAgentRequest, UpdateAutonomousAgentRequest
 from unifiedui.schema.requests.autonomous_agent_permissions import SetAutonomousAgentPermissionRequest
 from unifiedui.schema.responses.autonomous_agents import AutonomousAgentResponse
-from unifiedui.schema.responses.autonomous_agent_permissions import (
-    AutonomousAgentPermissionResponse,
-    AutonomousAgentPrincipalsResponse,
-    PrincipalPermissionsResponse
+from unifiedui.schema.responses.principals import (
+    PrincipalWithRolesResponse,
+    ResourcePrincipalsResponse
 )
 from unifiedui.exc.autonomous_agents import AutonomousAgentNotFoundError, AutonomousAgentPermissionNotFoundError
 from unifiedui.core.middleware.apis.v1.auth import authenticate, check_permissions
@@ -329,7 +328,7 @@ async def delete_autonomous_agent(
 
 @router.get(
     "/{autonomous_agent_id}/principals",
-    response_model=AutonomousAgentPrincipalsResponse,
+    response_model=ResourcePrincipalsResponse,
     summary="List autonomous agent permissions",
     description="Get all principals with permissions for an autonomous agent"
 )
@@ -349,7 +348,7 @@ async def list_autonomous_agent_permissions(
     tenant_id: str,
     autonomous_agent_id: str,
     handler: AutonomousAgentHandler = Depends(get_autonomous_agent_handler)
-) -> AutonomousAgentPrincipalsResponse:
+) -> ResourcePrincipalsResponse:
     """
     Get all principals with permissions for an autonomous agent.
     
@@ -384,7 +383,7 @@ async def list_autonomous_agent_permissions(
 
 @router.get(
     "/{autonomous_agent_id}/principals/{principal_id}",
-    response_model=PrincipalPermissionsResponse,
+    response_model=PrincipalWithRolesResponse,
     summary="Get autonomous agent permissions for principal",
     description="Get all permissions for a specific principal on an autonomous agent"
 )
@@ -405,7 +404,7 @@ async def get_autonomous_agent_permission(
     autonomous_agent_id: str,
     principal_id: str,
     handler: AutonomousAgentHandler = Depends(get_autonomous_agent_handler)
-) -> PrincipalPermissionsResponse:
+) -> PrincipalWithRolesResponse:
     """
     Get all permissions for a specific principal on an autonomous agent.
     
@@ -442,7 +441,7 @@ async def get_autonomous_agent_permission(
 
 @router.put(
     "/{autonomous_agent_id}/principals",
-    response_model=AutonomousAgentPermissionResponse,
+    response_model=PrincipalWithRolesResponse,
     summary="Set autonomous agent permission",
     description="Set or update a principal's permission for an autonomous agent"
 )
@@ -461,7 +460,7 @@ async def set_autonomous_agent_permission(
     autonomous_agent_id: str,
     permission_request: SetAutonomousAgentPermissionRequest,
     handler: AutonomousAgentHandler = Depends(get_autonomous_agent_handler)
-) -> AutonomousAgentPermissionResponse:
+) -> PrincipalWithRolesResponse:
     """
     Set or update a principal's permission for an autonomous agent.
     

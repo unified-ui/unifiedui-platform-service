@@ -22,10 +22,9 @@ from unifiedui.schema.requests.chat_widget_permissions import SetChatWidgetPermi
 from unifiedui.schema.responses.chat_widgets import ChatWidgetResponse
 from unifiedui.schema.responses.common import QuickListItemResponse
 from unifiedui.schema.responses.tags import TagSummary
-from unifiedui.schema.responses.chat_widget_permissions import (
-    ChatWidgetPermissionResponse,
-    ChatWidgetPrincipalsResponse,
-    PrincipalPermissionsResponse
+from unifiedui.schema.responses.principals import (
+    PrincipalWithRolesResponse,
+    ResourcePrincipalsResponse
 )
 from unifiedui.exc.chat_widgets import ChatWidgetNotFoundError
 from unifiedui.logger import get_logger
@@ -511,18 +510,21 @@ class ChatWidgetHandler:
         
         # Convert to response schema
         principals = [
-            PrincipalPermissionsResponse(
-                chat_widget_id=chat_widget_id,
-                tenant_id=tenant_id,
+            PrincipalWithRolesResponse(
                 principal_id=p["principal_id"],
                 principal_type=p["principal_type"],
-                roles=p["roles"]
+                roles=p["roles"],
+                mail=p.get("mail"),
+                display_name=p.get("display_name"),
+                principal_name=p.get("principal_name"),
+                description=p.get("description")
             )
             for p in result["principals"]
         ]
         
-        return ChatWidgetPrincipalsResponse(
-            chat_widget_id=chat_widget_id,
+        return ResourcePrincipalsResponse(
+            resource_id=chat_widget_id,
+            resource_type="chat_widget",
             tenant_id=tenant_id,
             principals=principals
         )
@@ -532,7 +534,7 @@ class ChatWidgetHandler:
         tenant_id: str,
         chat_widget_id: str,
         principal_id: str
-    ) -> PrincipalPermissionsResponse:
+    ) -> PrincipalWithRolesResponse:
         """
         Get all permissions for a specific principal on a chat widget.
         
@@ -562,12 +564,14 @@ class ChatWidgetHandler:
         except ValueError as e:
             raise ChatWidgetNotFoundError(str(e)) from e
         
-        return PrincipalPermissionsResponse(
-            chat_widget_id=chat_widget_id,
-            tenant_id=tenant_id,
+        return PrincipalWithRolesResponse(
             principal_id=result["principal_id"],
             principal_type=result["principal_type"],
-            roles=result["roles"]
+            roles=result["roles"],
+            mail=result.get("mail"),
+            display_name=result.get("display_name"),
+            principal_name=result.get("principal_name"),
+            description=result.get("description")
         )
 
     def set_chat_widget_permission(
@@ -577,7 +581,7 @@ class ChatWidgetHandler:
         request: SetChatWidgetPermissionRequest,
         user_id: str,
         user: ContextIdentityUser
-    ) -> ChatWidgetPermissionResponse:
+    ) -> PrincipalWithRolesResponse:
         """
         Set or update a permission for a principal on a chat widget.
         
@@ -603,7 +607,7 @@ class ChatWidgetHandler:
         )
         
         try:
-            result = self.permissions_handler.set_permission(
+            self.permissions_handler.set_permission(
                 resource_type="chat_widget",
                 tenant_id=tenant_id,
                 resource_id=chat_widget_id,
@@ -616,15 +620,11 @@ class ChatWidgetHandler:
         except ValueError as e:
             raise ChatWidgetNotFoundError(str(e)) from e
         
-        return ChatWidgetPermissionResponse(
-            id=result["id"],
-            chat_widget_id=chat_widget_id,
+        # Fetch and return the enriched principal data
+        return self.get_chat_widget_permission(
             tenant_id=tenant_id,
-            principal_id=result["principal_id"],
-            principal_type=request.principal_type,
-            role=request.role,
-            created_at=result["created_at"],
-            updated_at=result["updated_at"]
+            chat_widget_id=chat_widget_id,
+            principal_id=request.principal_id
         )
 
     def delete_chat_widget_permission(

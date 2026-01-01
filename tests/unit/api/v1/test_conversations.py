@@ -480,6 +480,9 @@ class TestConversationPrincipalRoutes:
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         
+        assert "resource_id" in data
+        assert "resource_type" in data
+        assert data["resource_type"] == "conversation"
         assert "principals" in data
         assert len(data["principals"]) == 1
         assert data["principals"][0]["principal_id"] == test_user_token.get_id()
@@ -542,7 +545,7 @@ class TestConversationPrincipalRoutes:
         data = response.json()
         
         assert data["principal_id"] == "other-user"
-        assert data["role"] == ROLE_READ
+        assert ROLE_READ in data["roles"]
     
     def test_set_principal_permission_update_existing(self, test_client: TestClient, test_user_token: Any) -> None:
         """Test updating permission for an existing principal."""
@@ -583,7 +586,7 @@ class TestConversationPrincipalRoutes:
         data = update_response.json()
         
         assert data["principal_id"] == "other-user"
-        assert data["role"] == ROLE_WRITE
+        assert ROLE_WRITE in data["roles"]
         
         # Verify only one role exists
         principals_response = test_client.get(

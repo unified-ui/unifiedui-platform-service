@@ -461,7 +461,9 @@ class TestCustomGroupPrincipalRoutes:
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         
-        assert "custom_group_id" in data
+        assert "resource_id" in data
+        assert "resource_type" in data
+        assert data["resource_type"] == "custom_group"
         assert "principals" in data
         assert len(data["principals"]) >= 1  # At least the creator
         

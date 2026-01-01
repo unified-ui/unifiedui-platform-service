@@ -203,6 +203,8 @@ class ResourcePermissionsHandler:
         """
         List all permissions for a resource, grouped by principal.
         
+        Returns enriched principal data including mail, display_name, principal_name, description.
+        
         Args:
             resource_type: Type of resource (application, credential, etc.)
             tenant_id: Tenant ID
@@ -210,7 +212,8 @@ class ResourcePermissionsHandler:
             use_cache: Whether to use caching
             
         Returns:
-            Dict with resource_id, tenant_id, and principals list
+            Dict with resource_id, resource_type, tenant_id, and principals list
+            Each principal includes: principal_id, principal_type, roles, mail, display_name, principal_name, description
         """
         logger.info(
             "Listing permissions",
@@ -239,25 +242,34 @@ class ResourcePermissionsHandler:
             # Verify resource exists
             self._verify_resource_exists(session, resource_type, tenant_id, resource_id)
             
-            # Get all members
+            # Get all members with joined principal data
             query = (
-                select(member_model)
+                select(member_model, Principal)
+                .outerjoin(
+                    Principal,
+                    (member_model.tenant_id == Principal.tenant_id) &
+                    (member_model.principal_id == Principal.principal_id)
+                )
                 .where(
                     getattr(member_model, id_field) == resource_id,
                     member_model.tenant_id == tenant_id
                 )
             )
-            members = session.execute(query).scalars().all()
+            results = session.execute(query).all()
             
             # Group by principal
             principals_dict: Dict[str, Dict[str, Any]] = {}
-            for member in members:
+            for member, principal in results:
                 key = member.principal_id
                 if key not in principals_dict:
                     principals_dict[key] = {
                         "principal_id": member.principal_id,
-                        "principal_type": member.principal.principal_type if hasattr(member, 'principal') and member.principal else None,
-                        "roles": []
+                        "principal_type": principal.principal_type if principal else None,
+                        "roles": [],
+                        "mail": principal.mail if principal else None,
+                        "display_name": principal.display_name if principal else None,
+                        "principal_name": principal.principal_name if principal else None,
+                        "description": principal.description if principal else None,
                     }
                 
                 role_value = member.role.value if hasattr(member.role, 'value') else member.role
@@ -291,6 +303,8 @@ class ResourcePermissionsHandler:
         """
         Get all permissions for a specific principal on a resource.
         
+        Returns enriched principal data including mail, display_name, principal_name, description.
+        
         Args:
             resource_type: Type of resource
             tenant_id: Tenant ID
@@ -298,7 +312,7 @@ class ResourcePermissionsHandler:
             principal_id: Principal ID
             
         Returns:
-            Dict with principal info and roles
+            Dict with principal info, roles, and enriched data from principals table
             
         Raises:
             ValueError: If resource or permission not found
@@ -321,32 +335,46 @@ class ResourcePermissionsHandler:
             # Verify resource exists
             self._verify_resource_exists(session, resource_type, tenant_id, resource_id)
             
-            # Get members for this principal
+            # Get members for this principal with joined principal data
             query = (
-                select(member_model)
+                select(member_model, Principal)
+                .outerjoin(
+                    Principal,
+                    (member_model.tenant_id == Principal.tenant_id) &
+                    (member_model.principal_id == Principal.principal_id)
+                )
                 .where(
                     getattr(member_model, id_field) == resource_id,
                     member_model.tenant_id == tenant_id,
                     member_model.principal_id == principal_id
                 )
             )
-            members = session.execute(query).scalars().all()
+            results = session.execute(query).all()
             
-            if not members:
+            if not results:
                 raise ValueError(f"No permissions found for principal {principal_id} on {resource_type} {resource_id}")
             
-            roles = [
-                m.role.value if hasattr(m.role, 'value') else m.role
-                for m in members
-            ]
+            # Extract roles and principal info
+            roles = []
+            principal_data = None
+            for member, principal in results:
+                role_value = member.role.value if hasattr(member.role, 'value') else member.role
+                if role_value not in roles:
+                    roles.append(role_value)
+                if principal and principal_data is None:
+                    principal_data = principal
             
             return {
                 "resource_id": resource_id,
                 "resource_type": resource_type,
                 "tenant_id": tenant_id,
                 "principal_id": principal_id,
-                "principal_type": members[0].principal.principal_type if hasattr(members[0], 'principal') and members[0].principal else None,
-                "roles": roles
+                "principal_type": principal_data.principal_type if principal_data else None,
+                "roles": roles,
+                "mail": principal_data.mail if principal_data else None,
+                "display_name": principal_data.display_name if principal_data else None,
+                "principal_name": principal_data.principal_name if principal_data else None,
+                "description": principal_data.description if principal_data else None,
             }
 
     def set_permission(

@@ -10,10 +10,9 @@ from unifiedui.handlers.dependencies import get_application_handler
 from unifiedui.schema.requests.applications import CreateApplicationRequest, UpdateApplicationRequest
 from unifiedui.schema.requests.application_permissions import SetApplicationPermissionRequest
 from unifiedui.schema.responses.applications import ApplicationResponse
-from unifiedui.schema.responses.application_permissions import (
-    ApplicationPermissionResponse,
-    ApplicationPrincipalsResponse,
-    PrincipalPermissionsResponse
+from unifiedui.schema.responses.principals import (
+    PrincipalWithRolesResponse,
+    ResourcePrincipalsResponse
 )
 from unifiedui.exc.applications import ApplicationNotFoundError
 from unifiedui.core.middleware.apis.v1.auth import authenticate, check_permissions
@@ -375,7 +374,7 @@ async def delete_application(
 
 @router.get(
     "/{application_id}/principals",
-    response_model=ApplicationPrincipalsResponse,
+    response_model=ResourcePrincipalsResponse,
     summary="List application permissions",
     description="Get all principals with permissions for an application"
 )
@@ -395,7 +394,7 @@ async def list_application_permissions(
     tenant_id: str,
     application_id: str,
     handler: ApplicationHandler = Depends(get_application_handler)
-) -> ApplicationPrincipalsResponse:
+) -> ResourcePrincipalsResponse:
     """
     List all permissions for an application.
     
@@ -408,7 +407,7 @@ async def list_application_permissions(
         handler: Application handler dependency
         
     Returns:
-        Grouped principals with their permissions
+        Unified ResourcePrincipalsResponse with enriched principal data
     """
     try:
         user: ContextIdentityUser = request.state.user
@@ -440,7 +439,7 @@ async def list_application_permissions(
 
 @router.get(
     "/{application_id}/principals/{principal_id}",
-    response_model=PrincipalPermissionsResponse,
+    response_model=PrincipalWithRolesResponse,
     summary="Get application permissions for principal",
     description="Get all permissions for a specific principal on an application"
 )
@@ -461,7 +460,7 @@ async def get_application_permission(
     application_id: str,
     principal_id: str,
     handler: ApplicationHandler = Depends(get_application_handler)
-) -> PrincipalPermissionsResponse:
+) -> PrincipalWithRolesResponse:
     """
     Get all permissions for a specific principal on an application.
     
@@ -475,7 +474,7 @@ async def get_application_permission(
         handler: Application handler dependency
         
     Returns:
-        Principal with all their permissions
+        Unified PrincipalWithRolesResponse with enriched principal data
     """
     try:
         user: ContextIdentityUser = request.state.user
@@ -509,7 +508,7 @@ async def get_application_permission(
 
 @router.put(
     "/{application_id}/principals",
-    response_model=ApplicationPermissionResponse,
+    response_model=PrincipalWithRolesResponse,
     summary="Set application permission",
     description="Set or update a principal's permission for an application"
 )
@@ -528,7 +527,7 @@ async def set_application_permission(
     application_id: str,
     permission_request: SetApplicationPermissionRequest,
     handler: ApplicationHandler = Depends(get_application_handler)
-) -> ApplicationPermissionResponse:
+) -> PrincipalWithRolesResponse:
     """
     Set or update an application permission.
     
@@ -542,7 +541,7 @@ async def set_application_permission(
         handler: Application handler dependency
         
     Returns:
-        Created or updated permission
+        Updated principal with their roles and enriched data
     """
     try:
         user: ContextIdentityUser = request.state.user

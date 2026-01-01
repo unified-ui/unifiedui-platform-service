@@ -10,10 +10,9 @@ from unifiedui.handlers.dependencies import get_development_platform_handler
 from unifiedui.schema.requests.development_platforms import CreateDevelopmentPlatformRequest, UpdateDevelopmentPlatformRequest
 from unifiedui.schema.requests.development_platform_permissions import SetDevelopmentPlatformPermissionRequest
 from unifiedui.schema.responses.development_platforms import DevelopmentPlatformResponse
-from unifiedui.schema.responses.development_platform_permissions import (
-    DevelopmentPlatformPermissionResponse,
-    DevelopmentPlatformPrincipalsResponse,
-    PrincipalPermissionsResponse
+from unifiedui.schema.responses.principals import (
+    PrincipalWithRolesResponse,
+    ResourcePrincipalsResponse
 )
 from unifiedui.exc.development_platforms import DevelopmentPlatformNotFoundError
 from unifiedui.core.middleware.apis.v1.auth import authenticate, check_permissions
@@ -373,7 +372,7 @@ async def delete_development_platform(
 
 @router.get(
     "/{development_platform_id}/principals",
-    response_model=DevelopmentPlatformPrincipalsResponse,
+    response_model=ResourcePrincipalsResponse,
     summary="List development platform permissions",
     description="Get all principals with permissions for a development platform"
 )
@@ -393,7 +392,7 @@ async def list_development_platform_permissions(
     tenant_id: str,
     development_platform_id: str,
     handler: DevelopmentPlatformHandler = Depends(get_development_platform_handler)
-) -> DevelopmentPlatformPrincipalsResponse:
+) -> ResourcePrincipalsResponse:
     """
     List all permissions for a development platform.
     
@@ -438,7 +437,7 @@ async def list_development_platform_permissions(
 
 @router.get(
     "/{development_platform_id}/principals/{principal_id}",
-    response_model=PrincipalPermissionsResponse,
+    response_model=PrincipalWithRolesResponse,
     summary="Get development platform permissions for principal",
     description="Get all permissions for a specific principal on a development platform"
 )
@@ -459,7 +458,7 @@ async def get_development_platform_permission(
     development_platform_id: str,
     principal_id: str,
     handler: DevelopmentPlatformHandler = Depends(get_development_platform_handler)
-) -> PrincipalPermissionsResponse:
+) -> PrincipalWithRolesResponse:
     """
     Get all permissions for a specific principal on a development platform.
     
@@ -507,7 +506,7 @@ async def get_development_platform_permission(
 
 @router.put(
     "/{development_platform_id}/principals",
-    response_model=DevelopmentPlatformPermissionResponse,
+    response_model=PrincipalWithRolesResponse,
     summary="Set development platform permission",
     description="Set or update a principal's permission for a development platform"
 )
@@ -526,7 +525,7 @@ async def set_development_platform_permission(
     development_platform_id: str,
     permission_request: SetDevelopmentPlatformPermissionRequest,
     handler: DevelopmentPlatformHandler = Depends(get_development_platform_handler)
-) -> DevelopmentPlatformPermissionResponse:
+) -> PrincipalWithRolesResponse:
     """
     Set or update a development platform permission.
     

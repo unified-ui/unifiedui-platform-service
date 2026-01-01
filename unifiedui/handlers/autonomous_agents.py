@@ -22,10 +22,9 @@ from unifiedui.schema.requests.autonomous_agent_permissions import SetAutonomous
 from unifiedui.schema.responses.autonomous_agents import AutonomousAgentResponse
 from unifiedui.schema.responses.common import QuickListItemResponse
 from unifiedui.schema.responses.tags import TagSummary
-from unifiedui.schema.responses.autonomous_agent_permissions import (
-    AutonomousAgentPermissionResponse,
-    AutonomousAgentPrincipalsResponse,
-    PrincipalPermissionsResponse
+from unifiedui.schema.responses.principals import (
+    PrincipalWithRolesResponse,
+    ResourcePrincipalsResponse
 )
 from unifiedui.exc.autonomous_agents import AutonomousAgentNotFoundError, AutonomousAgentPermissionNotFoundError
 from unifiedui.logger import get_logger
@@ -544,18 +543,21 @@ class AutonomousAgentHandler:
         
         # Convert to response schema
         principals = [
-            PrincipalPermissionsResponse(
-                autonomous_agent_id=autonomous_agent_id,
-                tenant_id=tenant_id,
+            PrincipalWithRolesResponse(
                 principal_id=p["principal_id"],
                 principal_type=p["principal_type"],
-                roles=p["roles"]
+                roles=p["roles"],
+                mail=p.get("mail"),
+                display_name=p.get("display_name"),
+                principal_name=p.get("principal_name"),
+                description=p.get("description")
             )
             for p in result["principals"]
         ]
         
-        return AutonomousAgentPrincipalsResponse(
-            autonomous_agent_id=autonomous_agent_id,
+        return ResourcePrincipalsResponse(
+            resource_id=autonomous_agent_id,
+            resource_type="autonomous_agent",
             tenant_id=tenant_id,
             principals=principals
         )
@@ -565,7 +567,7 @@ class AutonomousAgentHandler:
         tenant_id: str,
         autonomous_agent_id: str,
         principal_id: str
-    ) -> PrincipalPermissionsResponse:
+    ) -> PrincipalWithRolesResponse:
         """
         Get permissions for a specific principal on an autonomous agent.
         
@@ -596,21 +598,21 @@ class AutonomousAgentHandler:
         except ValueError as e:
             # If permission not found, return empty response
             if "No permissions found" in str(e):
-                return PrincipalPermissionsResponse(
-                    autonomous_agent_id=autonomous_agent_id,
-                    tenant_id=tenant_id,
+                return PrincipalWithRolesResponse(
                     principal_id=principal_id,
                     principal_type="",
                     roles=[]
                 )
             raise AutonomousAgentNotFoundError(str(e)) from e
         
-        return PrincipalPermissionsResponse(
-            autonomous_agent_id=autonomous_agent_id,
-            tenant_id=tenant_id,
+        return PrincipalWithRolesResponse(
             principal_id=result["principal_id"],
             principal_type=result["principal_type"],
-            roles=result["roles"]
+            roles=result["roles"],
+            mail=result.get("mail"),
+            display_name=result.get("display_name"),
+            principal_name=result.get("principal_name"),
+            description=result.get("description")
         )
 
     def set_autonomous_agent_permission(
@@ -620,7 +622,7 @@ class AutonomousAgentHandler:
         request: SetAutonomousAgentPermissionRequest,
         user_id: str,
         user: ContextIdentityUser
-    ) -> AutonomousAgentPermissionResponse:
+    ) -> PrincipalWithRolesResponse:
         """
         Set or update a permission for a principal on an autonomous agent.
         
@@ -645,7 +647,7 @@ class AutonomousAgentHandler:
         })
         
         try:
-            result = self.permissions_handler.set_permission(
+            self.permissions_handler.set_permission(
                 resource_type="autonomous_agent",
                 tenant_id=tenant_id,
                 resource_id=autonomous_agent_id,
@@ -658,15 +660,11 @@ class AutonomousAgentHandler:
         except ValueError as e:
             raise AutonomousAgentNotFoundError(str(e)) from e
         
-        return AutonomousAgentPermissionResponse(
-            id=result["id"],
-            autonomous_agent_id=autonomous_agent_id,
+        # Fetch and return the enriched principal data
+        return self.get_autonomous_agent_permission(
             tenant_id=tenant_id,
-            principal_id=result["principal_id"],
-            principal_type=request.principal_type,
-            role=request.role,
-            created_at=result["created_at"],
-            updated_at=result["updated_at"]
+            autonomous_agent_id=autonomous_agent_id,
+            principal_id=request.principal_id
         )
 
     def delete_autonomous_agent_permission(

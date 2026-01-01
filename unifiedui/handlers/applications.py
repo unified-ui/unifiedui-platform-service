@@ -22,10 +22,9 @@ from unifiedui.schema.requests.application_permissions import SetApplicationPerm
 from unifiedui.schema.responses.applications import ApplicationResponse
 from unifiedui.schema.responses.common import QuickListItemResponse
 from unifiedui.schema.responses.tags import TagSummary
-from unifiedui.schema.responses.application_permissions import (
-    ApplicationPermissionResponse,
-    ApplicationPrincipalsResponse,
-    PrincipalPermissionsResponse
+from unifiedui.schema.responses.principals import (
+    PrincipalWithRolesResponse,
+    ResourcePrincipalsResponse
 )
 from unifiedui.exc.applications import ApplicationNotFoundError
 from unifiedui.logger import get_logger
@@ -475,7 +474,7 @@ class ApplicationHandler:
         tenant_id: str,
         application_id: str,
         use_cache: bool = True
-    ) -> ApplicationPrincipalsResponse:
+    ) -> ResourcePrincipalsResponse:
         """
         List all permissions for an application, grouped by principal.
         
@@ -485,7 +484,7 @@ class ApplicationHandler:
             use_cache: Whether to use caching
             
         Returns:
-            Grouped principals with their permissions
+            Unified ResourcePrincipalsResponse with enriched principal data
             
         Raises:
             ApplicationNotFoundError: If application not found
@@ -502,20 +501,23 @@ class ApplicationHandler:
         except ValueError as e:
             raise ApplicationNotFoundError(application_id) from e
         
-        # Convert to response schema
+        # Convert to unified response schema
         principals = [
-            PrincipalPermissionsResponse(
-                application_id=application_id,
-                tenant_id=tenant_id,
+            PrincipalWithRolesResponse(
                 principal_id=p["principal_id"],
                 principal_type=p["principal_type"],
-                roles=p["roles"]
+                roles=p["roles"],
+                mail=p.get("mail"),
+                display_name=p.get("display_name"),
+                principal_name=p.get("principal_name"),
+                description=p.get("description")
             )
             for p in result["principals"]
         ]
         
-        return ApplicationPrincipalsResponse(
-            application_id=application_id,
+        return ResourcePrincipalsResponse(
+            resource_id=application_id,
+            resource_type="application",
             tenant_id=tenant_id,
             principals=principals
         )
@@ -525,7 +527,7 @@ class ApplicationHandler:
         tenant_id: str,
         application_id: str,
         principal_id: str
-    ) -> PrincipalPermissionsResponse:
+    ) -> PrincipalWithRolesResponse:
         """
         Get all permissions for a specific principal on an application.
         
@@ -535,7 +537,7 @@ class ApplicationHandler:
             principal_id: The ID of the principal
             
         Returns:
-            Principal with all their permissions
+            Unified PrincipalWithRolesResponse with enriched principal data
             
         Raises:
             ApplicationNotFoundError: If application or permission not found
@@ -555,12 +557,14 @@ class ApplicationHandler:
         except ValueError as e:
             raise ApplicationNotFoundError(str(e)) from e
         
-        return PrincipalPermissionsResponse(
-            application_id=application_id,
-            tenant_id=tenant_id,
+        return PrincipalWithRolesResponse(
             principal_id=result["principal_id"],
             principal_type=result["principal_type"],
-            roles=result["roles"]
+            roles=result["roles"],
+            mail=result.get("mail"),
+            display_name=result.get("display_name"),
+            principal_name=result.get("principal_name"),
+            description=result.get("description")
         )
 
     def set_application_permission(
@@ -570,7 +574,7 @@ class ApplicationHandler:
         request: SetApplicationPermissionRequest,
         user_id: str,
         user: ContextIdentityUser
-    ) -> ApplicationPermissionResponse:
+    ) -> PrincipalWithRolesResponse:
         """
         Set or update a permission for a principal on an application.
         
@@ -581,7 +585,7 @@ class ApplicationHandler:
             user_id: The ID of the user setting the permission
             
         Returns:
-            Created or updated permission
+            Updated principal with their roles
             
         Raises:
             ApplicationNotFoundError: If application not found
@@ -596,7 +600,7 @@ class ApplicationHandler:
         )
         
         try:
-            result = self.permissions_handler.set_permission(
+            self.permissions_handler.set_permission(
                 resource_type="application",
                 tenant_id=tenant_id,
                 resource_id=application_id,
@@ -606,18 +610,25 @@ class ApplicationHandler:
                 user_id=user_id,
                 user=user
             )
+            
+            # Fetch and return the updated permission with all enriched data
+            result = self.permissions_handler.get_permission(
+                resource_type="application",
+                tenant_id=tenant_id,
+                resource_id=application_id,
+                principal_id=request.principal_id
+            )
         except ValueError as e:
             raise ApplicationNotFoundError(str(e)) from e
         
-        return ApplicationPermissionResponse(
-            id=result["id"],
-            application_id=application_id,
-            tenant_id=tenant_id,
+        return PrincipalWithRolesResponse(
             principal_id=result["principal_id"],
-            principal_type=request.principal_type,
-            role=request.role,
-            created_at=result["created_at"],
-            updated_at=result["updated_at"]
+            principal_type=result["principal_type"],
+            roles=result["roles"],
+            mail=result.get("mail"),
+            display_name=result.get("display_name"),
+            principal_name=result.get("principal_name"),
+            description=result.get("description")
         )
 
     def delete_application_permission(

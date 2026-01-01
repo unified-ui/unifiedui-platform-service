@@ -18,10 +18,9 @@ if TYPE_CHECKING:
 from unifiedui.schema.requests.conversations import CreateConversationRequest, UpdateConversationRequest
 from unifiedui.schema.requests.conversation_permissions import SetConversationPermissionRequest
 from unifiedui.schema.responses.conversations import ConversationResponse
-from unifiedui.schema.responses.conversation_permissions import (
-    ConversationPermissionResponse,
-    ConversationPrincipalsResponse,
-    PrincipalPermissionsResponse
+from unifiedui.schema.responses.principals import (
+    PrincipalWithRolesResponse,
+    ResourcePrincipalsResponse
 )
 from unifiedui.exc.conversations import ConversationNotFoundError
 from unifiedui.logger import get_logger
@@ -449,18 +448,21 @@ class ConversationHandler:
         
         # Convert to response schema
         principals = [
-            PrincipalPermissionsResponse(
-                conversation_id=conversation_id,
-                tenant_id=tenant_id,
+            PrincipalWithRolesResponse(
                 principal_id=p["principal_id"],
                 principal_type=p["principal_type"],
-                roles=p["roles"]
+                roles=p["roles"],
+                mail=p.get("mail"),
+                display_name=p.get("display_name"),
+                principal_name=p.get("principal_name"),
+                description=p.get("description")
             )
             for p in result["principals"]
         ]
         
-        return ConversationPrincipalsResponse(
-            conversation_id=conversation_id,
+        return ResourcePrincipalsResponse(
+            resource_id=conversation_id,
+            resource_type="conversation",
             tenant_id=tenant_id,
             principals=principals
         )
@@ -470,7 +472,7 @@ class ConversationHandler:
         tenant_id: str,
         conversation_id: str,
         principal_id: str
-    ) -> PrincipalPermissionsResponse:
+    ) -> PrincipalWithRolesResponse:
         """
         Get all permissions for a specific principal on a conversation.
         
@@ -500,12 +502,14 @@ class ConversationHandler:
         except ValueError as e:
             raise ConversationNotFoundError(str(e)) from e
         
-        return PrincipalPermissionsResponse(
-            conversation_id=conversation_id,
-            tenant_id=tenant_id,
+        return PrincipalWithRolesResponse(
             principal_id=result["principal_id"],
             principal_type=result["principal_type"],
-            roles=result["roles"]
+            roles=result["roles"],
+            mail=result.get("mail"),
+            display_name=result.get("display_name"),
+            principal_name=result.get("principal_name"),
+            description=result.get("description")
         )
 
     def set_conversation_permission(
@@ -515,7 +519,7 @@ class ConversationHandler:
         request: SetConversationPermissionRequest,
         user_id: str,
         user: ContextIdentityUser
-    ) -> ConversationPermissionResponse:
+    ) -> PrincipalWithRolesResponse:
         """
         Set or update a permission for a principal on a conversation.
         
@@ -541,7 +545,7 @@ class ConversationHandler:
         )
         
         try:
-            result = self.permissions_handler.set_permission(
+            self.permissions_handler.set_permission(
                 resource_type="conversation",
                 tenant_id=tenant_id,
                 resource_id=conversation_id,
@@ -554,15 +558,11 @@ class ConversationHandler:
         except ValueError as e:
             raise ConversationNotFoundError(str(e)) from e
         
-        return ConversationPermissionResponse(
-            id=result["id"],
-            conversation_id=conversation_id,
+        # Fetch and return the enriched principal data
+        return self.get_conversation_permission(
             tenant_id=tenant_id,
-            principal_id=result["principal_id"],
-            principal_type=request.principal_type,
-            role=request.role,
-            created_at=result["created_at"],
-            updated_at=result["updated_at"]
+            conversation_id=conversation_id,
+            principal_id=request.principal_id
         )
 
     def delete_conversation_permission(

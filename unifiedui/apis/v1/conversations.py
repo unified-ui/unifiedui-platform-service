@@ -10,10 +10,9 @@ from unifiedui.handlers.dependencies import get_conversation_handler
 from unifiedui.schema.requests.conversations import CreateConversationRequest, UpdateConversationRequest
 from unifiedui.schema.requests.conversation_permissions import SetConversationPermissionRequest
 from unifiedui.schema.responses.conversations import ConversationResponse
-from unifiedui.schema.responses.conversation_permissions import (
-    ConversationPermissionResponse,
-    ConversationPrincipalsResponse,
-    PrincipalPermissionsResponse
+from unifiedui.schema.responses.principals import (
+    PrincipalWithRolesResponse,
+    ResourcePrincipalsResponse
 )
 from unifiedui.exc.conversations import ConversationNotFoundError
 from unifiedui.core.middleware.apis.v1.auth import authenticate, check_permissions
@@ -356,7 +355,7 @@ async def delete_conversation(
 
 @router.get(
     "/{conversation_id}/principals",
-    response_model=ConversationPrincipalsResponse,
+    response_model=ResourcePrincipalsResponse,
     summary="List conversation permissions",
     description="Get all principals with permissions for a conversation"
 )
@@ -376,7 +375,7 @@ async def list_conversation_permissions(
     tenant_id: str,
     conversation_id: str,
     handler: ConversationHandler = Depends(get_conversation_handler)
-) -> ConversationPrincipalsResponse:
+) -> ResourcePrincipalsResponse:
     """
     List all permissions for a conversation.
     
@@ -421,7 +420,7 @@ async def list_conversation_permissions(
 
 @router.get(
     "/{conversation_id}/principals/{principal_id}",
-    response_model=PrincipalPermissionsResponse,
+    response_model=PrincipalWithRolesResponse,
     summary="Get conversation permissions for principal",
     description="Get all permissions for a specific principal on a conversation"
 )
@@ -442,7 +441,7 @@ async def get_conversation_permission(
     conversation_id: str,
     principal_id: str,
     handler: ConversationHandler = Depends(get_conversation_handler)
-) -> PrincipalPermissionsResponse:
+) -> PrincipalWithRolesResponse:
     """
     Get all permissions for a specific principal on a conversation.
     
@@ -490,7 +489,7 @@ async def get_conversation_permission(
 
 @router.put(
     "/{conversation_id}/principals",
-    response_model=ConversationPermissionResponse,
+    response_model=PrincipalWithRolesResponse,
     summary="Set conversation permission",
     description="Set or update a principal's permission for a conversation"
 )
@@ -509,7 +508,7 @@ async def set_conversation_permission(
     conversation_id: str,
     permission_request: SetConversationPermissionRequest,
     handler: ConversationHandler = Depends(get_conversation_handler)
-) -> ConversationPermissionResponse:
+) -> PrincipalWithRolesResponse:
     """
     Set or update a conversation permission.
     

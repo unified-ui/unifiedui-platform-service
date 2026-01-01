@@ -10,10 +10,9 @@ from unifiedui.handlers.dependencies import get_credential_handler
 from unifiedui.schema.requests.credentials import CreateCredentialRequest, UpdateCredentialRequest
 from unifiedui.schema.requests.credential_permissions import SetCredentialPermissionRequest
 from unifiedui.schema.responses.credentials import CredentialResponse
-from unifiedui.schema.responses.credential_permissions import (
-    CredentialPermissionResponse,
-    CredentialPrincipalsResponse,
-    PrincipalPermissionsResponse
+from unifiedui.schema.responses.principals import (
+    PrincipalWithRolesResponse,
+    ResourcePrincipalsResponse
 )
 from unifiedui.exc.credentials import CredentialNotFoundError
 from unifiedui.core.middleware.apis.v1.auth import authenticate, check_permissions
@@ -376,7 +375,7 @@ async def delete_credential(
 
 @router.get(
     "/{credential_id}/principals",
-    response_model=CredentialPrincipalsResponse,
+    response_model=ResourcePrincipalsResponse,
     summary="List credential permissions",
     description="Get all principals with permissions for a credential"
 )
@@ -392,7 +391,7 @@ async def list_credential_permissions(
     tenant_id: str,
     credential_id: str,
     handler: CredentialHandler = Depends(get_credential_handler)
-) -> CredentialPrincipalsResponse:
+) -> ResourcePrincipalsResponse:
     """
     List all permissions for a credential.
     
@@ -437,7 +436,7 @@ async def list_credential_permissions(
 
 @router.get(
     "/{credential_id}/principals/{principal_id}",
-    response_model=PrincipalPermissionsResponse,
+    response_model=PrincipalWithRolesResponse,
     summary="Get credential permissions for principal",
     description="Get all permissions for a specific principal on a credential"
 )
@@ -452,7 +451,7 @@ async def get_credential_permission(
     credential_id: str,
     principal_id: str,
     handler: CredentialHandler = Depends(get_credential_handler)
-) -> PrincipalPermissionsResponse:
+) -> PrincipalWithRolesResponse:
     """
     Get all permissions for a specific principal on a credential.
     
@@ -500,7 +499,7 @@ async def get_credential_permission(
 
 @router.put(
     "/{credential_id}/principals",
-    response_model=CredentialPermissionResponse,
+    response_model=PrincipalWithRolesResponse,
     summary="Set credential permission",
     description="Set or update a principal's permission for a credential"
 )
@@ -516,7 +515,7 @@ async def set_credential_permission(
     credential_id: str,
     permission_request: SetCredentialPermissionRequest,
     handler: CredentialHandler = Depends(get_credential_handler)
-) -> CredentialPermissionResponse:
+) -> PrincipalWithRolesResponse:
     """
     Set or update a credential permission.
     

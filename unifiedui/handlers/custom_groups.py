@@ -19,10 +19,10 @@ from unifiedui.schema.requests.custom_groups import (
     SetPrincipalRoleRequest,
     DeletePrincipalRoleRequest
 )
-from unifiedui.schema.responses.custom_groups import (
-    CustomGroupResponse,
-    CustomGroupPrincipalsResponse,
-    PrincipalsResponse
+from unifiedui.schema.responses.custom_groups import CustomGroupResponse
+from unifiedui.schema.responses.principals import (
+    PrincipalWithRolesResponse,
+    ResourcePrincipalsResponse
 )
 from unifiedui.exc.custom_groups import CustomGroupNotFoundError
 from unifiedui.logger import get_logger
@@ -433,6 +433,7 @@ class CustomGroupHandler:
                     "display_name": principal.display_name,
                     "principal_name": principal.principal_name,
                     "mail": principal.mail,
+                    "description": principal.description,
                     "role": member.role,
                     "created_at": member.created_at.isoformat() if member.created_at else None,
                     "updated_at": member.updated_at.isoformat() if member.updated_at else None
@@ -667,33 +668,42 @@ class CustomGroupHandler:
         self,
         tenant_id: str,
         custom_group_id: str
-    ) -> dict:
-        """Alias for list_custom_group_members for backwards compatibility.
+    ) -> ResourcePrincipalsResponse:
+        """List all principals with their roles on a custom group.
         
-        Returns data in the format expected by CustomGroupPrincipalsResponse.
+        Returns unified ResourcePrincipalsResponse with enriched principal data.
         """
         result = self.list_custom_group_members(tenant_id, custom_group_id)
-        # Convert 'members' to 'principals' format with roles list
+        # Convert 'members' to 'principals' format with enriched data
         principals = []
         for member in result.get("members", []):
-            principals.append({
-                "principal_id": member["principal_id"],
-                "principal_type": member.get("principal_type"),
-                "roles": [member["role"]] if member.get("role") else []
-            })
-        return {
-            "custom_group_id": result["custom_group_id"],
-            "tenant_id": result["tenant_id"],
-            "principals": principals
-        }
+            principals.append(PrincipalWithRolesResponse(
+                principal_id=member["principal_id"],
+                principal_type=member.get("principal_type"),
+                roles=[member["role"]] if member.get("role") else [],
+                mail=member.get("mail"),
+                display_name=member.get("display_name"),
+                principal_name=member.get("principal_name"),
+                description=member.get("description")
+            ))
+        return ResourcePrincipalsResponse(
+            resource_id=result["custom_group_id"],
+            resource_type="custom_group",
+            tenant_id=result["tenant_id"],
+            principals=principals
+        )
     
     def get_principal_permissions(
         self,
         tenant_id: str,
         custom_group_id: str,
         principal_id: str
-    ) -> dict:
-        """Get permissions for a specific principal on a custom group."""
+    ) -> PrincipalWithRolesResponse:
+        """Get permissions for a specific principal on a custom group.
+        
+        Returns unified PrincipalWithRolesResponse with enriched principal data.
+        Raises PrincipalNotFoundError if principal is not a member of this group.
+        """
         logger.info(
             "Getting principal permissions",
             extra={"tenant_id": tenant_id, "custom_group_id": custom_group_id, "principal_id": principal_id}
@@ -710,10 +720,10 @@ class CustomGroupHandler:
             if not group:
                 raise CustomGroupNotFoundError(custom_group_id)
             
-            # Get member with principal info
+            # Get member with principal info using outer join
             query = (
                 select(CustomGroupMember, Principal)
-                .join(
+                .outerjoin(
                     Principal,
                     and_(
                         CustomGroupMember.tenant_id == Principal.tenant_id,
@@ -730,23 +740,22 @@ class CustomGroupHandler:
             result = session.execute(query).first()
             
             if not result:
-                # Member not found in this group
-                return {
-                    "custom_group_id": custom_group_id,
-                    "tenant_id": tenant_id,
-                    "principal_id": principal_id,
-                    "principal_type": None,
-                    "roles": []
-                }
+                # Member not found in this group - raise error
+                from unifiedui.exc.principal import PrincipalNotFoundError
+                raise PrincipalNotFoundError(principal_id)
             
             member, principal = result
-            return {
-                "custom_group_id": custom_group_id,
-                "tenant_id": tenant_id,
-                "principal_id": principal_id,
-                "principal_type": principal.principal_type,
-                "roles": [member.role] if member.role else []
-            }
+            # Use member's principal_type if Principal record doesn't exist (outer join)
+            p_type = principal.principal_type if principal else member.principal_type
+            return PrincipalWithRolesResponse(
+                principal_id=principal_id,
+                principal_type=p_type,
+                roles=[member.role] if member.role else [],
+                mail=principal.mail if principal else None,
+                display_name=principal.display_name if principal else None,
+                principal_name=principal.principal_name if principal else None,
+                description=principal.description
+            )
     
     def set_principal_permission(
         self,
@@ -757,16 +766,13 @@ class CustomGroupHandler:
         role: str,
         user_id: str,
         user: ContextIdentityUser
-    ) -> dict:
-        """Alias for set_member_role for backwards compatibility."""
-        result = self.set_member_role(tenant_id, custom_group_id, principal_id, principal_type, role, user_id, user)
-        return {
-            "custom_group_id": result["custom_group_id"],
-            "tenant_id": result["tenant_id"],
-            "principal_id": result["principal_id"],
-            "principal_type": principal_type,
-            "roles": [result["role"]] if result["role"] else []
-        }
+    ) -> PrincipalWithRolesResponse:
+        """Set a principal's permission on a custom group.
+        
+        Returns unified PrincipalWithRolesResponse with enriched principal data.
+        """
+        self.set_member_role(tenant_id, custom_group_id, principal_id, principal_type, role, user_id, user)
+        return self.get_principal_permissions(tenant_id, custom_group_id, principal_id)
     
     def delete_principal_permission(
         self,
@@ -775,10 +781,55 @@ class CustomGroupHandler:
         principal_id: str,
         principal_type: str,
         role: str
-    ) -> dict:
-        """Alias for delete_member for backwards compatibility."""
+    ) -> PrincipalWithRolesResponse:
+        """Delete a principal's permission from a custom group.
+        
+        Returns unified PrincipalWithRolesResponse with remaining permissions (empty list after deletion).
+        """
+        # Get principal info before deletion to ensure we have the type for response
+        principal_info = None
+        with self.db_client.get_session() as session:
+            # Try to get principal info from Principal table
+            principal_query = select(Principal).where(
+                Principal.tenant_id == tenant_id,
+                Principal.principal_id == principal_id
+            )
+            principal = session.execute(principal_query).scalar_one_or_none()
+            # Extract values while in session to avoid DetachedInstanceError
+            if principal:
+                principal_info = {
+                    "principal_type": principal.principal_type,
+                    "mail": principal.mail,
+                    "display_name": principal.display_name,
+                    "principal_name": principal.principal_name,
+                    "description": principal.description
+                }
+        
+        # Perform deletion
         self.delete_member(tenant_id, custom_group_id, principal_id)
-        return self.get_principal_permissions(tenant_id, custom_group_id, principal_id)
+        
+        # Return response - use principal info if available, otherwise use passed principal_type
+        if principal_info:
+            return PrincipalWithRolesResponse(
+                principal_id=principal_id,
+                principal_type=principal_info["principal_type"],
+                roles=[],  # Empty after deletion
+                mail=principal_info["mail"],
+                display_name=principal_info["display_name"],
+                principal_name=principal_info["principal_name"],
+                description=principal_info["description"]
+            )
+        else:
+            # Principal not in table (e.g., unsynced external user)
+            return PrincipalWithRolesResponse(
+                principal_id=principal_id,
+                principal_type=principal_type,  # Use passed type
+                roles=[],  # Empty after deletion
+                mail=None,
+                display_name=None,
+                principal_name=None,
+                description=None
+            )
     
     @staticmethod
     def _principal_to_response(principal: Principal) -> CustomGroupResponse:

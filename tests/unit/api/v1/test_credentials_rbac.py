@@ -159,7 +159,7 @@ class TestCredentialRBAC:
         )
         
         assert add_response.status_code == status.HTTP_200_OK
-        assert add_response.json()["role"] == ROLE_READ
+        assert ROLE_READ in add_response.json()["roles"]
         
         # Remove the role
         delete_response = test_client.request(
@@ -444,7 +444,7 @@ class TestCredentialRBAC:
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         
-        assert data["role"] == ROLE_WRITE
+        assert ROLE_WRITE in data["roles"]
     
     def test_removing_admin_role(self, test_client: TestClient, fake_redis_client: Any) -> None:
         """Test removing ADMIN role from a user."""

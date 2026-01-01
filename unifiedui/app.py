@@ -12,6 +12,7 @@ from unifiedui.exc.credentials import CredentialNotFoundError
 from unifiedui.exc.conversations import ConversationNotFoundError
 from unifiedui.exc.development_platforms import DevelopmentPlatformNotFoundError
 from unifiedui.exc.chat_widgets import ChatWidgetNotFoundError
+from unifiedui.exc.principal import PrincipalNotFoundError
 from unifiedui.exc.tags import TagNotFoundError, TagDeleteNotAllowedError
 
 from unifiedui.core.config import settings
@@ -167,6 +168,14 @@ def create_app() -> FastAPI:
             content={"detail": str(exc)}
         )
     
+    @app.exception_handler(PrincipalNotFoundError)
+    async def principal_not_found_handler(request: Request, exc: PrincipalNotFoundError):
+        """Handle principal not found errors."""
+        return JSONResponse(
+            status_code=404,
+            content={"detail": str(exc)}
+        )
+
     # Include routers
     app.include_router(
         health.router,

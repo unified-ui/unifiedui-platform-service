@@ -13,10 +13,10 @@ from unifiedui.schema.requests.custom_groups import (
     SetPrincipalRoleRequest,
     DeletePrincipalRoleRequest
 )
-from unifiedui.schema.responses.custom_groups import (
-    CustomGroupResponse,
-    CustomGroupPrincipalsResponse,
-    PrincipalsResponse
+from unifiedui.schema.responses.custom_groups import CustomGroupResponse
+from unifiedui.schema.responses.principals import (
+    PrincipalWithRolesResponse,
+    ResourcePrincipalsResponse
 )
 
 
@@ -197,7 +197,7 @@ async def delete_custom_group(
 
 @router.get(
     "/{custom_group_id}/principals",
-    response_model=CustomGroupPrincipalsResponse,
+    response_model=ResourcePrincipalsResponse,
     status_code=status.HTTP_200_OK,
     summary="List Custom Group Principals",
     description="Get all principals and their permissions for a custom group"
@@ -209,7 +209,7 @@ async def list_custom_group_principals(
     tenant_id: str,
     custom_group_id: str,
     handler: CustomGroupHandler = Depends(get_custom_group_handler)
-) -> CustomGroupPrincipalsResponse:
+) -> ResourcePrincipalsResponse:
     """
     Get all principals and their permissions for a specific custom group.
     Requires READ, WRITE, or ADMIN permission on the group, or GLOBAL_ADMIN/CUSTOM_GROUPS_ADMIN on tenant.
@@ -221,15 +221,14 @@ async def list_custom_group_principals(
         handler: Custom group handler dependency
     
     Returns:
-        CustomGroupPrincipalsResponse: All principals with their permissions on the custom group
+        ResourcePrincipalsResponse: All principals with their permissions on the custom group
     """
-    result = handler.list_custom_group_principals(tenant_id, custom_group_id)
-    return CustomGroupPrincipalsResponse(**result)
+    return handler.list_custom_group_principals(tenant_id, custom_group_id)
 
 
 @router.get(
     "/{custom_group_id}/principals/{principal_id}",
-    response_model=PrincipalsResponse,
+    response_model=PrincipalWithRolesResponse,
     status_code=status.HTTP_200_OK,
     summary="Get Principal Permissions",
     description="Get all permissions for a specific principal on a custom group"
@@ -242,7 +241,7 @@ async def get_principal_permissions(
     custom_group_id: str,
     principal_id: str,
     handler: CustomGroupHandler = Depends(get_custom_group_handler)
-) -> PrincipalsResponse:
+) -> PrincipalWithRolesResponse:
     """
     Get all permissions for a specific principal on a custom group.
     Requires READ, WRITE, or ADMIN permission on the group, or GLOBAL_ADMIN/CUSTOM_GROUPS_ADMIN on tenant.
@@ -255,15 +254,14 @@ async def get_principal_permissions(
         handler: Custom group handler dependency
     
     Returns:
-        PrincipalsResponse: Principal's permissions on the custom group
+        PrincipalWithRolesResponse: Principal's permissions on the custom group
     """
-    result = handler.get_principal_permissions(tenant_id, custom_group_id, principal_id)
-    return PrincipalsResponse(**result)
+    return handler.get_principal_permissions(tenant_id, custom_group_id, principal_id)
 
 
 @router.put(
     "/{custom_group_id}/principals",
-    response_model=PrincipalsResponse,
+    response_model=PrincipalWithRolesResponse,
     status_code=status.HTTP_200_OK,
     summary="Set Principal Permission",
     description="Add or update a permission for a principal on a custom group (requires ADMIN)"
@@ -276,7 +274,7 @@ async def set_principal_permission(
     custom_group_id: str,
     role_data: SetPrincipalRoleRequest,
     handler: CustomGroupHandler = Depends(get_custom_group_handler)
-) -> PrincipalsResponse:
+) -> PrincipalWithRolesResponse:
     """
     Add or update a permission for a principal on a custom group.
     Requires ADMIN permission on the group, or GLOBAL_ADMIN/CUSTOM_GROUPS_ADMIN on tenant.
@@ -290,12 +288,12 @@ async def set_principal_permission(
         handler: Custom group handler dependency
     
     Returns:
-        PrincipalsResponse: Updated principal's permissions on the custom group
+        PrincipalWithRolesResponse: Updated principal's permissions on the custom group
     """
     user: ContextIdentityUser = request.state.user
     user_id = user.identity.get_id()
     
-    result = handler.set_principal_permission(
+    return handler.set_principal_permission(
         tenant_id=tenant_id,
         custom_group_id=custom_group_id,
         principal_id=role_data.principal_id,
@@ -304,12 +302,11 @@ async def set_principal_permission(
         user_id=user_id,
         user=user
     )
-    return PrincipalsResponse(**result)
 
 
 @router.delete(
     "/{custom_group_id}/principals",
-    response_model=PrincipalsResponse,
+    response_model=PrincipalWithRolesResponse,
     status_code=status.HTTP_200_OK,
     summary="Delete Principal Permission",
     description="Remove a specific permission from a principal on a custom group (requires ADMIN)"
@@ -322,7 +319,7 @@ async def delete_principal_permission(
     custom_group_id: str,
     role_data: DeletePrincipalRoleRequest,
     handler: CustomGroupHandler = Depends(get_custom_group_handler)
-) -> PrincipalsResponse:
+) -> PrincipalWithRolesResponse:
     """
     Remove a specific permission from a principal on a custom group.
     Requires ADMIN permission on the group, or GLOBAL_ADMIN/CUSTOM_GROUPS_ADMIN on tenant.
@@ -336,13 +333,12 @@ async def delete_principal_permission(
         handler: Custom group handler dependency
     
     Returns:
-        PrincipalsResponse: Remaining principal's permissions on the custom group
+        PrincipalWithRolesResponse: Remaining principal's permissions on the custom group
     """
-    result = handler.delete_principal_permission(
+    return handler.delete_principal_permission(
         tenant_id=tenant_id,
         custom_group_id=custom_group_id,
         principal_id=role_data.principal_id,
         principal_type=role_data.principal_type,
         role=role_data.role
     )
-    return PrincipalsResponse(**result)

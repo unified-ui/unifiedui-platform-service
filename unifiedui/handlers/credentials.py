@@ -23,10 +23,9 @@ from unifiedui.schema.requests.credential_permissions import SetCredentialPermis
 from unifiedui.schema.responses.credentials import CredentialResponse
 from unifiedui.schema.responses.common import QuickListItemResponse
 from unifiedui.schema.responses.tags import TagSummary
-from unifiedui.schema.responses.credential_permissions import (
-    CredentialPermissionResponse,
-    CredentialPrincipalsResponse,
-    PrincipalPermissionsResponse
+from unifiedui.schema.responses.principals import (
+    PrincipalWithRolesResponse,
+    ResourcePrincipalsResponse
 )
 from unifiedui.exc.credentials import CredentialNotFoundError
 from unifiedui.logger import get_logger
@@ -601,18 +600,21 @@ class CredentialHandler:
         
         # Convert to response schema
         principals = [
-            PrincipalPermissionsResponse(
-                credential_id=credential_id,
-                tenant_id=tenant_id,
+            PrincipalWithRolesResponse(
                 principal_id=p["principal_id"],
                 principal_type=p["principal_type"],
-                roles=p["roles"]
+                roles=p["roles"],
+                mail=p.get("mail"),
+                display_name=p.get("display_name"),
+                principal_name=p.get("principal_name"),
+                description=p.get("description")
             )
             for p in result["principals"]
         ]
         
-        return CredentialPrincipalsResponse(
-            credential_id=credential_id,
+        return ResourcePrincipalsResponse(
+            resource_id=credential_id,
+            resource_type="credential",
             tenant_id=tenant_id,
             principals=principals
         )
@@ -622,7 +624,7 @@ class CredentialHandler:
         tenant_id: str,
         credential_id: str,
         principal_id: str
-    ) -> PrincipalPermissionsResponse:
+    ) -> PrincipalWithRolesResponse:
         """
         Get all permissions for a specific principal on a credential.
         
@@ -653,12 +655,14 @@ class CredentialHandler:
         except ValueError as e:
             raise CredentialNotFoundError(str(e)) from e
         
-        return PrincipalPermissionsResponse(
-            credential_id=credential_id,
-            tenant_id=tenant_id,
+        return PrincipalWithRolesResponse(
             principal_id=result["principal_id"],
             principal_type=result["principal_type"],
-            roles=result["roles"]
+            roles=result["roles"],
+            mail=result.get("mail"),
+            display_name=result.get("display_name"),
+            principal_name=result.get("principal_name"),
+            description=result.get("description")
         )
 
     def set_credential_permission(
@@ -668,7 +672,7 @@ class CredentialHandler:
         request: SetCredentialPermissionRequest,
         user_id: str,
         user: ContextIdentityUser
-    ) -> CredentialPermissionResponse:
+    ) -> PrincipalWithRolesResponse:
         """
         Set or update a credential permission.
         
@@ -691,7 +695,7 @@ class CredentialHandler:
         })
         
         try:
-            result = self.permissions_handler.set_permission(
+            self.permissions_handler.set_permission(
                 resource_type="credential",
                 tenant_id=tenant_id,
                 resource_id=credential_id,
@@ -704,15 +708,11 @@ class CredentialHandler:
         except ValueError as e:
             raise CredentialNotFoundError(str(e)) from e
         
-        return CredentialPermissionResponse(
-            id=result["id"],
-            credential_id=credential_id,
+        # Fetch and return the enriched principal data
+        return self.get_credential_permission(
             tenant_id=tenant_id,
-            principal_id=result["principal_id"],
-            principal_type=request.principal_type,
-            role=request.role,
-            created_at=result["created_at"],
-            updated_at=result["updated_at"]
+            credential_id=credential_id,
+            principal_id=request.principal_id
         )
 
     def delete_credential_permission(
