@@ -192,12 +192,19 @@ async def delete_tenant(
     response_model=TenantPrincipalsResponse,
     status_code=status.HTTP_200_OK,
     summary="List Tenant Principals",
-    description="Get all principals and their roles for a tenant"
+    description="Get all principals and their roles for a tenant with optional filtering, search, and pagination"
 )
 @authenticate
 async def list_tenant_principals(
     request: Request,
     tenant_id: str,
+    skip: int = Query(0, ge=0, description="Number of principals to skip"),
+    limit: int = Query(100, ge=1, le=500, description="Maximum number of principals to return"),
+    search: Optional[str] = Query(None, description="Search term for display_name, principal_name, or mail"),
+    roles: Optional[str] = Query(None, description="Comma-separated roles to filter by (OR logic)"),
+    is_active: Optional[bool] = Query(None, description="Filter by is_active status"),
+    order_by: Optional[str] = Query(None, enum=["display_name"], description="Column to order by"),
+    order_direction: Optional[str] = Query("asc", enum=["asc", "desc"], description="Sort direction"),
     handler: TenantHandler = Depends(get_tenant_handler)
 ) -> TenantPrincipalsResponse:
     """
@@ -206,6 +213,13 @@ async def list_tenant_principals(
     Args:
         request: FastAPI request object
         tenant_id: The ID of the tenant
+        skip: Number of principals to skip (for pagination)
+        limit: Maximum number of principals to return
+        search: Search term for display_name, principal_name, or mail
+        roles: Comma-separated list of roles to filter by (OR logic)
+        is_active: Filter by principal's active status
+        order_by: Column to order by (currently only 'display_name')
+        order_direction: Sort direction ('asc' or 'desc')
         handler: Tenant handler dependency
     
     Returns:
@@ -214,7 +228,19 @@ async def list_tenant_principals(
     Raises:
         TenantNotFoundError: If tenant not found
     """
-    return handler.list_tenant_principals(tenant_id)
+    # Parse comma-separated roles
+    roles_list = [r.strip() for r in roles.split(",")] if roles else None
+    
+    return handler.list_tenant_principals(
+        tenant_id=tenant_id,
+        skip=skip,
+        limit=limit,
+        search=search,
+        roles=roles_list,
+        is_active=is_active,
+        order_by=order_by,
+        order_direction=order_direction
+    )
 
 
 @router.get(

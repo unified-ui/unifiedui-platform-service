@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Optional, List
 import uuid
 from datetime import datetime
 
-from sqlalchemy import select, and_, or_
+from sqlalchemy import select, and_, or_, func
 from sqlalchemy.orm import Session
 
 from unifiedui.core.database.client import SQLAlchemyClient
@@ -418,13 +418,27 @@ class TenantHandler:
     
     def list_tenant_principals(
         self,
-        tenant_id: str
+        tenant_id: str,
+        skip: int = 0,
+        limit: int = 100,
+        search: Optional[str] = None,
+        roles: Optional[List[str]] = None,
+        is_active: Optional[bool] = None,
+        order_by: Optional[str] = None,
+        order_direction: Optional[str] = "asc"
     ) -> TenantPrincipalsResponse:
         """
         Get all principals and their roles for a specific tenant.
         
         Args:
             tenant_id: The ID of the tenant
+            skip: Number of principals to skip (for pagination)
+            limit: Maximum number of principals to return
+            search: Search term for display_name, principal_name, or mail
+            roles: List of roles to filter by (OR logic)
+            is_active: Filter by principal's active status
+            order_by: Column to order by (currently only 'display_name')
+            order_direction: Sort direction ('asc' or 'desc')
             
         Returns:
             TenantPrincipalsResponse with tenant_id and list of principals with their roles
@@ -441,7 +455,7 @@ class TenantHandler:
                 logger.warning("Tenant not found", extra={"tenant_id": tenant_id})
                 raise TenantNotFoundError(tenant_id)
             
-            # Query all member roles for this tenant, joining with Principal
+            # Build base query joining TenantMember with Principal
             query = (
                 select(TenantMember, Principal)
                 .join(
@@ -452,9 +466,28 @@ class TenantHandler:
                     )
                 )
                 .where(TenantMember.tenant_id == tenant_id)
-                .order_by(TenantMember.principal_id, TenantMember.role)
             )
             
+            # Apply role filter (filter members with matching roles)
+            if roles:
+                query = query.where(TenantMember.role.in_(roles))
+            
+            # Apply is_active filter
+            if is_active is not None:
+                query = query.where(Principal.is_active == is_active)
+            
+            # Apply search filter (case-insensitive)
+            if search:
+                search_term = f"%{search.lower()}%"
+                query = query.where(
+                    or_(
+                        func.lower(Principal.display_name).like(search_term),
+                        func.lower(Principal.principal_name).like(search_term),
+                        func.lower(Principal.mail).like(search_term)
+                    )
+                )
+            
+            # Execute query
             results = session.execute(query).all()
             
             # Group roles by principal_id
@@ -485,14 +518,28 @@ class TenantHandler:
                 TenantPrincipalResponse(**data) for data in principals_dict.values()
             ]
             
+            # Apply sorting
+            if order_by == "display_name":
+                reverse = order_direction == "desc"
+                principals.sort(
+                    key=lambda p: (p.display_name or "").lower(),
+                    reverse=reverse
+                )
+            else:
+                # Default: sort by display_name ascending
+                principals.sort(key=lambda p: (p.display_name or "").lower())
+            
+            # Apply pagination after grouping
+            paginated_principals = principals[skip:skip + limit]
+            
             logger.info(
                 "Retrieved tenant principals",
-                extra={"tenant_id": tenant_id, "principal_count": len(principals)}
+                extra={"tenant_id": tenant_id, "principal_count": len(paginated_principals), "total": len(principals)}
             )
             
             return TenantPrincipalsResponse(
                 tenant_id=tenant_id,
-                principals=principals
+                principals=paginated_principals
             )
     
     def _get_role_display_name(self, role: str) -> str:
