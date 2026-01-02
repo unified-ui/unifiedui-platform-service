@@ -560,7 +560,7 @@ class TestTenantRBAC:
         
         # Add user to custom group directly in DB (not via API)
         # Grant GLOBAL_ADMIN role to the custom group directly in DB (not via API)
-        from unifiedui.core.database.models import TenantMemberRole
+        from unifiedui.core.database.models import TenantMember
         
         # Use test_client.db_client to write to the SAME DB that the API reads from!
         with test_client.db_client.get_session() as session:
@@ -588,7 +588,7 @@ class TestTenantRBAC:
             session.commit()
             
             # Custom group is already in principals table (created above)
-            tenant_member_role = TenantMemberRole(
+            tenant_member_role = TenantMember(
                 id=str(uuid.uuid4()),
                 tenant_id=tenant_id,
                 principal_id=custom_group_id,
@@ -678,7 +678,7 @@ class TestTenantRBAC:
         reader_user_id = reader_user_token.get_id()  # Get actual user ID from token
         
         # Add user to custom group and grant permissions directly in DB (not via API)
-        from unifiedui.core.database.models import TenantMemberRole
+        from unifiedui.core.database.models import TenantMember
         
         # Use test_client.db_client to write to the SAME DB that the API reads from!
         with test_client.db_client.get_session() as session:
@@ -706,7 +706,7 @@ class TestTenantRBAC:
             session.commit()
             
             # Custom group is already in principals table (created above)
-            tenant_member_role = TenantMemberRole(
+            tenant_member_role = TenantMember(
                 id=str(uuid.uuid4()),
                 tenant_id=tenant_id,
                 principal_id=custom_group_id,
@@ -796,7 +796,7 @@ class TestTenantRBAC:
         non_member_headers = create_auth_headers(non_member_token, use_cache=False)
         
         # Add only first user to custom group and grant permissions directly in DB (not via API)
-        from unifiedui.core.database.models import TenantMemberRole
+        from unifiedui.core.database.models import TenantMember
         
         # Use test_client.db_client to write to the SAME DB that the API reads from!
         with test_client.db_client.get_session() as session:
@@ -823,7 +823,7 @@ class TestTenantRBAC:
             session.add(member)
             session.commit()
             
-            tenant_member_role = TenantMemberRole(
+            tenant_member_role = TenantMember(
                 id=str(uuid.uuid4()),
                 tenant_id=tenant_id,
                 principal_id=custom_group_id,

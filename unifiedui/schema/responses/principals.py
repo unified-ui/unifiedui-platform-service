@@ -15,6 +15,7 @@ class PrincipalResponse(BaseModel):
     display_name: str = Field(..., description="The display name")
     principal_name: str = Field(..., description="The principal name (UPN for users, name for groups)")
     description: Optional[str] = Field(None, description="Optional description")
+    is_active: bool = Field(True, description="Whether the principal is active in this tenant")
     created_at: datetime = Field(..., description="When the principal was created")
     updated_at: datetime = Field(..., description="When the principal was last updated")
 

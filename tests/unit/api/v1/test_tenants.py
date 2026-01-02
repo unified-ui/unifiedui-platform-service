@@ -451,8 +451,13 @@ class TestTenantPrincipalRoutes:
             None
         )
         assert creator_principal is not None
-        assert ROLE_GLOBAL_ADMIN in creator_principal["roles"]
-    
+        # roles is now a list of role detail objects
+        creator_roles = [r["role"] for r in creator_principal["roles"]]
+        assert ROLE_GLOBAL_ADMIN in creator_roles
+        # Verify new response structure includes principal details
+        assert "is_active" in creator_principal
+        assert creator_principal["is_active"] is True
+
     def test_get_principal_permissions(self, test_client: TestClient, auth_headers: dict[str, str], sample_tenant_data: dict[str, Any], test_user_token: Any) -> None:
         """Test getting permissions for a specific principal."""
         # Create a tenant
@@ -1187,8 +1192,13 @@ class TestTenantPrincipalRoutes:
             None
         )
         assert creator_principal is not None
-        assert ROLE_GLOBAL_ADMIN in creator_principal["roles"]
-    
+        # roles is now a list of role detail objects
+        creator_roles = [r["role"] for r in creator_principal["roles"]]
+        assert ROLE_GLOBAL_ADMIN in creator_roles
+        # Verify new response structure includes principal details
+        assert "is_active" in creator_principal
+        assert creator_principal["is_active"] is True
+
     def test_get_principal_permissions(self, test_client: TestClient, auth_headers: dict[str, str], sample_tenant_data: dict[str, Any], test_user_token: Any) -> None:
         """Test getting permissions for a specific principal."""
         # Create a tenant

@@ -119,7 +119,7 @@ class TenantScopedMixin:
 class Tenant(Base, IdNameDescriptionMixin):
     __tablename__ = "tenants"
 
-    member_roles: Mapped[list["TenantMemberRole"]] = relationship(
+    members: Mapped[list["TenantMember"]] = relationship(
         back_populates="tenant", cascade="all, delete-orphan"
     )
     principals: Mapped[list["Principal"]] = relationship(
@@ -127,12 +127,12 @@ class Tenant(Base, IdNameDescriptionMixin):
     )
 
 
-class TenantMemberRole(Base, IdMixin, AuditMixin):
+class TenantMember(Base, IdMixin, AuditMixin):
     """
-    Roles for tenant members.
+    Tenant membership and roles.
     Links directly to Principals via (tenant_id, principal_id).
     """
-    __tablename__ = "tenant_member_roles"
+    __tablename__ = "tenant_members"
 
     tenant_id: Mapped[str] = mapped_column(
         String(36), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False
@@ -140,11 +140,11 @@ class TenantMemberRole(Base, IdMixin, AuditMixin):
     principal_id: Mapped[str] = mapped_column(String(50), nullable=False)
     role: Mapped[str] = mapped_column(TenantPermissionSAEnum, nullable=False)
 
-    tenant: Mapped["Tenant"] = relationship(back_populates="member_roles")
+    tenant: Mapped["Tenant"] = relationship(back_populates="members")
     principal: Mapped["Principal"] = relationship(
-        foreign_keys="[TenantMemberRole.tenant_id, TenantMemberRole.principal_id]",
-        primaryjoin="and_(TenantMemberRole.tenant_id == Principal.tenant_id, TenantMemberRole.principal_id == Principal.principal_id)",
-        overlaps="member_roles,tenant"
+        foreign_keys="[TenantMember.tenant_id, TenantMember.principal_id]",
+        primaryjoin="and_(TenantMember.tenant_id == Principal.tenant_id, TenantMember.principal_id == Principal.principal_id)",
+        overlaps="members,tenant"
     )
 
     __table_args__ = (
@@ -152,11 +152,11 @@ class TenantMemberRole(Base, IdMixin, AuditMixin):
             ["tenant_id", "principal_id"],
             ["principals.tenant_id", "principals.principal_id"],
             ondelete="CASCADE",
-            name="fk_tenant_member_roles_principal"
+            name="fk_tenant_members_principal"
         ),
-        UniqueConstraint("tenant_id", "principal_id", "role", name="uq_tenant_member_roles"),
-        Index("ix_tmr_tenant", "tenant_id"),
-        Index("ix_tmr_principal", "principal_id"),
+        UniqueConstraint("tenant_id", "principal_id", "role", name="uq_tenant_members"),
+        Index("ix_tm_tenant", "tenant_id"),
+        Index("ix_tm_principal", "principal_id"),
     )
 
 
@@ -177,6 +177,7 @@ class Principal(Base):
     display_name: Mapped[str] = mapped_column(String(255), nullable=False)
     principal_name: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[Optional[str]] = mapped_column(String(2000), nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     created_at: Mapped[datetime] = mapped_column(
         HighPrecisionDateTime(), nullable=False, default=utc_now
     )

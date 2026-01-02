@@ -214,8 +214,7 @@ async def list_tenant_principals(
     Raises:
         TenantNotFoundError: If tenant not found
     """
-    result = handler.list_tenant_principals(tenant_id)
-    return TenantPrincipalsResponse(**result)
+    return handler.list_tenant_principals(tenant_id)
 
 
 @router.get(

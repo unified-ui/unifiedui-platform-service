@@ -9,9 +9,14 @@ from sqlalchemy import select, and_, or_
 from sqlalchemy.orm import Session
 
 from unifiedui.core.database.client import SQLAlchemyClient
-from unifiedui.core.database.models import Tenant, TenantMemberRole, Principal, CustomGroupMember
+from unifiedui.core.database.models import Tenant, TenantMember, Principal, CustomGroupMember
 from unifiedui.schema.requests.tenants import CreateTenantRequest, UpdateTenantRequest
-from unifiedui.schema.responses.tenants import TenantResponse
+from unifiedui.schema.responses.tenants import (
+    TenantResponse,
+    TenantPrincipalsResponse,
+    TenantPrincipalResponse,
+    TenantRoleDetailResponse,
+)
 from unifiedui.exc.tenants import TenantNotFoundError
 from unifiedui.caching.client import CacheClient
 from unifiedui.handlers.principals_helper import ensure_principal_exists
@@ -182,7 +187,7 @@ class TenantHandler:
             
             # Create GLOBAL_ADMIN role for the creator
             role_id = str(uuid.uuid4())
-            tenant_role = TenantMemberRole(
+            tenant_role = TenantMember(
                 id=role_id,
                 tenant_id=tenant_id,
                 principal_id=user_id,
@@ -348,12 +353,12 @@ class TenantHandler:
                 return []
             
             # Query to get all tenant member roles
-            # TenantMemberRole now directly references tenant and principal
+            # TenantMember now directly references tenant and principal
             query = (
-                select(Tenant, TenantMemberRole)
-                .join(TenantMemberRole, Tenant.id == TenantMemberRole.tenant_id)
-                .where(TenantMemberRole.principal_id.in_(all_principal_ids))
-                .order_by(Tenant.name, TenantMemberRole.role)
+                select(Tenant, TenantMember)
+                .join(TenantMember, Tenant.id == TenantMember.tenant_id)
+                .where(TenantMember.principal_id.in_(all_principal_ids))
+                .order_by(Tenant.name, TenantMember.role)
             )
             
             results = session.execute(query).all()
@@ -414,7 +419,7 @@ class TenantHandler:
     def list_tenant_principals(
         self,
         tenant_id: str
-    ) -> dict:
+    ) -> TenantPrincipalsResponse:
         """
         Get all principals and their roles for a specific tenant.
         
@@ -422,7 +427,7 @@ class TenantHandler:
             tenant_id: The ID of the tenant
             
         Returns:
-            Dict with tenant_id and list of principals with their roles
+            TenantPrincipalsResponse with tenant_id and list of principals with their roles
             
         Raises:
             TenantNotFoundError: If tenant not found
@@ -438,44 +443,79 @@ class TenantHandler:
             
             # Query all member roles for this tenant, joining with Principal
             query = (
-                select(TenantMemberRole, Principal)
+                select(TenantMember, Principal)
                 .join(
                     Principal,
                     and_(
-                        TenantMemberRole.tenant_id == Principal.tenant_id,
-                        TenantMemberRole.principal_id == Principal.principal_id
+                        TenantMember.tenant_id == Principal.tenant_id,
+                        TenantMember.principal_id == Principal.principal_id
                     )
                 )
-                .where(TenantMemberRole.tenant_id == tenant_id)
-                .order_by(TenantMemberRole.principal_id, TenantMemberRole.role)
+                .where(TenantMember.tenant_id == tenant_id)
+                .order_by(TenantMember.principal_id, TenantMember.role)
             )
             
             results = session.execute(query).all()
             
             # Group roles by principal_id
-            principals_dict = {}
-            for role, principal in results:
-                if role.principal_id not in principals_dict:
-                    principals_dict[role.principal_id] = {
-                        "principal_id": role.principal_id,
+            principals_dict: dict = {}
+            for member, principal in results:
+                if member.principal_id not in principals_dict:
+                    principals_dict[member.principal_id] = {
+                        "principal_id": member.principal_id,
                         "principal_type": principal.principal_type,
+                        "display_name": principal.display_name,
+                        "principal_name": principal.principal_name,
+                        "mail": principal.mail,
+                        "description": principal.description,
+                        "is_active": principal.is_active,
                         "roles": []
                     }
-                # Just append the role string, not the full response object
-                principals_dict[role.principal_id]["roles"].append(role.role)
+                # Append role with details
+                principals_dict[member.principal_id]["roles"].append(
+                    TenantRoleDetailResponse(
+                        role=member.role,
+                        display_name=self._get_role_display_name(member.role),
+                        created_at=member.created_at
+                    )
+                )
             
-            # Convert to list
-            principals = list(principals_dict.values())
+            # Convert to list of TenantPrincipalResponse
+            principals = [
+                TenantPrincipalResponse(**data) for data in principals_dict.values()
+            ]
             
             logger.info(
                 "Retrieved tenant principals",
                 extra={"tenant_id": tenant_id, "principal_count": len(principals)}
             )
             
-            return {
-                "tenant_id": tenant_id,
-                "principals": principals
-            }
+            return TenantPrincipalsResponse(
+                tenant_id=tenant_id,
+                principals=principals
+            )
+    
+    def _get_role_display_name(self, role: str) -> str:
+        """Get a human-readable display name for a role."""
+        role_display_names = {
+            "GLOBAL_ADMIN": "Global Administrator",
+            "READER": "Reader",
+            "CUSTOM_GROUPS_ADMIN": "Custom Groups Administrator",
+            "CUSTOM_GROUP_CREATOR": "Custom Group Creator",
+            "APPLICATIONS_ADMIN": "Applications Administrator",
+            "APPLICATIONS_CREATOR": "Application Creator",
+            "CREDENTIALS_ADMIN": "Credentials Administrator",
+            "CREDENTIALS_CREATOR": "Credential Creator",
+            "CONVERSATIONS_ADMIN": "Conversations Administrator",
+            "CONVERSATIONS_CREATOR": "Conversation Creator",
+            "AUTONOMOUS_AGENTS_ADMIN": "Autonomous Agents Administrator",
+            "AUTONOMOUS_AGENTS_CREATOR": "Autonomous Agent Creator",
+            "DEVELOPMENT_PLATFORMS_ADMIN": "Development Platforms Administrator",
+            "DEVELOPMENT_PLATFORMS_CREATOR": "Development Platform Creator",
+            "CHAT_WIDGETS_ADMIN": "Chat Widgets Administrator",
+            "CHAT_WIDGETS_CREATOR": "Chat Widget Creator",
+        }
+        return role_display_names.get(role, role.replace("_", " ").title())
     
     def get_principal_permissions(
         self,
@@ -509,24 +549,25 @@ class TenantHandler:
             
             # Query member roles, joining with Principal to get principal_type
             query = (
-                select(TenantMemberRole, Principal)
+                select(TenantMember, Principal)
                 .join(
                     Principal,
                     and_(
-                        TenantMemberRole.tenant_id == Principal.tenant_id,
-                        TenantMemberRole.principal_id == Principal.principal_id
+                        TenantMember.tenant_id == Principal.tenant_id,
+                        TenantMember.principal_id == Principal.principal_id
                     )
                 )
                 .where(
-                    TenantMemberRole.tenant_id == tenant_id,
-                    TenantMemberRole.principal_id == principal_id
+                    TenantMember.tenant_id == tenant_id,
+                    TenantMember.principal_id == principal_id
                 )
             )
             
             results = session.execute(query).all()
             
-            # Extract principal_type from first result's Principal (all should have same type)
+            # Extract principal_type and is_active from first result's Principal (all should have same type)
             principal_type = results[0][1].principal_type if results else None
+            is_active = results[0][1].is_active if results else True
             # Extract just the role strings
             roles = [role.role for role, principal in results]
             
@@ -539,6 +580,7 @@ class TenantHandler:
                 "tenant_id": tenant_id,
                 "principal_id": principal_id,
                 "principal_type": principal_type,
+                "is_active": is_active,
                 "roles": roles
             }
     
@@ -587,11 +629,11 @@ class TenantHandler:
             
             # Check if role already exists for this principal
             role_query = (
-                select(TenantMemberRole)
+                select(TenantMember)
                 .where(
-                    TenantMemberRole.tenant_id == tenant_id,
-                    TenantMemberRole.principal_id == principal_id,
-                    TenantMemberRole.role == permission
+                    TenantMember.tenant_id == tenant_id,
+                    TenantMember.principal_id == principal_id,
+                    TenantMember.role == permission
                 )
             )
             existing_role = session.execute(role_query).scalar_one_or_none()
@@ -599,7 +641,7 @@ class TenantHandler:
             if not existing_role:
                 # Create new role
                 role_id = str(uuid.uuid4())
-                role = TenantMemberRole(
+                role = TenantMember(
                     id=role_id,
                     tenant_id=tenant_id,
                     principal_id=principal_id,
@@ -627,12 +669,12 @@ class TenantHandler:
             
             # Get all roles for this principal
             query = (
-                select(TenantMemberRole)
+                select(TenantMember)
                 .where(
-                    TenantMemberRole.tenant_id == tenant_id,
-                    TenantMemberRole.principal_id == principal_id
+                    TenantMember.tenant_id == tenant_id,
+                    TenantMember.principal_id == principal_id
                 )
-                .order_by(TenantMemberRole.role)
+                .order_by(TenantMember.role)
             )
             results = session.execute(query).all()
             
@@ -679,11 +721,11 @@ class TenantHandler:
             
             # Find and delete the specific role
             role_query = (
-                select(TenantMemberRole)
+                select(TenantMember)
                 .where(
-                    TenantMemberRole.tenant_id == tenant_id,
-                    TenantMemberRole.principal_id == principal_id,
-                    TenantMemberRole.role == permission
+                    TenantMember.tenant_id == tenant_id,
+                    TenantMember.principal_id == principal_id,
+                    TenantMember.role == permission
                 )
             )
             role = session.execute(role_query).scalar_one_or_none()
@@ -707,12 +749,12 @@ class TenantHandler:
             
             # Get remaining roles for this principal
             query = (
-                select(TenantMemberRole)
+                select(TenantMember)
                 .where(
-                    TenantMemberRole.tenant_id == tenant_id,
-                    TenantMemberRole.principal_id == principal_id
+                    TenantMember.tenant_id == tenant_id,
+                    TenantMember.principal_id == principal_id
                 )
-                .order_by(TenantMemberRole.role)
+                .order_by(TenantMember.role)
             )
             remaining_results = session.execute(query).all()
             
@@ -840,12 +882,12 @@ class TenantHandler:
             logger.warning(f"Failed to clear user cache: {e}")
     
     @staticmethod
-    def _role_to_response(role: TenantMemberRole, principal: Principal):
+    def _role_to_response(role: TenantMember, principal: Principal):
         """
         Convert a tenant member role to a role response object.
         
         Args:
-            role: TenantMemberRole SQLAlchemy model
+            role: TenantMember SQLAlchemy model
             principal: Principal SQLAlchemy model
             
         Returns:

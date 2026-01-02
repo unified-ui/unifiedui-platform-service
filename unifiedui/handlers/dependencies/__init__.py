@@ -31,6 +31,7 @@ from unifiedui.handlers.dependencies.tags import get_tag_handler
 from unifiedui.handlers.dependencies.user_favorites import get_user_favorites_handler
 from unifiedui.handlers.dependencies.resource_permissions import get_resource_permissions_handler
 from unifiedui.handlers.dependencies.resource_tags import get_resource_tags_handler
+from unifiedui.handlers.dependencies.principals import get_principal_handler
 
 __all__ = [
     # Database
@@ -50,6 +51,7 @@ __all__ = [
     "get_chat_widget_handler",
     "get_tag_handler",
     "get_user_favorites_handler",
+    "get_principal_handler",
     # Central Handlers
     "get_resource_permissions_handler",
     "get_resource_tags_handler",

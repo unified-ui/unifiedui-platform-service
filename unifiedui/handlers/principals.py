@@ -201,9 +201,65 @@ class PrincipalHandler:
             display_name=principal.display_name,
             principal_name=principal.principal_name,
             description=principal.description,
+            is_active=principal.is_active,
             created_at=principal.created_at,
             updated_at=principal.updated_at
         )
+
+    def update_principal_status(
+        self,
+        tenant_id: str,
+        principal_id: str,
+        is_active: bool
+    ) -> PrincipalResponse:
+        """
+        Update the is_active status of a principal.
+        
+        Args:
+            tenant_id: The tenant ID
+            principal_id: The principal ID
+            is_active: The new status
+            
+        Returns:
+            PrincipalResponse with the updated principal data
+            
+        Raises:
+            ValueError: If principal is not found
+        """
+        logger.info(
+            "Updating principal status",
+            extra={
+                "tenant_id": tenant_id,
+                "principal_id": principal_id,
+                "is_active": is_active
+            }
+        )
+        
+        with self.db_client.get_session() as session:
+            principal = session.execute(
+                select(Principal).where(
+                    Principal.tenant_id == tenant_id,
+                    Principal.principal_id == principal_id
+                )
+            ).scalar_one_or_none()
+            
+            if not principal:
+                raise ValueError(f"Principal not found: {principal_id}")
+            
+            principal.is_active = is_active
+            session.flush()
+            
+            result = self._model_to_response(principal)
+            
+            # Invalidate related caches
+            self._invalidate_principal_caches(tenant_id, principal_id)
+            
+            logger.info(
+                "Updated principal status",
+                extra={"tenant_id": tenant_id, "principal_id": principal_id, "is_active": is_active}
+            )
+            
+            return result
 
     def _invalidate_principal_caches(self, tenant_id: str, principal_id: str) -> None:
         """Invalidate caches related to a principal."""
