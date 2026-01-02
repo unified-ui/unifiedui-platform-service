@@ -208,6 +208,13 @@ async def list_custom_group_principals(
     request: Request,
     tenant_id: str,
     custom_group_id: str,
+    skip: int = Query(0, ge=0, description="Number of principals to skip"),
+    limit: int = Query(100, ge=1, le=500, description="Maximum number of principals to return"),
+    search: Optional[str] = Query(None, description="Search term for display_name, principal_name, or mail"),
+    roles: Optional[str] = Query(None, description="Comma-separated roles to filter by (OR logic)"),
+    is_active: Optional[bool] = Query(None, description="Filter by is_active status"),
+    order_by: Optional[str] = Query(None, enum=["display_name"], description="Column to order by"),
+    order_direction: Optional[str] = Query("asc", enum=["asc", "desc"], description="Sort direction"),
     handler: CustomGroupHandler = Depends(get_custom_group_handler)
 ) -> ResourcePrincipalsResponse:
     """
@@ -218,12 +225,32 @@ async def list_custom_group_principals(
         request: FastAPI request object
         tenant_id: The ID of the tenant
         custom_group_id: The ID of the custom group
+        skip: Number of principals to skip
+        limit: Maximum number of principals to return
+        search: Search term for display_name, principal_name, or mail
+        roles: Comma-separated roles to filter by (OR logic)
+        is_active: Filter by is_active status
+        order_by: Column to order by
+        order_direction: Sort direction
         handler: Custom group handler dependency
     
     Returns:
         ResourcePrincipalsResponse: All principals with their permissions on the custom group
     """
-    return handler.list_custom_group_principals(tenant_id, custom_group_id)
+    # Parse comma-separated roles
+    roles_list = [r.strip() for r in roles.split(",")] if roles else None
+    
+    return handler.list_custom_group_principals(
+        tenant_id=tenant_id,
+        custom_group_id=custom_group_id,
+        skip=skip,
+        limit=limit,
+        search=search,
+        roles=roles_list,
+        is_active=is_active,
+        order_by=order_by,
+        order_direction=order_direction
+    )
 
 
 @router.get(

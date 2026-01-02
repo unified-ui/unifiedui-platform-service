@@ -649,3 +649,318 @@ class TestResourcePermissionsHandlerMultipleResourceTypes:
         
         assert result["resource_type"] == "conversation"
         assert result["resource_id"] == data["conversation_id"]
+
+
+class TestResourcePermissionsHandlerFilters:
+    """Tests for ResourcePermissionsHandler filtering and pagination functionality."""
+    
+    @pytest.fixture
+    def handler(self, test_db_client, test_cache_client):
+        """Create handler instance."""
+        return ResourcePermissionsHandler(
+            db_client=test_db_client,
+            cache_client=test_cache_client
+        )
+    
+    @pytest.fixture
+    def setup_with_multiple_principals(self, test_db_client, test_db_session):
+        """Create tenant, application, and multiple principals for testing filters."""
+        tenant_id = str(uuid.uuid4())
+        creator_id = f"creator-{str(uuid.uuid4())[:8]}"
+        application_id = str(uuid.uuid4())
+        
+        # Create tenant
+        tenant = Tenant(
+            id=tenant_id,
+            name="Test Tenant",
+            description="Test Description",
+            created_by=creator_id,
+            updated_by=creator_id
+        )
+        test_db_session.add(tenant)
+        
+        # Create application
+        application = Application(
+            id=application_id,
+            tenant_id=tenant_id,
+            name="Test Application",
+            description="Test Description",
+            type="N8N",
+            config={},
+            is_active=True,
+            created_by=creator_id,
+            updated_by=creator_id
+        )
+        test_db_session.add(application)
+        
+        # Create multiple principals with different attributes
+        users = [
+            {"id": f"user-alpha-{str(uuid.uuid4())[:8]}", "display_name": "Alpha User", "mail": "alpha@example.com", "is_active": True, "role": PermissionActionEnum.ADMIN.value},
+            {"id": f"user-beta-{str(uuid.uuid4())[:8]}", "display_name": "Beta User", "mail": "beta@example.com", "is_active": True, "role": PermissionActionEnum.WRITE.value},
+            {"id": f"user-charlie-{str(uuid.uuid4())[:8]}", "display_name": "Charlie User", "mail": "charlie@test.com", "is_active": False, "role": PermissionActionEnum.READ.value},
+            {"id": f"user-delta-{str(uuid.uuid4())[:8]}", "display_name": "Delta Admin", "mail": "delta@example.com", "is_active": True, "role": PermissionActionEnum.ADMIN.value},
+            {"id": f"user-echo-{str(uuid.uuid4())[:8]}", "display_name": "Echo Writer", "mail": "echo@test.com", "is_active": True, "role": PermissionActionEnum.WRITE.value},
+        ]
+        
+        user_ids = []
+        for user in users:
+            # Create principal
+            principal = Principal(
+                tenant_id=tenant_id,
+                principal_id=user["id"],
+                principal_type=PrincipalTypeEnum.IDENTITY_USER.value,
+                display_name=user["display_name"],
+                principal_name=user["mail"],
+                mail=user["mail"],
+                is_active=user["is_active"]
+            )
+            test_db_session.add(principal)
+            
+            # Create application member
+            member = ApplicationMember(
+                id=str(uuid.uuid4()),
+                tenant_id=tenant_id,
+                application_id=application_id,
+                principal_id=user["id"],
+                role=user["role"],
+                created_by=creator_id,
+                updated_by=creator_id
+            )
+            test_db_session.add(member)
+            user_ids.append(user["id"])
+        
+        test_db_session.commit()
+        
+        return {
+            "tenant_id": tenant_id,
+            "application_id": application_id,
+            "user_ids": user_ids,
+            "users": users
+        }
+    
+    def test_list_permissions_pagination_skip_limit(self, handler, setup_with_multiple_principals):
+        """Test pagination with skip and limit parameters."""
+        data = setup_with_multiple_principals
+        
+        # Get first 2 principals
+        result = handler.list_permissions(
+            resource_type="application",
+            tenant_id=data["tenant_id"],
+            resource_id=data["application_id"],
+            skip=0,
+            limit=2,
+            use_cache=False
+        )
+        
+        assert len(result["principals"]) == 2
+        
+        # Get next 2 principals
+        result2 = handler.list_permissions(
+            resource_type="application",
+            tenant_id=data["tenant_id"],
+            resource_id=data["application_id"],
+            skip=2,
+            limit=2,
+            use_cache=False
+        )
+        
+        assert len(result2["principals"]) == 2
+        
+        # Ensure no overlap
+        first_batch_ids = {p["principal_id"] for p in result["principals"]}
+        second_batch_ids = {p["principal_id"] for p in result2["principals"]}
+        assert first_batch_ids.isdisjoint(second_batch_ids)
+    
+    def test_list_permissions_search_by_display_name(self, handler, setup_with_multiple_principals):
+        """Test search filter by display_name."""
+        data = setup_with_multiple_principals
+        
+        result = handler.list_permissions(
+            resource_type="application",
+            tenant_id=data["tenant_id"],
+            resource_id=data["application_id"],
+            search="Alpha",
+            use_cache=False
+        )
+        
+        assert len(result["principals"]) == 1
+        assert result["principals"][0]["display_name"] == "Alpha User"
+    
+    def test_list_permissions_search_by_mail(self, handler, setup_with_multiple_principals):
+        """Test search filter by mail."""
+        data = setup_with_multiple_principals
+        
+        result = handler.list_permissions(
+            resource_type="application",
+            tenant_id=data["tenant_id"],
+            resource_id=data["application_id"],
+            search="@test.com",
+            use_cache=False
+        )
+        
+        # Charlie and Echo have @test.com
+        assert len(result["principals"]) == 2
+    
+    def test_list_permissions_search_case_insensitive(self, handler, setup_with_multiple_principals):
+        """Test that search is case insensitive."""
+        data = setup_with_multiple_principals
+        
+        result = handler.list_permissions(
+            resource_type="application",
+            tenant_id=data["tenant_id"],
+            resource_id=data["application_id"],
+            search="BETA",
+            use_cache=False
+        )
+        
+        assert len(result["principals"]) == 1
+        assert result["principals"][0]["display_name"] == "Beta User"
+    
+    def test_list_permissions_filter_by_single_role(self, handler, setup_with_multiple_principals):
+        """Test filtering by a single role."""
+        data = setup_with_multiple_principals
+        
+        result = handler.list_permissions(
+            resource_type="application",
+            tenant_id=data["tenant_id"],
+            resource_id=data["application_id"],
+            roles=[PermissionActionEnum.ADMIN.value],
+            use_cache=False
+        )
+        
+        # Alpha and Delta have ADMIN role
+        assert len(result["principals"]) == 2
+        for principal in result["principals"]:
+            assert PermissionActionEnum.ADMIN.value in principal["roles"]
+    
+    def test_list_permissions_filter_by_multiple_roles(self, handler, setup_with_multiple_principals):
+        """Test filtering by multiple roles (OR logic)."""
+        data = setup_with_multiple_principals
+        
+        result = handler.list_permissions(
+            resource_type="application",
+            tenant_id=data["tenant_id"],
+            resource_id=data["application_id"],
+            roles=[PermissionActionEnum.ADMIN.value, PermissionActionEnum.WRITE.value],
+            use_cache=False
+        )
+        
+        # Alpha, Delta (ADMIN) + Beta, Echo (WRITE) = 4
+        assert len(result["principals"]) == 4
+    
+    def test_list_permissions_filter_by_is_active_true(self, handler, setup_with_multiple_principals):
+        """Test filtering by is_active=True."""
+        data = setup_with_multiple_principals
+        
+        result = handler.list_permissions(
+            resource_type="application",
+            tenant_id=data["tenant_id"],
+            resource_id=data["application_id"],
+            is_active=True,
+            use_cache=False
+        )
+        
+        # All except Charlie are active = 4
+        assert len(result["principals"]) == 4
+        for principal in result["principals"]:
+            assert principal.get("is_active", True) is True
+    
+    def test_list_permissions_filter_by_is_active_false(self, handler, setup_with_multiple_principals):
+        """Test filtering by is_active=False."""
+        data = setup_with_multiple_principals
+        
+        result = handler.list_permissions(
+            resource_type="application",
+            tenant_id=data["tenant_id"],
+            resource_id=data["application_id"],
+            is_active=False,
+            use_cache=False
+        )
+        
+        # Only Charlie is inactive
+        assert len(result["principals"]) == 1
+        assert result["principals"][0]["display_name"] == "Charlie User"
+        assert result["principals"][0].get("is_active") is False
+    
+    def test_list_permissions_order_by_display_name_asc(self, handler, setup_with_multiple_principals):
+        """Test ordering by display_name ascending."""
+        data = setup_with_multiple_principals
+        
+        result = handler.list_permissions(
+            resource_type="application",
+            tenant_id=data["tenant_id"],
+            resource_id=data["application_id"],
+            order_by="display_name",
+            order_direction="asc",
+            use_cache=False
+        )
+        
+        display_names = [p["display_name"] for p in result["principals"]]
+        assert display_names == sorted(display_names)
+    
+    def test_list_permissions_order_by_display_name_desc(self, handler, setup_with_multiple_principals):
+        """Test ordering by display_name descending."""
+        data = setup_with_multiple_principals
+        
+        result = handler.list_permissions(
+            resource_type="application",
+            tenant_id=data["tenant_id"],
+            resource_id=data["application_id"],
+            order_by="display_name",
+            order_direction="desc",
+            use_cache=False
+        )
+        
+        display_names = [p["display_name"] for p in result["principals"]]
+        assert display_names == sorted(display_names, reverse=True)
+    
+    def test_list_permissions_combined_filters(self, handler, setup_with_multiple_principals):
+        """Test combining multiple filters."""
+        data = setup_with_multiple_principals
+        
+        result = handler.list_permissions(
+            resource_type="application",
+            tenant_id=data["tenant_id"],
+            resource_id=data["application_id"],
+            roles=[PermissionActionEnum.ADMIN.value],
+            is_active=True,
+            order_by="display_name",
+            order_direction="asc",
+            use_cache=False
+        )
+        
+        # Only active ADMINs: Alpha and Delta
+        assert len(result["principals"]) == 2
+        display_names = [p["display_name"] for p in result["principals"]]
+        assert display_names == ["Alpha User", "Delta Admin"]
+    
+    def test_list_permissions_search_with_pagination(self, handler, setup_with_multiple_principals):
+        """Test search combined with pagination."""
+        data = setup_with_multiple_principals
+        
+        result = handler.list_permissions(
+            resource_type="application",
+            tenant_id=data["tenant_id"],
+            resource_id=data["application_id"],
+            search="User",
+            skip=0,
+            limit=2,
+            use_cache=False
+        )
+        
+        # Alpha, Beta, Charlie have "User" in display_name
+        assert len(result["principals"]) == 2
+    
+    def test_list_permissions_is_active_in_response(self, handler, setup_with_multiple_principals):
+        """Test that is_active is included in the response."""
+        data = setup_with_multiple_principals
+        
+        result = handler.list_permissions(
+            resource_type="application",
+            tenant_id=data["tenant_id"],
+            resource_id=data["application_id"],
+            use_cache=False
+        )
+        
+        for principal in result["principals"]:
+            assert "is_active" in principal

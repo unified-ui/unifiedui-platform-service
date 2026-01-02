@@ -480,6 +480,13 @@ class ChatWidgetHandler:
         self,
         tenant_id: str,
         chat_widget_id: str,
+        skip: int = 0,
+        limit: int = 100,
+        search: Optional[str] = None,
+        roles: Optional[List[str]] = None,
+        is_active: Optional[bool] = None,
+        order_by: Optional[str] = None,
+        order_direction: Optional[str] = None,
         use_cache: bool = True
     ) -> ChatWidgetPrincipalsResponse:
         """
@@ -488,6 +495,13 @@ class ChatWidgetHandler:
         Args:
             tenant_id: The ID of the tenant
             chat_widget_id: The ID of the chat widget
+            skip: Number of principals to skip
+            limit: Maximum number of principals to return
+            search: Search term for display_name, principal_name, or mail
+            roles: Filter by roles (OR logic)
+            is_active: Filter by is_active status
+            order_by: Column to order by
+            order_direction: Sort direction
             use_cache: Whether to use caching
             
         Returns:
@@ -503,6 +517,13 @@ class ChatWidgetHandler:
                 resource_type="chat_widget",
                 tenant_id=tenant_id,
                 resource_id=chat_widget_id,
+                skip=skip,
+                limit=limit,
+                search=search,
+                roles=roles,
+                is_active=is_active,
+                order_by=order_by,
+                order_direction=order_direction,
                 use_cache=use_cache
             )
         except ValueError as e:
@@ -517,7 +538,8 @@ class ChatWidgetHandler:
                 mail=p.get("mail"),
                 display_name=p.get("display_name"),
                 principal_name=p.get("principal_name"),
-                description=p.get("description")
+                description=p.get("description"),
+                is_active=p.get("is_active", True)
             )
             for p in result["principals"]
         ]

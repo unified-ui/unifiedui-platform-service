@@ -5,7 +5,7 @@ import uuid
 from typing import TYPE_CHECKING, Optional, List
 from datetime import datetime, UTC
 
-from sqlalchemy import select, and_, or_
+from sqlalchemy import select, and_, or_, func
 from sqlalchemy.orm import Session
 
 from unifiedui.core.database.client import SQLAlchemyClient
@@ -378,7 +378,14 @@ class CustomGroupHandler:
     def list_custom_group_members(
         self,
         tenant_id: str,
-        custom_group_id: str
+        custom_group_id: str,
+        skip: int = 0,
+        limit: int = 100,
+        search: Optional[str] = None,
+        roles: Optional[List[str]] = None,
+        is_active: Optional[bool] = None,
+        order_by: Optional[str] = None,
+        order_direction: Optional[str] = None
     ) -> dict:
         """
         Get all members and their roles for a specific custom group.
@@ -386,6 +393,13 @@ class CustomGroupHandler:
         Args:
             tenant_id: The ID of the tenant
             custom_group_id: The ID of the custom group
+            skip: Number of members to skip
+            limit: Maximum number of members to return
+            search: Search term for display_name, principal_name, or mail
+            roles: Filter by roles (OR logic)
+            is_active: Filter by is_active status
+            order_by: Column to order by
+            order_direction: Sort direction
             
         Returns:
             Dict with custom_group_id and list of members with their roles
@@ -420,8 +434,26 @@ class CustomGroupHandler:
                     CustomGroupMember.tenant_id == tenant_id,
                     CustomGroupMember.custom_group_id == custom_group_id
                 )
-                .order_by(CustomGroupMember.principal_id)
             )
+            
+            # Apply role filter
+            if roles:
+                query = query.where(CustomGroupMember.role.in_(roles))
+            
+            # Apply is_active filter
+            if is_active is not None:
+                query = query.where(Principal.is_active == is_active)
+            
+            # Apply search filter
+            if search:
+                search_pattern = f"%{search.lower()}%"
+                query = query.where(
+                    or_(
+                        func.lower(Principal.display_name).like(search_pattern),
+                        func.lower(Principal.principal_name).like(search_pattern),
+                        func.lower(Principal.mail).like(search_pattern)
+                    )
+                )
             
             results = session.execute(query).all()
             
@@ -434,10 +466,22 @@ class CustomGroupHandler:
                     "principal_name": principal.principal_name,
                     "mail": principal.mail,
                     "description": principal.description,
+                    "is_active": principal.is_active,
                     "role": member.role,
                     "created_at": member.created_at.isoformat() if member.created_at else None,
                     "updated_at": member.updated_at.isoformat() if member.updated_at else None
                 })
+            
+            # Sort members
+            if order_by == "display_name":
+                reverse = order_direction == "desc"
+                members.sort(key=lambda x: (x.get("display_name") or "").lower(), reverse=reverse)
+            else:
+                # Default sort by display_name ascending
+                members.sort(key=lambda x: (x.get("display_name") or "").lower())
+            
+            # Apply pagination
+            members = members[skip:skip + limit]
             
             logger.info("Retrieved custom group members", extra={"custom_group_id": custom_group_id, "member_count": len(members)})
             
@@ -667,13 +711,43 @@ class CustomGroupHandler:
     def list_custom_group_principals(
         self,
         tenant_id: str,
-        custom_group_id: str
+        custom_group_id: str,
+        skip: int = 0,
+        limit: int = 100,
+        search: Optional[str] = None,
+        roles: Optional[List[str]] = None,
+        is_active: Optional[bool] = None,
+        order_by: Optional[str] = None,
+        order_direction: Optional[str] = None,
+        use_cache: bool = True
     ) -> ResourcePrincipalsResponse:
         """List all principals with their roles on a custom group.
         
+        Args:
+            tenant_id: The ID of the tenant
+            custom_group_id: The ID of the custom group
+            skip: Number of principals to skip
+            limit: Maximum number of principals to return
+            search: Search term for display_name, principal_name, or mail
+            roles: Filter by roles (OR logic)
+            is_active: Filter by is_active status
+            order_by: Column to order by
+            order_direction: Sort direction
+            use_cache: Whether to use caching
+        
         Returns unified ResourcePrincipalsResponse with enriched principal data.
         """
-        result = self.list_custom_group_members(tenant_id, custom_group_id)
+        result = self.list_custom_group_members(
+            tenant_id=tenant_id,
+            custom_group_id=custom_group_id,
+            skip=skip,
+            limit=limit,
+            search=search,
+            roles=roles,
+            is_active=is_active,
+            order_by=order_by,
+            order_direction=order_direction
+        )
         # Convert 'members' to 'principals' format with enriched data
         principals = []
         for member in result.get("members", []):
@@ -684,7 +758,8 @@ class CustomGroupHandler:
                 mail=member.get("mail"),
                 display_name=member.get("display_name"),
                 principal_name=member.get("principal_name"),
-                description=member.get("description")
+                description=member.get("description"),
+                is_active=member.get("is_active", True)
             ))
         return ResourcePrincipalsResponse(
             resource_id=result["custom_group_id"],

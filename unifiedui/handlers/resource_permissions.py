@@ -198,6 +198,13 @@ class ResourcePermissionsHandler:
         resource_type: str,
         tenant_id: str,
         resource_id: str,
+        skip: int = 0,
+        limit: int = 100,
+        search: Optional[str] = None,
+        roles: Optional[List[str]] = None,
+        is_active: Optional[bool] = None,
+        order_by: Optional[str] = None,
+        order_direction: Optional[str] = None,
         use_cache: bool = True
     ) -> Dict[str, Any]:
         """
@@ -209,7 +216,14 @@ class ResourcePermissionsHandler:
             resource_type: Type of resource (application, credential, etc.)
             tenant_id: Tenant ID
             resource_id: Resource ID
-            use_cache: Whether to use caching
+            skip: Number of principals to skip (for pagination)
+            limit: Maximum number of principals to return
+            search: Search term to filter by display_name, principal_name, or mail (case-insensitive)
+            roles: List of roles to filter by (OR logic)
+            is_active: Filter by principal is_active status
+            order_by: Column to order by (only 'display_name' supported)
+            order_direction: Sort direction ('asc' or 'desc')
+            use_cache: Whether to use caching (disabled when filters are applied)
             
         Returns:
             Dict with resource_id, resource_type, tenant_id, and principals list
@@ -217,7 +231,18 @@ class ResourcePermissionsHandler:
         """
         logger.info(
             "Listing permissions",
-            extra={"resource_type": resource_type, "tenant_id": tenant_id, "resource_id": resource_id}
+            extra={
+                "resource_type": resource_type,
+                "tenant_id": tenant_id,
+                "resource_id": resource_id,
+                "skip": skip,
+                "limit": limit,
+                "search": search,
+                "roles": roles,
+                "is_active": is_active,
+                "order_by": order_by,
+                "order_direction": order_direction
+            }
         )
         
         config = self._get_config(resource_type)
@@ -225,7 +250,11 @@ class ResourcePermissionsHandler:
         id_field = config["id_field"]
         cache_prefix = config["cache_prefix"]
         
-        # Build cache key
+        # Disable caching when filters are applied
+        has_filters = any([search, roles, is_active is not None, skip > 0, limit != 100, order_by, order_direction])
+        use_cache = use_cache and not has_filters
+        
+        # Build cache key (only used when no filters)
         cache_key = f"{cache_prefix}:permissions:tenant:{tenant_id}:res:{resource_id}:list"
         
         # Check cache
@@ -239,10 +268,13 @@ class ResourcePermissionsHandler:
                 logger.warning(f"Failed to get cached permissions: {e}")
         
         with self.db_client.get_session() as session:
+            from sqlalchemy import func, or_, asc, desc
+            from sqlalchemy.orm import aliased
+            
             # Verify resource exists
             self._verify_resource_exists(session, resource_type, tenant_id, resource_id)
             
-            # Get all members with joined principal data
+            # Build base query - get all members with joined principal data
             query = (
                 select(member_model, Principal)
                 .outerjoin(
@@ -255,6 +287,26 @@ class ResourcePermissionsHandler:
                     member_model.tenant_id == tenant_id
                 )
             )
+            
+            # Apply role filter (filter members by role)
+            if roles:
+                query = query.where(member_model.role.in_(roles))
+            
+            # Apply search filter on principal fields
+            if search:
+                search_term = f"%{search}%"
+                query = query.where(
+                    or_(
+                        func.lower(Principal.display_name).like(func.lower(search_term)),
+                        func.lower(Principal.principal_name).like(func.lower(search_term)),
+                        func.lower(Principal.mail).like(func.lower(search_term))
+                    )
+                )
+            
+            # Apply is_active filter
+            if is_active is not None:
+                query = query.where(Principal.is_active == is_active)
+            
             results = session.execute(query).all()
             
             # Group by principal
@@ -270,20 +322,36 @@ class ResourcePermissionsHandler:
                         "display_name": principal.display_name if principal else None,
                         "principal_name": principal.principal_name if principal else None,
                         "description": principal.description if principal else None,
+                        "is_active": principal.is_active if principal else True,
                     }
                 
                 role_value = member.role.value if hasattr(member.role, 'value') else member.role
                 if role_value not in principals_dict[key]["roles"]:
                     principals_dict[key]["roles"].append(role_value)
             
+            # Convert to list for sorting and pagination
+            principals_list = list(principals_dict.values())
+            
+            # Apply sorting
+            if order_by == "display_name":
+                reverse = order_direction == "desc"
+                principals_list.sort(
+                    key=lambda x: (x.get("display_name") or "").lower(),
+                    reverse=reverse
+                )
+            
+            # Apply pagination
+            total_before_pagination = len(principals_list)
+            principals_list = principals_list[skip:skip + limit]
+            
             result = {
                 "resource_id": resource_id,
                 "resource_type": resource_type,
                 "tenant_id": tenant_id,
-                "principals": list(principals_dict.values())
+                "principals": principals_list
             }
             
-            # Cache the result
+            # Cache the result (only when no filters)
             if use_cache and self.cache_client:
                 try:
                     self.cache_client.client.set(cache_key, result, ttl=300)

@@ -36,6 +36,7 @@ class PrincipalWithRolesResponse(BaseModel):
     display_name: Optional[str] = Field(None, description="The display name")
     principal_name: Optional[str] = Field(None, description="The principal name (UPN for users, name for groups)")
     description: Optional[str] = Field(None, description="Optional description")
+    is_active: bool = Field(True, description="Whether the principal is active in this tenant")
 
 
 class ResourcePrincipalsResponse(BaseModel):
