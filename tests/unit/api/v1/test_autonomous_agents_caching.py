@@ -8,9 +8,9 @@ from tests.conftest import create_auth_headers
 
 
 # API Endpoints
-ENDPOINT_AUTONOMOUS_AGENTS = "/api/v1/tenants/{tenant_id}/autonomous-agents"
-ENDPOINT_AUTONOMOUS_AGENT_DETAIL = "/api/v1/tenants/{tenant_id}/autonomous-agents/{autonomous_agent_id}"
-ENDPOINT_AUTONOMOUS_AGENT_PRINCIPALS = "/api/v1/tenants/{tenant_id}/autonomous-agents/{autonomous_agent_id}/principals"
+ENDPOINT_AUTONOMOUS_AGENTS = "/api/v1/platform-service/tenants/{tenant_id}/autonomous-agents"
+ENDPOINT_AUTONOMOUS_AGENT_DETAIL = "/api/v1/platform-service/tenants/{tenant_id}/autonomous-agents/{autonomous_agent_id}"
+ENDPOINT_AUTONOMOUS_AGENT_PRINCIPALS = "/api/v1/platform-service/tenants/{tenant_id}/autonomous-agents/{autonomous_agent_id}/principals"
 
 # Roles
 ROLE_READ = PermissionActionEnum.READ.value
@@ -25,7 +25,7 @@ def create_tenant_for_user(test_client: TestClient, user_token: Any, tenant_name
     """Helper function to create a tenant and return its ID."""
     headers = create_auth_headers(user_token, use_cache=False)
     response = test_client.post(
-        "/api/v1/tenants",
+        "/api/v1/platform-service/tenants",
         json={"name": tenant_name, "description": f"Tenant for {user_token.get_id()}"},
         headers=headers
     )
@@ -37,7 +37,7 @@ def add_user_to_tenant(test_client: TestClient, creator_token: Any, tenant_id: s
     """Helper function to add a user to a tenant."""
     headers = create_auth_headers(creator_token, use_cache=False)
     response = test_client.put(
-        f"/api/v1/tenants/{tenant_id}/principals",
+        f"/api/v1/platform-service/tenants/{tenant_id}/principals",
         json={
             "principal_id": user_id,
             "principal_type": PRINCIPAL_TYPE_USER,
@@ -527,7 +527,7 @@ class TestAutonomousAgentTagCacheInvalidation:
         
         # Add tags to agent
         test_client.put(
-            f"/api/v1/tenants/{tenant_id}/autonomous-agents/{agent_id}/tags",
+            f"/api/v1/platform-service/tenants/{tenant_id}/autonomous-agents/{agent_id}/tags",
             json={"tags": ["PRODUCTION", "ml"]},
             headers=headers
         )
@@ -556,7 +556,7 @@ class TestAutonomousAgentTagCacheInvalidation:
         
         # Set initial tags
         test_client.put(
-            f"/api/v1/tenants/{tenant_id}/autonomous-agents/{agent_id}/tags",
+            f"/api/v1/platform-service/tenants/{tenant_id}/autonomous-agents/{agent_id}/tags",
             json={"tags": ["TAG1", "TAG2"]},
             headers=headers
         )
@@ -570,7 +570,7 @@ class TestAutonomousAgentTagCacheInvalidation:
         
         # Remove tags
         test_client.delete(
-            f"/api/v1/tenants/{tenant_id}/autonomous-agents/{agent_id}/tags",
+            f"/api/v1/platform-service/tenants/{tenant_id}/autonomous-agents/{agent_id}/tags",
             headers=headers
         )
         
@@ -598,7 +598,7 @@ class TestAutonomousAgentTagCacheInvalidation:
         
         # Set initial tags
         test_client.put(
-            f"/api/v1/tenants/{tenant_id}/autonomous-agents/{agent_id}/tags",
+            f"/api/v1/platform-service/tenants/{tenant_id}/autonomous-agents/{agent_id}/tags",
             json={"tags": ["OLD-TAG"]},
             headers=headers
         )
@@ -613,7 +613,7 @@ class TestAutonomousAgentTagCacheInvalidation:
         
         # Replace with new tags
         test_client.put(
-            f"/api/v1/tenants/{tenant_id}/autonomous-agents/{agent_id}/tags",
+            f"/api/v1/platform-service/tenants/{tenant_id}/autonomous-agents/{agent_id}/tags",
             json={"tags": ["NEW-TAG-1", "NEW-TAG-2"]},
             headers=headers
         )

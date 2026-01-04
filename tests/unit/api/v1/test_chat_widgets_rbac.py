@@ -8,11 +8,11 @@ from tests.conftest import create_auth_headers
 
 
 # API Endpoints
-ENDPOINT_TENANTS = "/api/v1/tenants"
-ENDPOINT_CHAT_WIDGETS = "/api/v1/tenants/{tenant_id}/chat-widgets"
-ENDPOINT_CHAT_WIDGET_DETAIL = "/api/v1/tenants/{tenant_id}/chat-widgets/{chat_widget_id}"
-ENDPOINT_CHAT_WIDGET_PRINCIPALS = "/api/v1/tenants/{tenant_id}/chat-widgets/{chat_widget_id}/principals"
-ENDPOINT_PRINCIPAL_DETAIL = "/api/v1/tenants/{tenant_id}/chat-widgets/{chat_widget_id}/principals/{principal_id}"
+ENDPOINT_TENANTS = "/api/v1/platform-service/tenants"
+ENDPOINT_CHAT_WIDGETS = "/api/v1/platform-service/tenants/{tenant_id}/chat-widgets"
+ENDPOINT_CHAT_WIDGET_DETAIL = "/api/v1/platform-service/tenants/{tenant_id}/chat-widgets/{chat_widget_id}"
+ENDPOINT_CHAT_WIDGET_PRINCIPALS = "/api/v1/platform-service/tenants/{tenant_id}/chat-widgets/{chat_widget_id}/principals"
+ENDPOINT_PRINCIPAL_DETAIL = "/api/v1/platform-service/tenants/{tenant_id}/chat-widgets/{chat_widget_id}/principals/{principal_id}"
 
 # Roles
 ROLE_READ = PermissionActionEnum.READ.value
@@ -56,7 +56,7 @@ def create_chat_widget(test_client: TestClient, tenant_id: str, headers: dict, n
 def add_user_to_tenant(test_client: TestClient, tenant_id: str, admin_headers: dict, user_id: str, role: str = "READER") -> None:
     """Helper function to add a user to a tenant."""
     response = test_client.put(
-        f"/api/v1/tenants/{tenant_id}/principals",
+        f"/api/v1/platform-service/tenants/{tenant_id}/principals",
         json={
             "principal_id": user_id,
             "principal_type": PRINCIPAL_TYPE_USER,

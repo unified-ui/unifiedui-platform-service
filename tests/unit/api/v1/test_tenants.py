@@ -8,10 +8,10 @@ from tests.conftest import create_auth_headers
 
 
 # API Endpoints
-ENDPOINT_TENANTS = "/api/v1/tenants"
-ENDPOINT_TENANT_DETAIL = "/api/v1/tenants/{tenant_id}"
-ENDPOINT_TENANT_PRINCIPALS = "/api/v1/tenants/{tenant_id}/principals"
-ENDPOINT_PRINCIPAL_DETAIL = "/api/v1/tenants/{tenant_id}/principals/{principal_id}"
+ENDPOINT_TENANTS = "/api/v1/platform-service/tenants"
+ENDPOINT_TENANT_DETAIL = "/api/v1/platform-service/tenants/{tenant_id}"
+ENDPOINT_TENANT_PRINCIPALS = "/api/v1/platform-service/tenants/{tenant_id}/principals"
+ENDPOINT_PRINCIPAL_DETAIL = "/api/v1/platform-service/tenants/{tenant_id}/principals/{principal_id}"
 
 # Common Test IDs
 NON_EXISTENT_ID = "non-existent-id"

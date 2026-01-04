@@ -7,11 +7,11 @@ from tests.fixtures.auth import create_auth_headers, create_test_user
 
 
 # Endpoints
-ENDPOINT_TENANTS = "/api/v1/tenants"
-ENDPOINT_TENANT_PRINCIPALS = "/api/v1/tenants/{tenant_id}/principals"
-ENDPOINT_PRINCIPAL_DETAIL = "/api/v1/tenants/{tenant_id}/principals/{principal_id}"
-ENDPOINT_PRINCIPAL_REFRESH = "/api/v1/tenants/{tenant_id}/principals/{principal_id}/refresh"
-ENDPOINT_PRINCIPAL_STATUS = "/api/v1/tenants/{tenant_id}/principals/{principal_id}/status"
+ENDPOINT_TENANTS = "/api/v1/platform-service/tenants"
+ENDPOINT_TENANT_PRINCIPALS = "/api/v1/platform-service/tenants/{tenant_id}/principals"
+ENDPOINT_PRINCIPAL_DETAIL = "/api/v1/platform-service/tenants/{tenant_id}/principals/{principal_id}"
+ENDPOINT_PRINCIPAL_REFRESH = "/api/v1/platform-service/tenants/{tenant_id}/principals/{principal_id}/refresh"
+ENDPOINT_PRINCIPAL_STATUS = "/api/v1/platform-service/tenants/{tenant_id}/principals/{principal_id}/status"
 
 # Constants
 ROLE_GLOBAL_ADMIN = "GLOBAL_ADMIN"

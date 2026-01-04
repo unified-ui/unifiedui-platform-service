@@ -16,27 +16,27 @@ from tests.conftest import create_auth_headers
 
 
 # API Endpoints
-ENDPOINT_TAGS = "/api/v1/tenants/{tenant_id}/tags"
-ENDPOINT_TAG_DETAIL = "/api/v1/tenants/{tenant_id}/tags/{tag_id}"
-ENDPOINT_APPLICATION_TAGS = "/api/v1/tenants/{tenant_id}/applications/{application_id}/tags"
-ENDPOINT_AUTONOMOUS_AGENT_TAGS = "/api/v1/tenants/{tenant_id}/autonomous-agents/{autonomous_agent_id}/tags"
-ENDPOINT_CHAT_WIDGET_TAGS = "/api/v1/tenants/{tenant_id}/chat-widgets/{chat_widget_id}/tags"
-ENDPOINT_CREDENTIAL_TAGS = "/api/v1/tenants/{tenant_id}/credentials/{credential_id}/tags"
-ENDPOINT_DEVELOPMENT_PLATFORM_TAGS = "/api/v1/tenants/{tenant_id}/development-platforms/{development_platform_id}/tags"
+ENDPOINT_TAGS = "/api/v1/platform-service/tenants/{tenant_id}/tags"
+ENDPOINT_TAG_DETAIL = "/api/v1/platform-service/tenants/{tenant_id}/tags/{tag_id}"
+ENDPOINT_APPLICATION_TAGS = "/api/v1/platform-service/tenants/{tenant_id}/applications/{application_id}/tags"
+ENDPOINT_AUTONOMOUS_AGENT_TAGS = "/api/v1/platform-service/tenants/{tenant_id}/autonomous-agents/{autonomous_agent_id}/tags"
+ENDPOINT_CHAT_WIDGET_TAGS = "/api/v1/platform-service/tenants/{tenant_id}/chat-widgets/{chat_widget_id}/tags"
+ENDPOINT_CREDENTIAL_TAGS = "/api/v1/platform-service/tenants/{tenant_id}/credentials/{credential_id}/tags"
+ENDPOINT_DEVELOPMENT_PLATFORM_TAGS = "/api/v1/platform-service/tenants/{tenant_id}/development-platforms/{development_platform_id}/tags"
 
 # Resource endpoints for list with tags filter
-ENDPOINT_APPLICATIONS = "/api/v1/tenants/{tenant_id}/applications"
-ENDPOINT_AUTONOMOUS_AGENTS = "/api/v1/tenants/{tenant_id}/autonomous-agents"
-ENDPOINT_CHAT_WIDGETS = "/api/v1/tenants/{tenant_id}/chat-widgets"
-ENDPOINT_CREDENTIALS = "/api/v1/tenants/{tenant_id}/credentials"
-ENDPOINT_DEVELOPMENT_PLATFORMS = "/api/v1/tenants/{tenant_id}/development-platforms"
+ENDPOINT_APPLICATIONS = "/api/v1/platform-service/tenants/{tenant_id}/applications"
+ENDPOINT_AUTONOMOUS_AGENTS = "/api/v1/platform-service/tenants/{tenant_id}/autonomous-agents"
+ENDPOINT_CHAT_WIDGETS = "/api/v1/platform-service/tenants/{tenant_id}/chat-widgets"
+ENDPOINT_CREDENTIALS = "/api/v1/platform-service/tenants/{tenant_id}/credentials"
+ENDPOINT_DEVELOPMENT_PLATFORMS = "/api/v1/platform-service/tenants/{tenant_id}/development-platforms"
 
 
 def create_tenant_for_user(test_client: TestClient, user_token: Any, tenant_name: str = "Test Tenant") -> str:
     """Helper function to create a tenant and return its ID."""
     headers = create_auth_headers(user_token, use_cache=False)
     response = test_client.post(
-        "/api/v1/tenants",
+        "/api/v1/platform-service/tenants",
         json={"name": tenant_name, "description": f"Tenant for {user_token.get_id()}"},
         headers=headers
     )

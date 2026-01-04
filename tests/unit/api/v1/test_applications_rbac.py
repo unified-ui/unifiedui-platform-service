@@ -8,11 +8,11 @@ from tests.conftest import create_auth_headers
 
 
 # API Endpoints
-ENDPOINT_TENANTS = "/api/v1/tenants"
-ENDPOINT_APPLICATIONS = "/api/v1/tenants/{tenant_id}/applications"
-ENDPOINT_APPLICATION_DETAIL = "/api/v1/tenants/{tenant_id}/applications/{application_id}"
-ENDPOINT_APPLICATION_PRINCIPALS = "/api/v1/tenants/{tenant_id}/applications/{application_id}/principals"
-ENDPOINT_PRINCIPAL_DETAIL = "/api/v1/tenants/{tenant_id}/applications/{application_id}/principals/{principal_id}"
+ENDPOINT_TENANTS = "/api/v1/platform-service/tenants"
+ENDPOINT_APPLICATIONS = "/api/v1/platform-service/tenants/{tenant_id}/applications"
+ENDPOINT_APPLICATION_DETAIL = "/api/v1/platform-service/tenants/{tenant_id}/applications/{application_id}"
+ENDPOINT_APPLICATION_PRINCIPALS = "/api/v1/platform-service/tenants/{tenant_id}/applications/{application_id}/principals"
+ENDPOINT_PRINCIPAL_DETAIL = "/api/v1/platform-service/tenants/{tenant_id}/applications/{application_id}/principals/{principal_id}"
 
 # Common Test IDs
 NON_EXISTENT_ID = "non-existent-id"
@@ -54,7 +54,7 @@ def create_application(test_client: TestClient, tenant_id: str, headers: dict, a
 def add_user_to_tenant(test_client: TestClient, tenant_id: str, admin_headers: dict, user_id: str, role: str = "READER") -> None:
     """Helper function to add a user to a tenant."""
     response = test_client.put(
-        f"/api/v1/tenants/{tenant_id}/principals",
+        f"/api/v1/platform-service/tenants/{tenant_id}/principals",
         json={
             "principal_id": user_id,
             "principal_type": PRINCIPAL_TYPE_USER,

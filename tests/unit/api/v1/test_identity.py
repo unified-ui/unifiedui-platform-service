@@ -9,12 +9,12 @@ from tests.conftest import create_auth_headers
 
 
 # API Endpoints
-ENDPOINT_IDENTITY_ME = "/api/v1/identity/me"
-ENDPOINT_IDENTITY_USERS = "/api/v1/identity/users"
-ENDPOINT_IDENTITY_USER_DETAIL = "/api/v1/identity/users/{user_id}"
-ENDPOINT_IDENTITY_GROUPS = "/api/v1/identity/groups"
-ENDPOINT_IDENTITY_GROUP_DETAIL = "/api/v1/identity/groups/{group_id}"
-ENDPOINT_IDENTITY_PRINCIPAL_REFRESH = "/api/v1/identity/principals/{principal_id}/refresh"
+ENDPOINT_IDENTITY_ME = "/api/v1/platform-service/identity/me"
+ENDPOINT_IDENTITY_USERS = "/api/v1/platform-service/identity/users"
+ENDPOINT_IDENTITY_USER_DETAIL = "/api/v1/platform-service/identity/users/{user_id}"
+ENDPOINT_IDENTITY_GROUPS = "/api/v1/platform-service/identity/groups"
+ENDPOINT_IDENTITY_GROUP_DETAIL = "/api/v1/platform-service/identity/groups/{group_id}"
+ENDPOINT_IDENTITY_PRINCIPAL_REFRESH = "/api/v1/platform-service/identity/principals/{principal_id}/refresh"
 
 # Common Test IDs
 NON_EXISTENT_ID = "non-existent-id"
@@ -382,7 +382,7 @@ class TestRefreshPrincipal:
         """Test refreshing a user principal creates a new record if it doesn't exist."""
         # First create a tenant
         tenant_response = test_client.post(
-            "/api/v1/tenants",
+            "/api/v1/platform-service/tenants",
             headers=auth_headers,
             json=sample_tenant_data
         )
@@ -422,7 +422,7 @@ class TestRefreshPrincipal:
         """Test refreshing a group principal creates a new record if it doesn't exist."""
         # First create a tenant
         tenant_response = test_client.post(
-            "/api/v1/tenants",
+            "/api/v1/platform-service/tenants",
             headers=auth_headers,
             json=sample_tenant_data
         )
@@ -460,7 +460,7 @@ class TestRefreshPrincipal:
         """Test refreshing an existing user principal updates the record."""
         # First create a tenant
         tenant_response = test_client.post(
-            "/api/v1/tenants",
+            "/api/v1/platform-service/tenants",
             headers=auth_headers,
             json=sample_tenant_data
         )
@@ -508,7 +508,7 @@ class TestRefreshPrincipal:
         """Test that invalid principal type returns validation error."""
         # First create a tenant
         tenant_response = test_client.post(
-            "/api/v1/tenants",
+            "/api/v1/platform-service/tenants",
             headers=auth_headers,
             json=sample_tenant_data
         )
@@ -537,7 +537,7 @@ class TestRefreshPrincipal:
         """Test that CUSTOM_GROUP type is not allowed for refresh."""
         # First create a tenant
         tenant_response = test_client.post(
-            "/api/v1/tenants",
+            "/api/v1/platform-service/tenants",
             headers=auth_headers,
             json=sample_tenant_data
         )
@@ -581,7 +581,7 @@ class TestRefreshPrincipal:
     ) -> None:
         """Test that missing type returns validation error."""
         tenant_response = test_client.post(
-            "/api/v1/tenants",
+            "/api/v1/platform-service/tenants",
             headers=auth_headers,
             json=sample_tenant_data
         )
@@ -633,7 +633,7 @@ class TestRefreshPrincipal:
         """Test refreshing a principal with UUID format ID."""
         # First create a tenant
         tenant_response = test_client.post(
-            "/api/v1/tenants",
+            "/api/v1/platform-service/tenants",
             headers=auth_headers,
             json=sample_tenant_data
         )

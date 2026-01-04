@@ -8,9 +8,9 @@ from tests.conftest import create_auth_headers
 
 
 # API Endpoints
-ENDPOINT_TENANTS = "/api/v1/tenants"
-ENDPOINT_TAGS = "/api/v1/tenants/{tenant_id}/tags"
-ENDPOINT_RESOURCE_TYPE_TAGS = "/api/v1/tenants/{tenant_id}/{resource_type}/tags"
+ENDPOINT_TENANTS = "/api/v1/platform-service/tenants"
+ENDPOINT_TAGS = "/api/v1/platform-service/tenants/{tenant_id}/tags"
+ENDPOINT_RESOURCE_TYPE_TAGS = "/api/v1/platform-service/tenants/{tenant_id}/{resource_type}/tags"
 
 
 def create_tenant_for_user(test_client: TestClient, user_token: Any, tenant_name: str = "Test Tenant") -> str:
@@ -290,7 +290,7 @@ class TestResourceTypeTagsList:
         
         # Create application via API
         app_response = test_client.post(
-            f"/api/v1/tenants/{tenant_id}/applications",
+            f"/api/v1/platform-service/tenants/{tenant_id}/applications",
             json={
                 "name": "Test App",
                 "description": "Test",
@@ -309,7 +309,7 @@ class TestResourceTypeTagsList:
         
         # Set tags on application
         test_client.put(
-            f"/api/v1/tenants/{tenant_id}/applications/{app_id}/tags",
+            f"/api/v1/platform-service/tenants/{tenant_id}/applications/{app_id}/tags",
             json={"tags": ["BACKEND", "PRODUCTION"]},
             headers=headers
         )
@@ -341,7 +341,7 @@ class TestResourceTypeTagsList:
         
         # Create agent via API
         agent_response = test_client.post(
-            f"/api/v1/tenants/{tenant_id}/autonomous-agents",
+            f"/api/v1/platform-service/tenants/{tenant_id}/autonomous-agents",
             json={
                 "name": "Test Agent",
                 "description": "Test",
@@ -357,7 +357,7 @@ class TestResourceTypeTagsList:
         create_tag(test_client, tenant_id, headers, "AUTOMATION")
         
         test_client.put(
-            f"/api/v1/tenants/{tenant_id}/autonomous-agents/{agent_id}/tags",
+            f"/api/v1/platform-service/tenants/{tenant_id}/autonomous-agents/{agent_id}/tags",
             json={"tags": ["AI", "AUTOMATION"]},
             headers=headers
         )
@@ -385,7 +385,7 @@ class TestResourceTypeTagsList:
         
         # Create application and tags
         app_response = test_client.post(
-            f"/api/v1/tenants/{tenant_id}/applications",
+            f"/api/v1/platform-service/tenants/{tenant_id}/applications",
             json={"name": "Test App", "description": "Test", "type": "N8N", "config": {}},
             headers=headers
         )
@@ -396,7 +396,7 @@ class TestResourceTypeTagsList:
         create_tag(test_client, tenant_id, headers, "FRONTEND")
         
         test_client.put(
-            f"/api/v1/tenants/{tenant_id}/applications/{app_id}/tags",
+            f"/api/v1/platform-service/tenants/{tenant_id}/applications/{app_id}/tags",
             json={"tags": ["BACKEND", "BACKOFFICE", "FRONTEND"]},
             headers=headers
         )
@@ -427,7 +427,7 @@ class TestResourceTypeTagsList:
         
         # Create application with many tags
         app_response = test_client.post(
-            f"/api/v1/tenants/{tenant_id}/applications",
+            f"/api/v1/platform-service/tenants/{tenant_id}/applications",
             json={"name": "Test App", "description": "Test", "type": "N8N", "config": {}},
             headers=headers
         )
@@ -439,7 +439,7 @@ class TestResourceTypeTagsList:
             create_tag(test_client, tenant_id, headers, name)
         
         test_client.put(
-            f"/api/v1/tenants/{tenant_id}/applications/{app_id}/tags",
+            f"/api/v1/platform-service/tenants/{tenant_id}/applications/{app_id}/tags",
             json={"tags": tag_names},
             headers=headers
         )

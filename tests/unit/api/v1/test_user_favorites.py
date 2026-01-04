@@ -15,15 +15,15 @@ from tests.conftest import create_auth_headers
 
 
 # API Endpoints
-ENDPOINT_USER_FAVORITES = "/api/v1/tenants/{tenant_id}/users/{user_id}/favorites/{resource_type}"
-ENDPOINT_USER_FAVORITE_DETAIL = "/api/v1/tenants/{tenant_id}/users/{user_id}/favorites/{resource_type}/{resource_id}"
+ENDPOINT_USER_FAVORITES = "/api/v1/platform-service/tenants/{tenant_id}/users/{user_id}/favorites/{resource_type}"
+ENDPOINT_USER_FAVORITE_DETAIL = "/api/v1/platform-service/tenants/{tenant_id}/users/{user_id}/favorites/{resource_type}/{resource_id}"
 
 
 def create_tenant_for_user(test_client: TestClient, user_token: Any, tenant_name: str = "Test Tenant") -> str:
     """Helper function to create a tenant and return its ID."""
     headers = create_auth_headers(user_token, use_cache=False)
     response = test_client.post(
-        "/api/v1/tenants",
+        "/api/v1/platform-service/tenants",
         json={"name": tenant_name, "description": f"Tenant for {user_token.get_id()}"},
         headers=headers
     )

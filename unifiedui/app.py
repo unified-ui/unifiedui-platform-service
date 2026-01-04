@@ -179,31 +179,31 @@ def create_app() -> FastAPI:
     # Include routers
     app.include_router(
         health.router,
-        prefix="/api/v1",
+        prefix="/api/v1/platform-service",
         tags=["Health"]
     )
     
     app.include_router(
         identity.router,
-        prefix="/api/v1/identity",
+        prefix="/api/v1/platform-service/identity",
         tags=["Identity"]
     )
     
     app.include_router(
         tenants.router,
-        prefix="/api/v1/tenants",
+        prefix="/api/v1/platform-service/tenants",
         tags=["Tenants"]
     )
     
     app.include_router(
         principals.router,
-        prefix="/api/v1/tenants/{tenant_id}/principals",
+        prefix="/api/v1/platform-service/tenants/{tenant_id}/principals",
         tags=["Principals"]
     )
     
     app.include_router(
         custom_groups.router,
-        prefix="/api/v1/tenants/{tenant_id}/custom-groups",
+        prefix="/api/v1/platform-service/tenants/{tenant_id}/custom-groups",
         tags=["Custom Groups"]
     )
     
@@ -211,112 +211,112 @@ def create_app() -> FastAPI:
     # e.g., /applications/tags must be matched before /applications/{application_id}
     app.include_router(
         tags.credentials_tags_list_router,
-        prefix="/api/v1/tenants/{tenant_id}",
+        prefix="/api/v1/platform-service/tenants/{tenant_id}",
         tags=["Credentials"]
     )
     
     app.include_router(
         credentials.router,
-        prefix="/api/v1/tenants/{tenant_id}",
+        prefix="/api/v1/platform-service/tenants/{tenant_id}",
         tags=["Credentials"]
     )
     
     app.include_router(
         tags.applications_tags_list_router,
-        prefix="/api/v1/tenants/{tenant_id}",
+        prefix="/api/v1/platform-service/tenants/{tenant_id}",
         tags=["Applications"]
     )
     
     app.include_router(
         applications.router,
-        prefix="/api/v1/tenants/{tenant_id}",
+        prefix="/api/v1/platform-service/tenants/{tenant_id}",
         tags=["Applications"]
     )
     
     app.include_router(
         conversations.router,
-        prefix="/api/v1/tenants/{tenant_id}",
+        prefix="/api/v1/platform-service/tenants/{tenant_id}",
         tags=["Conversations"]
     )
     
     app.include_router(
         tags.autonomous_agents_tags_list_router,
-        prefix="/api/v1/tenants/{tenant_id}",
+        prefix="/api/v1/platform-service/tenants/{tenant_id}",
         tags=["Autonomous Agents"]
     )
     
     app.include_router(
         autonomous_agents.router,
-        prefix="/api/v1/tenants/{tenant_id}",
+        prefix="/api/v1/platform-service/tenants/{tenant_id}",
         tags=["Autonomous Agents"]
     )
     
     app.include_router(
         tags.development_platforms_tags_list_router,
-        prefix="/api/v1/tenants/{tenant_id}",
+        prefix="/api/v1/platform-service/tenants/{tenant_id}",
         tags=["Development Platforms"]
     )
     
     app.include_router(
         development_platforms.router,
-        prefix="/api/v1/tenants/{tenant_id}",
+        prefix="/api/v1/platform-service/tenants/{tenant_id}",
         tags=["Development Platforms"]
     )
     
     app.include_router(
         tags.chat_widgets_tags_list_router,
-        prefix="/api/v1/tenants/{tenant_id}",
+        prefix="/api/v1/platform-service/tenants/{tenant_id}",
         tags=["Chat Widgets"]
     )
     
     app.include_router(
         chat_widgets.router,
-        prefix="/api/v1/tenants/{tenant_id}",
+        prefix="/api/v1/platform-service/tenants/{tenant_id}",
         tags=["Chat Widgets"]
     )
     
     # Tags routes
     app.include_router(
         tags.router,
-        prefix="/api/v1/tenants/{tenant_id}",
+        prefix="/api/v1/platform-service/tenants/{tenant_id}",
         tags=["Tags"]
     )
     
     # Resource-specific tag routes
     app.include_router(
         tags.application_tags_router,
-        prefix="/api/v1/tenants/{tenant_id}",
+        prefix="/api/v1/platform-service/tenants/{tenant_id}",
         tags=["Applications"]
     )
     
     app.include_router(
         tags.autonomous_agent_tags_router,
-        prefix="/api/v1/tenants/{tenant_id}",
+        prefix="/api/v1/platform-service/tenants/{tenant_id}",
         tags=["Autonomous Agents"]
     )
     
     app.include_router(
         tags.chat_widget_tags_router,
-        prefix="/api/v1/tenants/{tenant_id}",
+        prefix="/api/v1/platform-service/tenants/{tenant_id}",
         tags=["Chat Widgets"]
     )
     
     app.include_router(
         tags.credential_tags_router,
-        prefix="/api/v1/tenants/{tenant_id}",
+        prefix="/api/v1/platform-service/tenants/{tenant_id}",
         tags=["Credentials"]
     )
     
     app.include_router(
         tags.development_platform_tags_router,
-        prefix="/api/v1/tenants/{tenant_id}",
+        prefix="/api/v1/platform-service/tenants/{tenant_id}",
         tags=["Development Platforms"]
     )
     
     # User Favorites routes
     app.include_router(
         user_favorites.router,
-        prefix="/api/v1/tenants/{tenant_id}",
+        prefix="/api/v1/platform-service/tenants/{tenant_id}",
         tags=["User Favorites"]
     )
     

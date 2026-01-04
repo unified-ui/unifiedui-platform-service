@@ -9,8 +9,8 @@ from tests.conftest import create_auth_headers
 
 
 # API Endpoints
-ENDPOINT_USER_FAVORITES = "/api/v1/tenants/{tenant_id}/users/{user_id}/favorites/{resource_type}"
-ENDPOINT_USER_FAVORITE_DETAIL = "/api/v1/tenants/{tenant_id}/users/{user_id}/favorites/{resource_type}/{resource_id}"
+ENDPOINT_USER_FAVORITES = "/api/v1/platform-service/tenants/{tenant_id}/users/{user_id}/favorites/{resource_type}"
+ENDPOINT_USER_FAVORITE_DETAIL = "/api/v1/platform-service/tenants/{tenant_id}/users/{user_id}/favorites/{resource_type}/{resource_id}"
 
 PRINCIPAL_TYPE_USER = PrincipalTypeEnum.IDENTITY_USER.value
 
@@ -19,7 +19,7 @@ def create_tenant_for_user(test_client: TestClient, user_token, tenant_name: str
     """Helper function to create a tenant and return its ID."""
     headers = create_auth_headers(user_token, use_cache=False)
     response = test_client.post(
-        "/api/v1/tenants",
+        "/api/v1/platform-service/tenants",
         json={"name": tenant_name, "description": f"Tenant for {user_token.get_id()}"},
         headers=headers
     )
@@ -30,7 +30,7 @@ def create_tenant_for_user(test_client: TestClient, user_token, tenant_name: str
 def add_user_to_tenant(test_client: TestClient, tenant_id: str, admin_headers: dict, user_id: str) -> None:
     """Helper function to add a user to a tenant."""
     response = test_client.put(
-        f"/api/v1/tenants/{tenant_id}/principals",
+        f"/api/v1/platform-service/tenants/{tenant_id}/principals",
         json={
             "principal_id": user_id,
             "principal_type": PRINCIPAL_TYPE_USER,

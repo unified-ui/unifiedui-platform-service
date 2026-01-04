@@ -9,10 +9,10 @@ from tests.conftest import create_auth_headers
 
 
 # API Endpoints
-ENDPOINT_APPLICATIONS = "/api/v1/tenants/{tenant_id}/applications"
-ENDPOINT_APPLICATION_DETAIL = "/api/v1/tenants/{tenant_id}/applications/{application_id}"
-ENDPOINT_APPLICATION_PRINCIPALS = "/api/v1/tenants/{tenant_id}/applications/{application_id}/principals"
-ENDPOINT_PRINCIPAL_DETAIL = "/api/v1/tenants/{tenant_id}/applications/{application_id}/principals/{principal_id}"
+ENDPOINT_APPLICATIONS = "/api/v1/platform-service/tenants/{tenant_id}/applications"
+ENDPOINT_APPLICATION_DETAIL = "/api/v1/platform-service/tenants/{tenant_id}/applications/{application_id}"
+ENDPOINT_APPLICATION_PRINCIPALS = "/api/v1/platform-service/tenants/{tenant_id}/applications/{application_id}/principals"
+ENDPOINT_PRINCIPAL_DETAIL = "/api/v1/platform-service/tenants/{tenant_id}/applications/{application_id}/principals/{principal_id}"
 
 # Common Test IDs
 NON_EXISTENT_ID = "non-existent-id"
@@ -32,7 +32,7 @@ def create_tenant_for_user(test_client: TestClient, user_token: Any, tenant_name
     """Helper function to create a tenant and return its ID."""
     headers = create_auth_headers(user_token, use_cache=False)
     response = test_client.post(
-        "/api/v1/tenants",
+        "/api/v1/platform-service/tenants",
         json={"name": tenant_name, "description": f"Tenant for {user_token.get_id()}"},
         headers=headers
     )

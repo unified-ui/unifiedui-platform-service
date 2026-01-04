@@ -8,11 +8,11 @@ from tests.conftest import create_auth_headers
 
 
 # API Endpoints
-ENDPOINT_TENANTS = "/api/v1/tenants"
-ENDPOINT_CREDENTIALS = "/api/v1/tenants/{tenant_id}/credentials"
-ENDPOINT_CREDENTIAL_DETAIL = "/api/v1/tenants/{tenant_id}/credentials/{credential_id}"
-ENDPOINT_CREDENTIAL_PRINCIPALS = "/api/v1/tenants/{tenant_id}/credentials/{credential_id}/principals"
-ENDPOINT_PRINCIPAL_DETAIL = "/api/v1/tenants/{tenant_id}/credentials/{credential_id}/principals/{principal_id}"
+ENDPOINT_TENANTS = "/api/v1/platform-service/tenants"
+ENDPOINT_CREDENTIALS = "/api/v1/platform-service/tenants/{tenant_id}/credentials"
+ENDPOINT_CREDENTIAL_DETAIL = "/api/v1/platform-service/tenants/{tenant_id}/credentials/{credential_id}"
+ENDPOINT_CREDENTIAL_PRINCIPALS = "/api/v1/platform-service/tenants/{tenant_id}/credentials/{credential_id}/principals"
+ENDPOINT_PRINCIPAL_DETAIL = "/api/v1/platform-service/tenants/{tenant_id}/credentials/{credential_id}/principals/{principal_id}"
 
 # Roles
 ROLE_READ = PermissionActionEnum.READ.value
@@ -55,7 +55,7 @@ def create_credential(test_client: TestClient, tenant_id: str, headers: dict, cr
 def add_user_to_tenant(test_client: TestClient, tenant_id: str, admin_headers: dict, user_id: str, role: str = "READER") -> None:
     """Helper function to add a user to a tenant."""
     response = test_client.put(
-        f"/api/v1/tenants/{tenant_id}/principals",
+        f"/api/v1/platform-service/tenants/{tenant_id}/principals",
         json={
             "principal_id": user_id,
             "principal_type": PRINCIPAL_TYPE_USER,
@@ -534,7 +534,7 @@ class TestCredentialTagCacheInvalidation:
         
         # Add tags to credential
         test_client.put(
-            f"/api/v1/tenants/{tenant_id}/credentials/{credential_id}/tags",
+            f"/api/v1/platform-service/tenants/{tenant_id}/credentials/{credential_id}/tags",
             json={"tags": ["PRODUCTION", "api-key"]},
             headers=admin_headers
         )
@@ -556,7 +556,7 @@ class TestCredentialTagCacheInvalidation:
         
         # Set initial tags
         test_client.put(
-            f"/api/v1/tenants/{tenant_id}/credentials/{credential_id}/tags",
+            f"/api/v1/platform-service/tenants/{tenant_id}/credentials/{credential_id}/tags",
             json={"tags": ["TAG1", "TAG2"]},
             headers=admin_headers
         )
@@ -570,7 +570,7 @@ class TestCredentialTagCacheInvalidation:
         
         # Remove tags
         test_client.delete(
-            f"/api/v1/tenants/{tenant_id}/credentials/{credential_id}/tags",
+            f"/api/v1/platform-service/tenants/{tenant_id}/credentials/{credential_id}/tags",
             headers=admin_headers
         )
         
@@ -591,7 +591,7 @@ class TestCredentialTagCacheInvalidation:
         
         # Set initial tags
         test_client.put(
-            f"/api/v1/tenants/{tenant_id}/credentials/{credential_id}/tags",
+            f"/api/v1/platform-service/tenants/{tenant_id}/credentials/{credential_id}/tags",
             json={"tags": ["OLD-TAG"]},
             headers=admin_headers
         )
@@ -606,7 +606,7 @@ class TestCredentialTagCacheInvalidation:
         
         # Replace with new tags
         test_client.put(
-            f"/api/v1/tenants/{tenant_id}/credentials/{credential_id}/tags",
+            f"/api/v1/platform-service/tenants/{tenant_id}/credentials/{credential_id}/tags",
             json={"tags": ["NEW-TAG-1", "NEW-TAG-2"]},
             headers=admin_headers
         )

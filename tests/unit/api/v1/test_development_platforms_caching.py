@@ -8,11 +8,11 @@ from tests.conftest import create_auth_headers
 
 
 # API Endpoints
-ENDPOINT_TENANTS = "/api/v1/tenants"
-ENDPOINT_DEVELOPMENT_PLATFORMS = "/api/v1/tenants/{tenant_id}/development-platforms"
-ENDPOINT_DEVELOPMENT_PLATFORM_DETAIL = "/api/v1/tenants/{tenant_id}/development-platforms/{development_platform_id}"
-ENDPOINT_DEVELOPMENT_PLATFORM_PRINCIPALS = "/api/v1/tenants/{tenant_id}/development-platforms/{development_platform_id}/principals"
-ENDPOINT_DEVELOPMENT_PLATFORM_TAGS = "/api/v1/tenants/{tenant_id}/development-platforms/{development_platform_id}/tags"
+ENDPOINT_TENANTS = "/api/v1/platform-service/tenants"
+ENDPOINT_DEVELOPMENT_PLATFORMS = "/api/v1/platform-service/tenants/{tenant_id}/development-platforms"
+ENDPOINT_DEVELOPMENT_PLATFORM_DETAIL = "/api/v1/platform-service/tenants/{tenant_id}/development-platforms/{development_platform_id}"
+ENDPOINT_DEVELOPMENT_PLATFORM_PRINCIPALS = "/api/v1/platform-service/tenants/{tenant_id}/development-platforms/{development_platform_id}/principals"
+ENDPOINT_DEVELOPMENT_PLATFORM_TAGS = "/api/v1/platform-service/tenants/{tenant_id}/development-platforms/{development_platform_id}/tags"
 
 # Roles
 ROLE_READ = PermissionActionEnum.READ.value
@@ -54,7 +54,7 @@ def create_development_platform(test_client: TestClient, tenant_id: str, headers
 def add_user_to_tenant(test_client: TestClient, tenant_id: str, admin_headers: dict, user_id: str, role: str = "READER") -> None:
     """Helper function to add a user to a tenant."""
     response = test_client.put(
-        f"/api/v1/tenants/{tenant_id}/principals",
+        f"/api/v1/platform-service/tenants/{tenant_id}/principals",
         json={
             "principal_id": user_id,
             "principal_type": PRINCIPAL_TYPE_USER,

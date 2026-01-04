@@ -9,11 +9,11 @@ from tests.conftest import create_auth_headers
 
 
 # API Endpoints
-ENDPOINT_TENANTS = "/api/v1/tenants"
-ENDPOINT_CUSTOM_GROUPS = "/api/v1/tenants/{tenant_id}/custom-groups"
-ENDPOINT_CUSTOM_GROUP_DETAIL = "/api/v1/tenants/{tenant_id}/custom-groups/{custom_group_id}"
-ENDPOINT_CUSTOM_GROUP_PRINCIPALS = "/api/v1/tenants/{tenant_id}/custom-groups/{custom_group_id}/principals"
-ENDPOINT_PRINCIPAL_DETAIL = "/api/v1/tenants/{tenant_id}/custom-groups/{custom_group_id}/principals/{principal_id}"
+ENDPOINT_TENANTS = "/api/v1/platform-service/tenants"
+ENDPOINT_CUSTOM_GROUPS = "/api/v1/platform-service/tenants/{tenant_id}/custom-groups"
+ENDPOINT_CUSTOM_GROUP_DETAIL = "/api/v1/platform-service/tenants/{tenant_id}/custom-groups/{custom_group_id}"
+ENDPOINT_CUSTOM_GROUP_PRINCIPALS = "/api/v1/platform-service/tenants/{tenant_id}/custom-groups/{custom_group_id}/principals"
+ENDPOINT_PRINCIPAL_DETAIL = "/api/v1/platform-service/tenants/{tenant_id}/custom-groups/{custom_group_id}/principals/{principal_id}"
 
 # Common Test IDs
 NON_EXISTENT_ID = "non-existent-id"
@@ -55,7 +55,7 @@ def create_custom_group(test_client: TestClient, tenant_id: str, headers: dict, 
 def add_user_to_tenant(test_client: TestClient, tenant_id: str, admin_headers: dict, user_id: str, role: str = "READER") -> None:
     """Helper function to add a user to a tenant."""
     response = test_client.put(
-        f"/api/v1/tenants/{tenant_id}/principals",
+        f"/api/v1/platform-service/tenants/{tenant_id}/principals",
         json={
             "principal_id": user_id,
             "principal_type": PRINCIPAL_TYPE_USER,
@@ -528,7 +528,7 @@ class TestCustomGroupRBAC:
         
         # User A (tenant admin) grants User B CUSTOM_GROUP_CREATOR permission
         test_client.put(
-            f"/api/v1/tenants/{tenant_id}/principals",
+            f"/api/v1/platform-service/tenants/{tenant_id}/principals",
             json={
                 "principal_id": "group-creator",
                 "principal_type": PRINCIPAL_TYPE_USER,
@@ -590,7 +590,7 @@ class TestCustomGroupRBAC:
         headers_b = create_auth_headers(user_b_token, use_cache=False)
         
         test_client.put(
-            f"/api/v1/tenants/{tenant_id}/principals",
+            f"/api/v1/platform-service/tenants/{tenant_id}/principals",
             json={
                 "principal_id": "groups-admin",
                 "principal_type": PRINCIPAL_TYPE_USER,
