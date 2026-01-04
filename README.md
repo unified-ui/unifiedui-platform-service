@@ -62,7 +62,6 @@ The **Platform Service** is the central authority in the unified-ui architecture
 | **Caching** | Redis |
 | **Secrets** | Azure Key Vault / HashiCorp Vault |
 | **Identity** | Microsoft Entra ID (MSAL) |
-| **Document DB** | MongoDB / Azure Cosmos DB |
 
 ---
 
@@ -155,7 +154,6 @@ unifiedui/
 ├── caching/                # Redis implementation
 ├── vault/                  # Key Vault / HashiCorp implementation
 ├── identity/               # Entra ID implementation
-├── docdatabase/            # MongoDB / Cosmos DB client
 ├── exc/                    # Custom exceptions
 └── utils/                  # Utilities
 ```
