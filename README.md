@@ -1,5 +1,7 @@
 # unified-ui Platform Service
 
+[![CI](https://github.com/unified-ui/unifiedui-platform-service/actions/workflows/ci.yml/badge.svg)](https://github.com/unified-ui/unifiedui-platform-service/actions/workflows/ci.yml)
+
 > **The backbone of your AI management platform** — Centralized authentication, authorization, and core data management for all unified-ui services.
 
 ## What is unified-ui?
