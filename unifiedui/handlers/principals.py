@@ -80,14 +80,15 @@ class PrincipalHandler:
             display_name = identity_data.display_name
             mail = identity_data.mail
             description = None
+            # For users, principal_name is their email/principal_name from identity data
+            principal_name = identity_data.principal_name or identity_data.mail or display_name
         else:  # IDENTITY_GROUP
             identity_data = user.idp.get_group_by_id(principal_id)
             display_name = identity_data.display_name
             mail = None
             description = None
-        
-        # Get principal_name from identity provider
-        principal_name = user.identity.get_principal_name()
+            # For groups, principal_name equals display_name
+            principal_name = display_name
         
         with self.db_client.get_session() as session:
             # Try to find existing principal
