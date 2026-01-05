@@ -22,32 +22,14 @@ class TestServiceKeyValidation:
         assert exc_info.value.status_code == status.HTTP_401_UNAUTHORIZED
         assert "X-Service-Key header missing" in exc_info.value.detail
     
-    def test_validate_service_key_valid_from_vault(self):
-        """Test that valid service key from vault passes."""
+    def test_validate_service_key_valid_from_settings(self):
+        """Test that valid service key from settings passes."""
         mock_request = Mock(spec=Request)
         mock_request.headers = {"X-Service-Key": "valid-key-123"}
         
-        mock_vault = Mock()
-        mock_vault.get_secret.return_value = "valid-key-123"
-        
-        with patch('unifiedui.core.middleware.apis.v1.auth.get_app_service_vault', return_value=mock_vault):
+        with patch('unifiedui.core.middleware.apis.v1.auth.settings') as mock_settings:
+            mock_settings.x_agent_service_key = "valid-key-123"
             result = _validate_service_key(mock_request, "X_AGENT_SERVICE_KEY")
-        
-        assert result is True
-        mock_vault.get_secret.assert_called_once_with("X_AGENT_SERVICE_KEY")
-    
-    def test_validate_service_key_valid_from_settings(self):
-        """Test that valid service key from settings passes when vault returns None."""
-        mock_request = Mock(spec=Request)
-        mock_request.headers = {"X-Service-Key": "settings-key-456"}
-        
-        mock_vault = Mock()
-        mock_vault.get_secret.return_value = None
-        
-        with patch('unifiedui.core.middleware.apis.v1.auth.get_app_service_vault', return_value=mock_vault):
-            with patch('unifiedui.core.middleware.apis.v1.auth.settings') as mock_settings:
-                mock_settings.x_agent_service_key = "settings-key-456"
-                result = _validate_service_key(mock_request, "X_AGENT_SERVICE_KEY")
         
         assert result is True
     
@@ -56,10 +38,8 @@ class TestServiceKeyValidation:
         mock_request = Mock(spec=Request)
         mock_request.headers = {"X-Service-Key": "invalid-key"}
         
-        mock_vault = Mock()
-        mock_vault.get_secret.return_value = "valid-key-123"
-        
-        with patch('unifiedui.core.middleware.apis.v1.auth.get_app_service_vault', return_value=mock_vault):
+        with patch('unifiedui.core.middleware.apis.v1.auth.settings') as mock_settings:
+            mock_settings.x_agent_service_key = "valid-key-123"
             with pytest.raises(HTTPException) as exc_info:
                 _validate_service_key(mock_request, "X_AGENT_SERVICE_KEY")
         
@@ -71,14 +51,10 @@ class TestServiceKeyValidation:
         mock_request = Mock(spec=Request)
         mock_request.headers = {"X-Service-Key": "some-key"}
         
-        mock_vault = Mock()
-        mock_vault.get_secret.return_value = None
-        
-        with patch('unifiedui.core.middleware.apis.v1.auth.get_app_service_vault', return_value=mock_vault):
-            with patch('unifiedui.core.middleware.apis.v1.auth.settings') as mock_settings:
-                mock_settings.x_agent_service_key = None
-                with pytest.raises(HTTPException) as exc_info:
-                    _validate_service_key(mock_request, "X_AGENT_SERVICE_KEY")
+        with patch('unifiedui.core.middleware.apis.v1.auth.settings') as mock_settings:
+            mock_settings.x_agent_service_key = None
+            with pytest.raises(HTTPException) as exc_info:
+                _validate_service_key(mock_request, "X_AGENT_SERVICE_KEY")
         
         assert exc_info.value.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
         assert "Service authentication not configured" in exc_info.value.detail
@@ -104,14 +80,12 @@ class TestAuthenticateWithServiceKey:
         mock_user.identity = mock_identity
         mock_user.tenants = []
         
-        mock_vault = Mock()
-        mock_vault.get_secret.return_value = "valid-service-key"
-        
         @authenticate(required_service_auth_key="X_AGENT_SERVICE_KEY")
         async def test_handler(request: Request):
             return "success"
         
-        with patch('unifiedui.core.middleware.apis.v1.auth.get_app_service_vault', return_value=mock_vault):
+        with patch('unifiedui.core.middleware.apis.v1.auth.settings') as mock_settings:
+            mock_settings.x_agent_service_key = "valid-service-key"
             with patch('unifiedui.core.middleware.apis.v1.auth.ContextIdentityUser', return_value=mock_user):
                 with patch('unifiedui.core.middleware.apis.v1.auth.get_db_client'):
                     with patch('unifiedui.core.middleware.apis.v1.auth.get_cache_client'):
@@ -148,14 +122,12 @@ class TestAuthenticateWithServiceKey:
         }
         mock_request.state = Mock()
         
-        mock_vault = Mock()
-        mock_vault.get_secret.return_value = "correct-key"
-        
         @authenticate(required_service_auth_key="X_AGENT_SERVICE_KEY")
         async def test_handler(request: Request):
             return "success"
         
-        with patch('unifiedui.core.middleware.apis.v1.auth.get_app_service_vault', return_value=mock_vault):
+        with patch('unifiedui.core.middleware.apis.v1.auth.settings') as mock_settings:
+            mock_settings.x_agent_service_key = "correct-key"
             with pytest.raises(HTTPException) as exc_info:
                 await test_handler(mock_request)
         
@@ -173,14 +145,12 @@ class TestAuthenticateWithServiceKey:
         mock_request.path_params = {}
         mock_request.state = Mock()
         
-        mock_vault = Mock()
-        mock_vault.get_secret.return_value = "valid-service-key"
-        
         @authenticate(required_service_auth_key="X_AGENT_SERVICE_KEY")
         async def test_handler(request: Request):
             return "success"
         
-        with patch('unifiedui.core.middleware.apis.v1.auth.get_app_service_vault', return_value=mock_vault):
+        with patch('unifiedui.core.middleware.apis.v1.auth.settings') as mock_settings:
+            mock_settings.x_agent_service_key = "valid-service-key"
             with patch('unifiedui.core.middleware.apis.v1.auth.ContextIdentityUser', side_effect=ValueError("Invalid token")):
                 with patch('unifiedui.core.middleware.apis.v1.auth.get_db_client'):
                     with patch('unifiedui.core.middleware.apis.v1.auth.get_cache_client'):

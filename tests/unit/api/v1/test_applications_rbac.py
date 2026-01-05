@@ -592,12 +592,6 @@ class TestApplicationRBAC:
 class TestApplicationConfigRBAC:
     """Test suite for /config endpoint RBAC with X-Service-Key requirement."""
     
-    def _mock_vault_get_secret(self, key: str) -> str | None:
-        """Mock vault get_secret method."""
-        if key == "X_AGENT_SERVICE_KEY":
-            return TEST_SERVICE_KEY
-        return None
-    
     def test_config_requires_service_key_header(self, test_client: TestClient) -> None:
         """Test that /config endpoint requires X-Service-Key header."""
         # Create user and tenant
@@ -626,10 +620,9 @@ class TestApplicationConfigRBAC:
         headers = create_auth_headers(user_token, use_cache=False)
         headers["X-Service-Key"] = "invalid-service-key"
         
-        # Mock vault to return the expected key
-        mock_vault = type('MockVault', (), {'get_secret': self._mock_vault_get_secret})()
-        
-        with patch('unifiedui.core.middleware.apis.v1.auth.get_app_service_vault', return_value=mock_vault):
+        # Mock settings to return the expected key
+        with patch('unifiedui.core.middleware.apis.v1.auth.settings') as mock_settings:
+            mock_settings.x_agent_service_key = TEST_SERVICE_KEY
             response = test_client.get(
                 ENDPOINT_APPLICATION_CONFIG.format(tenant_id=tenant_id, application_id=app_id),
                 headers=headers
@@ -668,9 +661,8 @@ class TestApplicationConfigRBAC:
         # Reader with valid service key can access config
         reader_headers = create_auth_headers_with_service_key(reader_token, TEST_SERVICE_KEY, use_cache=False)
         
-        mock_vault = type('MockVault', (), {'get_secret': self._mock_vault_get_secret})()
-        
-        with patch('unifiedui.core.middleware.apis.v1.auth.get_app_service_vault', return_value=mock_vault):
+        with patch('unifiedui.core.middleware.apis.v1.auth.settings') as mock_settings:
+            mock_settings.x_agent_service_key = TEST_SERVICE_KEY
             response = test_client.get(
                 ENDPOINT_APPLICATION_CONFIG.format(tenant_id=tenant_id, application_id=app_id),
                 headers=reader_headers
@@ -698,9 +690,8 @@ class TestApplicationConfigRBAC:
         # Other user with valid service key but no app permission should be denied
         other_headers = create_auth_headers_with_service_key(other_token, TEST_SERVICE_KEY, use_cache=False)
         
-        mock_vault = type('MockVault', (), {'get_secret': self._mock_vault_get_secret})()
-        
-        with patch('unifiedui.core.middleware.apis.v1.auth.get_app_service_vault', return_value=mock_vault):
+        with patch('unifiedui.core.middleware.apis.v1.auth.settings') as mock_settings:
+            mock_settings.x_agent_service_key = TEST_SERVICE_KEY
             response = test_client.get(
                 ENDPOINT_APPLICATION_CONFIG.format(tenant_id=tenant_id, application_id=app_id),
                 headers=other_headers
@@ -727,9 +718,8 @@ class TestApplicationConfigRBAC:
         # Global admin with valid service key can access config
         global_admin_headers = create_auth_headers_with_service_key(global_admin_token, TEST_SERVICE_KEY, use_cache=False)
         
-        mock_vault = type('MockVault', (), {'get_secret': self._mock_vault_get_secret})()
-        
-        with patch('unifiedui.core.middleware.apis.v1.auth.get_app_service_vault', return_value=mock_vault):
+        with patch('unifiedui.core.middleware.apis.v1.auth.settings') as mock_settings:
+            mock_settings.x_agent_service_key = TEST_SERVICE_KEY
             response = test_client.get(
                 ENDPOINT_APPLICATION_CONFIG.format(tenant_id=tenant_id, application_id=app_id),
                 headers=global_admin_headers
@@ -758,9 +748,8 @@ class TestApplicationConfigRBAC:
         # Apps admin with valid service key can access config
         apps_admin_headers = create_auth_headers_with_service_key(apps_admin_token, TEST_SERVICE_KEY, use_cache=False)
         
-        mock_vault = type('MockVault', (), {'get_secret': self._mock_vault_get_secret})()
-        
-        with patch('unifiedui.core.middleware.apis.v1.auth.get_app_service_vault', return_value=mock_vault):
+        with patch('unifiedui.core.middleware.apis.v1.auth.settings') as mock_settings:
+            mock_settings.x_agent_service_key = TEST_SERVICE_KEY
             response = test_client.get(
                 ENDPOINT_APPLICATION_CONFIG.format(tenant_id=tenant_id, application_id=app_id),
                 headers=apps_admin_headers
