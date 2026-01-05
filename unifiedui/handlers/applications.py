@@ -609,6 +609,16 @@ class ApplicationHandler:
                     api_credentials=api_credentials,
                     chat_credentials=chat_credentials
                 )
+            elif app_type == ApplicationTypeEnum.MICROSOFT_FOUNDRY:
+                # For Microsoft Foundry, return the config settings
+                from unifiedui.schema.responses.applications import MicrosoftFoundryConfigSettingsResponse
+                
+                settings = MicrosoftFoundryConfigSettingsResponse(
+                    api_version=config.get("api_version", "2025-11-15-preview"),
+                    agent_type=config.get("agent_type", "AGENT"),
+                    project_endpoint=config.get("project_endpoint", ""),
+                    agent_name=config.get("agent_name", "")
+                )
             else:
                 # For unsupported types, return raw config
                 settings = config

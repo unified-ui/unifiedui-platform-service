@@ -1,7 +1,7 @@
 """API routes for conversation management."""
 from typing import Optional, List
 
-from fastapi import APIRouter, Depends, HTTPException, status, Request, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Request, Query, Header
 from fastapi.responses import Response
 
 from unifiedui.core.identity.users import ContextIdentityUser
@@ -14,7 +14,7 @@ from unifiedui.schema.responses.principals import (
     PrincipalWithRolesResponse,
     ResourcePrincipalsResponse
 )
-from unifiedui.exc.conversations import ConversationNotFoundError
+from unifiedui.exc.conversations import ConversationNotFoundError, FoundryConversationCreationError
 from unifiedui.core.middleware.apis.v1.auth import authenticate, check_permissions
 from unifiedui.core.database.enums import TenantRolesEnum, PermissionActionEnum, OrderDirectionEnum
 from unifiedui.logger import get_logger
@@ -98,7 +98,7 @@ async def list_conversations(
     response_model=ConversationResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Create conversation",
-    description="Create a new conversation"
+    description="Create a new conversation. For MICROSOFT_FOUNDRY applications, include the X-Microsoft-Foundry-API-Key header."
 )
 @authenticate()
 @check_permissions(
@@ -113,16 +113,21 @@ async def create_conversation(
     request: Request,
     tenant_id: str,
     create_request: CreateConversationRequest,
-    handler: ConversationHandler = Depends(get_conversation_handler)
+    handler: ConversationHandler = Depends(get_conversation_handler),
+    x_microsoft_foundry_api_key: Optional[str] = Header(None, alias="X-Microsoft-Foundry-API-Key")
 ) -> ConversationResponse:
     """
     Create a new conversation.
+    
+    For MICROSOFT_FOUNDRY applications, a conversation will also be created in the
+    Foundry service. The X-Microsoft-Foundry-API-Key header is required for these applications.
     
     Args:
         request: FastAPI request with user in state
         tenant_id: Tenant ID from path
         create_request: Conversation creation data
         handler: Conversation handler dependency
+        x_microsoft_foundry_api_key: Optional API key for Microsoft Foundry
         
     Returns:
         Created conversation
@@ -141,7 +146,14 @@ async def create_conversation(
             tenant_id=tenant_id,
             request=create_request,
             user_id=user.identity.get_id(),
-            user=user
+            user=user,
+            foundry_api_key=x_microsoft_foundry_api_key
+        )
+    except FoundryConversationCreationError as e:
+        logger.error(f"Failed to create Foundry conversation: {e}")
+        raise HTTPException(
+            status_code=e.status_code or status.HTTP_502_BAD_GATEWAY,
+            detail=e.message
         )
     except Exception as e:
         logger.error(f"Failed to create conversation: {e}")

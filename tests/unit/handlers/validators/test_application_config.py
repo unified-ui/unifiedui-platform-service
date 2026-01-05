@@ -8,6 +8,10 @@ from unifiedui.handlers.validators.application_config import (
     N8NApplicationConfig,
     N8NApiVersionEnum,
     N8NWorkflowTypeEnum,
+    MicrosoftFoundryConfigValidator,
+    MicrosoftFoundryApplicationConfig,
+    MicrosoftFoundryAgentTypeEnum,
+    MicrosoftFoundryApiVersionEnum,
 )
 from unifiedui.core.database.enums import ApplicationTypeEnum
 from unifiedui.exc.application_config import (
@@ -277,7 +281,7 @@ class TestApplicationConfigValidatorFactory:
     def test_get_validator_unsupported_type(self):
         """Test getting validator for unsupported type raises error."""
         with pytest.raises(UnsupportedApplicationTypeError):
-            ApplicationConfigValidatorFactory.get_validator(ApplicationTypeEnum.MICROSOFT_FOUNDRY)
+            ApplicationConfigValidatorFactory.get_validator(ApplicationTypeEnum.REST_API)
     
     def test_validate_config_n8n(self):
         """Test validate_config with N8N type."""
@@ -327,11 +331,220 @@ class TestApplicationConfigValidatorFactory:
     
     def test_is_supported_unsupported_type(self):
         """Test is_supported returns False for unsupported types."""
-        assert ApplicationConfigValidatorFactory.is_supported(ApplicationTypeEnum.MICROSOFT_FOUNDRY) is False
         assert ApplicationConfigValidatorFactory.is_supported(ApplicationTypeEnum.REST_API) is False
     
     def test_get_supported_types(self):
-        """Test get_supported_types returns list with N8N."""
+        """Test get_supported_types returns list with N8N and MICROSOFT_FOUNDRY."""
         supported = ApplicationConfigValidatorFactory.get_supported_types()
         assert ApplicationTypeEnum.N8N in supported
-        assert len(supported) >= 1
+        assert ApplicationTypeEnum.MICROSOFT_FOUNDRY in supported
+        assert len(supported) >= 2
+
+
+# ========== Microsoft Foundry Tests ==========
+
+class TestMicrosoftFoundryAgentTypeEnum:
+    """Tests for MicrosoftFoundryAgentTypeEnum."""
+    
+    def test_agent_value(self):
+        """Test that AGENT is a valid agent type."""
+        assert MicrosoftFoundryAgentTypeEnum.AGENT.value == "AGENT"
+    
+    def test_multi_agent_value(self):
+        """Test that MULTI_AGENT is a valid agent type."""
+        assert MicrosoftFoundryAgentTypeEnum.MULTI_AGENT.value == "MULTI_AGENT"
+    
+    def test_all_returns_list(self):
+        """Test that all() returns a list of values."""
+        types = MicrosoftFoundryAgentTypeEnum.all()
+        assert isinstance(types, list)
+        assert "AGENT" in types
+        assert "MULTI_AGENT" in types
+
+
+class TestMicrosoftFoundryApiVersionEnum:
+    """Tests for MicrosoftFoundryApiVersionEnum."""
+    
+    def test_v2025_11_15_preview_value(self):
+        """Test that 2025-11-15-preview is a valid API version."""
+        assert MicrosoftFoundryApiVersionEnum.V2025_11_15_PREVIEW.value == "2025-11-15-preview"
+    
+    def test_all_returns_list(self):
+        """Test that all() returns a list of values."""
+        versions = MicrosoftFoundryApiVersionEnum.all()
+        assert isinstance(versions, list)
+        assert "2025-11-15-preview" in versions
+
+
+class TestMicrosoftFoundryApplicationConfig:
+    """Tests for MicrosoftFoundryApplicationConfig Pydantic model."""
+    
+    def test_valid_config_agent(self):
+        """Test a valid Microsoft Foundry AGENT configuration."""
+        config = MicrosoftFoundryApplicationConfig(
+            agent_type=MicrosoftFoundryAgentTypeEnum.AGENT,
+            api_version=MicrosoftFoundryApiVersionEnum.V2025_11_15_PREVIEW,
+            project_endpoint="https://engo-foundry.services.ai.azure.com/api/projects/proj-default-2",
+            agent_name="my-agent"
+        )
+        
+        assert config.agent_type == MicrosoftFoundryAgentTypeEnum.AGENT
+        assert config.api_version == MicrosoftFoundryApiVersionEnum.V2025_11_15_PREVIEW
+        assert config.project_endpoint == "https://engo-foundry.services.ai.azure.com/api/projects/proj-default-2"
+        assert config.agent_name == "my-agent"
+    
+    def test_valid_config_multi_agent(self):
+        """Test a valid Microsoft Foundry MULTI_AGENT configuration."""
+        config = MicrosoftFoundryApplicationConfig(
+            agent_type=MicrosoftFoundryAgentTypeEnum.MULTI_AGENT,
+            api_version=MicrosoftFoundryApiVersionEnum.V2025_11_15_PREVIEW,
+            project_endpoint="https://engo-foundry.services.ai.azure.com/api/projects/proj-default-2",
+            agent_name="my-workflow"
+        )
+        
+        assert config.agent_type == MicrosoftFoundryAgentTypeEnum.MULTI_AGENT
+    
+    def test_invalid_agent_type(self):
+        """Test that invalid agent type raises ValidationError."""
+        with pytest.raises(ValidationError):
+            MicrosoftFoundryApplicationConfig(
+                agent_type="INVALID_TYPE",
+                api_version=MicrosoftFoundryApiVersionEnum.V2025_11_15_PREVIEW,
+                project_endpoint="https://engo-foundry.services.ai.azure.com/api/projects/proj-default-2",
+                agent_name="my-agent"
+            )
+    
+    def test_invalid_api_version(self):
+        """Test that invalid API version raises ValidationError."""
+        with pytest.raises(ValidationError):
+            MicrosoftFoundryApplicationConfig(
+                agent_type=MicrosoftFoundryAgentTypeEnum.AGENT,
+                api_version="2024-01-01",
+                project_endpoint="https://engo-foundry.services.ai.azure.com/api/projects/proj-default-2",
+                agent_name="my-agent"
+            )
+    
+    def test_project_endpoint_must_be_https(self):
+        """Test that project_endpoint must start with https://."""
+        with pytest.raises(ValidationError) as exc_info:
+            MicrosoftFoundryApplicationConfig(
+                agent_type=MicrosoftFoundryAgentTypeEnum.AGENT,
+                api_version=MicrosoftFoundryApiVersionEnum.V2025_11_15_PREVIEW,
+                project_endpoint="http://engo-foundry.services.ai.azure.com/api/projects/proj-default-2",
+                agent_name="my-agent"
+            )
+        assert "must start with https://" in str(exc_info.value)
+    
+    def test_project_endpoint_must_contain_foundry_pattern(self):
+        """Test that project_endpoint must contain Foundry pattern."""
+        with pytest.raises(ValidationError) as exc_info:
+            MicrosoftFoundryApplicationConfig(
+                agent_type=MicrosoftFoundryAgentTypeEnum.AGENT,
+                api_version=MicrosoftFoundryApiVersionEnum.V2025_11_15_PREVIEW,
+                project_endpoint="https://example.com/api/projects/test",
+                agent_name="my-agent"
+            )
+        assert "services.ai.azure.com/api/projects" in str(exc_info.value)
+    
+    def test_missing_required_field(self):
+        """Test that missing required field raises ValidationError."""
+        with pytest.raises(ValidationError):
+            MicrosoftFoundryApplicationConfig(
+                agent_type=MicrosoftFoundryAgentTypeEnum.AGENT,
+                api_version=MicrosoftFoundryApiVersionEnum.V2025_11_15_PREVIEW,
+                project_endpoint="https://engo-foundry.services.ai.azure.com/api/projects/proj-default-2"
+                # Missing agent_name
+            )
+    
+    def test_empty_agent_name_not_allowed(self):
+        """Test that empty agent_name is not allowed."""
+        with pytest.raises(ValidationError):
+            MicrosoftFoundryApplicationConfig(
+                agent_type=MicrosoftFoundryAgentTypeEnum.AGENT,
+                api_version=MicrosoftFoundryApiVersionEnum.V2025_11_15_PREVIEW,
+                project_endpoint="https://engo-foundry.services.ai.azure.com/api/projects/proj-default-2",
+                agent_name=""
+            )
+
+
+class TestMicrosoftFoundryConfigValidator:
+    """Tests for MicrosoftFoundryConfigValidator."""
+    
+    def test_validate_valid_config(self):
+        """Test validation of a valid config."""
+        validator = MicrosoftFoundryConfigValidator()
+        config = {
+            "agent_type": "AGENT",
+            "api_version": "2025-11-15-preview",
+            "project_endpoint": "https://engo-foundry.services.ai.azure.com/api/projects/proj-default-2",
+            "agent_name": "my-agent"
+        }
+        
+        result = validator.validate(config)
+        
+        assert result["agent_type"] == "AGENT"
+        assert result["api_version"] == "2025-11-15-preview"
+        assert result["project_endpoint"] == "https://engo-foundry.services.ai.azure.com/api/projects/proj-default-2"
+        assert result["agent_name"] == "my-agent"
+    
+    def test_validate_multi_agent_config(self):
+        """Test validation of a MULTI_AGENT config."""
+        validator = MicrosoftFoundryConfigValidator()
+        config = {
+            "agent_type": "MULTI_AGENT",
+            "api_version": "2025-11-15-preview",
+            "project_endpoint": "https://engo-foundry.services.ai.azure.com/api/projects/proj-default-2",
+            "agent_name": "my-workflow"
+        }
+        
+        result = validator.validate(config)
+        
+        assert result["agent_type"] == "MULTI_AGENT"
+    
+    def test_validate_invalid_config_raises_error(self):
+        """Test that invalid config raises ApplicationConfigValidationError."""
+        validator = MicrosoftFoundryConfigValidator()
+        config = {
+            "agent_type": "INVALID",
+            "api_version": "2025-11-15-preview",
+            "project_endpoint": "https://engo-foundry.services.ai.azure.com/api/projects/proj-default-2",
+            "agent_name": "my-agent"
+        }
+        
+        with pytest.raises(ApplicationConfigValidationError):
+            validator.validate(config)
+    
+    def test_get_supported_type(self):
+        """Test that get_supported_type returns MICROSOFT_FOUNDRY."""
+        validator = MicrosoftFoundryConfigValidator()
+        assert validator.get_supported_type() == ApplicationTypeEnum.MICROSOFT_FOUNDRY
+
+
+class TestApplicationConfigValidatorFactoryMicrosoftFoundry:
+    """Tests for ApplicationConfigValidatorFactory with Microsoft Foundry."""
+    
+    def test_get_validator_microsoft_foundry(self):
+        """Test getting Microsoft Foundry validator."""
+        validator = ApplicationConfigValidatorFactory.get_validator(ApplicationTypeEnum.MICROSOFT_FOUNDRY)
+        assert isinstance(validator, MicrosoftFoundryConfigValidator)
+    
+    def test_validate_config_microsoft_foundry(self):
+        """Test validate_config with Microsoft Foundry type."""
+        config = {
+            "agent_type": "AGENT",
+            "api_version": "2025-11-15-preview",
+            "project_endpoint": "https://engo-foundry.services.ai.azure.com/api/projects/proj-default-2",
+            "agent_name": "my-agent"
+        }
+        
+        result = ApplicationConfigValidatorFactory.validate_config(
+            ApplicationTypeEnum.MICROSOFT_FOUNDRY,
+            config
+        )
+        
+        assert result["agent_type"] == "AGENT"
+        assert result["api_version"] == "2025-11-15-preview"
+    
+    def test_is_supported_microsoft_foundry(self):
+        """Test is_supported returns True for MICROSOFT_FOUNDRY."""
+        assert ApplicationConfigValidatorFactory.is_supported(ApplicationTypeEnum.MICROSOFT_FOUNDRY) is True

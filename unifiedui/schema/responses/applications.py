@@ -67,6 +67,17 @@ class N8NConfigSettingsResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class MicrosoftFoundryConfigSettingsResponse(BaseModel):
+    """Response model for Microsoft Foundry application config settings."""
+    
+    api_version: str = Field(..., description="API version (e.g., '2025-11-15-preview')")
+    agent_type: str = Field(..., description="Agent type (AGENT or MULTI_AGENT)")
+    project_endpoint: str = Field(..., description="Foundry project endpoint URL")
+    agent_name: str = Field(..., description="Name of the agent in Foundry")
+    
+    model_config = ConfigDict(from_attributes=True)
+
+
 class ApplicationConfigResponse(BaseModel):
     """
     Response model for application configuration (for agent service).
@@ -77,7 +88,7 @@ class ApplicationConfigResponse(BaseModel):
     type: ApplicationTypeEnum = Field(..., description="Application type")
     tenant_id: str = Field(..., description="Tenant ID")
     application_id: str = Field(..., description="Application ID")
-    settings: Union[N8NConfigSettingsResponse, dict] = Field(..., description="Application settings with resolved credentials")
+    settings: Union[N8NConfigSettingsResponse, MicrosoftFoundryConfigSettingsResponse, dict] = Field(..., description="Application settings with resolved credentials")
     user: UserInfoResponse = Field(..., description="User information")
     
     model_config = ConfigDict(from_attributes=True)

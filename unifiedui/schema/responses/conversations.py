@@ -10,6 +10,7 @@ class ConversationResponse(BaseModel):
     id: str = Field(..., description="Conversation ID")
     tenant_id: str = Field(..., description="Tenant ID")
     application_id: str = Field(..., description="Application ID this conversation belongs to")
+    ext_conversation_id: Optional[str] = Field(None, description="External conversation ID (e.g., from Microsoft Foundry)")
     name: str = Field(..., description="Conversation name")
     description: Optional[str] = Field(None, description="Conversation description")
     is_active: bool = Field(..., description="Whether the conversation is active")

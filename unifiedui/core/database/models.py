@@ -275,6 +275,9 @@ class Conversation(Base, IdNameDescriptionMixin, TenantScopedMixin):
     application_id: Mapped[str] = mapped_column(
         String(100), ForeignKey("applications.id", ondelete="CASCADE"), nullable=False
     )
+    ext_conversation_id: Mapped[Optional[str]] = mapped_column(
+        String(100), nullable=True, default=None
+    )
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
     application: Mapped["Application"] = relationship()

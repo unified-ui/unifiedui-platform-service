@@ -7,8 +7,8 @@ from typing import TYPE_CHECKING, Optional, List
 from sqlalchemy import select
 
 from unifiedui.core.database.client import SQLAlchemyClient
-from unifiedui.core.database.models import Conversation, ConversationMember
-from unifiedui.core.database.enums import PermissionActionEnum, PrincipalTypeEnum
+from unifiedui.core.database.models import Conversation, ConversationMember, Application
+from unifiedui.core.database.enums import PermissionActionEnum, PrincipalTypeEnum, ApplicationTypeEnum
 from unifiedui.caching.client import CacheClient
 
 if TYPE_CHECKING:
@@ -22,7 +22,8 @@ from unifiedui.schema.responses.principals import (
     PrincipalWithRolesResponse,
     ResourcePrincipalsResponse
 )
-from unifiedui.exc.conversations import ConversationNotFoundError
+from unifiedui.exc.conversations import ConversationNotFoundError, FoundryConversationCreationError
+from unifiedui.libs.foundry.client import MicrosoftFoundryClient, MicrosoftFoundryError
 from unifiedui.logger import get_logger
 
 logger = get_logger(__name__)
@@ -254,30 +255,85 @@ class ConversationHandler:
         tenant_id: str,
         request: CreateConversationRequest,
         user_id: str,
-        user: ContextIdentityUser
+        user: ContextIdentityUser,
+        foundry_api_key: Optional[str] = None
     ) -> ConversationResponse:
         """
         Create a new conversation.
+        
+        For MICROSOFT_FOUNDRY applications, this will also create a conversation
+        in the Foundry service and store the external conversation ID.
         
         Args:
             tenant_id: The ID of the tenant
             request: Conversation creation data
             user_id: The ID of the user creating the conversation
             user: The authenticated user context (for IDP access)
+            foundry_api_key: Optional API key for Microsoft Foundry (required for MICROSOFT_FOUNDRY apps)
             
         Returns:
             Created conversation response
+            
+        Raises:
+            FoundryConversationCreationError: If Foundry conversation creation fails
         """
         logger.info("Creating conversation", extra={"tenant_id": tenant_id, "conversation_name": request.name})
         
         conversation_id = str(uuid.uuid4())
+        ext_conversation_id = None
         
         with self.db_client.get_session() as session:
+            # First, check the application type
+            app_query = select(Application).where(
+                Application.id == request.application_id,
+                Application.tenant_id == tenant_id
+            )
+            application = session.execute(app_query).scalar_one_or_none()
+            
+            if not application:
+                raise ValueError(f"Application with ID '{request.application_id}' not found")
+            
+            # If application type is MICROSOFT_FOUNDRY, create external conversation
+            if application.type == ApplicationTypeEnum.MICROSOFT_FOUNDRY.value:
+                if not foundry_api_key:
+                    raise FoundryConversationCreationError(
+                        message="X-Microsoft-Foundry-API-Key header is required for MICROSOFT_FOUNDRY applications"
+                    )
+                
+                # Extract Foundry settings from application config
+                app_config = application.config or {}
+                project_endpoint = app_config.get("project_endpoint")
+                api_version = app_config.get("api_version", "2025-11-15-preview")
+                
+                if not project_endpoint:
+                    raise FoundryConversationCreationError(
+                        message="Application config missing 'project_endpoint' for MICROSOFT_FOUNDRY"
+                    )
+                
+                try:
+                    foundry_client = MicrosoftFoundryClient(
+                        project_endpoint=project_endpoint,
+                        api_token=foundry_api_key,
+                        api_version=api_version
+                    )
+                    ext_conversation_id = foundry_client.get_conversation_id()
+                    logger.info(
+                        "Created Foundry external conversation",
+                        extra={"ext_conversation_id": ext_conversation_id}
+                    )
+                except MicrosoftFoundryError as e:
+                    logger.error(f"Failed to create Foundry conversation: {e}")
+                    raise FoundryConversationCreationError(
+                        message=f"Failed to create Foundry conversation: {e.message}",
+                        status_code=e.status_code
+                    ) from e
+            
             # Create conversation
             conversation = Conversation(
                 id=conversation_id,
                 tenant_id=tenant_id,
                 application_id=request.application_id,
+                ext_conversation_id=ext_conversation_id,
                 name=request.name,
                 description=request.description,
                 created_by=user_id,
@@ -638,6 +694,7 @@ class ConversationHandler:
             id=conversation.id,
             tenant_id=conversation.tenant_id,
             application_id=conversation.application_id,
+            ext_conversation_id=conversation.ext_conversation_id,
             name=conversation.name,
             description=conversation.description,
             is_active=conversation.is_active,

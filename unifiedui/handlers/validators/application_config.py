@@ -2,6 +2,7 @@
 from abc import ABC, abstractmethod
 from typing import Dict, Any, List, Optional
 from enum import Enum
+import re
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
@@ -143,6 +144,94 @@ class N8NConfigValidator(BaseApplicationConfigValidator):
         return ApplicationTypeEnum.N8N
 
 
+# ========== Microsoft Foundry Config Enums ==========
+
+class MicrosoftFoundryAgentTypeEnum(str, Enum):
+    """Supported Microsoft Foundry agent types."""
+    AGENT = "AGENT"
+    MULTI_AGENT = "MULTI_AGENT"
+
+    @classmethod
+    def all(cls) -> list[str]:
+        return [v.value for v in cls]
+
+
+class MicrosoftFoundryApiVersionEnum(str, Enum):
+    """Supported Microsoft Foundry API versions."""
+    V2025_11_15_PREVIEW = "2025-11-15-preview"
+
+    @classmethod
+    def all(cls) -> list[str]:
+        return [v.value for v in cls]
+
+
+# ========== Microsoft Foundry Config Schema ==========
+
+class MicrosoftFoundryApplicationConfig(BaseModel):
+    """Pydantic model for Microsoft Foundry application configuration validation."""
+    
+    agent_type: MicrosoftFoundryAgentTypeEnum = Field(
+        ...,
+        description="Agent type (AGENT or MULTI_AGENT)"
+    )
+    api_version: MicrosoftFoundryApiVersionEnum = Field(
+        ...,
+        description="API version (currently only '2025-11-15-preview' supported)"
+    )
+    project_endpoint: str = Field(
+        ...,
+        min_length=1,
+        description="Foundry project endpoint URL"
+    )
+    agent_name: str = Field(
+        ...,
+        min_length=1,
+        description="Name of the agent in Foundry"
+    )
+
+    @field_validator('project_endpoint')
+    @classmethod
+    def validate_project_endpoint(cls, v: str) -> str:
+        """Validate that project_endpoint is a valid Foundry endpoint URL."""
+        if not v.startswith('https://'):
+            raise ValueError("project_endpoint must start with https://")
+        if 'services.ai.azure.com/api/projects' not in v:
+            raise ValueError("project_endpoint must contain 'services.ai.azure.com/api/projects'")
+        return v
+
+
+# ========== Microsoft Foundry Validator ==========
+
+class MicrosoftFoundryConfigValidator(BaseApplicationConfigValidator):
+    """Validator for Microsoft Foundry application configuration."""
+    
+    def validate(self, config: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Validate Microsoft Foundry configuration.
+        
+        Args:
+            config: Configuration dictionary to validate
+            
+        Returns:
+            Validated configuration dictionary
+            
+        Raises:
+            ApplicationConfigValidationError: If validation fails
+        """
+        try:
+            validated = MicrosoftFoundryApplicationConfig(**config)
+            return validated.model_dump()
+        except Exception as e:
+            logger.error(f"Microsoft Foundry config validation failed: {e}")
+            raise ApplicationConfigValidationError(
+                message=f"Microsoft Foundry configuration validation failed: {str(e)}",
+                errors=[str(e)]
+            )
+    
+    def get_supported_type(self) -> ApplicationTypeEnum:
+        return ApplicationTypeEnum.MICROSOFT_FOUNDRY
+
+
 # ========== Config Validator Factory ==========
 
 class ApplicationConfigValidatorFactory:
@@ -150,6 +239,7 @@ class ApplicationConfigValidatorFactory:
     
     _validators: Dict[ApplicationTypeEnum, BaseApplicationConfigValidator] = {
         ApplicationTypeEnum.N8N: N8NConfigValidator(),
+        ApplicationTypeEnum.MICROSOFT_FOUNDRY: MicrosoftFoundryConfigValidator(),
     }
     
     @classmethod
