@@ -235,17 +235,13 @@ class ContextIdentityUser:
         tenants_with_permissions = self.tenants
         
         # Get principal_name from identity provider
-        principal_name = self.idp.get_principal_name(
-            self.identity.get_id(),
-            PrincipalTypeEnum.IDENTITY_USER.value
-        )
         
         return IdentityUserResponse(
             id=self.identity.get_id(),
             identity_provider=self.identity.get_identity_provider(),
             identity_tenant_id=self.identity.get_identity_tenant_id(),
             display_name=self.identity.get_display_name(),
-            principal_name=principal_name,
+            principal_name=self.identity.get_principal_name(),
             mail=self.identity.get_mail(),
             firstname=self.identity.get_firstname(),
             lastname=self.identity.get_lastname(),

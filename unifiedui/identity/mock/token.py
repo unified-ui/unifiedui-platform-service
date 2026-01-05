@@ -18,6 +18,7 @@ class MockIdentityToken(BaseIdentityToken):
             "oid": user_id,
             "tid": "test-tenant-123",
             "name": name,
+            "principal_name": mail or f"{user_id}@test.com",
             "given_name": name.split()[0] if " " in name else name,
             "family_name": name.split()[1] if " " in name and len(name.split()) > 1 else "",
             "mail": mail or f"{user_id}@test.com",
@@ -49,6 +50,9 @@ class MockIdentityToken(BaseIdentityToken):
     
     def get_firstname(self) -> str:
         return self.deserialized_token.get("given_name", "")
+
+    def get_principal_name(self) -> str:
+        return self.deserialized_token.get("principal_name", "")
     
     def get_lastname(self) -> str:
         return self.deserialized_token.get("family_name", "")

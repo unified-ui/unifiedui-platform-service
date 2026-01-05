@@ -87,7 +87,7 @@ class PrincipalHandler:
             description = None
         
         # Get principal_name from identity provider
-        principal_name = user.idp.get_principal_name(principal_id, principal_type)
+        principal_name = user.identity.get_principal_name()
         
         with self.db_client.get_session() as session:
             # Try to find existing principal

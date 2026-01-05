@@ -23,6 +23,9 @@ class ExtraIDIdentityTokenSerializer(BaseIdentityToken):
     def get_display_name(self) -> str:
         return self.deserialized_token.get("name", "")
 
+    def get_principal_name(self) -> str:
+        return self.deserialized_token.get("userPrincipalName", "")
+
     def get_firstname(self) -> str:
         given_name = self.deserialized_token.get("given_name", "")
         if given_name:

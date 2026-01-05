@@ -531,9 +531,9 @@ class ApplicationHandler:
             
             user_info = UserInfoResponse(
                 id=user.identity.get_id(),
-                display_name=user.identity.display_name,
-                principal_name=user.identity.principal_name,
-                mail=user.identity.mail
+                display_name=user.identity.get_display_name(),
+                principal_name=user.idp.get_principal_name(),
+                mail=user.identity.get_mail()
             )
             
             # Build settings based on application type
