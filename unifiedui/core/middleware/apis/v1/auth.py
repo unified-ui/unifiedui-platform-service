@@ -19,7 +19,6 @@ from unifiedui.core.database.models import (
     Tag
 )
 from unifiedui.handlers.dependencies.database import get_db_client
-from unifiedui.handlers.dependencies.vault import get_app_service_vault
 from unifiedui.caching.dependencies import get_cache_client
 from unifiedui.logger import get_logger
 
@@ -28,11 +27,11 @@ logger = get_logger(__name__)
 
 def _validate_service_key(request: Request, required_service_auth_key: str) -> bool:
     """
-    Validate X-Service-Key header against vault stored key.
+    Validate X-Service-Key header against settings or environment variable.
     
     Args:
         request: FastAPI request object
-        required_service_auth_key: Key name in vault (e.g., "X_AGENT_SERVICE_KEY")
+        required_service_auth_key: Key name in settings/env (e.g., "X_AGENT_SERVICE_KEY")
         
     Returns:
         True if service key is valid
@@ -49,19 +48,12 @@ def _validate_service_key(request: Request, required_service_auth_key: str) -> b
             detail="X-Service-Key header missing for service authentication"
         )
     
-    # Get expected key from app service vault
-    app_vault = get_app_service_vault()
-    expected_key = None
-    
-    if app_vault:
-        expected_key = app_vault.get_secret(required_service_auth_key)
-    
-    # Fallback to settings if vault doesn't have it
-    if not expected_key:
-        expected_key = getattr(settings, required_service_auth_key.lower(), None)
+    # Get expected key from settings (which reads from environment variables)
+    # Service keys are NOT stored in vault - they are configuration values
+    expected_key = getattr(settings, required_service_auth_key.lower(), None)
     
     if not expected_key:
-        logger.error(f"Service key {required_service_auth_key} not configured in vault or settings")
+        logger.error(f"Service key {required_service_auth_key} not configured in settings")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Service authentication not configured: {required_service_auth_key}"
@@ -84,12 +76,12 @@ def authenticate(required_service_auth_key: Optional[str] = None) -> Callable:
     Optionally uses cache based on X-Use-Cache header.
     
     If required_service_auth_key is provided, the decorator ALSO validates the
-    X-Service-Key header against the key stored in the app service vault.
+    X-Service-Key header against the key stored in settings/environment.
     Both service key AND Bearer token must be valid.
     
     Args:
-        required_service_auth_key: Optional key name in vault (e.g., "X_AGENT_SERVICE_KEY").
-                                   If provided, X-Service-Key header must match the vault value.
+        required_service_auth_key: Optional key name in settings (e.g., "X_AGENT_SERVICE_KEY").
+                                   If provided, X-Service-Key header must match the settings value.
     
     Usage:
         @authenticate()  # Standard auth, no service key required
