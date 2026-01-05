@@ -146,8 +146,8 @@ class BaseVaultClient(ABC):
         # Fetch from vault
         secret = self.get_vault().get_secret(uri)
         
-        # Cache encrypted secret if available
-        if secret and self.cache_client and self._cipher:
+        # Cache encrypted secret if available and caching is enabled
+        if use_cache and secret and self.cache_client and self._cipher:
             try:
                 encrypted = self._encrypt_secret(secret)
                 if encrypted:

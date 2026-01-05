@@ -300,7 +300,8 @@ class CredentialHandler:
     def get_credential_secret(
         self,
         tenant_id: str,
-        credential_id: str
+        credential_id: str,
+        use_cache: bool = False
     ) -> Optional[str]:
         """
         Get the actual secret value from vault (for internal use only).
@@ -309,6 +310,7 @@ class CredentialHandler:
         Args:
             tenant_id: The ID of the tenant
             credential_id: The ID of the credential
+            use_cache: Whether to use caching (default: False)
             
         Returns:
             Secret value or None
@@ -328,8 +330,8 @@ class CredentialHandler:
             if not credential:
                 raise CredentialNotFoundError(credential_id)
             
-            # Fetch secret from vault (with encrypted caching)
-            secret = self.vault_client.get_secret(credential.credential_uri)
+            # Fetch secret from vault
+            secret = self.vault_client.get_secret(credential.credential_uri, use_cache=use_cache)
             logger.debug(f"Retrieved secret for credential {credential_id}")
             return secret
 
@@ -603,7 +605,7 @@ class CredentialHandler:
         order_by: Optional[str] = None,
         order_direction: Optional[str] = None,
         use_cache: bool = True
-    ) -> CredentialPrincipalsResponse:
+    ) -> ResourcePrincipalsResponse:
         """
         List all permissions for a credential.
         
@@ -802,20 +804,6 @@ class CredentialHandler:
             )
         except ValueError as e:
             raise CredentialNotFoundError(str(e)) from e
-
-    @staticmethod
-    def _member_to_response(member: CredentialMember) -> CredentialPermissionResponse:
-        """Convert CredentialMember to response."""
-        return CredentialPermissionResponse(
-            id=member.id,
-            credential_id=member.credential_id,
-            tenant_id=member.tenant_id,
-            principal_id=member.principal_id,
-            principal_type=member.principal.principal_type,
-            role=member.role,  # Changed from action to role
-            created_at=member.created_at,
-            updated_at=member.updated_at
-        )
 
     @staticmethod
     def _model_to_response(credential: Credential) -> CredentialResponse:
