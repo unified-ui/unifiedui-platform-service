@@ -256,7 +256,7 @@ class TestCredentialRoutes:
         tenant_id = create_tenant_for_user(test_client, test_user_token)
         headers = create_auth_headers(test_user_token, use_cache=False)
         
-        # Create multiple credentials
+        # Create multiple credentials (using only supported types: API_KEY, BASIC_AUTH)
         cred1_data = {
             "name": "Credential 1",
             "credential_type": "API_KEY",
@@ -264,7 +264,7 @@ class TestCredentialRoutes:
         }
         cred2_data = {
             "name": "Credential 2",
-            "credential_type": "PASSWORD",
+            "credential_type": "API_KEY",
             "secret_value": "secret2"
         }
         
@@ -337,7 +337,7 @@ class TestCredentialRoutes:
         tenant_id = create_tenant_for_user(test_client, test_user_token)
         headers = create_auth_headers(test_user_token, use_cache=False)
         
-        # Create credentials with different names
+        # Create credentials with different names (using supported types only)
         test_client.post(
             ENDPOINT_CREDENTIALS.format(tenant_id=tenant_id),
             json={
@@ -351,7 +351,7 @@ class TestCredentialRoutes:
             ENDPOINT_CREDENTIALS.format(tenant_id=tenant_id),
             json={
                 "name": "Development Token",
-                "credential_type": "TOKEN",
+                "credential_type": "API_KEY",
                 "secret_value": "dev-secret"
             },
             headers=headers
@@ -359,8 +359,8 @@ class TestCredentialRoutes:
         test_client.post(
             ENDPOINT_CREDENTIALS.format(tenant_id=tenant_id),
             json={
-                "name": "QA Password",
-                "credential_type": "PASSWORD",
+                "name": "QA API Key",
+                "credential_type": "API_KEY",
                 "secret_value": "qa-secret"
             },
             headers=headers
@@ -383,7 +383,7 @@ class TestCredentialRoutes:
         tenant_id = create_tenant_for_user(test_client, test_user_token)
         headers = create_auth_headers(test_user_token, use_cache=False)
         
-        # Create credentials
+        # Create credentials (using supported types only)
         test_client.post(
             ENDPOINT_CREDENTIALS.format(tenant_id=tenant_id),
             json={
@@ -397,9 +397,9 @@ class TestCredentialRoutes:
         test_client.post(
             ENDPOINT_CREDENTIALS.format(tenant_id=tenant_id),
             json={
-                "name": "Token Two",
+                "name": "API Key Two",
                 "description": "Second credential",
-                "credential_type": "TOKEN",
+                "credential_type": "API_KEY",
                 "secret_value": "secret-2"
             },
             headers=headers

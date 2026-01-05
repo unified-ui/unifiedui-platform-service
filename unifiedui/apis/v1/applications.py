@@ -6,15 +6,21 @@ from fastapi.responses import Response
 
 from unifiedui.core.identity.users import ContextIdentityUser
 from unifiedui.handlers.applications import ApplicationHandler
-from unifiedui.handlers.dependencies import get_application_handler
+from unifiedui.handlers.credentials import CredentialHandler
+from unifiedui.handlers.dependencies import get_application_handler, get_credential_handler
 from unifiedui.schema.requests.applications import CreateApplicationRequest, UpdateApplicationRequest
 from unifiedui.schema.requests.application_permissions import SetApplicationPermissionRequest
-from unifiedui.schema.responses.applications import ApplicationResponse
+from unifiedui.schema.responses.applications import ApplicationResponse, ApplicationConfigResponse
 from unifiedui.schema.responses.principals import (
     PrincipalWithRolesResponse,
     ResourcePrincipalsResponse
 )
 from unifiedui.exc.applications import ApplicationNotFoundError
+from unifiedui.exc.application_config import (
+    ApplicationConfigValidationError,
+    UnsupportedApplicationTypeError,
+    InvalidCredentialError
+)
 from unifiedui.core.middleware.apis.v1.auth import authenticate, check_permissions
 from unifiedui.core.database.enums import TenantRolesEnum, PermissionActionEnum, OrderDirectionEnum, ListViewEnum
 from unifiedui.schema.responses.common import QuickListItemResponse
@@ -367,6 +373,87 @@ async def delete_application(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to delete application"
+        )
+
+
+# ========== Application Config Endpoint (for Agent Service) ==========
+
+@router.get(
+    "/{application_id}/config",
+    response_model=ApplicationConfigResponse,
+    summary="Get application config with credentials",
+    description="Get the full application configuration including credential secrets and user data. For internal agent-service use."
+)
+@authenticate
+@check_permissions(
+    entity="application",
+    required_permissions=[
+        TenantRolesEnum.GLOBAL_ADMIN,
+        TenantRolesEnum.APPLICATIONS_ADMIN,
+        PermissionActionEnum.ADMIN,
+        PermissionActionEnum.WRITE,
+        PermissionActionEnum.READ
+    ]
+)
+async def get_application_config(
+    request: Request,
+    tenant_id: str,
+    application_id: str,
+    handler: ApplicationHandler = Depends(get_application_handler),
+    credential_handler: CredentialHandler = Depends(get_credential_handler)
+) -> ApplicationConfigResponse:
+    """
+    Get the full application configuration including credential secrets.
+    
+    This endpoint is intended for the agent-service to fetch complete
+    configuration including resolved credential secrets and user information.
+    
+    Args:
+        request: FastAPI request with user in state
+        tenant_id: Tenant ID from path
+        application_id: Application ID from path
+        handler: Application handler dependency
+        credential_handler: Credential handler dependency
+        
+    Returns:
+        ApplicationConfigResponse with full config including secrets
+        
+    Raises:
+        HTTPException: If application not found, credentials invalid, or access denied
+    """
+    try:
+        user: ContextIdentityUser = request.state.user
+        logger.info(
+            "API: Get application config",
+            extra={
+                "tenant_id": tenant_id,
+                "application_id": application_id,
+                "user_id": user.identity.get_id()
+            }
+        )
+        return handler.get_application_config(
+            tenant_id=tenant_id,
+            application_id=application_id,
+            user=user,
+            credential_handler=credential_handler
+        )
+    except ApplicationNotFoundError as e:
+        logger.warning(f"Application not found: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e)
+        )
+    except InvalidCredentialError as e:
+        logger.error(f"Invalid credential: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e.message)
+        )
+    except Exception as e:
+        logger.error(f"Failed to get application config: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get application config: {str(e)}"
         )
 
 

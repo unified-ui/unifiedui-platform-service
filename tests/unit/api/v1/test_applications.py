@@ -28,6 +28,19 @@ PRINCIPAL_TYPE_GROUP = PrincipalTypeEnum.IDENTITY_GROUP.value
 PRINCIPAL_TYPE_CUSTOM_GROUP = PrincipalTypeEnum.CUSTOM_GROUP.value
 
 
+def get_valid_n8n_config() -> dict:
+    """Returns a valid N8N application config for testing."""
+    return {
+        "api_version": "v1",
+        "workflow_type": "N8N_CHAT_AGENT_WORKFLOW",
+        "use_unified_chat_history": True,
+        "chat_history_count": 30,
+        "chat_url": "https://example.com/webhook",
+        "api_api_key_credential_id": "test-cred-123",
+        "chat_auth_credential_id": "test-cred-456"
+    }
+
+
 def create_tenant_for_user(test_client: TestClient, user_token: Any, tenant_name: str = "Test Tenant") -> str:
     """Helper function to create a tenant and return its ID."""
     headers = create_auth_headers(user_token, use_cache=False)
@@ -53,12 +66,13 @@ class TestApplicationRoutes:
         tenant_id = create_tenant_for_user(test_client, test_user_token)
         headers = create_auth_headers(test_user_token, use_cache=False)
         
-        # Create application
+        # Create application with valid N8N config
+        n8n_config = get_valid_n8n_config()
         app_data = {
             "name": "Test Application",
             "description": "A test application",
             "type": "N8N",
-            "config": {"key": "value"}
+            "config": n8n_config
         }
         
         response = test_client.post(
@@ -73,7 +87,7 @@ class TestApplicationRoutes:
         assert data["name"] == app_data["name"]
         assert data["description"] == app_data["description"]
         assert data["type"] == app_data["type"]
-        assert data["config"] == app_data["config"]
+        assert data["config"] == n8n_config
         assert data["is_active"] == False
         assert "id" in data
         assert data["tenant_id"] == tenant_id
@@ -323,10 +337,11 @@ class TestApplicationRoutes:
         tenant_id = create_tenant_for_user(test_client, test_user_token)
         headers = create_auth_headers(test_user_token, use_cache=False)
         
-        # Create applications
+        # Create applications with valid N8N config
+        n8n_config = get_valid_n8n_config()
         test_client.post(
             ENDPOINT_APPLICATIONS.format(tenant_id=tenant_id),
-            json={"name": "App One", "description": "First app", "type": "N8N", "config": {"key": "value"}},
+            json={"name": "App One", "description": "First app", "type": "N8N", "config": n8n_config},
             headers=headers
         )
         test_client.post(
@@ -651,24 +666,29 @@ class TestApplicationRoutes:
         tenant_id = create_tenant_for_user(test_client, test_user_token)
         headers = create_auth_headers(test_user_token, use_cache=False)
         
-        # Create application with initial config
+        # Create application with initial valid N8N config
+        initial_config = get_valid_n8n_config()
         create_response = test_client.post(
             ENDPOINT_APPLICATIONS.format(tenant_id=tenant_id),
-            json={"name": "Test App", "description": "Test", "type": "N8N", "config": {"key1": "value1"}},
+            json={"name": "Test App", "description": "Test", "type": "N8N", "config": initial_config},
             headers=headers
         )
         app_id = create_response.json()["id"]
-        assert create_response.json()["config"] == {"key1": "value1"}
+        assert create_response.json()["config"] == initial_config
         
-        # Update config
+        # Update config with a new valid N8N config (different chat URL)
+        updated_config = get_valid_n8n_config()
+        updated_config["chat_url"] = "https://updated.example.com/webhook"
+        updated_config["chat_history_count"] = 50
+        
         update_response = test_client.patch(
             ENDPOINT_APPLICATION_DETAIL.format(tenant_id=tenant_id, application_id=app_id),
-            json={"config": {"key2": "value2", "nested": {"prop": "test"}}},
+            json={"config": updated_config},
             headers=headers
         )
         
         assert update_response.status_code == status.HTTP_200_OK
-        assert update_response.json()["config"] == {"key2": "value2", "nested": {"prop": "test"}}
+        assert update_response.json()["config"] == updated_config
     
     def test_delete_application_success(self, test_client: TestClient, test_user_token: Any) -> None:
         """Test successful application deletion."""

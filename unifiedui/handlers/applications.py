@@ -9,8 +9,9 @@ from sqlalchemy.orm import selectinload
 
 from unifiedui.core.database.client import SQLAlchemyClient
 from unifiedui.core.database.models import Application, ApplicationMember, ApplicationTag, Tag
-from unifiedui.core.database.enums import PermissionActionEnum, PrincipalTypeEnum
+from unifiedui.core.database.enums import PermissionActionEnum, PrincipalTypeEnum, ApplicationTypeEnum
 from unifiedui.caching.client import CacheClient
+from unifiedui.core.vault.client import BaseVaultClient
 
 if TYPE_CHECKING:
     from unifiedui.core.identity.users import ContextIdentityUser
@@ -19,7 +20,7 @@ if TYPE_CHECKING:
 
 from unifiedui.schema.requests.applications import CreateApplicationRequest, UpdateApplicationRequest
 from unifiedui.schema.requests.application_permissions import SetApplicationPermissionRequest
-from unifiedui.schema.responses.applications import ApplicationResponse
+from unifiedui.schema.responses.applications import ApplicationResponse, ApplicationConfigResponse
 from unifiedui.schema.responses.common import QuickListItemResponse
 from unifiedui.schema.responses.tags import TagSummary
 from unifiedui.schema.responses.principals import (
@@ -27,6 +28,12 @@ from unifiedui.schema.responses.principals import (
     ResourcePrincipalsResponse
 )
 from unifiedui.exc.applications import ApplicationNotFoundError
+from unifiedui.exc.application_config import (
+    ApplicationConfigValidationError,
+    UnsupportedApplicationTypeError,
+    InvalidCredentialError
+)
+from unifiedui.handlers.validators.application_config import ApplicationConfigValidatorFactory
 from unifiedui.logger import get_logger
 
 logger = get_logger(__name__)
@@ -39,6 +46,7 @@ class ApplicationHandler:
         self,
         db_client: SQLAlchemyClient,
         cache_client: Optional[CacheClient] = None,
+        vault_client: Optional[BaseVaultClient] = None,
         permissions_handler: Optional[ResourcePermissionsHandler] = None,
         tags_handler: Optional[ResourceTagsHandler] = None
     ):
@@ -48,11 +56,13 @@ class ApplicationHandler:
         Args:
             db_client: SQLAlchemy database client instance
             cache_client: Optional cache client for Redis caching
+            vault_client: Optional vault client for secret management
             permissions_handler: Optional central permissions handler
             tags_handler: Optional central tags handler
         """
         self.db_client = db_client
         self.cache_client = cache_client
+        self.vault_client = vault_client
         self._permissions_handler = permissions_handler
         self._tags_handler = tags_handler
 
@@ -305,8 +315,20 @@ class ApplicationHandler:
             
         Returns:
             Created application response
+            
+        Raises:
+            ApplicationConfigValidationError: If config validation fails
+            UnsupportedApplicationTypeError: If application type is not supported for validation
         """
         logger.info("Creating application", extra={"tenant_id": tenant_id, "app_name": request.name})
+        
+        # Validate config based on application type
+        validated_config = {}
+        if request.config:
+            validated_config = ApplicationConfigValidatorFactory.validate_config(
+                application_type=request.type,
+                config=request.config
+            )
         
         application_id = str(uuid.uuid4())
         
@@ -318,7 +340,7 @@ class ApplicationHandler:
                 name=request.name,
                 description=request.description,
                 type=request.type.value,
-                config=request.config or {},
+                config=validated_config,
                 is_active=request.is_active,
                 created_by=user_id,
                 updated_by=user_id
@@ -366,6 +388,8 @@ class ApplicationHandler:
             
         Raises:
             ApplicationNotFoundError: If application not found
+            ApplicationConfigValidationError: If config validation fails
+            UnsupportedApplicationTypeError: If application type is not supported for validation
         """
         logger.info("Updating application", extra={"tenant_id": tenant_id, "application_id": application_id})
         
@@ -381,6 +405,9 @@ class ApplicationHandler:
             if not application:
                 raise ApplicationNotFoundError(application_id)
             
+            # Determine the application type for config validation
+            app_type = request.type if request.type is not None else ApplicationTypeEnum(application.type)
+            
             # Update fields if provided
             if request.name is not None:
                 application.name = request.name
@@ -389,7 +416,12 @@ class ApplicationHandler:
             if request.type is not None:
                 application.type = request.type.value
             if request.config is not None:
-                application.config = request.config
+                # Validate config based on application type
+                validated_config = ApplicationConfigValidatorFactory.validate_config(
+                    application_type=app_type,
+                    config=request.config
+                )
+                application.config = validated_config
             if request.is_active is not None:
                 application.is_active = request.is_active
             
@@ -448,6 +480,147 @@ class ApplicationHandler:
             self._invalidate_list_cache(tenant_id)
             self._invalidate_detail_cache(tenant_id, application_id)
             self._invalidate_permissions_cache(tenant_id, application_id)
+
+    def get_application_config(
+        self,
+        tenant_id: str,
+        application_id: str,
+        user: ContextIdentityUser,
+        credential_handler
+    ) -> ApplicationConfigResponse:
+        """
+        Get the full application configuration including credential secrets and user data.
+        This endpoint is for the agent-service to fetch complete configuration.
+        
+        Args:
+            tenant_id: The ID of the tenant
+            application_id: The ID of the application
+            user: The authenticated user context
+            credential_handler: Credential handler for fetching secrets
+            
+        Returns:
+            ApplicationConfigResponse with full config including secrets
+            
+        Raises:
+            ApplicationNotFoundError: If application not found
+            InvalidCredentialError: If a credential cannot be fetched
+        """
+        import json
+        
+        logger.info("Fetching application config", extra={"tenant_id": tenant_id, "application_id": application_id})
+        
+        with self.db_client.get_session() as session:
+            query = select(Application).where(
+                Application.id == application_id,
+                Application.tenant_id == tenant_id
+            )
+            application = session.execute(query).scalar_one_or_none()
+            
+            if not application:
+                raise ApplicationNotFoundError(application_id)
+            
+            app_type = ApplicationTypeEnum(application.type)
+            config = application.config or {}
+            
+            # Build user info
+            from unifiedui.schema.responses.applications import (
+                UserInfoResponse,
+                CredentialSecretResponse,
+                N8NConfigSettingsResponse
+            )
+            
+            user_info = UserInfoResponse(
+                id=user.identity.get_id(),
+                display_name=user.identity.display_name,
+                principal_name=user.identity.principal_name,
+                mail=user.identity.mail
+            )
+            
+            # Build settings based on application type
+            if app_type == ApplicationTypeEnum.N8N:
+                # Fetch API credential
+                api_credential_id = config.get("api_api_key_credential_id")
+                chat_credential_id = config.get("chat_auth_credential_id")
+                
+                if not api_credential_id or not chat_credential_id:
+                    raise InvalidCredentialError(
+                        credential_id=api_credential_id or chat_credential_id or "unknown",
+                        message="Application config is missing required credential IDs"
+                    )
+                
+                # Fetch credentials with secrets
+                try:
+                    api_credential = credential_handler.get_credential(tenant_id, api_credential_id)
+                    api_secret = credential_handler.get_credential_secret(tenant_id, api_credential_id)
+                except Exception as e:
+                    logger.error(f"Failed to fetch API credential: {e}")
+                    raise InvalidCredentialError(
+                        credential_id=api_credential_id,
+                        message=f"Invalid or inaccessible API credential with ID '{api_credential_id}'"
+                    )
+                
+                try:
+                    chat_credential = credential_handler.get_credential(tenant_id, chat_credential_id)
+                    chat_secret = credential_handler.get_credential_secret(tenant_id, chat_credential_id)
+                except Exception as e:
+                    logger.error(f"Failed to fetch chat credential: {e}")
+                    raise InvalidCredentialError(
+                        credential_id=chat_credential_id,
+                        message=f"Invalid or inaccessible chat credential with ID '{chat_credential_id}'"
+                    )
+                
+                # Parse secrets based on credential type
+                api_secret_value = api_secret
+                chat_secret_value = chat_secret
+                
+                # For BASIC_AUTH, parse as JSON dict
+                if chat_credential.type == "BASIC_AUTH":
+                    try:
+                        chat_secret_value = json.loads(chat_secret)
+                    except json.JSONDecodeError:
+                        chat_secret_value = chat_secret
+                
+                api_credentials = CredentialSecretResponse(
+                    id=api_credential.id,
+                    credentials_uri=api_credential.credential_uri,
+                    name=api_credential.name,
+                    description=api_credential.description,
+                    type=api_credential.type,
+                    is_active=api_credential.is_active,
+                    secret=api_secret_value
+                )
+                
+                chat_credentials = CredentialSecretResponse(
+                    id=chat_credential.id,
+                    credentials_uri=chat_credential.credential_uri,
+                    name=chat_credential.name,
+                    description=chat_credential.description,
+                    type=chat_credential.type,
+                    is_active=chat_credential.is_active,
+                    secret=chat_secret_value
+                )
+                
+                settings = N8NConfigSettingsResponse(
+                    api_version=config.get("api_version", "v1"),
+                    workflow_type=config.get("workflow_type", "N8N_CHAT_AGENT_WORKFLOW"),
+                    use_unified_chat_history=config.get("use_unified_chat_history", True),
+                    chat_history_count=config.get("chat_history_count", 30),
+                    chat_url=config.get("chat_url", ""),
+                    api_credentials=api_credentials,
+                    chat_credentials=chat_credentials
+                )
+            else:
+                # For unsupported types, return raw config
+                settings = config
+            
+            return ApplicationConfigResponse(
+                docversion="v1",
+                type=app_type,
+                tenant_id=tenant_id,
+                application_id=application_id,
+                settings=settings,
+                user=user_info
+            )
 
     def _invalidate_list_cache(self, tenant_id: str) -> None:
         """Invalidate list cache for a tenant."""

@@ -28,10 +28,14 @@ from unifiedui.schema.responses.principals import (
     ResourcePrincipalsResponse
 )
 from unifiedui.exc.credentials import CredentialNotFoundError
+from unifiedui.handlers.validators.credential_validator import (
+    validate_credential_secret,
+    CredentialValidationError,
+    UnsupportedCredentialTypeError,
+)
 from unifiedui.logger import get_logger
 
 logger = get_logger(__name__)
-
 
 class CredentialHandler:
     """Handler class for credential business logic."""
@@ -347,8 +351,18 @@ class CredentialHandler:
             
         Returns:
             Created credential response
+            
+        Raises:
+            CredentialValidationError: If credential validation fails
+            UnsupportedCredentialTypeError: If credential type is not supported
         """
         logger.info("Creating credential", extra={"tenant_id": tenant_id, "credential_name": request.name, "user_id": user_id})
+        
+        # Validate secret value based on credential type
+        validated_secret = validate_credential_secret(
+            credential_type=request.credential_type,
+            secret_value=request.secret_value
+        )
         
         credential_id = str(uuid.uuid4())
         
@@ -356,7 +370,7 @@ class CredentialHandler:
         try:
             vault_uri = self.vault_client.store_secret(
                 key=f"{tenant_id}/{credential_id}",
-                value=request.secret_value,
+                value=validated_secret,
                 metadata=request.metadata
             )
             logger.info(f"Stored secret in vault for credential {credential_id}")
@@ -427,6 +441,8 @@ class CredentialHandler:
             
         Raises:
             CredentialNotFoundError: If credential not found
+            CredentialValidationError: If credential validation fails
+            UnsupportedCredentialTypeError: If credential type is not supported
         """
         logger.info("Updating credential", extra={"tenant_id": tenant_id, "credential_id": credential_id})
         
@@ -442,12 +458,21 @@ class CredentialHandler:
             if not credential:
                 raise CredentialNotFoundError(credential_id)
             
+            # Determine the credential type for validation
+            cred_type = request.credential_type if request.credential_type is not None else credential.type
+            
             # Update secret in vault if provided
             if request.secret_value is not None:
+                # Validate secret value based on credential type
+                validated_secret = validate_credential_secret(
+                    credential_type=cred_type,
+                    secret_value=request.secret_value
+                )
+                
                 try:
                     self.vault_client.update_secret(
                         uri=credential.credential_uri,
-                        value=request.secret_value,
+                        value=validated_secret,
                         metadata=request.metadata
                     )
                     logger.info(f"Updated secret in vault for credential {credential_id}")

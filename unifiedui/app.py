@@ -14,6 +14,15 @@ from unifiedui.exc.development_platforms import DevelopmentPlatformNotFoundError
 from unifiedui.exc.chat_widgets import ChatWidgetNotFoundError
 from unifiedui.exc.principal import PrincipalNotFoundError
 from unifiedui.exc.tags import TagNotFoundError, TagDeleteNotAllowedError
+from unifiedui.exc.application_config import (
+    ApplicationConfigValidationError,
+    UnsupportedApplicationTypeError,
+    InvalidCredentialError
+)
+from unifiedui.handlers.validators.credential_validator import (
+    CredentialValidationError,
+    UnsupportedCredentialTypeError,
+)
 
 from unifiedui.core.config import settings
 from unifiedui.exc.tenants import TenantNotFoundError, TenantError
@@ -98,6 +107,50 @@ def create_app() -> FastAPI:
         """Handle application not found errors."""
         return JSONResponse(
             status_code=404,
+            content={"detail": str(exc)}
+        )
+    
+    # Application config exception handlers
+    
+    @app.exception_handler(ApplicationConfigValidationError)
+    async def application_config_validation_handler(request: Request, exc: ApplicationConfigValidationError):
+        """Handle application config validation errors."""
+        return JSONResponse(
+            status_code=400,
+            content={"detail": exc.message, "errors": exc.errors}
+        )
+    
+    @app.exception_handler(UnsupportedApplicationTypeError)
+    async def unsupported_application_type_handler(request: Request, exc: UnsupportedApplicationTypeError):
+        """Handle unsupported application type errors."""
+        return JSONResponse(
+            status_code=400,
+            content={"detail": str(exc)}
+        )
+    
+    @app.exception_handler(InvalidCredentialError)
+    async def invalid_credential_handler(request: Request, exc: InvalidCredentialError):
+        """Handle invalid credential errors."""
+        return JSONResponse(
+            status_code=400,
+            content={"detail": exc.message, "credential_id": exc.credential_id}
+        )
+    
+    # Credential validation exception handlers
+    
+    @app.exception_handler(CredentialValidationError)
+    async def credential_validation_handler(request: Request, exc: CredentialValidationError):
+        """Handle credential validation errors."""
+        return JSONResponse(
+            status_code=400,
+            content={"detail": exc.message, "errors": exc.errors}
+        )
+    
+    @app.exception_handler(UnsupportedCredentialTypeError)
+    async def unsupported_credential_type_handler(request: Request, exc: UnsupportedCredentialTypeError):
+        """Handle unsupported credential type errors."""
+        return JSONResponse(
+            status_code=400,
             content={"detail": str(exc)}
         )
         # Credential exception handlers
