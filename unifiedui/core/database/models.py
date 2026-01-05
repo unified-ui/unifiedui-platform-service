@@ -272,8 +272,12 @@ class Application(Base, IdNameDescriptionMixin, TenantScopedMixin):
 class Conversation(Base, IdNameDescriptionMixin, TenantScopedMixin):
     __tablename__ = "conversations"
 
+    application_id: Mapped[str] = mapped_column(
+        String(100), ForeignKey("applications.id", ondelete="CASCADE"), nullable=False
+    )
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
+    application: Mapped["Application"] = relationship()
     members: Mapped[list["ConversationMember"]] = relationship(
         back_populates="conversation", cascade="all, delete-orphan"
     )
@@ -281,7 +285,10 @@ class Conversation(Base, IdNameDescriptionMixin, TenantScopedMixin):
         back_populates="conversation", cascade="all, delete-orphan"
     )
 
-    __table_args__ = (Index("ix_conversations_tenant", "tenant_id"),)
+    __table_args__ = (
+        Index("ix_conversations_tenant", "tenant_id"),
+        Index("ix_conversations_application", "application_id"),
+    )
 
 
 class AutonomousAgent(Base, IdNameDescriptionMixin, TenantScopedMixin):

@@ -277,6 +277,7 @@ class ConversationHandler:
             conversation = Conversation(
                 id=conversation_id,
                 tenant_id=tenant_id,
+                application_id=request.application_id,
                 name=request.name,
                 description=request.description,
                 created_by=user_id,
@@ -636,6 +637,7 @@ class ConversationHandler:
         return ConversationResponse(
             id=conversation.id,
             tenant_id=conversation.tenant_id,
+            application_id=conversation.application_id,
             name=conversation.name,
             description=conversation.description,
             is_active=conversation.is_active,

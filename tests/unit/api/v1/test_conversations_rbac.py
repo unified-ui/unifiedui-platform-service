@@ -11,6 +11,7 @@ from tests.conftest import create_auth_headers
 ENDPOINT_CONVERSATIONS = "/api/v1/platform-service/tenants/{tenant_id}/conversations"
 ENDPOINT_CONVERSATION_DETAIL = "/api/v1/platform-service/tenants/{tenant_id}/conversations/{conversation_id}"
 ENDPOINT_CONVERSATION_PRINCIPALS = "/api/v1/platform-service/tenants/{tenant_id}/conversations/{conversation_id}/principals"
+ENDPOINT_APPLICATIONS = "/api/v1/platform-service/tenants/{tenant_id}/applications"
 
 # Roles
 ROLE_READ = PermissionActionEnum.READ.value
@@ -27,6 +28,18 @@ def create_tenant_for_user(test_client: TestClient, user_token: Any, tenant_name
     response = test_client.post(
         "/api/v1/platform-service/tenants",
         json={"name": tenant_name, "description": f"Tenant for {user_token.get_id()}"},
+        headers=headers
+    )
+    assert response.status_code == status.HTTP_201_CREATED
+    return response.json()["id"]
+
+
+def create_application_for_user(test_client: TestClient, user_token: Any, tenant_id: str, app_name: str = "Test App") -> str:
+    """Helper function to create an application and return its ID."""
+    headers = create_auth_headers(user_token, use_cache=False)
+    response = test_client.post(
+        ENDPOINT_APPLICATIONS.format(tenant_id=tenant_id),
+        json={"name": app_name, "description": f"App for testing conversations", "type": "N8N"},
         headers=headers
     )
     assert response.status_code == status.HTTP_201_CREATED
@@ -57,9 +70,10 @@ class TestConversationRBAC:
         user1_token = test_client.create_test_user("user-1", "User One")
         headers1 = create_auth_headers(user1_token, use_cache=False)
         tenant_id = create_tenant_for_user(test_client, user1_token)
+        application_id = create_application_for_user(test_client, user1_token, tenant_id)
         
         # Create conversation
-        conversation_data = {"name": "Test Conversation", "description": "Test"}
+        conversation_data = {"application_id": application_id, "name": "Test Conversation", "description": "Test"}
         create_response = test_client.post(
             ENDPOINT_CONVERSATIONS.format(tenant_id=tenant_id),
             json=conversation_data,
@@ -96,8 +110,9 @@ class TestConversationRBAC:
         user1_token = test_client.create_test_user("user-1", "User One")
         headers1 = create_auth_headers(user1_token, use_cache=False)
         tenant_id = create_tenant_for_user(test_client, user1_token)
+        application_id = create_application_for_user(test_client, user1_token, tenant_id)
         
-        conversation_data = {"name": "Test Conversation", "description": "Test"}
+        conversation_data = {"application_id": application_id, "name": "Test Conversation", "description": "Test"}
         create_response = test_client.post(
             ENDPOINT_CONVERSATIONS.format(tenant_id=tenant_id),
             json=conversation_data,
@@ -135,8 +150,9 @@ class TestConversationRBAC:
         user1_token = test_client.create_test_user("user-1", "User One")
         headers1 = create_auth_headers(user1_token, use_cache=False)
         tenant_id = create_tenant_for_user(test_client, user1_token)
+        application_id = create_application_for_user(test_client, user1_token, tenant_id)
         
-        conversation_data = {"name": "Test Conversation", "description": "Test"}
+        conversation_data = {"application_id": application_id, "name": "Test Conversation", "description": "Test"}
         create_response = test_client.post(
             ENDPOINT_CONVERSATIONS.format(tenant_id=tenant_id),
             json=conversation_data,
@@ -175,8 +191,9 @@ class TestConversationRBAC:
         user1_token = test_client.create_test_user("user-1", "User One")
         headers1 = create_auth_headers(user1_token, use_cache=False)
         tenant_id = create_tenant_for_user(test_client, user1_token)
+        application_id = create_application_for_user(test_client, user1_token, tenant_id)
         
-        conversation_data = {"name": "Test Conversation", "description": "Test"}
+        conversation_data = {"application_id": application_id, "name": "Test Conversation", "description": "Test"}
         create_response = test_client.post(
             ENDPOINT_CONVERSATIONS.format(tenant_id=tenant_id),
             json=conversation_data,
@@ -215,8 +232,9 @@ class TestConversationRBAC:
         user1_token = test_client.create_test_user("user-1", "User One")
         headers1 = create_auth_headers(user1_token, use_cache=False)
         tenant_id = create_tenant_for_user(test_client, user1_token)
+        application_id = create_application_for_user(test_client, user1_token, tenant_id)
         
-        conversation_data = {"name": "Test Conversation", "description": "Test"}
+        conversation_data = {"application_id": application_id, "name": "Test Conversation", "description": "Test"}
         create_response = test_client.post(
             ENDPOINT_CONVERSATIONS.format(tenant_id=tenant_id),
             json=conversation_data,
@@ -259,8 +277,9 @@ class TestConversationRBAC:
         user1_token = test_client.create_test_user("user-1", "User One")
         headers1 = create_auth_headers(user1_token, use_cache=False)
         tenant_id = create_tenant_for_user(test_client, user1_token)
+        application_id = create_application_for_user(test_client, user1_token, tenant_id)
         
-        conversation_data = {"name": "Test Conversation", "description": "Test"}
+        conversation_data = {"application_id": application_id, "name": "Test Conversation", "description": "Test"}
         create_response = test_client.post(
             ENDPOINT_CONVERSATIONS.format(tenant_id=tenant_id),
             json=conversation_data,
@@ -299,8 +318,9 @@ class TestConversationRBAC:
         user1_token = test_client.create_test_user("user-1", "User One")
         headers1 = create_auth_headers(user1_token, use_cache=False)
         tenant_id = create_tenant_for_user(test_client, user1_token)
+        application_id = create_application_for_user(test_client, user1_token, tenant_id)
         
-        conversation_data = {"name": "Test Conversation", "description": "Test"}
+        conversation_data = {"application_id": application_id, "name": "Test Conversation", "description": "Test"}
         create_response = test_client.post(
             ENDPOINT_CONVERSATIONS.format(tenant_id=tenant_id),
             json=conversation_data,
@@ -340,8 +360,9 @@ class TestConversationRBAC:
         user1_token = test_client.create_test_user("user-1", "User One")
         headers1 = create_auth_headers(user1_token, use_cache=False)
         tenant_id = create_tenant_for_user(test_client, user1_token)
+        application_id = create_application_for_user(test_client, user1_token, tenant_id)
         
-        conversation_data = {"name": "Test Conversation", "description": "Test"}
+        conversation_data = {"application_id": application_id, "name": "Test Conversation", "description": "Test"}
         create_response = test_client.post(
             ENDPOINT_CONVERSATIONS.format(tenant_id=tenant_id),
             json=conversation_data,
@@ -384,8 +405,9 @@ class TestConversationRBAC:
         user1_token = test_client.create_test_user("user-1", "User One")
         headers1 = create_auth_headers(user1_token, use_cache=False)
         tenant_id = create_tenant_for_user(test_client, user1_token)
+        application_id = create_application_for_user(test_client, user1_token, tenant_id)
         
-        conversation_data = {"name": "Test Conversation", "description": "Test"}
+        conversation_data = {"application_id": application_id, "name": "Test Conversation", "description": "Test"}
         create_response = test_client.post(
             ENDPOINT_CONVERSATIONS.format(tenant_id=tenant_id),
             json=conversation_data,
@@ -451,8 +473,9 @@ class TestConversationRBAC:
         user1_token = test_client.create_test_user("user-1", "User One")
         headers1 = create_auth_headers(user1_token, use_cache=False)
         tenant_id = create_tenant_for_user(test_client, user1_token)
+        application_id = create_application_for_user(test_client, user1_token, tenant_id)
         
-        conversation_data = {"name": "Private Conversation", "description": "Test"}
+        conversation_data = {"application_id": application_id, "name": "Private Conversation", "description": "Test"}
         create_response = test_client.post(
             ENDPOINT_CONVERSATIONS.format(tenant_id=tenant_id),
             json=conversation_data,
@@ -479,24 +502,25 @@ class TestConversationRBAC:
         user1_token = test_client.create_test_user("user-1", "User One")
         headers1 = create_auth_headers(user1_token, use_cache=False)
         tenant_id = create_tenant_for_user(test_client, user1_token)
+        application_id = create_application_for_user(test_client, user1_token, tenant_id)
         
         # Create 3 conversations
         conv1_response = test_client.post(
             ENDPOINT_CONVERSATIONS.format(tenant_id=tenant_id),
-            json={"name": "Conversation 1", "description": "Test"},
+            json={"application_id": application_id, "name": "Conversation 1", "description": "Test"},
             headers=headers1
         )
         conv1_id = conv1_response.json()["id"]
         
         test_client.post(
             ENDPOINT_CONVERSATIONS.format(tenant_id=tenant_id),
-            json={"name": "Conversation 2", "description": "Test"},
+            json={"application_id": application_id, "name": "Conversation 2", "description": "Test"},
             headers=headers1
         )
         
         conv3_response = test_client.post(
             ENDPOINT_CONVERSATIONS.format(tenant_id=tenant_id),
-            json={"name": "Conversation 3", "description": "Test"},
+            json={"application_id": application_id, "name": "Conversation 3", "description": "Test"},
             headers=headers1
         )
         conv3_id = conv3_response.json()["id"]

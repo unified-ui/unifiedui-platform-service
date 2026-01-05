@@ -133,10 +133,41 @@ def create_development_platform_in_db(test_client: TestClient, tenant_id: str, u
 def create_conversation_in_db(test_client: TestClient, tenant_id: str, user_id: str, name: str = "Test Conversation") -> str:
     """Helper function to create a conversation directly in DB and return its ID."""
     conversation_id = str(uuid.uuid4())
+    application_id = str(uuid.uuid4())
     with test_client.db_client.get_session() as session:
+        # First create an application (required for conversation)
+        app = Application(
+            id=application_id,
+            tenant_id=tenant_id,
+            name=f"App for {name}",
+            description="Test application for conversation",
+            type="N8N",
+            config={},
+            is_active=True,
+            created_by=user_id,
+            updated_by=user_id
+        )
+        session.add(app)
+        session.commit()
+        
+        # Add user as ADMIN member of the application
+        app_member = ApplicationMember(
+            id=str(uuid.uuid4()),
+            tenant_id=tenant_id,
+            application_id=application_id,
+            principal_id=user_id,
+            role=PermissionActionEnum.ADMIN,
+            created_by=user_id,
+            updated_by=user_id
+        )
+        session.add(app_member)
+        session.commit()
+        
+        # Now create the conversation with application_id
         conversation = Conversation(
             id=conversation_id,
             tenant_id=tenant_id,
+            application_id=application_id,
             name=name,
             description="Test conversation",
             is_active=True,

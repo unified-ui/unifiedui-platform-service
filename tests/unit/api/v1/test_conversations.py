@@ -26,6 +26,9 @@ PRINCIPAL_TYPE_USER = PrincipalTypeEnum.IDENTITY_USER.value
 PRINCIPAL_TYPE_GROUP = PrincipalTypeEnum.IDENTITY_GROUP.value
 PRINCIPAL_TYPE_CUSTOM_GROUP = PrincipalTypeEnum.CUSTOM_GROUP.value
 
+# Application endpoint for creating applications
+ENDPOINT_APPLICATIONS = "/api/v1/platform-service/tenants/{tenant_id}/applications"
+
 
 def create_tenant_for_user(test_client: TestClient, user_token: Any, tenant_name: str = "Test Tenant") -> str:
     """Helper function to create a tenant and return its ID."""
@@ -33,6 +36,18 @@ def create_tenant_for_user(test_client: TestClient, user_token: Any, tenant_name
     response = test_client.post(
         "/api/v1/platform-service/tenants",
         json={"name": tenant_name, "description": f"Tenant for {user_token.get_id()}"},
+        headers=headers
+    )
+    assert response.status_code == status.HTTP_201_CREATED
+    return response.json()["id"]
+
+
+def create_application_for_user(test_client: TestClient, user_token: Any, tenant_id: str, app_name: str = "Test App") -> str:
+    """Helper function to create an application and return its ID."""
+    headers = create_auth_headers(user_token, use_cache=False)
+    response = test_client.post(
+        ENDPOINT_APPLICATIONS.format(tenant_id=tenant_id),
+        json={"name": app_name, "description": f"App for testing conversations", "type": "N8N"},
         headers=headers
     )
     assert response.status_code == status.HTTP_201_CREATED
@@ -52,8 +67,12 @@ class TestConversationRoutes:
         tenant_id = create_tenant_for_user(test_client, test_user_token)
         headers = create_auth_headers(test_user_token, use_cache=False)
         
+        # Create application for conversation
+        application_id = create_application_for_user(test_client, test_user_token, tenant_id)
+        
         # Create conversation
         conversation_data = {
+            "application_id": application_id,
             "name": "Test Conversation",
             "description": "A test conversation"
         }
@@ -69,6 +88,7 @@ class TestConversationRoutes:
         
         assert data["name"] == conversation_data["name"]
         assert data["description"] == conversation_data["description"]
+        assert data["application_id"] == application_id
         assert data["is_active"] == False
         assert "id" in data
         assert data["tenant_id"] == tenant_id
@@ -80,10 +100,11 @@ class TestConversationRoutes:
         """Test conversation creation with missing name."""
         tenant_id = create_tenant_for_user(test_client, test_user_token)
         headers = create_auth_headers(test_user_token, use_cache=False)
+        application_id = create_application_for_user(test_client, test_user_token, tenant_id)
         
         response = test_client.post(
             ENDPOINT_CONVERSATIONS.format(tenant_id=tenant_id),
-            json={"description": "Test conversation"},
+            json={"application_id": application_id, "description": "Test conversation"},
             headers=headers
         )
         
@@ -93,10 +114,11 @@ class TestConversationRoutes:
         """Test conversation creation with invalid name type."""
         tenant_id = create_tenant_for_user(test_client, test_user_token)
         headers = create_auth_headers(test_user_token, use_cache=False)
+        application_id = create_application_for_user(test_client, test_user_token, tenant_id)
         
         response = test_client.post(
             ENDPOINT_CONVERSATIONS.format(tenant_id=tenant_id),
-            json={"name": 123, "description": "Test"},
+            json={"application_id": application_id, "name": 123, "description": "Test"},
             headers=headers
         )
         
@@ -106,10 +128,11 @@ class TestConversationRoutes:
         """Test conversation creation with empty name."""
         tenant_id = create_tenant_for_user(test_client, test_user_token)
         headers = create_auth_headers(test_user_token, use_cache=False)
+        application_id = create_application_for_user(test_client, test_user_token, tenant_id)
         
         response = test_client.post(
             ENDPOINT_CONVERSATIONS.format(tenant_id=tenant_id),
-            json={"name": "", "description": "Test"},
+            json={"application_id": application_id, "name": "", "description": "Test"},
             headers=headers
         )
         
@@ -119,10 +142,11 @@ class TestConversationRoutes:
         """Test conversation creation with invalid description type."""
         tenant_id = create_tenant_for_user(test_client, test_user_token)
         headers = create_auth_headers(test_user_token, use_cache=False)
+        application_id = create_application_for_user(test_client, test_user_token, tenant_id)
         
         response = test_client.post(
             ENDPOINT_CONVERSATIONS.format(tenant_id=tenant_id),
-            json={"name": "Test Conversation", "description": 123},
+            json={"application_id": application_id, "name": "Test Conversation", "description": 123},
             headers=headers
         )
         
@@ -146,6 +170,7 @@ class TestConversationRoutes:
         # Create user1 with a tenant
         user1_token = test_client.create_test_user("user-1", "User One")
         tenant_id = create_tenant_for_user(test_client, user1_token)
+        application_id = create_application_for_user(test_client, user1_token, tenant_id)
         
         # Create user2 (not a member of the tenant)
         user2_token = test_client.create_test_user("user-2", "User Two")
@@ -154,7 +179,7 @@ class TestConversationRoutes:
         # Try to create conversation as user2 (should fail - no tenant membership)
         response = test_client.post(
             ENDPOINT_CONVERSATIONS.format(tenant_id=tenant_id),
-            json={"name": "Unauthorized Conversation", "description": "Should fail"},
+            json={"application_id": application_id, "name": "Unauthorized Conversation", "description": "Should fail"},
             headers=headers2
         )
         
@@ -164,9 +189,10 @@ class TestConversationRoutes:
         """Test successful conversation retrieval."""
         tenant_id = create_tenant_for_user(test_client, test_user_token)
         headers = create_auth_headers(test_user_token, use_cache=False)
+        application_id = create_application_for_user(test_client, test_user_token, tenant_id)
         
         # Create a conversation
-        conversation_data = {"name": "Test Conversation", "description": "Test description"}
+        conversation_data = {"application_id": application_id, "name": "Test Conversation", "description": "Test description"}
         create_response = test_client.post(
             ENDPOINT_CONVERSATIONS.format(tenant_id=tenant_id),
             json=conversation_data,
@@ -219,10 +245,11 @@ class TestConversationRoutes:
         """Test listing conversations with existing data."""
         tenant_id = create_tenant_for_user(test_client, test_user_token)
         headers = create_auth_headers(test_user_token, use_cache=False)
+        application_id = create_application_for_user(test_client, test_user_token, tenant_id)
         
         # Create multiple conversations
-        conversation1_data = {"name": "Conversation 1", "description": "First conversation"}
-        conversation2_data = {"name": "Conversation 2", "description": "Second conversation"}
+        conversation1_data = {"application_id": application_id, "name": "Conversation 1", "description": "First conversation"}
+        conversation2_data = {"application_id": application_id, "name": "Conversation 2", "description": "Second conversation"}
         
         test_client.post(
             ENDPOINT_CONVERSATIONS.format(tenant_id=tenant_id),
@@ -255,12 +282,13 @@ class TestConversationRoutes:
         """Test listing conversations with pagination parameters."""
         tenant_id = create_tenant_for_user(test_client, test_user_token)
         headers = create_auth_headers(test_user_token, use_cache=False)
+        application_id = create_application_for_user(test_client, test_user_token, tenant_id)
         
         # Create multiple conversations
         for i in range(5):
             test_client.post(
                 ENDPOINT_CONVERSATIONS.format(tenant_id=tenant_id),
-                json={"name": f"Conversation {i}", "description": f"Description {i}"},
+                json={"application_id": application_id, "name": f"Conversation {i}", "description": f"Description {i}"},
                 headers=headers
             )
         
@@ -288,16 +316,17 @@ class TestConversationRoutes:
         """Test listing conversations with name filter."""
         tenant_id = create_tenant_for_user(test_client, test_user_token)
         headers = create_auth_headers(test_user_token, use_cache=False)
+        application_id = create_application_for_user(test_client, test_user_token, tenant_id)
         
         # Create conversations with different names
         test_client.post(
             ENDPOINT_CONVERSATIONS.format(tenant_id=tenant_id),
-            json={"name": "Production Chat", "description": "Prod"},
+            json={"application_id": application_id, "name": "Production Chat", "description": "Prod"},
             headers=headers
         )
         test_client.post(
             ENDPOINT_CONVERSATIONS.format(tenant_id=tenant_id),
-            json={"name": "Development Chat", "description": "Dev"},
+            json={"application_id": application_id, "name": "Development Chat", "description": "Dev"},
             headers=headers
         )
         
@@ -317,11 +346,12 @@ class TestConversationRoutes:
         """Test successful conversation update."""
         tenant_id = create_tenant_for_user(test_client, test_user_token)
         headers = create_auth_headers(test_user_token, use_cache=False)
+        application_id = create_application_for_user(test_client, test_user_token, tenant_id)
         
         # Create conversation
         create_response = test_client.post(
             ENDPOINT_CONVERSATIONS.format(tenant_id=tenant_id),
-            json={"name": "Original", "description": "Original Description"},
+            json={"application_id": application_id, "name": "Original", "description": "Original Description"},
             headers=headers
         )
         conversation_id = create_response.json()["id"]
@@ -356,6 +386,7 @@ class TestConversationRoutes:
         """Test partial conversation update (only name)."""
         tenant_id = create_tenant_for_user(test_client, test_user_token)
         headers = create_auth_headers(test_user_token, use_cache=False)
+        application_id = create_application_for_user(test_client, test_user_token, tenant_id)
         
         # Create conversation
     
@@ -363,11 +394,12 @@ class TestConversationRoutes:
         """Test updating conversation is_active status."""
         tenant_id = create_tenant_for_user(test_client, test_user_token)
         headers = create_auth_headers(test_user_token, use_cache=False)
+        application_id = create_application_for_user(test_client, test_user_token, tenant_id)
         
         # Create conversation (default is_active=False)
         create_response = test_client.post(
             ENDPOINT_CONVERSATIONS.format(tenant_id=tenant_id),
-            json={"name": "Test Conversation", "description": "Test"},
+            json={"application_id": application_id, "name": "Test Conversation", "description": "Test"},
             headers=headers
         )
         conversation_id = create_response.json()["id"]
@@ -394,7 +426,7 @@ class TestConversationRoutes:
         assert update_response2.json()["is_active"] == False
         create_response = test_client.post(
             ENDPOINT_CONVERSATIONS.format(tenant_id=tenant_id),
-            json={"name": "Original", "description": "Keep this"},
+            json={"application_id": application_id, "name": "Original", "description": "Keep this"},
             headers=headers
         )
         conversation_id = create_response.json()["id"]
@@ -416,11 +448,12 @@ class TestConversationRoutes:
         """Test successful conversation deletion."""
         tenant_id = create_tenant_for_user(test_client, test_user_token)
         headers = create_auth_headers(test_user_token, use_cache=False)
+        application_id = create_application_for_user(test_client, test_user_token, tenant_id)
         
         # Create conversation
         create_response = test_client.post(
             ENDPOINT_CONVERSATIONS.format(tenant_id=tenant_id),
-            json={"name": "To Delete", "description": "Will be deleted"},
+            json={"application_id": application_id, "name": "To Delete", "description": "Will be deleted"},
             headers=headers
         )
         conversation_id = create_response.json()["id"]
@@ -462,11 +495,12 @@ class TestConversationPrincipalRoutes:
         """Test that only creator is listed initially."""
         tenant_id = create_tenant_for_user(test_client, test_user_token)
         headers = create_auth_headers(test_user_token, use_cache=False)
+        application_id = create_application_for_user(test_client, test_user_token, tenant_id)
         
         # Create conversation
         create_response = test_client.post(
             ENDPOINT_CONVERSATIONS.format(tenant_id=tenant_id),
-            json={"name": "Test Conversation", "description": "Test"},
+            json={"application_id": application_id, "name": "Test Conversation", "description": "Test"},
             headers=headers
         )
         conversation_id = create_response.json()["id"]
@@ -492,11 +526,12 @@ class TestConversationPrincipalRoutes:
         """Test getting specific principal permissions."""
         tenant_id = create_tenant_for_user(test_client, test_user_token)
         headers = create_auth_headers(test_user_token, use_cache=False)
+        application_id = create_application_for_user(test_client, test_user_token, tenant_id)
         
         # Create conversation
         create_response = test_client.post(
             ENDPOINT_CONVERSATIONS.format(tenant_id=tenant_id),
-            json={"name": "Test Conversation", "description": "Test"},
+            json={"application_id": application_id, "name": "Test Conversation", "description": "Test"},
             headers=headers
         )
         conversation_id = create_response.json()["id"]
@@ -521,11 +556,12 @@ class TestConversationPrincipalRoutes:
         """Test setting permission for a new principal."""
         tenant_id = create_tenant_for_user(test_client, test_user_token)
         headers = create_auth_headers(test_user_token, use_cache=False)
+        application_id = create_application_for_user(test_client, test_user_token, tenant_id)
         
         # Create conversation
         create_response = test_client.post(
             ENDPOINT_CONVERSATIONS.format(tenant_id=tenant_id),
-            json={"name": "Test Conversation", "description": "Test"},
+            json={"application_id": application_id, "name": "Test Conversation", "description": "Test"},
             headers=headers
         )
         conversation_id = create_response.json()["id"]
@@ -551,11 +587,12 @@ class TestConversationPrincipalRoutes:
         """Test updating permission for an existing principal."""
         tenant_id = create_tenant_for_user(test_client, test_user_token)
         headers = create_auth_headers(test_user_token, use_cache=False)
+        application_id = create_application_for_user(test_client, test_user_token, tenant_id)
         
         # Create conversation
         create_response = test_client.post(
             ENDPOINT_CONVERSATIONS.format(tenant_id=tenant_id),
-            json={"name": "Test Conversation", "description": "Test"},
+            json={"application_id": application_id, "name": "Test Conversation", "description": "Test"},
             headers=headers
         )
         conversation_id = create_response.json()["id"]
@@ -602,11 +639,12 @@ class TestConversationPrincipalRoutes:
         """Test setting permission with missing principal_id."""
         tenant_id = create_tenant_for_user(test_client, test_user_token)
         headers = create_auth_headers(test_user_token, use_cache=False)
+        application_id = create_application_for_user(test_client, test_user_token, tenant_id)
         
         # Create conversation
         create_response = test_client.post(
             ENDPOINT_CONVERSATIONS.format(tenant_id=tenant_id),
-            json={"name": "Test Conversation", "description": "Test"},
+            json={"application_id": application_id, "name": "Test Conversation", "description": "Test"},
             headers=headers
         )
         conversation_id = create_response.json()["id"]
@@ -627,11 +665,12 @@ class TestConversationPrincipalRoutes:
         """Test setting permission with missing role."""
         tenant_id = create_tenant_for_user(test_client, test_user_token)
         headers = create_auth_headers(test_user_token, use_cache=False)
+        application_id = create_application_for_user(test_client, test_user_token, tenant_id)
         
         # Create conversation
         create_response = test_client.post(
             ENDPOINT_CONVERSATIONS.format(tenant_id=tenant_id),
-            json={"name": "Test Conversation", "description": "Test"},
+            json={"application_id": application_id, "name": "Test Conversation", "description": "Test"},
             headers=headers
         )
         conversation_id = create_response.json()["id"]
@@ -652,11 +691,12 @@ class TestConversationPrincipalRoutes:
         """Test setting permission with invalid role."""
         tenant_id = create_tenant_for_user(test_client, test_user_token)
         headers = create_auth_headers(test_user_token, use_cache=False)
+        application_id = create_application_for_user(test_client, test_user_token, tenant_id)
         
         # Create conversation
         create_response = test_client.post(
             ENDPOINT_CONVERSATIONS.format(tenant_id=tenant_id),
-            json={"name": "Test Conversation", "description": "Test"},
+            json={"application_id": application_id, "name": "Test Conversation", "description": "Test"},
             headers=headers
         )
         conversation_id = create_response.json()["id"]
@@ -678,11 +718,12 @@ class TestConversationPrincipalRoutes:
         """Test setting permission with invalid principal_type."""
         tenant_id = create_tenant_for_user(test_client, test_user_token)
         headers = create_auth_headers(test_user_token, use_cache=False)
+        application_id = create_application_for_user(test_client, test_user_token, tenant_id)
         
         # Create conversation
         create_response = test_client.post(
             ENDPOINT_CONVERSATIONS.format(tenant_id=tenant_id),
-            json={"name": "Test Conversation", "description": "Test"},
+            json={"application_id": application_id, "name": "Test Conversation", "description": "Test"},
             headers=headers
         )
         conversation_id = create_response.json()["id"]
@@ -704,11 +745,12 @@ class TestConversationPrincipalRoutes:
         """Test deleting a principal permission."""
         tenant_id = create_tenant_for_user(test_client, test_user_token)
         headers = create_auth_headers(test_user_token, use_cache=False)
+        application_id = create_application_for_user(test_client, test_user_token, tenant_id)
         
         # Create conversation
         create_response = test_client.post(
             ENDPOINT_CONVERSATIONS.format(tenant_id=tenant_id),
-            json={"name": "Test Conversation", "description": "Test"},
+            json={"application_id": application_id, "name": "Test Conversation", "description": "Test"},
             headers=headers
         )
         conversation_id = create_response.json()["id"]
@@ -751,11 +793,12 @@ class TestConversationPrincipalRoutes:
         """Test deleting a non-existent permission."""
         tenant_id = create_tenant_for_user(test_client, test_user_token)
         headers = create_auth_headers(test_user_token, use_cache=False)
+        application_id = create_application_for_user(test_client, test_user_token, tenant_id)
         
         # Create conversation
         create_response = test_client.post(
             ENDPOINT_CONVERSATIONS.format(tenant_id=tenant_id),
-            json={"name": "Test Conversation", "description": "Test"},
+            json={"application_id": application_id, "name": "Test Conversation", "description": "Test"},
             headers=headers
         )
         conversation_id = create_response.json()["id"]

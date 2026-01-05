@@ -586,6 +586,20 @@ class TestResourcePermissionsHandlerMultipleResourceTypes:
         test_db_session.add(principal)
         
         # Create resources
+        application_id = str(uuid.uuid4())
+        application = Application(
+            id=application_id,
+            tenant_id=tenant_id,
+            name="Test Application",
+            description="Test",
+            type="N8N",
+            config={},
+            is_active=True,
+            created_by=user_id,
+            updated_by=user_id
+        )
+        test_db_session.add(application)
+        
         credential_id = str(uuid.uuid4())
         credential = Credential(
             id=credential_id,
@@ -605,6 +619,7 @@ class TestResourcePermissionsHandlerMultipleResourceTypes:
         conversation = Conversation(
             id=conversation_id,
             tenant_id=tenant_id,
+            application_id=application_id,
             name="Test Conversation",
             description="Test",
             is_active=True,
@@ -618,6 +633,7 @@ class TestResourcePermissionsHandlerMultipleResourceTypes:
         return {
             "tenant_id": tenant_id,
             "user_id": user_id,
+            "application_id": application_id,
             "credential_id": credential_id,
             "conversation_id": conversation_id
         }
