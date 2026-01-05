@@ -32,7 +32,7 @@ router = APIRouter(
     summary="List conversations",
     description="Get a paginated list of conversations for the current tenant"
 )
-@authenticate
+@authenticate()
 async def list_conversations(
     request: Request,
     tenant_id: str,
@@ -100,7 +100,7 @@ async def list_conversations(
     summary="Create conversation",
     description="Create a new conversation"
 )
-@authenticate
+@authenticate()
 @check_permissions(
     entity="tenant",
     required_permissions=[
@@ -157,7 +157,7 @@ async def create_conversation(
     summary="Get conversation",
     description="Get a specific conversation by ID"
 )
-@authenticate
+@authenticate()
 @check_permissions(
     entity="conversation",
     required_permissions=[
@@ -223,7 +223,7 @@ async def get_conversation(
     summary="Update conversation",
     description="Update an existing conversation"
 )
-@authenticate
+@authenticate()
 @check_permissions(
     entity="conversation",
     required_permissions=[
@@ -292,7 +292,7 @@ async def update_conversation(
     summary="Delete conversation",
     description="Delete a conversation"
 )
-@authenticate
+@authenticate()
 @check_permissions(
     entity="conversation",
     required_permissions=[
@@ -359,7 +359,7 @@ async def delete_conversation(
     summary="List conversation permissions",
     description="Get all principals with permissions for a conversation"
 )
-@authenticate
+@authenticate()
 @check_permissions(
     entity="conversation",
     required_permissions=[
@@ -449,7 +449,7 @@ async def list_conversation_permissions(
     summary="Get conversation permissions for principal",
     description="Get all permissions for a specific principal on a conversation"
 )
-@authenticate
+@authenticate()
 @check_permissions(
     entity="conversation",
     required_permissions=[
@@ -518,7 +518,7 @@ async def get_conversation_permission(
     summary="Set conversation permission",
     description="Set or update a principal's permission for a conversation"
 )
-@authenticate
+@authenticate()
 @check_permissions(
     entity="conversation",
     required_permissions=[
@@ -587,7 +587,7 @@ async def set_conversation_permission(
     summary="Delete conversation permission",
     description="Remove a principal's permission for a conversation"
 )
-@authenticate
+@authenticate()
 @check_permissions(
     entity="conversation",
     required_permissions=[

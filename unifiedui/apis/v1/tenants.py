@@ -30,7 +30,7 @@ router = APIRouter()
     summary="List Tenants",
     description="Get a paginated list of tenants"
 )
-@authenticate
+@authenticate()
 async def list_tenants(
     request: Request,
     skip: int = Query(0, ge=0, description="Number of items to skip"),
@@ -69,7 +69,7 @@ async def list_tenants(
     summary="Get Tenant",
     description="Get a specific tenant by ID"
 )
-@authenticate
+@authenticate()
 async def get_tenant(
     request: Request,
     tenant_id: str,
@@ -99,7 +99,7 @@ async def get_tenant(
     summary="Create Tenant",
     description="Create a new tenant and assign creator as GLOBAL_ADMIN"
 )
-@authenticate
+@authenticate()
 async def create_tenant(
     request: Request,
     tenant_data: CreateTenantRequest,
@@ -129,7 +129,7 @@ async def create_tenant(
     summary="Update Tenant",
     description="Update an existing tenant"
 )
-@authenticate
+@authenticate()
 @check_permissions(entity="tenant", required_permissions=[TenantRolesEnum.GLOBAL_ADMIN])
 async def update_tenant(
     request: Request,
@@ -164,7 +164,7 @@ async def update_tenant(
     summary="Delete Tenant",
     description="Delete a tenant by ID"
 )
-@authenticate
+@authenticate()
 @check_permissions(entity="tenant", required_permissions=[TenantRolesEnum.GLOBAL_ADMIN])
 async def delete_tenant(
     request: Request,
@@ -194,7 +194,7 @@ async def delete_tenant(
     summary="List Tenant Principals",
     description="Get all principals and their roles for a tenant with optional filtering, search, and pagination"
 )
-@authenticate
+@authenticate()
 async def list_tenant_principals(
     request: Request,
     tenant_id: str,
@@ -250,7 +250,7 @@ async def list_tenant_principals(
     summary="Get Principal Roles",
     description="Get all roles for a specific principal on a tenant"
 )
-@authenticate
+@authenticate()
 async def get_principal_permissions(
     request: Request,
     tenant_id: str,
@@ -283,7 +283,7 @@ async def get_principal_permissions(
     summary="Set Principal Role",
     description="Add or update a role for a principal on a tenant"
 )
-@authenticate
+@authenticate()
 @check_permissions(entity="tenant", required_permissions=[TenantRolesEnum.GLOBAL_ADMIN])
 async def set_principal_permission(
     request: Request,
@@ -328,7 +328,7 @@ async def set_principal_permission(
     summary="Delete Principal Role",
     description="Remove a specific role from a principal on a tenant"
 )
-@authenticate
+@authenticate()
 @check_permissions(entity="tenant", required_permissions=[TenantRolesEnum.GLOBAL_ADMIN])
 async def delete_principal_permission(
     request: Request,

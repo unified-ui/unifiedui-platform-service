@@ -31,7 +31,7 @@ router = APIRouter(
     summary="List credentials",
     description="Get a paginated list of credentials for the current tenant. Use view=quick-list to get only id and name."
 )
-@authenticate
+@authenticate()
 async def list_credentials(
     request: Request,
     tenant_id: str,
@@ -117,7 +117,7 @@ async def list_credentials(
     summary="Create credential",
     description="Create a new credential and store secret in vault"
 )
-@authenticate
+@authenticate()
 @check_permissions(
     entity="tenant",
     required_permissions=[
@@ -177,7 +177,7 @@ async def create_credential(
     summary="Get credential",
     description="Get a specific credential by ID (without secret value)"
 )
-@authenticate
+@authenticate()
 @check_permissions(
     entity="credential",
     required_permissions=[
@@ -242,7 +242,7 @@ async def get_credential(
     summary="Update credential",
     description="Update an existing credential and optionally update the secret"
 )
-@authenticate
+@authenticate()
 @check_permissions(
     entity="credential",
     required_permissions=[
@@ -311,7 +311,7 @@ async def update_credential(
     summary="Delete credential",
     description="Delete a credential and its secret from the vault"
 )
-@authenticate
+@authenticate()
 @check_permissions(
     entity="credential",
     required_permissions=[
@@ -379,7 +379,7 @@ async def delete_credential(
     summary="List credential permissions",
     description="Get all principals with permissions for a credential"
 )
-@authenticate
+@authenticate()
 @check_permissions(
     entity="credential",
     required_permissions=[
@@ -465,7 +465,7 @@ async def list_credential_permissions(
     summary="Get credential permissions for principal",
     description="Get all permissions for a specific principal on a credential"
 )
-@authenticate
+@authenticate()
 @check_permissions(
     entity="credential", required_permissions=[
         PermissionActionEnum.READ
@@ -528,7 +528,7 @@ async def get_credential_permission(
     summary="Set credential permission",
     description="Set or update a principal's permission for a credential"
 )
-@authenticate
+@authenticate()
 @check_permissions(
     entity="credential", required_permissions=[
         PermissionActionEnum.ADMIN
@@ -594,7 +594,7 @@ async def set_credential_permission(
     summary="Delete credential permission",
     description="Remove a principal's permission for a credential"
 )
-@authenticate
+@authenticate()
 @check_permissions(
     entity="credential",
     required_permissions=[

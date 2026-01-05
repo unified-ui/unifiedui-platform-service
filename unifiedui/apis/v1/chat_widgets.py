@@ -31,7 +31,7 @@ router = APIRouter(
     summary="List chat widgets",
     description="Get a paginated list of chat widgets for the current tenant. Use view=quick-list to get only id and name."
 )
-@authenticate
+@authenticate()
 async def list_chat_widgets(
     request: Request,
     tenant_id: str,
@@ -117,7 +117,7 @@ async def list_chat_widgets(
     summary="Create chat widget",
     description="Create a new chat widget"
 )
-@authenticate
+@authenticate()
 @check_permissions(
     entity="tenant",
     required_permissions=[
@@ -174,7 +174,7 @@ async def create_chat_widget(
     summary="Get chat widget",
     description="Get a specific chat widget by ID"
 )
-@authenticate
+@authenticate()
 @check_permissions(
     entity="chat_widget",
     required_permissions=[
@@ -240,7 +240,7 @@ async def get_chat_widget(
     summary="Update chat widget",
     description="Update an existing chat widget"
 )
-@authenticate
+@authenticate()
 @check_permissions(
     entity="chat_widget",
     required_permissions=[
@@ -309,7 +309,7 @@ async def update_chat_widget(
     summary="Delete chat widget",
     description="Delete a chat widget"
 )
-@authenticate
+@authenticate()
 @check_permissions(
     entity="chat_widget",
     required_permissions=[
@@ -376,7 +376,7 @@ async def delete_chat_widget(
     summary="List chat widget permissions",
     description="Get all principals with permissions for a chat widget"
 )
-@authenticate
+@authenticate()
 @check_permissions(
     entity="chat_widget",
     required_permissions=[
@@ -466,7 +466,7 @@ async def list_chat_widget_permissions(
     summary="Get chat widget permissions for principal",
     description="Get all permissions for a specific principal on a chat widget"
 )
-@authenticate
+@authenticate()
 @check_permissions(
     entity="chat_widget",
     required_permissions=[
@@ -535,7 +535,7 @@ async def get_chat_widget_permission(
     summary="Set chat widget permission",
     description="Set or update a principal's permission for a chat widget"
 )
-@authenticate
+@authenticate()
 @check_permissions(
     entity="chat_widget",
     required_permissions=[
@@ -604,7 +604,7 @@ async def set_chat_widget_permission(
     summary="Delete chat widget permission",
     description="Remove a principal's permission for a chat widget"
 )
-@authenticate
+@authenticate()
 @check_permissions(
     entity="chat_widget",
     required_permissions=[

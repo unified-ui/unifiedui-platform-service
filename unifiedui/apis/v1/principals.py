@@ -23,7 +23,7 @@ router = APIRouter()
     summary="Refresh Principal",
     description="Refresh a principal's data from the identity provider"
 )
-@authenticate
+@authenticate()
 @check_permissions(entity="tenant", required_permissions=[TenantRolesEnum.GLOBAL_ADMIN])
 async def refresh_principal(
     request: Request,
@@ -68,7 +68,7 @@ async def refresh_principal(
     summary="Update Principal Status",
     description="Update a principal's is_active status (GLOBAL_ADMIN only)"
 )
-@authenticate
+@authenticate()
 @check_permissions(entity="tenant", required_permissions=[TenantRolesEnum.GLOBAL_ADMIN])
 async def update_principal_status(
     request: Request,

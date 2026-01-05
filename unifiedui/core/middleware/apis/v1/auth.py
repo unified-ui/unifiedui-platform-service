@@ -1,9 +1,10 @@
 from functools import wraps
-from typing import Callable, Any, Union
+from typing import Callable, Any, Union, Optional
 
 from fastapi import Request, HTTPException, status
 from sqlalchemy import select
 
+from unifiedui.core.config import settings
 from unifiedui.core.identity.users import ContextIdentityUser
 from unifiedui.handlers.dependencies import get_db_client
 from unifiedui.core.database.enums import TenantRolesEnum, PermissionActionEnum, UserPermissionEnum, PrincipalTypeEnum
@@ -18,108 +19,186 @@ from unifiedui.core.database.models import (
     Tag
 )
 from unifiedui.handlers.dependencies.database import get_db_client
+from unifiedui.handlers.dependencies.vault import get_app_service_vault
 from unifiedui.caching.dependencies import get_cache_client
+from unifiedui.logger import get_logger
+
+logger = get_logger(__name__)
 
 
-def authenticate(func: Callable) -> Callable:
+def _validate_service_key(request: Request, required_service_auth_key: str) -> bool:
     """
-    Decorator to authenticate users via Bearer token from Authorization header.
+    Validate X-Service-Key header against vault stored key.
+    
+    Args:
+        request: FastAPI request object
+        required_service_auth_key: Key name in vault (e.g., "X_AGENT_SERVICE_KEY")
+        
+    Returns:
+        True if service key is valid
+        
+    Raises:
+        HTTPException: If service key is missing, invalid, or not configured
+    """
+    service_key_header = request.headers.get("X-Service-Key")
+    
+    if not service_key_header:
+        logger.warning("X-Service-Key header missing")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="X-Service-Key header missing for service authentication"
+        )
+    
+    # Get expected key from app service vault
+    app_vault = get_app_service_vault()
+    expected_key = None
+    
+    if app_vault:
+        expected_key = app_vault.get_secret(required_service_auth_key)
+    
+    # Fallback to settings if vault doesn't have it
+    if not expected_key:
+        expected_key = getattr(settings, required_service_auth_key.lower(), None)
+    
+    if not expected_key:
+        logger.error(f"Service key {required_service_auth_key} not configured in vault or settings")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Service authentication not configured: {required_service_auth_key}"
+        )
+    
+    if service_key_header != expected_key:
+        logger.warning(f"Invalid service key provided for {required_service_auth_key}")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Invalid service key"
+        )
+    
+    return True
+
+
+def authenticate(required_service_auth_key: Optional[str] = None) -> Callable:
+    """
+    Decorator factory to authenticate users via Bearer token from Authorization header.
     Creates a User object and injects it into the decorated function.
     Optionally uses cache based on X-Use-Cache header.
+    
+    If required_service_auth_key is provided, the decorator ALSO validates the
+    X-Service-Key header against the key stored in the app service vault.
+    Both service key AND Bearer token must be valid.
+    
+    Args:
+        required_service_auth_key: Optional key name in vault (e.g., "X_AGENT_SERVICE_KEY").
+                                   If provided, X-Service-Key header must match the vault value.
+    
+    Usage:
+        @authenticate()  # Standard auth, no service key required
+        async def handler(request: Request): ...
+        
+        @authenticate(required_service_auth_key="X_AGENT_SERVICE_KEY")  # Service key + Bearer
+        async def internal_handler(request: Request): ...
     """
-    @wraps(func)
-    async def wrapper(*args: Any, **kwargs: Any) -> Any:
-        # Extract request from args or kwargs
-        request: Request | None = kwargs.get("request")
-        if request is None:
-            for arg in args:
-                if isinstance(arg, Request):
-                    request = arg
-                    break
-        
-        if request is None:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Request object not found"
-            )
-        
-        # Extract Authorization header
-        auth_header = request.headers.get("Authorization")
-        if not auth_header:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Authorization header missing",
-                headers={"WWW-Authenticate": "Bearer"}
-            )
-        
-        # Extract Bearer token
-        if not auth_header.startswith("Bearer "):
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid authorization scheme. Expected 'Bearer'",
-                headers={"WWW-Authenticate": "Bearer"}
-            )
-        
-        token = auth_header[7:]  # Remove "Bearer " prefix
-        if not token:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Token is empty",
-                headers={"WWW-Authenticate": "Bearer"}
-            )
-        
-        # Extract cache preference from header (default: True)
-        use_cache_header = request.headers.get("X-Use-Cache", "true")
-        use_cache = use_cache_header.lower() in ("true", "1", "yes")
-        
-        # Get database and cache clients for user
-        
-        db_client = get_db_client()
-        cache_client = get_cache_client()
-        
-        # Create User object
-        try:
-            user = ContextIdentityUser(
-                token=token,
-                database_client=db_client,
-                cache_client=cache_client,
-                use_cache=use_cache
-            )
-            if not user.identity.get_id():
+    def decorator(func: Callable) -> Callable:
+        @wraps(func)
+        async def wrapper(*args: Any, **kwargs: Any) -> Any:
+            # Extract request from args or kwargs
+            request: Request | None = kwargs.get("request")
+            if request is None:
+                for arg in args:
+                    if isinstance(arg, Request):
+                        request = arg
+                        break
+            
+            if request is None:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Request object not found"
+                )
+            
+            # If service auth key is required, validate X-Service-Key header first
+            if required_service_auth_key:
+                _validate_service_key(request, required_service_auth_key)
+                request.state.service_authenticated = True
+                request.state.service_key_name = required_service_auth_key
+            
+            # Extract Authorization header
+            auth_header = request.headers.get("Authorization")
+            if not auth_header:
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Invalid token: unable to retrieve user identity id.",
+                    detail="Authorization header missing",
                     headers={"WWW-Authenticate": "Bearer"}
                 )
-        except ValueError as e:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail=f"Invalid token: {str(e)}",
-                headers={"WWW-Authenticate": "Bearer"}
-            )
-        except Exception as e:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Authentication error: {str(e)}"
-            )
-        
-        # Attach user to request state (FastAPI best practice)
-        request.state.user = user
-        request.state.use_cache = use_cache
-        
-        # Check tenant access if tenant_id is in path parameters
-        tenant_id = request.path_params.get("tenant_id")
-        if tenant_id:
-            user_tenants = user.tenants
-            if not any(t["tenant"]["id"] == tenant_id for t in user_tenants):
+            
+            # Extract Bearer token
+            if not auth_header.startswith("Bearer "):
                 raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail=f"Access denied: User does not have access to tenant {tenant_id}"
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Invalid authorization scheme. Expected 'Bearer'",
+                    headers={"WWW-Authenticate": "Bearer"}
                 )
-        
-        return await func(*args, **kwargs)
+            
+            token = auth_header[7:]  # Remove "Bearer " prefix
+            if not token:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Token is empty",
+                    headers={"WWW-Authenticate": "Bearer"}
+                )
+            
+            # Extract cache preference from header (default: True)
+            use_cache_header = request.headers.get("X-Use-Cache", "true")
+            use_cache = use_cache_header.lower() in ("true", "1", "yes")
+            
+            # Get database and cache clients for user
+            
+            db_client = get_db_client()
+            cache_client = get_cache_client()
+            
+            # Create User object
+            try:
+                user = ContextIdentityUser(
+                    token=token,
+                    database_client=db_client,
+                    cache_client=cache_client,
+                    use_cache=use_cache
+                )
+                if not user.identity.get_id():
+                    raise HTTPException(
+                        status_code=status.HTTP_401_UNAUTHORIZED,
+                        detail="Invalid token: unable to retrieve user identity id.",
+                        headers={"WWW-Authenticate": "Bearer"}
+                    )
+            except ValueError as e:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail=f"Invalid token: {str(e)}",
+                    headers={"WWW-Authenticate": "Bearer"}
+                )
+            except Exception as e:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=f"Authentication error: {str(e)}"
+                )
+            
+            # Attach user to request state (FastAPI best practice)
+            request.state.user = user
+            request.state.use_cache = use_cache
+            
+            # Check tenant access if tenant_id is in path parameters
+            tenant_id = request.path_params.get("tenant_id")
+            if tenant_id:
+                user_tenants = user.tenants
+                if not any(t["tenant"]["id"] == tenant_id for t in user_tenants):
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail=f"Access denied: User does not have access to tenant {tenant_id}"
+                    )
+            
+            return await func(*args, **kwargs)
 
-    return wrapper
+        return wrapper
+    return decorator
 
 
 def check_permissions(

@@ -38,7 +38,7 @@ router = APIRouter(
     summary="List applications",
     description="Get a paginated list of applications for the current tenant. Use view=quick-list to get only id and name."
 )
-@authenticate
+@authenticate()
 async def list_applications(
     request: Request,
     tenant_id: str,
@@ -125,7 +125,7 @@ async def list_applications(
     summary="Create application",
     description="Create a new application"
 )
-@authenticate
+@authenticate()
 @check_permissions(
     entity="tenant",
     required_permissions=[
@@ -182,7 +182,7 @@ async def create_application(
     summary="Get application",
     description="Get a specific application by ID"
 )
-@authenticate
+@authenticate()
 @check_permissions(
     entity="application",
     required_permissions=[
@@ -248,7 +248,7 @@ async def get_application(
     summary="Update application",
     description="Update an existing application"
 )
-@authenticate
+@authenticate()
 @check_permissions(
     entity="application",
     required_permissions=[
@@ -317,7 +317,7 @@ async def update_application(
     summary="Delete application",
     description="Delete an application"
 )
-@authenticate
+@authenticate()
 @check_permissions(
     entity="application",
     required_permissions=[
@@ -382,9 +382,9 @@ async def delete_application(
     "/{application_id}/config",
     response_model=ApplicationConfigResponse,
     summary="Get application config with credentials",
-    description="Get the full application configuration including credential secrets and user data. For internal agent-service use."
+    description="Get the full application configuration including credential secrets and user data. For internal agent-service use. Requires X-Service-Key header."
 )
-@authenticate
+@authenticate(required_service_auth_key="X_AGENT_SERVICE_KEY")
 @check_permissions(
     entity="application",
     required_permissions=[
@@ -465,7 +465,7 @@ async def get_application_config(
     summary="List application permissions",
     description="Get all principals with permissions for an application"
 )
-@authenticate
+@authenticate()
 @check_permissions(
     entity="application",
     required_permissions=[
@@ -555,7 +555,7 @@ async def list_application_permissions(
     summary="Get application permissions for principal",
     description="Get all permissions for a specific principal on an application"
 )
-@authenticate
+@authenticate()
 @check_permissions(
     entity="application",
     required_permissions=[
@@ -624,7 +624,7 @@ async def get_application_permission(
     summary="Set application permission",
     description="Set or update a principal's permission for an application"
 )
-@authenticate
+@authenticate()
 @check_permissions(
     entity="application",
     required_permissions=[
@@ -693,7 +693,7 @@ async def set_application_permission(
     summary="Delete application permission",
     description="Remove a principal's permission for an application"
 )
-@authenticate
+@authenticate()
 @check_permissions(
     entity="application",
     required_permissions=[

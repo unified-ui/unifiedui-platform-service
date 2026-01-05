@@ -31,7 +31,7 @@ router = APIRouter(
     summary="List autonomous agents",
     description="Get a paginated list of autonomous agents for the current tenant. Use view=quick-list to get only id and name."
 )
-@authenticate
+@authenticate()
 async def list_autonomous_agents(
     request: Request,
     tenant_id: str,
@@ -106,7 +106,7 @@ async def list_autonomous_agents(
     summary="Create autonomous agent",
     description="Create a new autonomous agent"
 )
-@authenticate
+@authenticate()
 @check_permissions(
     entity="tenant",
     required_permissions=[
@@ -160,7 +160,7 @@ async def create_autonomous_agent(
     summary="Get autonomous agent",
     description="Get a specific autonomous agent by ID"
 )
-@authenticate
+@authenticate()
 @check_permissions(
     entity="autonomous_agent",
     required_permissions=[
@@ -215,7 +215,7 @@ async def get_autonomous_agent(
     summary="Update autonomous agent",
     description="Update an existing autonomous agent"
 )
-@authenticate
+@authenticate()
 @check_permissions(
     entity="autonomous_agent",
     required_permissions=[
@@ -276,7 +276,7 @@ async def update_autonomous_agent(
     summary="Delete autonomous agent",
     description="Delete an autonomous agent"
 )
-@authenticate
+@authenticate()
 @check_permissions(
     entity="autonomous_agent",
     required_permissions=[
@@ -332,7 +332,7 @@ async def delete_autonomous_agent(
     summary="List autonomous agent permissions",
     description="Get all principals with permissions for an autonomous agent"
 )
-@authenticate
+@authenticate()
 @check_permissions(
     entity="autonomous_agent",
     required_permissions=[
@@ -411,7 +411,7 @@ async def list_autonomous_agent_permissions(
     summary="Get autonomous agent permissions for principal",
     description="Get all permissions for a specific principal on an autonomous agent"
 )
-@authenticate
+@authenticate()
 @check_permissions(
     entity="autonomous_agent",
     required_permissions=[
@@ -469,7 +469,7 @@ async def get_autonomous_agent_permission(
     summary="Set autonomous agent permission",
     description="Set or update a principal's permission for an autonomous agent"
 )
-@authenticate
+@authenticate()
 @check_permissions(
     entity="autonomous_agent",
     required_permissions=[
@@ -530,7 +530,7 @@ async def set_autonomous_agent_permission(
     summary="Delete autonomous agent permission",
     description="Remove a principal's permission for an autonomous agent"
 )
-@authenticate
+@authenticate()
 @check_permissions(
     entity="autonomous_agent",
     required_permissions=[

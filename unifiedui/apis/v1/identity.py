@@ -25,7 +25,7 @@ router = APIRouter()
     summary="Get Current User",
     description="Returns the authenticated user's identity information"
 )
-@authenticate
+@authenticate()
 async def get_current_user(request: Request) -> IdentityUserResponse:
     """
     Get current authenticated user's identity.
@@ -51,7 +51,7 @@ async def get_current_user(request: Request) -> IdentityUserResponse:
     summary="Get Users",
     description="Returns a paginated list of users from the identity provider"
 )
-@authenticate
+@authenticate()
 async def get_users(
     request: Request,
     search: str = Query(default="", description="Search term to filter users"),
@@ -83,7 +83,7 @@ async def get_users(
     summary="Get Security Groups",
     description="Returns a paginated list of security groups from the identity provider"
 )
-@authenticate
+@authenticate()
 async def get_groups(
     request: Request,
     search: str = Query(default="", description="Search term to filter groups"),
@@ -115,7 +115,7 @@ async def get_groups(
     summary="Get User by ID",
     description="Returns a specific user from the identity provider by their ID"
 )
-@authenticate
+@authenticate()
 async def get_user_by_id(
     request: Request,
     user_id: str
@@ -141,7 +141,7 @@ async def get_user_by_id(
     summary="Get Group by ID",
     description="Returns a specific security group from the identity provider by its ID"
 )
-@authenticate
+@authenticate()
 async def get_group_by_id(
     request: Request,
     group_id: str
@@ -167,7 +167,7 @@ async def get_group_by_id(
     summary="Refresh Principal",
     description="Fetches a principal (user or group) from the identity provider and updates or creates the principal record in the database"
 )
-@authenticate
+@authenticate()
 async def refresh_principal(
     request: Request,
     principal_id: str,

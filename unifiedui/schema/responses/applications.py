@@ -81,4 +81,3 @@ class ApplicationConfigResponse(BaseModel):
     user: UserInfoResponse = Field(..., description="User information")
     
     model_config = ConfigDict(from_attributes=True)
-

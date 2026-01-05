@@ -43,10 +43,13 @@ class Settings(BaseSettings):
     azure_keyvault_vault_name: Optional[str] = None
     
     # Vault Type Selection
-    vault_type: Optional[str] = None  # AZURE_KEYVAULT or HASHICORP_VAULT
+    vault_type: Optional[str] = None  # AZURE_KEYVAULT, HASHICORP_VAULT, or DOTENV
     
     # Secret Encryption Key (for caching secrets)
     secrets_encryption_key: Optional[str] = None
+    
+    # Service-to-Service Authentication Keys
+    x_agent_service_key: Optional[str] = None  # Service key for agent-service authentication
     
     # API Configuration
     api_title: str = "unified-ui API"

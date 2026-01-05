@@ -27,7 +27,7 @@ router = APIRouter(prefix="/tags")
     summary="List tags",
     description="Get a list of tags for the current tenant"
 )
-@authenticate
+@authenticate()
 async def list_tags(
     request: Request,
     tenant_id: str,
@@ -87,7 +87,7 @@ async def list_tags(
     summary="Create tag",
     description="Create a new tag. Any authenticated tenant member can create tags."
 )
-@authenticate
+@authenticate()
 async def create_tag(
     request: Request,
     tenant_id: str,
@@ -146,7 +146,7 @@ applications_tags_list_router = APIRouter(prefix="/applications/tags")
     summary="List tags for applications",
     description="Get all tags that are applied to applications"
 )
-@authenticate
+@authenticate()
 async def list_application_tags(
     request: Request,
     tenant_id: str,
@@ -204,7 +204,7 @@ autonomous_agents_tags_list_router = APIRouter(prefix="/autonomous-agents/tags")
     summary="List tags for autonomous agents",
     description="Get all tags that are applied to autonomous agents"
 )
-@authenticate
+@authenticate()
 async def list_autonomous_agent_tags(
     request: Request,
     tenant_id: str,
@@ -262,7 +262,7 @@ chat_widgets_tags_list_router = APIRouter(prefix="/chat-widgets/tags")
     summary="List tags for chat widgets",
     description="Get all tags that are applied to chat widgets"
 )
-@authenticate
+@authenticate()
 async def list_chat_widget_tags(
     request: Request,
     tenant_id: str,
@@ -320,7 +320,7 @@ credentials_tags_list_router = APIRouter(prefix="/credentials/tags")
     summary="List tags for credentials",
     description="Get all tags that are applied to credentials"
 )
-@authenticate
+@authenticate()
 async def list_credential_tags(
     request: Request,
     tenant_id: str,
@@ -378,7 +378,7 @@ development_platforms_tags_list_router = APIRouter(prefix="/development-platform
     summary="List tags for development platforms",
     description="Get all tags that are applied to development platforms"
 )
-@authenticate
+@authenticate()
 async def list_development_platform_tags(
     request: Request,
     tenant_id: str,
@@ -432,7 +432,7 @@ async def list_development_platform_tags(
     summary="Delete tag",
     description="Delete a tag. Only GLOBAL_ADMIN or the tag creator can delete."
 )
-@authenticate
+@authenticate()
 @check_permissions(
     entity="tag",
     required_permissions=[TenantRolesEnum.GLOBAL_ADMIN, UserPermissionEnum.IS_CREATOR]
@@ -498,7 +498,7 @@ application_tags_router = APIRouter(prefix="/applications/{application_id}/tags"
     summary="Get application tags",
     description="Get tags for an application"
 )
-@authenticate
+@authenticate()
 @check_permissions(
     entity="application",
     required_permissions=[
@@ -549,7 +549,7 @@ async def get_application_tags(
     summary="Set application tags",
     description="Set tags for an application (replaces existing tags)"
 )
-@authenticate
+@authenticate()
 @check_permissions(
     entity="application",
     required_permissions=[
@@ -601,7 +601,7 @@ async def set_application_tags(
     summary="Delete application tags",
     description="Remove all tags from an application"
 )
-@authenticate
+@authenticate()
 @check_permissions(
     entity="application",
     required_permissions=[
@@ -655,7 +655,7 @@ autonomous_agent_tags_router = APIRouter(prefix="/autonomous-agents/{autonomous_
     summary="Get autonomous agent tags",
     description="Get tags for an autonomous agent"
 )
-@authenticate
+@authenticate()
 @check_permissions(
     entity="autonomous_agent",
     required_permissions=[
@@ -706,7 +706,7 @@ async def get_autonomous_agent_tags(
     summary="Set autonomous agent tags",
     description="Set tags for an autonomous agent (replaces existing tags)"
 )
-@authenticate
+@authenticate()
 @check_permissions(
     entity="autonomous_agent",
     required_permissions=[
@@ -758,7 +758,7 @@ async def set_autonomous_agent_tags(
     summary="Delete autonomous agent tags",
     description="Remove all tags from an autonomous agent"
 )
-@authenticate
+@authenticate()
 @check_permissions(
     entity="autonomous_agent",
     required_permissions=[
@@ -812,7 +812,7 @@ chat_widget_tags_router = APIRouter(prefix="/chat-widgets/{chat_widget_id}/tags"
     summary="Get chat widget tags",
     description="Get tags for a chat widget"
 )
-@authenticate
+@authenticate()
 @check_permissions(
     entity="chat_widget",
     required_permissions=[
@@ -863,7 +863,7 @@ async def get_chat_widget_tags(
     summary="Set chat widget tags",
     description="Set tags for a chat widget (replaces existing tags)"
 )
-@authenticate
+@authenticate()
 @check_permissions(
     entity="chat_widget",
     required_permissions=[
@@ -915,7 +915,7 @@ async def set_chat_widget_tags(
     summary="Delete chat widget tags",
     description="Remove all tags from a chat widget"
 )
-@authenticate
+@authenticate()
 @check_permissions(
     entity="chat_widget",
     required_permissions=[
@@ -969,7 +969,7 @@ credential_tags_router = APIRouter(prefix="/credentials/{credential_id}/tags")
     summary="Get credential tags",
     description="Get tags for a credential"
 )
-@authenticate
+@authenticate()
 @check_permissions(
     entity="credential",
     required_permissions=[
@@ -1020,7 +1020,7 @@ async def get_credential_tags(
     summary="Set credential tags",
     description="Set tags for a credential (replaces existing tags)"
 )
-@authenticate
+@authenticate()
 @check_permissions(
     entity="credential",
     required_permissions=[
@@ -1072,7 +1072,7 @@ async def set_credential_tags(
     summary="Delete credential tags",
     description="Remove all tags from a credential"
 )
-@authenticate
+@authenticate()
 @check_permissions(
     entity="credential",
     required_permissions=[
@@ -1126,7 +1126,7 @@ development_platform_tags_router = APIRouter(prefix="/development-platforms/{dev
     summary="Get development platform tags",
     description="Get tags for a development platform"
 )
-@authenticate
+@authenticate()
 @check_permissions(
     entity="development_platform",
     required_permissions=[
@@ -1177,7 +1177,7 @@ async def get_development_platform_tags(
     summary="Set development platform tags",
     description="Set tags for a development platform (replaces existing tags)"
 )
-@authenticate
+@authenticate()
 @check_permissions(
     entity="development_platform",
     required_permissions=[
@@ -1229,7 +1229,7 @@ async def set_development_platform_tags(
     summary="Delete development platform tags",
     description="Remove all tags from a development platform"
 )
-@authenticate
+@authenticate()
 @check_permissions(
     entity="development_platform",
     required_permissions=[

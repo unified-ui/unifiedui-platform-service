@@ -23,7 +23,7 @@ router = APIRouter(
     summary="List user favorites",
     description="Get a list of user favorites for a specific resource type"
 )
-@authenticate
+@authenticate()
 @check_permissions(
     entity="user_favorite",
     required_permissions=[UserPermissionEnum.IS_CREATOR]
@@ -85,7 +85,7 @@ async def list_user_favorites(
     summary="Add user favorite",
     description="Add a resource to user favorites"
 )
-@authenticate
+@authenticate()
 @check_permissions(
     entity="user_favorite",
     required_permissions=[UserPermissionEnum.IS_CREATOR]
@@ -148,7 +148,7 @@ async def add_user_favorite(
     summary="Remove user favorite",
     description="Remove a resource from user favorites"
 )
-@authenticate
+@authenticate()
 @check_permissions(
     entity="user_favorite",
     required_permissions=[UserPermissionEnum.IS_CREATOR]

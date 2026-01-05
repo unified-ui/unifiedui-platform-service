@@ -31,7 +31,7 @@ router = APIRouter(
     summary="List development platforms",
     description="Get a paginated list of development platforms for the current tenant. Use view=quick-list to get only id and name."
 )
-@authenticate
+@authenticate()
 async def list_development_platforms(
     request: Request,
     tenant_id: str,
@@ -117,7 +117,7 @@ async def list_development_platforms(
     summary="Create development platform",
     description="Create a new development platform"
 )
-@authenticate
+@authenticate()
 @check_permissions(
     entity="tenant",
     required_permissions=[
@@ -174,7 +174,7 @@ async def create_development_platform(
     summary="Get development platform",
     description="Get a specific development platform by ID"
 )
-@authenticate
+@authenticate()
 @check_permissions(
     entity="development_platform",
     required_permissions=[
@@ -240,7 +240,7 @@ async def get_development_platform(
     summary="Update development platform",
     description="Update an existing development platform"
 )
-@authenticate
+@authenticate()
 @check_permissions(
     entity="development_platform",
     required_permissions=[
@@ -309,7 +309,7 @@ async def update_development_platform(
     summary="Delete development platform",
     description="Delete a development platform"
 )
-@authenticate
+@authenticate()
 @check_permissions(
     entity="development_platform",
     required_permissions=[
@@ -376,7 +376,7 @@ async def delete_development_platform(
     summary="List development platform permissions",
     description="Get all principals with permissions for a development platform"
 )
-@authenticate
+@authenticate()
 @check_permissions(
     entity="development_platform",
     required_permissions=[
@@ -466,7 +466,7 @@ async def list_development_platform_permissions(
     summary="Get development platform permissions for principal",
     description="Get all permissions for a specific principal on a development platform"
 )
-@authenticate
+@authenticate()
 @check_permissions(
     entity="development_platform",
     required_permissions=[
@@ -535,7 +535,7 @@ async def get_development_platform_permission(
     summary="Set development platform permission",
     description="Set or update a principal's permission for a development platform"
 )
-@authenticate
+@authenticate()
 @check_permissions(
     entity="development_platform",
     required_permissions=[
@@ -604,7 +604,7 @@ async def set_development_platform_permission(
     summary="Delete development platform permission",
     description="Remove a principal's permission for a development platform"
 )
-@authenticate
+@authenticate()
 @check_permissions(
     entity="development_platform",
     required_permissions=[

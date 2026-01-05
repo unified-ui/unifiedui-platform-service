@@ -127,6 +127,26 @@
         - + /unifiedui/vault
 - schreibe mir eine CI GitHub Action pipeline, welche die tests auf github ausführt
     - wichtig: das projekt nutzt uv -> also install, tests etc mit uv (pytest) ausführen
+## Done - Service Authentication
+
+**Completed Service-to-Service Authentication:**
+- ✅ Added X_AGENT_SERVICE_KEY to .env files (both platform-service and agent-service)
+- ✅ Extended `authenticate` decorator with `required_service_auth_key` parameter
+- ✅ Protected `/config` endpoint with service key + bearer token authentication
+- ✅ Wrote auth middleware tests for service key validation
+- ✅ Wrote RBAC tests for /config endpoint (6 tests passing)
+- ✅ Ran all platform-service tests (1110 tests passing)
+- ✅ Updated agent-service platform client (GetApplicationConfig with authToken)
+- ✅ Updated agent-service tests (13 platform client tests passing)
+- ✅ Agent-service build and all tests passing (7 test packages)
+
+**Auth Flow:**
+- `/config` endpoint requires: Bearer token (user auth) + X-Service-Key header
+- 401 = invalid/missing bearer token
+- 403 = invalid/missing service key
+- Service key validates agent-service is authorized caller
+- Bearer token validates user permissions on the application
+
 ## TODO
 
 **Next Steps**

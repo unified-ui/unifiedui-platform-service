@@ -30,7 +30,7 @@ router = APIRouter()
     summary="List Custom Groups",
     description="Get a paginated list of custom groups in a tenant"
 )
-@authenticate
+@authenticate()
 async def list_custom_groups(
     request: Request,
     tenant_id: str,
@@ -73,7 +73,7 @@ async def list_custom_groups(
     summary="Get Custom Group",
     description="Get a specific custom group by ID"
 )
-@authenticate
+@authenticate()
 async def get_custom_group(
     request: Request,
     tenant_id: str,
@@ -103,7 +103,7 @@ async def get_custom_group(
     summary="Create Custom Group",
     description="Create a new custom group and assign creator as ADMIN (requires CUSTOM_GROUP_CREATOR, CUSTOM_GROUPS_ADMIN, or GLOBAL_ADMIN on tenant)"
 )
-@authenticate
+@authenticate()
 @check_permissions(entity="tenant", required_permissions=[TenantRolesEnum.CUSTOM_GROUP_CREATOR, TenantRolesEnum.CUSTOM_GROUPS_ADMIN, TenantRolesEnum.GLOBAL_ADMIN])
 async def create_custom_group(
     request: Request,
@@ -137,7 +137,7 @@ async def create_custom_group(
     summary="Update Custom Group",
     description="Update an existing custom group (requires WRITE/ADMIN on group or GLOBAL_ADMIN/CUSTOM_GROUPS_ADMIN on tenant)"
 )
-@authenticate
+@authenticate()
 @check_permissions(entity="custom_group", required_permissions=[PermissionActionEnum.WRITE, PermissionActionEnum.ADMIN])
 async def update_custom_group(
     request: Request,
@@ -172,7 +172,7 @@ async def update_custom_group(
     summary="Delete Custom Group",
     description="Delete a custom group (requires ADMIN on group or GLOBAL_ADMIN/CUSTOM_GROUPS_ADMIN on tenant)"
 )
-@authenticate
+@authenticate()
 @check_permissions(entity="custom_group", required_permissions=[PermissionActionEnum.ADMIN])
 async def delete_custom_group(
     request: Request,
@@ -202,7 +202,7 @@ async def delete_custom_group(
     summary="List Custom Group Principals",
     description="Get all principals and their permissions for a custom group"
 )
-@authenticate
+@authenticate()
 @check_permissions(entity="custom_group", required_permissions=[PermissionActionEnum.READ, PermissionActionEnum.WRITE, PermissionActionEnum.ADMIN])
 async def list_custom_group_principals(
     request: Request,
@@ -260,7 +260,7 @@ async def list_custom_group_principals(
     summary="Get Principal Permissions",
     description="Get all permissions for a specific principal on a custom group"
 )
-@authenticate
+@authenticate()
 @check_permissions(entity="custom_group", required_permissions=[PermissionActionEnum.READ, PermissionActionEnum.WRITE, PermissionActionEnum.ADMIN])
 async def get_principal_permissions(
     request: Request,
@@ -293,7 +293,7 @@ async def get_principal_permissions(
     summary="Set Principal Permission",
     description="Add or update a permission for a principal on a custom group (requires ADMIN)"
 )
-@authenticate
+@authenticate()
 @check_permissions(entity="custom_group", required_permissions=[PermissionActionEnum.ADMIN])
 async def set_principal_permission(
     request: Request,
@@ -338,7 +338,7 @@ async def set_principal_permission(
     summary="Delete Principal Permission",
     description="Remove a specific permission from a principal on a custom group (requires ADMIN)"
 )
-@authenticate
+@authenticate()
 @check_permissions(entity="custom_group", required_permissions=[PermissionActionEnum.ADMIN])
 async def delete_principal_permission(
     request: Request,

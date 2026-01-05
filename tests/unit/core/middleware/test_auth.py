@@ -3,9 +3,192 @@ import pytest
 from unittest.mock import Mock, MagicMock, AsyncMock, patch
 from fastapi import Request, HTTPException, status
 
-from unifiedui.core.middleware.apis.v1.auth import authenticate, check_permissions
+from unifiedui.core.middleware.apis.v1.auth import authenticate, check_permissions, _validate_service_key
 from unifiedui.core.identity.users import ContextIdentityUser
 from unifiedui.core.database.enums import TenantRolesEnum, PermissionActionEnum
+
+
+class TestServiceKeyValidation:
+    """Test suite for service key validation (_validate_service_key)."""
+    
+    def test_validate_service_key_missing_header(self):
+        """Test that missing X-Service-Key header raises 401."""
+        mock_request = Mock(spec=Request)
+        mock_request.headers = {}
+        
+        with pytest.raises(HTTPException) as exc_info:
+            _validate_service_key(mock_request, "X_AGENT_SERVICE_KEY")
+        
+        assert exc_info.value.status_code == status.HTTP_401_UNAUTHORIZED
+        assert "X-Service-Key header missing" in exc_info.value.detail
+    
+    def test_validate_service_key_valid_from_vault(self):
+        """Test that valid service key from vault passes."""
+        mock_request = Mock(spec=Request)
+        mock_request.headers = {"X-Service-Key": "valid-key-123"}
+        
+        mock_vault = Mock()
+        mock_vault.get_secret.return_value = "valid-key-123"
+        
+        with patch('unifiedui.core.middleware.apis.v1.auth.get_app_service_vault', return_value=mock_vault):
+            result = _validate_service_key(mock_request, "X_AGENT_SERVICE_KEY")
+        
+        assert result is True
+        mock_vault.get_secret.assert_called_once_with("X_AGENT_SERVICE_KEY")
+    
+    def test_validate_service_key_valid_from_settings(self):
+        """Test that valid service key from settings passes when vault returns None."""
+        mock_request = Mock(spec=Request)
+        mock_request.headers = {"X-Service-Key": "settings-key-456"}
+        
+        mock_vault = Mock()
+        mock_vault.get_secret.return_value = None
+        
+        with patch('unifiedui.core.middleware.apis.v1.auth.get_app_service_vault', return_value=mock_vault):
+            with patch('unifiedui.core.middleware.apis.v1.auth.settings') as mock_settings:
+                mock_settings.x_agent_service_key = "settings-key-456"
+                result = _validate_service_key(mock_request, "X_AGENT_SERVICE_KEY")
+        
+        assert result is True
+    
+    def test_validate_service_key_invalid(self):
+        """Test that invalid service key raises 403."""
+        mock_request = Mock(spec=Request)
+        mock_request.headers = {"X-Service-Key": "invalid-key"}
+        
+        mock_vault = Mock()
+        mock_vault.get_secret.return_value = "valid-key-123"
+        
+        with patch('unifiedui.core.middleware.apis.v1.auth.get_app_service_vault', return_value=mock_vault):
+            with pytest.raises(HTTPException) as exc_info:
+                _validate_service_key(mock_request, "X_AGENT_SERVICE_KEY")
+        
+        assert exc_info.value.status_code == status.HTTP_403_FORBIDDEN
+        assert "Invalid service key" in exc_info.value.detail
+    
+    def test_validate_service_key_not_configured(self):
+        """Test that unconfigured key raises 500."""
+        mock_request = Mock(spec=Request)
+        mock_request.headers = {"X-Service-Key": "some-key"}
+        
+        mock_vault = Mock()
+        mock_vault.get_secret.return_value = None
+        
+        with patch('unifiedui.core.middleware.apis.v1.auth.get_app_service_vault', return_value=mock_vault):
+            with patch('unifiedui.core.middleware.apis.v1.auth.settings') as mock_settings:
+                mock_settings.x_agent_service_key = None
+                with pytest.raises(HTTPException) as exc_info:
+                    _validate_service_key(mock_request, "X_AGENT_SERVICE_KEY")
+        
+        assert exc_info.value.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+        assert "Service authentication not configured" in exc_info.value.detail
+
+
+class TestAuthenticateWithServiceKey:
+    """Test suite for @authenticate decorator with service key requirement."""
+    
+    @pytest.mark.asyncio
+    async def test_authenticate_with_service_key_success(self):
+        """Test that valid service key + bearer token allows access."""
+        mock_request = Mock(spec=Request)
+        mock_request.headers = {
+            "Authorization": "Bearer test-token-123",
+            "X-Service-Key": "valid-service-key"
+        }
+        mock_request.path_params = {}
+        mock_request.state = Mock()
+        
+        mock_user = Mock()
+        mock_identity = Mock()
+        mock_identity.get_id.return_value = "user-123"
+        mock_user.identity = mock_identity
+        mock_user.tenants = []
+        
+        mock_vault = Mock()
+        mock_vault.get_secret.return_value = "valid-service-key"
+        
+        @authenticate(required_service_auth_key="X_AGENT_SERVICE_KEY")
+        async def test_handler(request: Request):
+            return "success"
+        
+        with patch('unifiedui.core.middleware.apis.v1.auth.get_app_service_vault', return_value=mock_vault):
+            with patch('unifiedui.core.middleware.apis.v1.auth.ContextIdentityUser', return_value=mock_user):
+                with patch('unifiedui.core.middleware.apis.v1.auth.get_db_client'):
+                    with patch('unifiedui.core.middleware.apis.v1.auth.get_cache_client'):
+                        result = await test_handler(mock_request)
+        
+        assert result == "success"
+        assert mock_request.state.service_authenticated is True
+        assert mock_request.state.service_key_name == "X_AGENT_SERVICE_KEY"
+    
+    @pytest.mark.asyncio
+    async def test_authenticate_with_service_key_missing(self):
+        """Test that missing service key raises 401."""
+        mock_request = Mock(spec=Request)
+        mock_request.headers = {"Authorization": "Bearer test-token-123"}
+        mock_request.state = Mock()
+        
+        @authenticate(required_service_auth_key="X_AGENT_SERVICE_KEY")
+        async def test_handler(request: Request):
+            return "success"
+        
+        with pytest.raises(HTTPException) as exc_info:
+            await test_handler(mock_request)
+        
+        assert exc_info.value.status_code == status.HTTP_401_UNAUTHORIZED
+        assert "X-Service-Key header missing" in exc_info.value.detail
+    
+    @pytest.mark.asyncio
+    async def test_authenticate_with_service_key_invalid(self):
+        """Test that invalid service key raises 403."""
+        mock_request = Mock(spec=Request)
+        mock_request.headers = {
+            "Authorization": "Bearer test-token-123",
+            "X-Service-Key": "wrong-key"
+        }
+        mock_request.state = Mock()
+        
+        mock_vault = Mock()
+        mock_vault.get_secret.return_value = "correct-key"
+        
+        @authenticate(required_service_auth_key="X_AGENT_SERVICE_KEY")
+        async def test_handler(request: Request):
+            return "success"
+        
+        with patch('unifiedui.core.middleware.apis.v1.auth.get_app_service_vault', return_value=mock_vault):
+            with pytest.raises(HTTPException) as exc_info:
+                await test_handler(mock_request)
+        
+        assert exc_info.value.status_code == status.HTTP_403_FORBIDDEN
+        assert "Invalid service key" in exc_info.value.detail
+    
+    @pytest.mark.asyncio
+    async def test_authenticate_with_service_key_valid_but_bearer_invalid(self):
+        """Test that valid service key but invalid bearer token still fails."""
+        mock_request = Mock(spec=Request)
+        mock_request.headers = {
+            "Authorization": "Bearer invalid-token",
+            "X-Service-Key": "valid-service-key"
+        }
+        mock_request.path_params = {}
+        mock_request.state = Mock()
+        
+        mock_vault = Mock()
+        mock_vault.get_secret.return_value = "valid-service-key"
+        
+        @authenticate(required_service_auth_key="X_AGENT_SERVICE_KEY")
+        async def test_handler(request: Request):
+            return "success"
+        
+        with patch('unifiedui.core.middleware.apis.v1.auth.get_app_service_vault', return_value=mock_vault):
+            with patch('unifiedui.core.middleware.apis.v1.auth.ContextIdentityUser', side_effect=ValueError("Invalid token")):
+                with patch('unifiedui.core.middleware.apis.v1.auth.get_db_client'):
+                    with patch('unifiedui.core.middleware.apis.v1.auth.get_cache_client'):
+                        with pytest.raises(HTTPException) as exc_info:
+                            await test_handler(mock_request)
+        
+        assert exc_info.value.status_code == status.HTTP_401_UNAUTHORIZED
+        assert "Invalid token" in exc_info.value.detail
 
 
 class TestAuthenticateDecorator:
@@ -25,7 +208,7 @@ class TestAuthenticateDecorator:
         mock_user.tenants = []
         
         # Mock function to decorate
-        @authenticate
+        @authenticate()
         async def test_handler(request: Request):
             return "success"
         
@@ -44,7 +227,7 @@ class TestAuthenticateDecorator:
         mock_request = Mock(spec=Request)
         mock_request.headers = {}
         
-        @authenticate
+        @authenticate()
         async def test_handler(request: Request):
             return "success"
         
@@ -60,7 +243,7 @@ class TestAuthenticateDecorator:
         mock_request = Mock(spec=Request)
         mock_request.headers = {"Authorization": "Basic dXNlcjpwYXNz"}
         
-        @authenticate
+        @authenticate()
         async def test_handler(request: Request):
             return "success"
         
@@ -76,7 +259,7 @@ class TestAuthenticateDecorator:
         mock_request = Mock(spec=Request)
         mock_request.headers = {"Authorization": "Bearer "}
         
-        @authenticate
+        @authenticate()
         async def test_handler(request: Request):
             return "success"
         
@@ -102,7 +285,7 @@ class TestAuthenticateDecorator:
         mock_user.identity = mock_identity
         mock_user.tenants = []
         
-        @authenticate
+        @authenticate()
         async def test_handler(request: Request):
             return "success"
         
@@ -129,7 +312,7 @@ class TestAuthenticateDecorator:
             {"tenant": {"id": "tenant-456"}}
         ]
         
-        @authenticate
+        @authenticate()
         async def test_handler(request: Request):
             return "success"
         
@@ -157,7 +340,7 @@ class TestAuthenticateDecorator:
             {"tenant": {"id": "tenant-123"}, "roles": ["READER"]}
         ]
         
-        @authenticate
+        @authenticate()
         async def test_handler(request: Request):
             return "success"
         
@@ -175,7 +358,7 @@ class TestAuthenticateDecorator:
         mock_request.headers = {"Authorization": "Bearer invalid-token"}
         mock_request.path_params = {}
         
-        @authenticate
+        @authenticate()
         async def test_handler(request: Request):
             return "success"
         
