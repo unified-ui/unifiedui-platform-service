@@ -69,6 +69,147 @@ def _validate_service_key(request: Request, required_service_auth_key: str) -> b
     return True
 
 
+def authenticate_autonomous_agent_api_key() -> Callable:
+    """
+    Decorator factory to authenticate requests via X-Unified-UI-Autonomous-Agent-API-Key header.
+    
+    This validates the API key against the autonomous agent's primary or secondary key
+    stored in the vault. No Bearer token is required.
+    
+    The decorated function must have:
+    - request: Request - FastAPI request object
+    - tenant_id: str - Path parameter
+    - autonomous_agent_id: str - Path parameter
+    
+    Stores validated data in request.state:
+    - request.state.autonomous_agent: The autonomous agent model
+    - request.state.authenticated_via_api_key: True
+    
+    Usage:
+        @authenticate_autonomous_agent_api_key()
+        async def get_config(request: Request, tenant_id: str, autonomous_agent_id: str): ...
+    """
+    def decorator(func: Callable) -> Callable:
+        @wraps(func)
+        async def wrapper(*args: Any, **kwargs: Any) -> Any:
+            from unifiedui.handlers.dependencies.database import get_db_client
+            from unifiedui.handlers.dependencies.vault import get_vault_client
+            from unifiedui.core.database.models import AutonomousAgent
+            
+            # Extract request from args or kwargs
+            request: Request | None = kwargs.get("request")
+            if request is None:
+                for arg in args:
+                    if isinstance(arg, Request):
+                        request = arg
+                        break
+            
+            if request is None:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Request object not found"
+                )
+            
+            # Extract API key from header
+            api_key_header = request.headers.get("X-Unified-UI-Autonomous-Agent-API-Key")
+            if not api_key_header:
+                logger.warning("X-Unified-UI-Autonomous-Agent-API-Key header missing")
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="X-Unified-UI-Autonomous-Agent-API-Key header missing"
+                )
+            
+            # Extract tenant_id and autonomous_agent_id from path params
+            tenant_id = request.path_params.get("tenant_id")
+            autonomous_agent_id = request.path_params.get("autonomous_agent_id")
+            
+            if not tenant_id or not autonomous_agent_id:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Missing tenant_id or autonomous_agent_id in path"
+                )
+            
+            # Get vault client and db client
+            vault_client = get_vault_client()
+            db_client = get_db_client()
+            
+            if not vault_client:
+                logger.error("Vault client not configured")
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Service configuration error: vault not available"
+                )
+            
+            # Fetch the autonomous agent to get vault URIs
+            with db_client.get_session() as session:
+                query = select(AutonomousAgent).where(
+                    AutonomousAgent.id == autonomous_agent_id,
+                    AutonomousAgent.tenant_id == tenant_id
+                )
+                autonomous_agent = session.execute(query).scalar_one_or_none()
+                
+                if not autonomous_agent:
+                    raise HTTPException(
+                        status_code=status.HTTP_404_NOT_FOUND,
+                        detail=f"Autonomous agent not found: {autonomous_agent_id}"
+                    )
+                
+                # Check if autonomous agent is active
+                if not autonomous_agent.is_active:
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail="Autonomous agent is not active"
+                    )
+                
+                # Retrieve keys from vault and compare (always fresh, no cache)
+                is_valid = False
+                
+                if autonomous_agent.primary_key_vault_uri:
+                    try:
+                        primary_key = vault_client.get_secret(
+                            autonomous_agent.primary_key_vault_uri, 
+                            use_cache=False  # Critical: no caching for key rotation
+                        )
+                        if primary_key and primary_key == api_key_header:
+                            is_valid = True
+                    except Exception as e:
+                        logger.warning(f"Failed to retrieve primary key from vault: {e}")
+                
+                if not is_valid and autonomous_agent.secondary_key_vault_uri:
+                    try:
+                        secondary_key = vault_client.get_secret(
+                            autonomous_agent.secondary_key_vault_uri,
+                            use_cache=False  # Critical: no caching for key rotation
+                        )
+                        if secondary_key and secondary_key == api_key_header:
+                            is_valid = True
+                    except Exception as e:
+                        logger.warning(f"Failed to retrieve secondary key from vault: {e}")
+                
+                if not is_valid:
+                    logger.warning(f"Invalid API key for autonomous agent {autonomous_agent_id}")
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail="Invalid API key"
+                    )
+                
+                # Store autonomous agent in request state for handler use
+                # Need to expunge from session to use outside
+                session.expunge(autonomous_agent)
+                request.state.autonomous_agent = autonomous_agent
+                request.state.authenticated_via_api_key = True
+                
+                logger.info(
+                    f"API key authentication successful for autonomous agent {autonomous_agent_id}",
+                    extra={"tenant_id": tenant_id, "autonomous_agent_id": autonomous_agent_id}
+                )
+            
+            return await func(*args, **kwargs)
+
+        return wrapper
+    return decorator
+
+
 def authenticate(required_service_auth_key: Optional[str] = None) -> Callable:
     """
     Decorator factory to authenticate users via Bearer token from Authorization header.

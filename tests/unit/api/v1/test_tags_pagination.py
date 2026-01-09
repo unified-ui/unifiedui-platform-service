@@ -347,6 +347,7 @@ class TestResourceTypeTagsList:
                 "description": "Test",
                 "type": "N8N",
                 "config": {
+                    "api_version": "v1",
                     "workflow_endpoint": "http://localhost:5678/workflow/test-workflow-id",
                     "api_api_key_credential_id": "test-credential-id"
                 }

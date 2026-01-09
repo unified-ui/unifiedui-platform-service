@@ -573,6 +573,114 @@ class AutonomousAgentHandler:
         """Generate a secure random API key."""
         return secrets.token_urlsafe(32)
 
+    # ========== Config Endpoint Method ==========
+
+    def get_autonomous_agent_config(
+        self,
+        tenant_id: str,
+        autonomous_agent_id: str,
+        autonomous_agent: AutonomousAgent,
+        credential_handler
+    ):
+        """
+        Get the full autonomous agent configuration including credential secrets.
+        This endpoint is for external systems (like N8N) to fetch complete configuration.
+        
+        Args:
+            tenant_id: The ID of the tenant
+            autonomous_agent_id: The ID of the autonomous agent
+            autonomous_agent: The autonomous agent model (already fetched by middleware)
+            credential_handler: Credential handler for fetching secrets
+            
+        Returns:
+            AutonomousAgentConfigResponse with full config including secrets
+            
+        Raises:
+            AutonomousAgentNotFoundError: If autonomous agent not found
+            InvalidCredentialError: If a credential cannot be fetched
+        """
+        from unifiedui.schema.responses.autonomous_agents import (
+            AutonomousAgentConfigResponse,
+            N8NAutonomousAgentConfigSettingsResponse,
+            CredentialSecretResponse
+        )
+        from unifiedui.exc.application_config import InvalidCredentialError
+        
+        logger.info(
+            "Fetching autonomous agent config", 
+            extra={"tenant_id": tenant_id, "autonomous_agent_id": autonomous_agent_id}
+        )
+        
+        agent_type = AutonomousAgentTypeEnum(autonomous_agent.type)
+        config = autonomous_agent.config or {}
+        
+        # Build settings based on agent type
+        if agent_type == AutonomousAgentTypeEnum.N8N:
+            # Extract config values
+            api_version = config.get("api_version", "v1")
+            workflow_endpoint = config.get("workflow_endpoint", "")
+            api_credential_id = config.get("api_api_key_credential_id")
+            
+            if not api_credential_id:
+                raise InvalidCredentialError(
+                    credential_id="unknown",
+                    message="Autonomous agent config is missing required api_api_key_credential_id"
+                )
+            
+            # Parse workflow URL to extract host and workflow ID
+            n8n_host = ""
+            workflow_id = ""
+            if workflow_endpoint:
+                # Parse URL: http://host:port/workflow/workflowId
+                from urllib.parse import urlparse
+                parsed = urlparse(workflow_endpoint)
+                n8n_host = f"{parsed.scheme}://{parsed.netloc}"
+                
+                # Extract workflow ID from path
+                path_parts = parsed.path.split("/workflow/")
+                if len(path_parts) > 1:
+                    workflow_id = path_parts[1].strip("/")
+            
+            # Fetch API credential with secret
+            try:
+                api_credential = credential_handler.get_credential(tenant_id, api_credential_id)
+                api_secret = credential_handler.get_credential_secret(tenant_id, api_credential_id)
+            except Exception as e:
+                logger.error(f"Failed to fetch API credential: {e}")
+                raise InvalidCredentialError(
+                    credential_id=api_credential_id,
+                    message=f"Invalid or inaccessible API credential with ID '{api_credential_id}'"
+                )
+            
+            api_credentials = CredentialSecretResponse(
+                id=api_credential.id,
+                credentials_uri=api_credential.credential_uri,
+                name=api_credential.name,
+                description=api_credential.description,
+                type=api_credential.type,
+                is_active=api_credential.is_active,
+                secret=api_secret
+            )
+            
+            settings = N8NAutonomousAgentConfigSettingsResponse(
+                api_version=api_version,
+                n8n_host=n8n_host,
+                n8n_workflow_endpoint=workflow_endpoint,
+                workflow_id=workflow_id,
+                api_credentials=api_credentials
+            )
+        else:
+            # For unsupported types, return raw config
+            settings = config
+        
+        return AutonomousAgentConfigResponse(
+            docversion="v1",
+            type=agent_type,
+            tenant_id=tenant_id,
+            autonomous_agent_id=autonomous_agent_id,
+            settings=settings
+        )
+
     # ========== API Key Management Methods ==========
 
     def get_api_key(

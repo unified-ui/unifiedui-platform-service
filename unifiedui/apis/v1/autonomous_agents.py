@@ -6,10 +6,15 @@ from fastapi.responses import Response
 
 from unifiedui.core.identity.users import ContextIdentityUser
 from unifiedui.handlers.autonomous_agents import AutonomousAgentHandler
-from unifiedui.handlers.dependencies import get_autonomous_agent_handler
+from unifiedui.handlers.dependencies import get_autonomous_agent_handler, get_credential_handler
+from unifiedui.handlers.credentials import CredentialHandler
 from unifiedui.schema.requests.autonomous_agents import CreateAutonomousAgentRequest, UpdateAutonomousAgentRequest
 from unifiedui.schema.requests.autonomous_agent_permissions import SetAutonomousAgentPermissionRequest
-from unifiedui.schema.responses.autonomous_agents import AutonomousAgentResponse, AutonomousAgentKeyResponse
+from unifiedui.schema.responses.autonomous_agents import (
+    AutonomousAgentResponse, 
+    AutonomousAgentKeyResponse,
+    AutonomousAgentConfigResponse
+)
 from unifiedui.schema.responses.principals import (
     PrincipalWithRolesResponse,
     ResourcePrincipalsResponse
@@ -21,7 +26,8 @@ from unifiedui.exc.autonomous_agents import (
     UnsupportedAutonomousAgentTypeError,
     AutonomousAgentKeyNotFoundError
 )
-from unifiedui.core.middleware.apis.v1.auth import authenticate, check_permissions
+from unifiedui.exc.application_config import InvalidCredentialError
+from unifiedui.core.middleware.apis.v1.auth import authenticate, check_permissions, authenticate_autonomous_agent_api_key
 from unifiedui.core.database.enums import TenantRolesEnum, PermissionActionEnum, OrderDirectionEnum, ListViewEnum
 from unifiedui.logger import get_logger
 
@@ -763,4 +769,80 @@ async def rotate_autonomous_agent_key(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to rotate autonomous agent key"
+        )
+
+
+# ========== Config Endpoint (Agent Service) ==========
+
+@router.get(
+    "/{autonomous_agent_id}/config",
+    response_model=AutonomousAgentConfigResponse,
+    summary="Get autonomous agent configuration",
+    description="""
+    Get the full autonomous agent configuration including credential secrets.
+    
+    **Authentication**: This endpoint uses API key authentication via the 
+    `X-Unified-UI-Autonomous-Agent-API-Key` header (NOT Bearer token).
+    
+    The API key must match either the primary or secondary key of the autonomous agent.
+    
+    This endpoint is designed for external systems (like N8N) to fetch configuration
+    and credentials needed to perform autonomous agent operations.
+    
+    **IMPORTANT**: No caching is used for this endpoint to ensure key rotation 
+    takes effect immediately.
+    """
+)
+@authenticate_autonomous_agent_api_key()
+async def get_autonomous_agent_config(
+    request: Request,
+    tenant_id: str,
+    autonomous_agent_id: str,
+    handler: AutonomousAgentHandler = Depends(get_autonomous_agent_handler),
+    credential_handler: CredentialHandler = Depends(get_credential_handler)
+) -> AutonomousAgentConfigResponse:
+    """
+    Get autonomous agent configuration with resolved credentials.
+    
+    This endpoint is authenticated via X-Unified-UI-Autonomous-Agent-API-Key header.
+    The autonomous agent must be active.
+    
+    Args:
+        request: FastAPI request with autonomous_agent in state
+        tenant_id: Tenant ID from path
+        autonomous_agent_id: Autonomous agent ID from path
+        handler: Autonomous agent handler dependency
+        credential_handler: Credential handler for fetching secrets
+        
+    Returns:
+        AutonomousAgentConfigResponse with full config including secrets
+    """
+    try:
+        # The autonomous agent is already validated and stored in request.state
+        # by the authenticate_autonomous_agent_api_key decorator
+        autonomous_agent = request.state.autonomous_agent
+        
+        return handler.get_autonomous_agent_config(
+            tenant_id=tenant_id,
+            autonomous_agent_id=autonomous_agent_id,
+            autonomous_agent=autonomous_agent,
+            credential_handler=credential_handler
+        )
+    except InvalidCredentialError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+    except AutonomousAgentNotFoundError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e)
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to get autonomous agent config: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to get autonomous agent configuration"
         )

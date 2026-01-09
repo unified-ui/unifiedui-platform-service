@@ -21,6 +21,10 @@ logger = get_logger(__name__)
 class N8NAutonomousAgentConfig(BaseModel):
     """Pydantic model for N8N autonomous agent configuration validation."""
     
+    api_version: str = Field(
+        ...,
+        description="API version for the autonomous agent (currently only 'v1' is supported)"
+    )
     workflow_endpoint: str = Field(
         ...,
         min_length=1,
@@ -31,6 +35,15 @@ class N8NAutonomousAgentConfig(BaseModel):
         min_length=1,
         description="Credential ID for N8N API key"
     )
+
+    @field_validator('api_version')
+    @classmethod
+    def validate_api_version(cls, v: str) -> str:
+        """Validate that api_version is a supported version."""
+        allowed_versions = ['v1']
+        if v not in allowed_versions:
+            raise ValueError(f"api_version must be one of: {', '.join(allowed_versions)}")
+        return v
 
     @field_validator('workflow_endpoint')
     @classmethod

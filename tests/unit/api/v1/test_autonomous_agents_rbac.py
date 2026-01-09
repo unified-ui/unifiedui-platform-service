@@ -23,6 +23,7 @@ PRINCIPAL_TYPE_USER = PrincipalTypeEnum.IDENTITY_USER.value
 # Agent Types and Config
 AGENT_TYPE_N8N = "N8N"
 VALID_N8N_CONFIG = {
+    "api_version": "v1",
     "workflow_endpoint": "http://localhost:5678/workflow/test-workflow-id",
     "api_api_key_credential_id": "test-credential-id"
 }

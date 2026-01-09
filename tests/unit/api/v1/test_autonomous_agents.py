@@ -35,9 +35,16 @@ AGENT_TYPE_N8N = AutonomousAgentTypeEnum.N8N.value
 
 # Valid N8N Config for tests
 VALID_N8N_CONFIG = {
+    "api_version": "v1",
     "workflow_endpoint": "http://localhost:5678/workflow/test-workflow-id",
     "api_api_key_credential_id": "test-credential-id"
 }
+
+# Endpoint for config
+ENDPOINT_AUTONOMOUS_AGENT_CONFIG = "/api/v1/platform-service/tenants/{tenant_id}/autonomous-agents/{autonomous_agent_id}/config"
+
+# API Key header name
+API_KEY_HEADER = "X-Unified-UI-Autonomous-Agent-API-Key"
 
 
 def create_tenant_for_user(test_client: TestClient, user_token: Any, tenant_name: str = "Test Tenant") -> str:
@@ -1155,3 +1162,195 @@ class TestAutonomousAgentConfigValidation:
         data = create_response.json()
         assert "type" in data
         assert data["type"] == AGENT_TYPE_N8N
+
+    def test_create_agent_with_api_version(self, test_client: TestClient, test_user_token: Any) -> None:
+        """Test that api_version is required in N8N config."""
+        tenant_id = create_tenant_for_user(test_client, test_user_token)
+        headers = create_auth_headers(test_user_token, use_cache=False)
+        
+        # Config with api_version
+        config_with_version = {
+            "api_version": "v1",
+            "workflow_endpoint": "http://localhost:5678/workflow/test-workflow-id",
+            "api_api_key_credential_id": "test-credential-id"
+        }
+        
+        agent_data = {"name": "Test Agent", "description": "Test", "type": AGENT_TYPE_N8N, "config": config_with_version}
+        response = test_client.post(
+            ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id),
+            json=agent_data,
+            headers=headers
+        )
+        
+        assert response.status_code == status.HTTP_201_CREATED
+        data = response.json()
+        assert data["config"]["api_version"] == "v1"
+    
+    def test_create_agent_missing_api_version_fails(self, test_client: TestClient, test_user_token: Any) -> None:
+        """Test that missing api_version in N8N config raises error."""
+        tenant_id = create_tenant_for_user(test_client, test_user_token)
+        headers = create_auth_headers(test_user_token, use_cache=False)
+        
+        # Config without api_version
+        config_without_version = {
+            "workflow_endpoint": "http://localhost:5678/workflow/test-workflow-id",
+            "api_api_key_credential_id": "test-credential-id"
+        }
+        
+        agent_data = {"name": "Test Agent", "description": "Test", "type": AGENT_TYPE_N8N, "config": config_without_version}
+        response = test_client.post(
+            ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id),
+            json=agent_data,
+            headers=headers
+        )
+        
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+    
+    def test_create_agent_invalid_api_version_fails(self, test_client: TestClient, test_user_token: Any) -> None:
+        """Test that invalid api_version (v2) in N8N config raises error."""
+        tenant_id = create_tenant_for_user(test_client, test_user_token)
+        headers = create_auth_headers(test_user_token, use_cache=False)
+        
+        # Config with invalid api_version
+        config_invalid_version = {
+            "api_version": "v2",  # Invalid - only v1 allowed
+            "workflow_endpoint": "http://localhost:5678/workflow/test-workflow-id",
+            "api_api_key_credential_id": "test-credential-id"
+        }
+        
+        agent_data = {"name": "Test Agent", "description": "Test", "type": AGENT_TYPE_N8N, "config": config_invalid_version}
+        response = test_client.post(
+            ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id),
+            json=agent_data,
+            headers=headers
+        )
+        
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+
+class TestAutonomousAgentConfigEndpoint:
+    """Test suite for the /autonomous-agents/{id}/config endpoint with API key auth."""
+    
+    def test_config_endpoint_requires_api_key_header(self, test_client: TestClient, test_user_token: Any) -> None:
+        """Test that config endpoint requires X-Unified-UI-Autonomous-Agent-API-Key header."""
+        tenant_id = create_tenant_for_user(test_client, test_user_token)
+        headers = create_auth_headers(test_user_token, use_cache=False)
+        
+        # Create an agent
+        agent_data = {"name": "Test Agent", "type": AGENT_TYPE_N8N, "config": VALID_N8N_CONFIG}
+        create_response = test_client.post(
+            ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id),
+            json=agent_data,
+            headers=headers
+        )
+        agent_id = create_response.json()["id"]
+        
+        # Try to access config without API key header
+        response = test_client.get(
+            ENDPOINT_AUTONOMOUS_AGENT_CONFIG.format(tenant_id=tenant_id, autonomous_agent_id=agent_id)
+            # No headers - should fail
+        )
+        
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
+    
+    def test_config_endpoint_rejects_bearer_token(self, test_client: TestClient, test_user_token: Any) -> None:
+        """Test that config endpoint does not accept Bearer token (only API key)."""
+        tenant_id = create_tenant_for_user(test_client, test_user_token)
+        headers = create_auth_headers(test_user_token, use_cache=False)
+        
+        # Create an agent
+        agent_data = {"name": "Test Agent", "type": AGENT_TYPE_N8N, "config": VALID_N8N_CONFIG}
+        create_response = test_client.post(
+            ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id),
+            json=agent_data,
+            headers=headers
+        )
+        agent_id = create_response.json()["id"]
+        
+        # Try to access config with Bearer token only (no API key)
+        response = test_client.get(
+            ENDPOINT_AUTONOMOUS_AGENT_CONFIG.format(tenant_id=tenant_id, autonomous_agent_id=agent_id),
+            headers=headers  # Bearer token only
+        )
+        
+        # Should fail because API key header is required
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
+    
+    def test_config_endpoint_rejects_invalid_api_key(self, test_client: TestClient, test_user_token: Any) -> None:
+        """Test that config endpoint rejects invalid API key."""
+        tenant_id = create_tenant_for_user(test_client, test_user_token)
+        headers = create_auth_headers(test_user_token, use_cache=False)
+        
+        # Create an agent with keys
+        agent_data = {"name": "Test Agent", "type": AGENT_TYPE_N8N, "config": VALID_N8N_CONFIG}
+        create_response = test_client.post(
+            ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id),
+            json=agent_data,
+            headers=headers
+        )
+        agent_id = create_response.json()["id"]
+        
+        # Rotate keys for the agent (PUT /keys/1/rotate generates a new key)
+        keys_response = test_client.put(
+            f"{ENDPOINT_AUTONOMOUS_AGENT_DETAIL.format(tenant_id=tenant_id, autonomous_agent_id=agent_id)}/keys/1/rotate",
+            headers=headers
+        )
+        assert keys_response.status_code == status.HTTP_200_OK
+        
+        # Activate the agent (required for config access)
+        test_client.patch(
+            ENDPOINT_AUTONOMOUS_AGENT_DETAIL.format(tenant_id=tenant_id, autonomous_agent_id=agent_id),
+            json={"is_active": True},
+            headers=headers
+        )
+        
+        # Try with invalid API key
+        response = test_client.get(
+            ENDPOINT_AUTONOMOUS_AGENT_CONFIG.format(tenant_id=tenant_id, autonomous_agent_id=agent_id),
+            headers={API_KEY_HEADER: "invalid-api-key"}
+        )
+        
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+    
+    def test_config_endpoint_rejects_inactive_agent(self, test_client: TestClient, test_user_token: Any) -> None:
+        """Test that config endpoint rejects access if agent is not active."""
+        tenant_id = create_tenant_for_user(test_client, test_user_token)
+        headers = create_auth_headers(test_user_token, use_cache=False)
+        
+        # Create an inactive agent with keys
+        agent_data = {"name": "Test Agent", "type": AGENT_TYPE_N8N, "config": VALID_N8N_CONFIG}
+        create_response = test_client.post(
+            ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id),
+            json=agent_data,
+            headers=headers
+        )
+        agent_id = create_response.json()["id"]
+        
+        # Rotate keys (PUT /keys/1/rotate generates a new key)
+        keys_response = test_client.put(
+            f"{ENDPOINT_AUTONOMOUS_AGENT_DETAIL.format(tenant_id=tenant_id, autonomous_agent_id=agent_id)}/keys/1/rotate",
+            headers=headers
+        )
+        assert keys_response.status_code == status.HTTP_200_OK
+        api_key = keys_response.json()["key"]
+        
+        # Agent is NOT activated (is_active=False)
+        # Try to access config
+        response = test_client.get(
+            ENDPOINT_AUTONOMOUS_AGENT_CONFIG.format(tenant_id=tenant_id, autonomous_agent_id=agent_id),
+            headers={API_KEY_HEADER: api_key}
+        )
+        
+        # Should fail because agent is not active
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+    
+    def test_config_endpoint_not_found_agent(self, test_client: TestClient, test_user_token: Any) -> None:
+        """Test that config endpoint returns 404 for non-existent agent."""
+        tenant_id = create_tenant_for_user(test_client, test_user_token)
+        
+        response = test_client.get(
+            ENDPOINT_AUTONOMOUS_AGENT_CONFIG.format(tenant_id=tenant_id, autonomous_agent_id="non-existent-id"),
+            headers={API_KEY_HEADER: "some-api-key"}
+        )
+        
+        assert response.status_code in [status.HTTP_403_FORBIDDEN, status.HTTP_404_NOT_FOUND]
