@@ -65,6 +65,11 @@ class N8NApplicationConfig(BaseModel):
         min_length=1,
         description="N8N webhook URL for chat"
     )
+    workflow_endpoint: str = Field(
+        ...,
+        min_length=1,
+        description="N8N workflow endpoint URL (e.g., https://n8n.example.com/workflow/abc123)"
+    )
     api_api_key_credential_id: str = Field(
         ...,
         min_length=1,
@@ -82,6 +87,16 @@ class N8NApplicationConfig(BaseModel):
         """Validate that chat_url is a valid URL format."""
         if not v.startswith(('http://', 'https://')):
             raise ValueError("chat_url must start with http:// or https://")
+        return v
+
+    @field_validator('workflow_endpoint')
+    @classmethod
+    def validate_workflow_endpoint(cls, v: str) -> str:
+        """Validate that workflow_endpoint is a valid URL format."""
+        if not v.startswith(('http://', 'https://')):
+            raise ValueError("workflow_endpoint must start with http:// or https://")
+        if '/workflow/' not in v:
+            raise ValueError("workflow_endpoint must contain '/workflow/' in the path")
         return v
 
 

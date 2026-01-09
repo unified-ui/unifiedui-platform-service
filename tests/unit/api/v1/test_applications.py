@@ -36,6 +36,7 @@ def get_valid_n8n_config() -> dict:
         "use_unified_chat_history": True,
         "chat_history_count": 30,
         "chat_url": "https://example.com/webhook",
+        "workflow_endpoint": "https://n8n.example.com/workflow/abc123",
         "api_api_key_credential_id": "test-cred-123",
         "chat_auth_credential_id": "test-cred-456"
     }

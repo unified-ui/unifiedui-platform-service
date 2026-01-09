@@ -606,6 +606,8 @@ class ApplicationHandler:
                     use_unified_chat_history=config.get("use_unified_chat_history", True),
                     chat_history_count=config.get("chat_history_count", 30),
                     chat_url=config.get("chat_url", ""),
+                    workflow_id=self._extract_workflow_id(config.get("workflow_endpoint", "")),
+                    n8n_host=self._extract_n8n_host(config.get("workflow_endpoint", "")),
                     api_credentials=api_credentials,
                     chat_credentials=chat_credentials
                 )
@@ -878,6 +880,52 @@ class ApplicationHandler:
             )
         except ValueError as e:
             raise ApplicationNotFoundError(str(e)) from e
+
+    @staticmethod
+    def _extract_workflow_id(workflow_endpoint: str) -> str:
+        """
+        Extract the workflow ID from a workflow endpoint URL.
+        
+        Example: https://n8n.example.com/workflow/abc123 -> abc123
+        
+        Args:
+            workflow_endpoint: The full workflow endpoint URL
+            
+        Returns:
+            The workflow ID extracted from the URL
+        """
+        if not workflow_endpoint:
+            return ""
+        # Split by '/workflow/' and get the part after it
+        parts = workflow_endpoint.split('/workflow/')
+        if len(parts) < 2:
+            return ""
+        # Return the workflow ID (everything after /workflow/, strip any trailing slashes or paths)
+        workflow_part = parts[1]
+        # Remove any trailing path components or query strings
+        workflow_id = workflow_part.split('/')[0].split('?')[0]
+        return workflow_id
+
+    @staticmethod
+    def _extract_n8n_host(workflow_endpoint: str) -> str:
+        """
+        Extract the N8N host URL from a workflow endpoint URL.
+        
+        Example: https://n8n.example.com/workflow/abc123 -> https://n8n.example.com
+        
+        Args:
+            workflow_endpoint: The full workflow endpoint URL
+            
+        Returns:
+            The N8N host URL (scheme + host)
+        """
+        if not workflow_endpoint:
+            return ""
+        from urllib.parse import urlparse
+        parsed = urlparse(workflow_endpoint)
+        if not parsed.scheme or not parsed.netloc:
+            return ""
+        return f"{parsed.scheme}://{parsed.netloc}"
 
     @staticmethod
     def _model_to_response(application: Application) -> ApplicationResponse:

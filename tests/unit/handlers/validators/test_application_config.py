@@ -59,6 +59,7 @@ class TestN8NApplicationConfig:
             use_unified_chat_history=True,
             chat_history_count=30,
             chat_url="https://example.com/webhook",
+            workflow_endpoint="https://n8n.example.com/workflow/abc123",
             api_api_key_credential_id="cred-123",
             chat_auth_credential_id="cred-456"
         )
@@ -78,6 +79,7 @@ class TestN8NApplicationConfig:
             workflow_type=N8NWorkflowTypeEnum.N8N_CHAT_AGENT_WORKFLOW,
             use_unified_chat_history=True,
             chat_url="https://example.com/webhook",
+            workflow_endpoint="https://n8n.example.com/workflow/abc123",
             api_api_key_credential_id="cred-123",
             chat_auth_credential_id="cred-456"
         )
@@ -92,6 +94,7 @@ class TestN8NApplicationConfig:
                 workflow_type=N8NWorkflowTypeEnum.N8N_CHAT_AGENT_WORKFLOW,
                 use_unified_chat_history=True,
                 chat_url="https://example.com/webhook",
+            workflow_endpoint="https://n8n.example.com/workflow/abc123",
                 api_api_key_credential_id="cred-123",
                 chat_auth_credential_id="cred-456"
             )
@@ -104,6 +107,7 @@ class TestN8NApplicationConfig:
                 workflow_type="INVALID_WORKFLOW",
                 use_unified_chat_history=True,
                 chat_url="https://example.com/webhook",
+            workflow_endpoint="https://n8n.example.com/workflow/abc123",
                 api_api_key_credential_id="cred-123",
                 chat_auth_credential_id="cred-456"
             )
@@ -116,6 +120,7 @@ class TestN8NApplicationConfig:
                 workflow_type=N8NWorkflowTypeEnum.N8N_CHAT_AGENT_WORKFLOW,
                 use_unified_chat_history=True,
                 chat_url="ftp://example.com/webhook",
+            workflow_endpoint="https://n8n.example.com/workflow/abc123",
                 api_api_key_credential_id="cred-123",
                 chat_auth_credential_id="cred-456"
             )
@@ -128,6 +133,7 @@ class TestN8NApplicationConfig:
             workflow_type=N8NWorkflowTypeEnum.N8N_CHAT_AGENT_WORKFLOW,
             use_unified_chat_history=True,
             chat_url="http://localhost:5678/webhook",
+            workflow_endpoint="https://n8n.example.com/workflow/abc123",
             api_api_key_credential_id="cred-123",
             chat_auth_credential_id="cred-456"
         )
@@ -141,6 +147,7 @@ class TestN8NApplicationConfig:
                 workflow_type=N8NWorkflowTypeEnum.N8N_CHAT_AGENT_WORKFLOW,
                 use_unified_chat_history=True,
                 chat_url="https://example.com/webhook",
+            workflow_endpoint="https://n8n.example.com/workflow/abc123",
                 # Missing api_api_key_credential_id and chat_auth_credential_id
             )
     
@@ -152,6 +159,7 @@ class TestN8NApplicationConfig:
                 workflow_type=N8NWorkflowTypeEnum.N8N_CHAT_AGENT_WORKFLOW,
                 use_unified_chat_history=True,
                 chat_url="https://example.com/webhook",
+            workflow_endpoint="https://n8n.example.com/workflow/abc123",
                 api_api_key_credential_id="",
                 chat_auth_credential_id="cred-456"
             )
@@ -165,6 +173,7 @@ class TestN8NApplicationConfig:
             use_unified_chat_history=True,
             chat_history_count=1,
             chat_url="https://example.com/webhook",
+            workflow_endpoint="https://n8n.example.com/workflow/abc123",
             api_api_key_credential_id="cred-123",
             chat_auth_credential_id="cred-456"
         )
@@ -177,6 +186,7 @@ class TestN8NApplicationConfig:
             use_unified_chat_history=True,
             chat_history_count=100,
             chat_url="https://example.com/webhook",
+            workflow_endpoint="https://n8n.example.com/workflow/abc123",
             api_api_key_credential_id="cred-123",
             chat_auth_credential_id="cred-456"
         )
@@ -190,6 +200,7 @@ class TestN8NApplicationConfig:
                 use_unified_chat_history=True,
                 chat_history_count=0,
                 chat_url="https://example.com/webhook",
+            workflow_endpoint="https://n8n.example.com/workflow/abc123",
                 api_api_key_credential_id="cred-123",
                 chat_auth_credential_id="cred-456"
             )
@@ -202,6 +213,7 @@ class TestN8NApplicationConfig:
                 use_unified_chat_history=True,
                 chat_history_count=101,
                 chat_url="https://example.com/webhook",
+            workflow_endpoint="https://n8n.example.com/workflow/abc123",
                 api_api_key_credential_id="cred-123",
                 chat_auth_credential_id="cred-456"
             )
@@ -219,6 +231,7 @@ class TestN8NConfigValidator:
             "use_unified_chat_history": True,
             "chat_history_count": 25,
             "chat_url": "https://example.com/webhook",
+            "workflow_endpoint": "https://n8n.example.com/workflow/abc123",
             "api_api_key_credential_id": "cred-123",
             "chat_auth_credential_id": "cred-456"
         }
@@ -226,6 +239,7 @@ class TestN8NConfigValidator:
         result = validator.validate(config)
         
         assert result["api_version"] == "v1"
+        assert result["workflow_endpoint"] == "https://n8n.example.com/workflow/abc123"
         assert result["workflow_type"] == "N8N_CHAT_AGENT_WORKFLOW"
         assert result["use_unified_chat_history"] is True
         assert result["chat_history_count"] == 25
@@ -241,6 +255,7 @@ class TestN8NConfigValidator:
             "workflow_type": "N8N_CHAT_AGENT_WORKFLOW",
             "use_unified_chat_history": False,
             "chat_url": "https://example.com/webhook",
+            "workflow_endpoint": "https://n8n.example.com/workflow/abc123",
             "api_api_key_credential_id": "cred-123",
             "chat_auth_credential_id": "cred-456"
         }
@@ -257,6 +272,7 @@ class TestN8NConfigValidator:
             "workflow_type": "N8N_CHAT_AGENT_WORKFLOW",
             "use_unified_chat_history": True,
             "chat_url": "https://example.com/webhook",
+            "workflow_endpoint": "https://n8n.example.com/workflow/abc123",
             "api_api_key_credential_id": "cred-123",
             "chat_auth_credential_id": "cred-456"
         }
@@ -290,6 +306,7 @@ class TestApplicationConfigValidatorFactory:
             "workflow_type": "N8N_CHAT_AGENT_WORKFLOW",
             "use_unified_chat_history": True,
             "chat_url": "https://example.com/webhook",
+            "workflow_endpoint": "https://n8n.example.com/workflow/abc123",
             "api_api_key_credential_id": "cred-123",
             "chat_auth_credential_id": "cred-456"
         }

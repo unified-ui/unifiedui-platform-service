@@ -61,6 +61,8 @@ class N8NConfigSettingsResponse(BaseModel):
     use_unified_chat_history: bool = Field(..., description="Whether to use unified chat history")
     chat_history_count: int = Field(..., description="Number of chat history messages")
     chat_url: str = Field(..., description="N8N webhook URL for chat")
+    workflow_id: str = Field(..., description="N8N workflow ID extracted from workflow_endpoint")
+    n8n_host: str = Field(..., description="N8N host URL extracted from workflow_endpoint")
     api_credentials: CredentialSecretResponse = Field(..., description="API key credentials with secret")
     chat_credentials: CredentialSecretResponse = Field(..., description="Chat auth credentials with secret")
     
