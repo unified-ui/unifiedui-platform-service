@@ -579,3 +579,189 @@ class TestCredentialRBAC:
             headers=headers_b
         )
         assert delete_response.status_code == status.HTTP_204_NO_CONTENT
+
+
+class TestCredentialSecretRBAC:
+    """Test suite for credential secret endpoint RBAC."""
+    
+    def test_admin_can_get_secret(self, test_client: TestClient) -> None:
+        """Test that ADMIN on credential can get secret."""
+        user_token = test_client.create_test_user("secret-admin", "Secret Admin")
+        headers = create_auth_headers(user_token, use_cache=False)
+        tenant_id = create_tenant_for_user(test_client, user_token)
+        
+        # Create credential
+        credential_id = create_credential(test_client, tenant_id, headers, "Secret Test Cred")
+        
+        # ADMIN can get secret
+        response = test_client.get(
+            f"{ENDPOINT_CREDENTIAL_DETAIL.format(tenant_id=tenant_id, credential_id=credential_id)}/secret",
+            headers=headers
+        )
+        
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert data["credential_id"] == credential_id
+        assert "secret_value" in data
+        assert data["secret_value"] == "secret-Secret Test Cred"
+    
+    def test_write_user_can_get_secret(self, test_client: TestClient) -> None:
+        """Test that user with WRITE permission can get secret."""
+        # Create admin user and tenant
+        admin_token = test_client.create_test_user("secret-owner", "Secret Owner")
+        admin_headers = create_auth_headers(admin_token, use_cache=False)
+        tenant_id = create_tenant_for_user(test_client, admin_token)
+        
+        # Create credential
+        credential_id = create_credential(test_client, tenant_id, admin_headers, "Write Test Cred")
+        
+        # Create write user and add to tenant
+        write_token = test_client.create_test_user("secret-writer", "Secret Writer")
+        write_headers = create_auth_headers(write_token, use_cache=False)
+        add_user_to_tenant(test_client, tenant_id, admin_headers, "secret-writer", "READER")
+        
+        # Grant WRITE permission to user
+        test_client.put(
+            ENDPOINT_CREDENTIAL_PRINCIPALS.format(tenant_id=tenant_id, credential_id=credential_id),
+            json={
+                "principal_id": "secret-writer",
+                "principal_type": PRINCIPAL_TYPE_USER,
+                "role": ROLE_WRITE
+            },
+            headers=admin_headers
+        )
+        
+        # WRITE user can get secret
+        response = test_client.get(
+            f"{ENDPOINT_CREDENTIAL_DETAIL.format(tenant_id=tenant_id, credential_id=credential_id)}/secret",
+            headers=write_headers
+        )
+        
+        assert response.status_code == status.HTTP_200_OK
+        assert response.json()["secret_value"] == "secret-Write Test Cred"
+    
+    def test_read_user_cannot_get_secret(self, test_client: TestClient) -> None:
+        """Test that user with only READ permission CANNOT get secret."""
+        # Create admin user and tenant
+        admin_token = test_client.create_test_user("secret-admin-2", "Secret Admin 2")
+        admin_headers = create_auth_headers(admin_token, use_cache=False)
+        tenant_id = create_tenant_for_user(test_client, admin_token)
+        
+        # Create credential
+        credential_id = create_credential(test_client, tenant_id, admin_headers, "Read Test Cred")
+        
+        # Create read user and add to tenant
+        read_token = test_client.create_test_user("secret-reader", "Secret Reader")
+        read_headers = create_auth_headers(read_token, use_cache=False)
+        add_user_to_tenant(test_client, tenant_id, admin_headers, "secret-reader", "READER")
+        
+        # Grant READ permission to user (not WRITE)
+        test_client.put(
+            ENDPOINT_CREDENTIAL_PRINCIPALS.format(tenant_id=tenant_id, credential_id=credential_id),
+            json={
+                "principal_id": "secret-reader",
+                "principal_type": PRINCIPAL_TYPE_USER,
+                "role": ROLE_READ
+            },
+            headers=admin_headers
+        )
+        
+        # READ user can get credential metadata
+        get_response = test_client.get(
+            ENDPOINT_CREDENTIAL_DETAIL.format(tenant_id=tenant_id, credential_id=credential_id),
+            headers=read_headers
+        )
+        assert get_response.status_code == status.HTTP_200_OK
+        
+        # READ user CANNOT get secret
+        secret_response = test_client.get(
+            f"{ENDPOINT_CREDENTIAL_DETAIL.format(tenant_id=tenant_id, credential_id=credential_id)}/secret",
+            headers=read_headers
+        )
+        assert secret_response.status_code == status.HTTP_403_FORBIDDEN
+    
+    def test_non_member_cannot_get_secret(self, test_client: TestClient) -> None:
+        """Test that user without any permission cannot get secret."""
+        # Create admin user and tenant
+        admin_token = test_client.create_test_user("secret-admin-3", "Secret Admin 3")
+        admin_headers = create_auth_headers(admin_token, use_cache=False)
+        tenant_id = create_tenant_for_user(test_client, admin_token)
+        
+        # Create credential
+        credential_id = create_credential(test_client, tenant_id, admin_headers, "Private Cred")
+        
+        # Create other user (NOT added to tenant)
+        other_token = test_client.create_test_user("secret-outsider", "Secret Outsider")
+        other_headers = create_auth_headers(other_token, use_cache=False)
+        
+        # Non-member cannot get secret
+        response = test_client.get(
+            f"{ENDPOINT_CREDENTIAL_DETAIL.format(tenant_id=tenant_id, credential_id=credential_id)}/secret",
+            headers=other_headers
+        )
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+    
+    def test_global_admin_can_get_secret(self, test_client: TestClient) -> None:
+        """Test that GLOBAL_ADMIN on tenant can get any credential secret."""
+        # Create owner and tenant
+        owner_token = test_client.create_test_user("tenant-owner", "Tenant Owner")
+        owner_headers = create_auth_headers(owner_token, use_cache=False)
+        tenant_id = create_tenant_for_user(test_client, owner_token)
+        
+        # Create credential
+        credential_id = create_credential(test_client, tenant_id, owner_headers, "Global Admin Test")
+        
+        # Create global admin user
+        admin_token = test_client.create_test_user("global-admin-user", "Global Admin User")
+        admin_headers = create_auth_headers(admin_token, use_cache=False)
+        
+        # Add as GLOBAL_ADMIN to tenant
+        add_user_to_tenant(test_client, tenant_id, owner_headers, "global-admin-user", "GLOBAL_ADMIN")
+        
+        # GLOBAL_ADMIN can get secret without specific credential permission
+        response = test_client.get(
+            f"{ENDPOINT_CREDENTIAL_DETAIL.format(tenant_id=tenant_id, credential_id=credential_id)}/secret",
+            headers=admin_headers
+        )
+        
+        assert response.status_code == status.HTTP_200_OK
+        assert response.json()["secret_value"] == "secret-Global Admin Test"
+    
+    def test_credentials_admin_can_get_secret(self, test_client: TestClient) -> None:
+        """Test that CREDENTIALS_ADMIN on tenant can get any credential secret."""
+        # Create owner and tenant
+        owner_token = test_client.create_test_user("cred-tenant-owner", "Cred Tenant Owner")
+        owner_headers = create_auth_headers(owner_token, use_cache=False)
+        tenant_id = create_tenant_for_user(test_client, owner_token)
+        
+        # Create credential
+        credential_id = create_credential(test_client, tenant_id, owner_headers, "Cred Admin Test")
+        
+        # Create credentials admin user
+        cred_admin_token = test_client.create_test_user("cred-admin-user", "Cred Admin User")
+        cred_admin_headers = create_auth_headers(cred_admin_token, use_cache=False)
+        
+        # Add as CREDENTIALS_ADMIN to tenant
+        add_user_to_tenant(test_client, tenant_id, owner_headers, "cred-admin-user", "CREDENTIALS_ADMIN")
+        
+        # CREDENTIALS_ADMIN can get secret without specific credential permission
+        response = test_client.get(
+            f"{ENDPOINT_CREDENTIAL_DETAIL.format(tenant_id=tenant_id, credential_id=credential_id)}/secret",
+            headers=cred_admin_headers
+        )
+        
+        assert response.status_code == status.HTTP_200_OK
+        assert response.json()["secret_value"] == "secret-Cred Admin Test"
+    
+    def test_get_secret_nonexistent_credential(self, test_client: TestClient) -> None:
+        """Test getting secret for non-existent credential returns 404."""
+        user_token = test_client.create_test_user("secret-404-user", "Secret 404 User")
+        headers = create_auth_headers(user_token, use_cache=False)
+        tenant_id = create_tenant_for_user(test_client, user_token)
+        
+        response = test_client.get(
+            f"{ENDPOINT_CREDENTIAL_DETAIL.format(tenant_id=tenant_id, credential_id='non-existent-id')}/secret",
+            headers=headers
+        )
+        
+        assert response.status_code == status.HTTP_404_NOT_FOUND

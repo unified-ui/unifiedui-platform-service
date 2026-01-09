@@ -24,3 +24,10 @@ class CredentialResponse(BaseModel):
     created_by: Optional[str] = Field(None, description="Creator user ID")
     updated_by: Optional[str] = Field(None, description="Last updater user ID")
 
+
+class CredentialSecretResponse(BaseModel):
+    """Response model for credential secret value."""
+    
+    credential_id: str = Field(..., description="Credential ID")
+    secret_value: str = Field(..., description="The actual secret value from vault")
+

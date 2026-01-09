@@ -9,7 +9,7 @@ from unifiedui.handlers.credentials import CredentialHandler
 from unifiedui.handlers.dependencies import get_credential_handler
 from unifiedui.schema.requests.credentials import CreateCredentialRequest, UpdateCredentialRequest
 from unifiedui.schema.requests.credential_permissions import SetCredentialPermissionRequest
-from unifiedui.schema.responses.credentials import CredentialResponse
+from unifiedui.schema.responses.credentials import CredentialResponse, CredentialSecretResponse
 from unifiedui.schema.responses.principals import (
     PrincipalWithRolesResponse,
     ResourcePrincipalsResponse
@@ -233,6 +233,88 @@ async def get_credential(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to get credential"
+        )
+
+
+@router.get(
+    "/{credential_id}/secret",
+    response_model=CredentialSecretResponse,
+    summary="Get credential secret",
+    description="Get the secret value of a credential from the vault"
+)
+@authenticate()
+@check_permissions(
+    entity="credential",
+    required_permissions=[
+        TenantRolesEnum.GLOBAL_ADMIN,
+        TenantRolesEnum.CREDENTIALS_ADMIN,
+        PermissionActionEnum.WRITE,
+        PermissionActionEnum.ADMIN
+    ]
+)
+async def get_credential_secret(
+    request: Request,
+    tenant_id: str,
+    credential_id: str,
+    handler: CredentialHandler = Depends(get_credential_handler)
+) -> CredentialSecretResponse:
+    """
+    Get the secret value of a credential.
+    
+    This endpoint returns the actual secret value from the vault.
+    Requires WRITE or ADMIN permission on the credential, 
+    or GLOBAL_ADMIN/CREDENTIALS_ADMIN on the tenant.
+    
+    Args:
+        request: FastAPI request with user in state
+        tenant_id: Tenant ID from path
+        credential_id: Credential ID from path
+        handler: Credential handler dependency
+        
+    Returns:
+        The credential secret value
+        
+    Raises:
+        HTTPException: If credential not found or access denied
+    """
+    try:
+        user: ContextIdentityUser = request.state.user
+        logger.info(
+            "API: Get credential secret",
+            extra={
+                "tenant_id": tenant_id,
+                "credential_id": credential_id,
+                "user_id": user.identity.get_id()
+            }
+        )
+        secret_value = handler.get_credential_secret(
+            tenant_id=tenant_id,
+            credential_id=credential_id
+        )
+        
+        if secret_value is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Secret not found in vault"
+            )
+        
+        return CredentialSecretResponse(
+            credential_id=credential_id,
+            secret_value=secret_value
+        )
+    except CredentialNotFoundError as e:
+        logger.warning(f"Credential not found: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e)
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to get credential secret: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to get credential secret"
         )
 
 
