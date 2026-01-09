@@ -90,6 +90,7 @@ def create_autonomous_agent_in_db(test_client: TestClient, tenant_id: str, user_
             tenant_id=tenant_id,
             name=name,
             description=f"Agent {name}",
+            type="N8N",
             config={},
             is_active=True,
             created_by=user_id,

@@ -345,7 +345,11 @@ class TestResourceTypeTagsList:
             json={
                 "name": "Test Agent",
                 "description": "Test",
-                "config": {}
+                "type": "N8N",
+                "config": {
+                    "workflow_endpoint": "http://localhost:5678/workflow/test-workflow-id",
+                    "api_api_key_credential_id": "test-credential-id"
+                }
             },
             headers=headers
         )

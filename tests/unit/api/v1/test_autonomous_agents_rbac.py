@@ -20,6 +20,13 @@ ROLE_ADMIN = PermissionActionEnum.ADMIN.value
 # Principal Types
 PRINCIPAL_TYPE_USER = PrincipalTypeEnum.IDENTITY_USER.value
 
+# Agent Types and Config
+AGENT_TYPE_N8N = "N8N"
+VALID_N8N_CONFIG = {
+    "workflow_endpoint": "http://localhost:5678/workflow/test-workflow-id",
+    "api_api_key_credential_id": "test-credential-id"
+}
+
 
 def create_tenant_for_user(test_client: TestClient, user_token: Any, tenant_name: str = "Test Tenant") -> str:
     """Helper function to create a tenant and return its ID."""
@@ -57,7 +64,7 @@ class TestAutonomousAgentRBAC:
         headers = create_auth_headers(test_user_token, use_cache=False)
         
         # Create autonomous agent
-        agent_data = {"name": "Test Agent", "description": "Test", "config": {}}
+        agent_data = {"name": "Test Agent", "description": "Test", "type": AGENT_TYPE_N8N, "config": VALID_N8N_CONFIG}
         create_response = test_client.post(
             ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id),
             json=agent_data,
@@ -89,7 +96,7 @@ class TestAutonomousAgentRBAC:
         tenant_id = create_tenant_for_user(test_client, user1_token)
         headers1 = create_auth_headers(user1_token, use_cache=False)
         
-        agent_data = {"name": "Test Agent", "description": "Test", "config": {}}
+        agent_data = {"name": "Test Agent", "description": "Test", "type": AGENT_TYPE_N8N, "config": VALID_N8N_CONFIG}
         create_response = test_client.post(
             ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id),
             json=agent_data,
@@ -129,7 +136,7 @@ class TestAutonomousAgentRBAC:
         tenant_id = create_tenant_for_user(test_client, user1_token)
         headers1 = create_auth_headers(user1_token, use_cache=False)
         
-        agent_data = {"name": "Test Agent", "description": "Test", "config": {}}
+        agent_data = {"name": "Test Agent", "description": "Test", "type": AGENT_TYPE_N8N, "config": VALID_N8N_CONFIG}
         create_response = test_client.post(
             ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id),
             json=agent_data,
@@ -170,7 +177,7 @@ class TestAutonomousAgentRBAC:
         tenant_id = create_tenant_for_user(test_client, user1_token)
         headers1 = create_auth_headers(user1_token, use_cache=False)
         
-        agent_data = {"name": "Test Agent", "description": "Test", "config": {}}
+        agent_data = {"name": "Test Agent", "description": "Test", "type": AGENT_TYPE_N8N, "config": VALID_N8N_CONFIG}
         create_response = test_client.post(
             ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id),
             json=agent_data,
@@ -211,7 +218,7 @@ class TestAutonomousAgentRBAC:
         tenant_id = create_tenant_for_user(test_client, user1_token)
         headers1 = create_auth_headers(user1_token, use_cache=False)
         
-        agent_data = {"name": "Test Agent", "description": "Test", "config": {}}
+        agent_data = {"name": "Test Agent", "description": "Test", "type": AGENT_TYPE_N8N, "config": VALID_N8N_CONFIG}
         create_response = test_client.post(
             ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id),
             json=agent_data,
@@ -256,7 +263,7 @@ class TestAutonomousAgentRBAC:
         tenant_id = create_tenant_for_user(test_client, user1_token)
         headers1 = create_auth_headers(user1_token, use_cache=False)
         
-        agent_data = {"name": "Test Agent", "description": "Test", "config": {}}
+        agent_data = {"name": "Test Agent", "description": "Test", "type": AGENT_TYPE_N8N, "config": VALID_N8N_CONFIG}
         create_response = test_client.post(
             ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id),
             json=agent_data,
@@ -298,7 +305,7 @@ class TestAutonomousAgentRBAC:
         tenant_id = create_tenant_for_user(test_client, user1_token)
         headers1 = create_auth_headers(user1_token, use_cache=False)
         
-        agent_data = {"name": "Test Agent", "description": "Test", "config": {}}
+        agent_data = {"name": "Test Agent", "description": "Test", "type": AGENT_TYPE_N8N, "config": VALID_N8N_CONFIG}
         create_response = test_client.post(
             ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id),
             json=agent_data,
@@ -339,7 +346,7 @@ class TestAutonomousAgentRBAC:
         tenant_id = create_tenant_for_user(test_client, user1_token)
         headers1 = create_auth_headers(user1_token, use_cache=False)
         
-        agent_data = {"name": "Test Agent", "description": "Test", "config": {}}
+        agent_data = {"name": "Test Agent", "description": "Test", "type": AGENT_TYPE_N8N, "config": VALID_N8N_CONFIG}
         create_response = test_client.post(
             ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id),
             json=agent_data,
@@ -384,7 +391,7 @@ class TestAutonomousAgentRBAC:
         tenant_id = create_tenant_for_user(test_client, user1_token)
         headers1 = create_auth_headers(user1_token, use_cache=False)
         
-        agent_data = {"name": "Test Agent", "description": "Test", "config": {}}
+        agent_data = {"name": "Test Agent", "description": "Test", "type": AGENT_TYPE_N8N, "config": VALID_N8N_CONFIG}
         create_response = test_client.post(
             ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id),
             json=agent_data,
@@ -451,7 +458,7 @@ class TestAutonomousAgentRBAC:
         tenant_id = create_tenant_for_user(test_client, user1_token)
         headers1 = create_auth_headers(user1_token, use_cache=False)
         
-        agent_data = {"name": "Test Agent", "description": "Test", "config": {}}
+        agent_data = {"name": "Test Agent", "description": "Test", "type": AGENT_TYPE_N8N, "config": VALID_N8N_CONFIG}
         create_response = test_client.post(
             ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id),
             json=agent_data,
@@ -483,19 +490,19 @@ class TestAutonomousAgentRBAC:
         # Create 3 agents
         agent1 = test_client.post(
             ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id),
-            json={"name": "Agent 1", "description": "Test", "config": {}},
+            json={"name": "Agent 1", "description": "Test", "type": AGENT_TYPE_N8N, "config": VALID_N8N_CONFIG},
             headers=headers1
         ).json()
         
         agent2 = test_client.post(
             ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id),
-            json={"name": "Agent 2", "description": "Test", "config": {}},
+            json={"name": "Agent 2", "description": "Test", "type": AGENT_TYPE_N8N, "config": VALID_N8N_CONFIG},
             headers=headers1
         ).json()
         
         agent3 = test_client.post(
             ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id),
-            json={"name": "Agent 3", "description": "Test", "config": {}},
+            json={"name": "Agent 3", "description": "Test", "type": AGENT_TYPE_N8N, "config": VALID_N8N_CONFIG},
             headers=headers1
         ).json()
         

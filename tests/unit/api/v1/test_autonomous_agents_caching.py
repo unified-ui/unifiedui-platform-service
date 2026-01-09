@@ -20,6 +20,13 @@ ROLE_ADMIN = PermissionActionEnum.ADMIN.value
 # Principal Types
 PRINCIPAL_TYPE_USER = PrincipalTypeEnum.IDENTITY_USER.value
 
+# Agent Types and Config
+AGENT_TYPE_N8N = "N8N"
+VALID_N8N_CONFIG = {
+    "workflow_endpoint": "http://localhost:5678/workflow/test-workflow-id",
+    "api_api_key_credential_id": "test-credential-id"
+}
+
 
 def create_tenant_for_user(test_client: TestClient, user_token: Any, tenant_name: str = "Test Tenant") -> str:
     """Helper function to create a tenant and return its ID."""
@@ -58,7 +65,7 @@ class TestAutonomousAgentCaching:
         tenant_id = create_tenant_for_user(test_client, user1_token)
         headers1 = create_auth_headers(user1_token, use_cache=False)
         
-        agent_data = {"name": "Test Agent", "description": "Test", "config": {}}
+        agent_data = {"name": "Test Agent", "description": "Test", "type": AGENT_TYPE_N8N, "config": VALID_N8N_CONFIG}
         create_response = test_client.post(
             ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id),
             json=agent_data,
@@ -107,7 +114,7 @@ class TestAutonomousAgentCaching:
         tenant_id = create_tenant_for_user(test_client, user1_token)
         headers1 = create_auth_headers(user1_token, use_cache=False)
         
-        agent_data = {"name": "Test Agent", "description": "Test", "config": {}}
+        agent_data = {"name": "Test Agent", "description": "Test", "type": AGENT_TYPE_N8N, "config": VALID_N8N_CONFIG}
         create_response = test_client.post(
             ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id),
             json=agent_data,
@@ -170,13 +177,13 @@ class TestAutonomousAgentCaching:
         # Create two agents
         agent1 = test_client.post(
             ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id),
-            json={"name": "Agent 1", "description": "Test", "config": {}},
+            json={"name": "Agent 1", "description": "Test", "type": AGENT_TYPE_N8N, "config": VALID_N8N_CONFIG},
             headers=headers1
         ).json()
         
         agent2 = test_client.post(
             ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id),
-            json={"name": "Agent 2", "description": "Test", "config": {}},
+            json={"name": "Agent 2", "description": "Test", "type": AGENT_TYPE_N8N, "config": VALID_N8N_CONFIG},
             headers=headers1
         ).json()
         
@@ -257,7 +264,7 @@ class TestAutonomousAgentCaching:
         tenant_id = create_tenant_for_user(test_client, user1_token)
         headers1 = create_auth_headers(user1_token, use_cache=False)
         
-        agent_data = {"name": "Test Agent", "description": "Original description", "config": {}}
+        agent_data = {"name": "Test Agent", "description": "Original description", "type": AGENT_TYPE_N8N, "config": VALID_N8N_CONFIG}
         create_response = test_client.post(
             ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id),
             json=agent_data,
@@ -296,7 +303,7 @@ class TestAutonomousAgentCaching:
         tenant_id = create_tenant_for_user(test_client, user1_token)
         headers1 = create_auth_headers(user1_token, use_cache=True)
         
-        agent_data = {"name": "Test Agent", "description": "Test", "config": {}}
+        agent_data = {"name": "Test Agent", "description": "Test", "type": AGENT_TYPE_N8N, "config": VALID_N8N_CONFIG}
         create_response = test_client.post(
             ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id),
             json=agent_data,
@@ -358,7 +365,7 @@ class TestAutonomousAgentCaching:
         headers1_no_cache = create_auth_headers(user1_token, use_cache=False)
         headers1_cached = create_auth_headers(user1_token, use_cache=True)
         
-        agent_data = {"name": "Test Agent", "description": "Test", "config": {}}
+        agent_data = {"name": "Test Agent", "description": "Test", "type": AGENT_TYPE_N8N, "config": VALID_N8N_CONFIG}
         create_response = test_client.post(
             ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id),
             json=agent_data,
@@ -399,7 +406,7 @@ class TestAutonomousAgentCaching:
         headers_no_cache = create_auth_headers(user1_token, use_cache=False)
         headers_cached = create_auth_headers(user1_token, use_cache=True)
         
-        agent_data = {"name": "Original Name", "description": "Test", "config": {}}
+        agent_data = {"name": "Original Name", "description": "Test", "type": AGENT_TYPE_N8N, "config": VALID_N8N_CONFIG}
         create_response = test_client.post(
             ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id),
             json=agent_data,
@@ -442,7 +449,7 @@ class TestAutonomousAgentCaching:
         tenant_id = create_tenant_for_user(test_client, user1_token)
         headers1 = create_auth_headers(user1_token, use_cache=False)
         
-        agent_data = {"name": "Test Agent", "description": "Test", "config": {}}
+        agent_data = {"name": "Test Agent", "description": "Test", "type": AGENT_TYPE_N8N, "config": VALID_N8N_CONFIG}
         create_response = test_client.post(
             ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id),
             json=agent_data,
@@ -512,7 +519,7 @@ class TestAutonomousAgentTagCacheInvalidation:
         # Create agent
         create_response = test_client.post(
             ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id),
-            json={"name": "Tagged Agent", "description": "Test", "config": {}},
+            json={"name": "Tagged Agent", "description": "Test", "type": AGENT_TYPE_N8N, "config": VALID_N8N_CONFIG},
             headers=headers
         )
         agent_id = create_response.json()["id"]
@@ -549,7 +556,7 @@ class TestAutonomousAgentTagCacheInvalidation:
         # Create agent
         create_response = test_client.post(
             ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id),
-            json={"name": "Tagged Agent 2", "description": "Test", "config": {}},
+            json={"name": "Tagged Agent 2", "description": "Test", "type": AGENT_TYPE_N8N, "config": VALID_N8N_CONFIG},
             headers=headers
         )
         agent_id = create_response.json()["id"]
@@ -591,7 +598,7 @@ class TestAutonomousAgentTagCacheInvalidation:
         # Create agent
         create_response = test_client.post(
             ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id),
-            json={"name": "Tagged Agent 3", "description": "Test", "config": {}},
+            json={"name": "Tagged Agent 3", "description": "Test", "type": AGENT_TYPE_N8N, "config": VALID_N8N_CONFIG},
             headers=headers
         )
         agent_id = create_response.json()["id"]
@@ -640,8 +647,8 @@ class TestAutonomousAgentListCaching:
         tenant_id = create_tenant_for_user(test_client, user_token)
         
         # Create agents
-        agent_data_a = {"name": "Agent A", "description": "Test", "config": {}}
-        agent_data_b = {"name": "Agent B", "description": "Test", "config": {}}
+        agent_data_a = {"name": "Agent A", "description": "Test", "type": AGENT_TYPE_N8N, "config": VALID_N8N_CONFIG}
+        agent_data_b = {"name": "Agent B", "description": "Test", "type": AGENT_TYPE_N8N, "config": VALID_N8N_CONFIG}
         test_client.post(ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id), json=agent_data_a, headers=headers)
         test_client.post(ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id), json=agent_data_b, headers=headers)
         
@@ -680,10 +687,10 @@ class TestAutonomousAgentListCaching:
         tenant_id = create_tenant_for_user(test_client, user_token)
         
         # Create two agents (default is_active=False)
-        agent_data_1 = {"name": "Agent Inactive", "description": "Test", "config": {}}
+        agent_data_1 = {"name": "Agent Inactive", "description": "Test", "type": AGENT_TYPE_N8N, "config": VALID_N8N_CONFIG}
         test_client.post(ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id), json=agent_data_1, headers=headers)
         
-        agent_data_2 = {"name": "Agent Active", "description": "Test", "config": {}}
+        agent_data_2 = {"name": "Agent Active", "description": "Test", "type": AGENT_TYPE_N8N, "config": VALID_N8N_CONFIG}
         response = test_client.post(ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id), json=agent_data_2, headers=headers)
         agent_id_2 = response.json()["id"]
         
@@ -728,7 +735,7 @@ class TestAutonomousAgentListCaching:
         headers = create_auth_headers(user_token)
         tenant_id = create_tenant_for_user(test_client, user_token)
         
-        agent_data = {"name": "Test Agent", "description": "Test", "config": {}}
+        agent_data = {"name": "Test Agent", "description": "Test", "type": AGENT_TYPE_N8N, "config": VALID_N8N_CONFIG}
         test_client.post(ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id), json=agent_data, headers=headers)
         
         # Different parameter combinations should return results

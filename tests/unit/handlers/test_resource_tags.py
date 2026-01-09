@@ -428,6 +428,7 @@ class TestResourceTagsHandlerMultipleResourceTypes:
             tenant_id=tenant_id,
             name="Test Agent",
             description="Test",
+            type="N8N",
             config={},
             is_active=True,
             created_by=user_id,
