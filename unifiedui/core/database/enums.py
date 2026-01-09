@@ -32,6 +32,14 @@ class ApplicationTypeEnum(str, Enum):
         return [app_type.value for app_type in ApplicationTypeEnum]
 
 
+class AutonomousAgentTypeEnum(str, Enum):
+    """Supported autonomous agent types."""
+    N8N = "N8N"
+
+    def all() -> list[str]:
+        return [agent_type.value for agent_type in AutonomousAgentTypeEnum]
+
+
 class ChatWidgetTypeEnum(str, Enum):
     IFRAME = "IFRAME"
     FORM = "FORM"

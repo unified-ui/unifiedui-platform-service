@@ -3,7 +3,11 @@ from typing import Any
 from fastapi import status
 from starlette.testclient import TestClient
 
-from unifiedui.core.database.enums import PermissionActionEnum, PrincipalTypeEnum
+from unifiedui.core.database.enums import (
+    PermissionActionEnum, 
+    PrincipalTypeEnum, 
+    AutonomousAgentTypeEnum
+)
 from tests.conftest import create_auth_headers
 
 
@@ -25,6 +29,15 @@ ROLE_ADMIN = PermissionActionEnum.ADMIN.value
 PRINCIPAL_TYPE_USER = PrincipalTypeEnum.IDENTITY_USER.value
 PRINCIPAL_TYPE_GROUP = PrincipalTypeEnum.IDENTITY_GROUP.value
 PRINCIPAL_TYPE_CUSTOM_GROUP = PrincipalTypeEnum.CUSTOM_GROUP.value
+
+# Agent Types
+AGENT_TYPE_N8N = AutonomousAgentTypeEnum.N8N.value
+
+# Valid N8N Config for tests
+VALID_N8N_CONFIG = {
+    "workflow_endpoint": "http://localhost:5678/workflow/test-workflow-id",
+    "api_api_key_credential_id": "test-credential-id"
+}
 
 
 def create_tenant_for_user(test_client: TestClient, user_token: Any, tenant_name: str = "Test Tenant") -> str:
@@ -56,7 +69,8 @@ class TestAutonomousAgentRoutes:
         agent_data = {
             "name": "Test Agent",
             "description": "A test autonomous agent",
-            "config": {"model": "gpt-4", "temperature": 0.7}
+            "type": AGENT_TYPE_N8N,
+            "config": VALID_N8N_CONFIG
         }
         
         response = test_client.post(
@@ -70,6 +84,7 @@ class TestAutonomousAgentRoutes:
         
         assert data["name"] == agent_data["name"]
         assert data["description"] == agent_data["description"]
+        assert data["type"] == AGENT_TYPE_N8N
         assert data["config"] == agent_data["config"]
         assert data["is_active"] == False
         assert "id" in data
@@ -85,7 +100,7 @@ class TestAutonomousAgentRoutes:
         
         response = test_client.post(
             ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id),
-            json={"description": "Test agent"},
+            json={"description": "Test agent", "type": AGENT_TYPE_N8N, "config": VALID_N8N_CONFIG},
             headers=headers
         )
         
@@ -98,7 +113,7 @@ class TestAutonomousAgentRoutes:
         
         response = test_client.post(
             ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id),
-            json={"name": 123, "description": "Test"},
+            json={"name": 123, "description": "Test", "type": AGENT_TYPE_N8N, "config": VALID_N8N_CONFIG},
             headers=headers
         )
         
@@ -111,7 +126,7 @@ class TestAutonomousAgentRoutes:
         
         response = test_client.post(
             ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id),
-            json={"name": "", "description": "Test"},
+            json={"name": "", "description": "Test", "type": AGENT_TYPE_N8N, "config": VALID_N8N_CONFIG},
             headers=headers
         )
         
@@ -124,7 +139,7 @@ class TestAutonomousAgentRoutes:
         
         response = test_client.post(
             ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id),
-            json={"name": "Test Agent", "description": 123},
+            json={"name": "Test Agent", "description": 123, "type": AGENT_TYPE_N8N, "config": VALID_N8N_CONFIG},
             headers=headers
         )
         
@@ -157,7 +172,7 @@ class TestAutonomousAgentRoutes:
         # Try to create agent as user2 (should fail - no tenant membership)
         response = test_client.post(
             ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id),
-            json={"name": "Unauthorized Agent", "description": "Should fail"},
+            json={"name": "Unauthorized Agent", "description": "Should fail", "type": AGENT_TYPE_N8N, "config": VALID_N8N_CONFIG},
             headers=headers2
         )
         
@@ -169,7 +184,7 @@ class TestAutonomousAgentRoutes:
         headers = create_auth_headers(test_user_token, use_cache=False)
         
         # Create an autonomous agent
-        agent_data = {"name": "Test Agent", "description": "Test description", "config": {}}
+        agent_data = {"name": "Test Agent", "description": "Test description", "type": AGENT_TYPE_N8N, "config": VALID_N8N_CONFIG}
         create_response = test_client.post(
             ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id),
             json=agent_data,
@@ -189,6 +204,7 @@ class TestAutonomousAgentRoutes:
         assert data["id"] == agent_id
         assert data["name"] == agent_data["name"]
         assert data["description"] == agent_data["description"]
+        assert data["type"] == AGENT_TYPE_N8N
     
     def test_get_autonomous_agent_not_found(self, test_client: TestClient, test_user_token: Any) -> None:
         """Test autonomous agent retrieval with non-existent ID."""
@@ -224,8 +240,8 @@ class TestAutonomousAgentRoutes:
         headers = create_auth_headers(test_user_token, use_cache=False)
         
         # Create multiple autonomous agents
-        agent1_data = {"name": "Agent 1", "description": "First agent", "config": {}}
-        agent2_data = {"name": "Agent 2", "description": "Second agent", "config": {}}
+        agent1_data = {"name": "Agent 1", "description": "First agent", "type": AGENT_TYPE_N8N, "config": VALID_N8N_CONFIG}
+        agent2_data = {"name": "Agent 2", "description": "Second agent", "type": AGENT_TYPE_N8N, "config": VALID_N8N_CONFIG}
         
         test_client.post(
             ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id),
@@ -263,7 +279,7 @@ class TestAutonomousAgentRoutes:
         for i in range(5):
             test_client.post(
                 ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id),
-                json={"name": f"Agent {i}", "description": f"Agent number {i}", "config": {}},
+                json={"name": f"Agent {i}", "description": f"Agent number {i}", "type": AGENT_TYPE_N8N, "config": VALID_N8N_CONFIG},
                 headers=headers
             )
         
@@ -295,17 +311,17 @@ class TestAutonomousAgentRoutes:
         # Create agents with different names
         test_client.post(
             ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id),
-            json={"name": "Production Agent", "description": "Prod", "config": {}},
+            json={"name": "Production Agent", "description": "Prod", "type": AGENT_TYPE_N8N, "config": VALID_N8N_CONFIG},
             headers=headers
         )
         test_client.post(
             ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id),
-            json={"name": "Development Agent", "description": "Dev", "config": {}},
+            json={"name": "Development Agent", "description": "Dev", "type": AGENT_TYPE_N8N, "config": VALID_N8N_CONFIG},
             headers=headers
         )
         test_client.post(
             ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id),
-            json={"name": "Testing Bot", "description": "Test", "config": {}},
+            json={"name": "Testing Bot", "description": "Test", "type": AGENT_TYPE_N8N, "config": VALID_N8N_CONFIG},
             headers=headers
         )
         
@@ -332,12 +348,12 @@ class TestAutonomousAgentRoutes:
         # Create agents
         test_client.post(
             ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id),
-            json={"name": "Agent One", "description": "First agent", "config": {"key": "value"}},
+            json={"name": "Agent One", "description": "First agent", "type": AGENT_TYPE_N8N, "config": VALID_N8N_CONFIG},
             headers=headers
         )
         test_client.post(
             ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id),
-            json={"name": "Agent Two", "description": "Second agent", "config": {}},
+            json={"name": "Agent Two", "description": "Second agent", "type": AGENT_TYPE_N8N, "config": VALID_N8N_CONFIG},
             headers=headers
         )
         
@@ -371,7 +387,7 @@ class TestAutonomousAgentRoutes:
         headers = create_auth_headers(test_user_token, use_cache=False)
         
         # Create an autonomous agent
-        agent_data = {"name": "Original Name", "description": "Original description", "config": {"key": "value"}}
+        agent_data = {"name": "Original Name", "description": "Original description", "type": AGENT_TYPE_N8N, "config": VALID_N8N_CONFIG}
         create_response = test_client.post(
             ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id),
             json=agent_data,
@@ -392,7 +408,7 @@ class TestAutonomousAgentRoutes:
         
         assert data["name"] == "Updated Name"
         assert data["description"] == "Updated description"
-        assert data["config"] == {"key": "value"}  # Config should remain unchanged
+        assert data["config"] == VALID_N8N_CONFIG  # Config should remain unchanged
     
     def test_update_autonomous_agent_not_found(self, test_client: TestClient, test_user_token: Any) -> None:
         """Test autonomous agent update with non-existent ID."""
@@ -413,7 +429,7 @@ class TestAutonomousAgentRoutes:
         headers = create_auth_headers(test_user_token, use_cache=False)
         
         # Create an autonomous agent
-        agent_data = {"name": "Original Name", "description": "Original description", "config": {}}
+        agent_data = {"name": "Original Name", "description": "Original description", "type": AGENT_TYPE_N8N, "config": VALID_N8N_CONFIG}
         create_response = test_client.post(
             ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id),
             json=agent_data,
@@ -426,7 +442,7 @@ class TestAutonomousAgentRoutes:
         headers = create_auth_headers(test_user_token, use_cache=False)
         
         # Create an autonomous agent (default is_active=False)
-        agent_data = {"name": "Test Agent", "description": "Test", "config": {}}
+        agent_data = {"name": "Test Agent", "description": "Test", "type": AGENT_TYPE_N8N, "config": VALID_N8N_CONFIG}
         create_response = test_client.post(
             ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id),
             json=agent_data,
@@ -475,7 +491,7 @@ class TestAutonomousAgentRoutes:
         headers = create_auth_headers(test_user_token, use_cache=False)
         
         # Create an autonomous agent
-        agent_data = {"name": "To Delete", "description": "Will be deleted", "config": {}}
+        agent_data = {"name": "To Delete", "description": "Will be deleted", "type": AGENT_TYPE_N8N, "config": VALID_N8N_CONFIG}
         create_response = test_client.post(
             ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id),
             json=agent_data,
@@ -523,7 +539,7 @@ class TestAutonomousAgentPrincipalRoutes:
         headers = create_auth_headers(test_user_token, use_cache=False)
         
         # Create an autonomous agent
-        agent_data = {"name": "Test Agent", "description": "Test", "config": {}}
+        agent_data = {"name": "Test Agent", "description": "Test", "type": AGENT_TYPE_N8N, "config": VALID_N8N_CONFIG}
         create_response = test_client.post(
             ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id),
             json=agent_data,
@@ -560,7 +576,7 @@ class TestAutonomousAgentPrincipalRoutes:
         headers = create_auth_headers(test_user_token, use_cache=False)
         
         # Create an autonomous agent
-        agent_data = {"name": "Test Agent", "description": "Test", "config": {}}
+        agent_data = {"name": "Test Agent", "description": "Test", "type": AGENT_TYPE_N8N, "config": VALID_N8N_CONFIG}
         create_response = test_client.post(
             ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id),
             json=agent_data,
@@ -591,7 +607,7 @@ class TestAutonomousAgentPrincipalRoutes:
         headers = create_auth_headers(test_user_token, use_cache=False)
         
         # Create an autonomous agent
-        agent_data = {"name": "Test Agent", "description": "Test", "config": {}}
+        agent_data = {"name": "Test Agent", "description": "Test", "type": AGENT_TYPE_N8N, "config": VALID_N8N_CONFIG}
         create_response = test_client.post(
             ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id),
             json=agent_data,
@@ -624,7 +640,7 @@ class TestAutonomousAgentPrincipalRoutes:
         headers = create_auth_headers(test_user_token, use_cache=False)
         
         # Create an autonomous agent
-        agent_data = {"name": "Test Agent", "description": "Test", "config": {}}
+        agent_data = {"name": "Test Agent", "description": "Test", "type": AGENT_TYPE_N8N, "config": VALID_N8N_CONFIG}
         create_response = test_client.post(
             ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id),
             json=agent_data,
@@ -666,7 +682,7 @@ class TestAutonomousAgentPrincipalRoutes:
         headers = create_auth_headers(test_user_token, use_cache=False)
         
         # Create an autonomous agent
-        agent_data = {"name": "Test Agent", "description": "Test", "config": {}}
+        agent_data = {"name": "Test Agent", "description": "Test", "type": AGENT_TYPE_N8N, "config": VALID_N8N_CONFIG}
         create_response = test_client.post(
             ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id),
             json=agent_data,
@@ -691,7 +707,7 @@ class TestAutonomousAgentPrincipalRoutes:
         headers = create_auth_headers(test_user_token, use_cache=False)
         
         # Create an autonomous agent
-        agent_data = {"name": "Test Agent", "description": "Test", "config": {}}
+        agent_data = {"name": "Test Agent", "description": "Test", "type": AGENT_TYPE_N8N, "config": VALID_N8N_CONFIG}
         create_response = test_client.post(
             ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id),
             json=agent_data,
@@ -716,7 +732,7 @@ class TestAutonomousAgentPrincipalRoutes:
         headers = create_auth_headers(test_user_token, use_cache=False)
         
         # Create an autonomous agent
-        agent_data = {"name": "Test Agent", "description": "Test", "config": {}}
+        agent_data = {"name": "Test Agent", "description": "Test", "type": AGENT_TYPE_N8N, "config": VALID_N8N_CONFIG}
         create_response = test_client.post(
             ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id),
             json=agent_data,
@@ -742,7 +758,7 @@ class TestAutonomousAgentPrincipalRoutes:
         headers = create_auth_headers(test_user_token, use_cache=False)
         
         # Create an autonomous agent
-        agent_data = {"name": "Test Agent", "description": "Test", "config": {}}
+        agent_data = {"name": "Test Agent", "description": "Test", "type": AGENT_TYPE_N8N, "config": VALID_N8N_CONFIG}
         create_response = test_client.post(
             ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id),
             json=agent_data,
@@ -768,7 +784,7 @@ class TestAutonomousAgentPrincipalRoutes:
         headers = create_auth_headers(test_user_token, use_cache=False)
         
         # Create an autonomous agent
-        agent_data = {"name": "Test Agent", "description": "Test", "config": {}}
+        agent_data = {"name": "Test Agent", "description": "Test", "type": AGENT_TYPE_N8N, "config": VALID_N8N_CONFIG}
         create_response = test_client.post(
             ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id),
             json=agent_data,
@@ -807,7 +823,7 @@ class TestAutonomousAgentPrincipalRoutes:
         headers = create_auth_headers(test_user_token, use_cache=False)
         
         # Create an autonomous agent
-        agent_data = {"name": "Test Agent", "description": "Test", "config": {}}
+        agent_data = {"name": "Test Agent", "description": "Test", "type": AGENT_TYPE_N8N, "config": VALID_N8N_CONFIG}
         create_response = test_client.post(
             ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id),
             json=agent_data,
@@ -828,3 +844,314 @@ class TestAutonomousAgentPrincipalRoutes:
         )
         
         assert response.status_code == status.HTTP_404_NOT_FOUND
+
+
+class TestAutonomousAgentKeyRoutes:
+    """Test suite for autonomous agent API key management routes."""
+    
+    def test_get_primary_key_success(self, test_client: TestClient, test_user_token: Any) -> None:
+        """Test successful retrieval of primary API key."""
+        tenant_id = create_tenant_for_user(test_client, test_user_token)
+        headers = create_auth_headers(test_user_token, use_cache=False)
+        
+        # Create an autonomous agent
+        agent_data = {"name": "Test Agent", "description": "Test", "type": AGENT_TYPE_N8N, "config": VALID_N8N_CONFIG}
+        create_response = test_client.post(
+            ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id),
+            json=agent_data,
+            headers=headers
+        )
+        agent_id = create_response.json()["id"]
+        
+        # Get primary key
+        response = test_client.get(
+            f"{ENDPOINT_AUTONOMOUS_AGENT_DETAIL.format(tenant_id=tenant_id, autonomous_agent_id=agent_id)}/keys/1",
+            headers=headers
+        )
+        
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert "key" in data
+        assert data["key_number"] == 1
+        assert len(data["key"]) > 20  # Key should be a reasonable length
+    
+    def test_get_secondary_key_success(self, test_client: TestClient, test_user_token: Any) -> None:
+        """Test successful retrieval of secondary API key."""
+        tenant_id = create_tenant_for_user(test_client, test_user_token)
+        headers = create_auth_headers(test_user_token, use_cache=False)
+        
+        # Create an autonomous agent
+        agent_data = {"name": "Test Agent", "description": "Test", "type": AGENT_TYPE_N8N, "config": VALID_N8N_CONFIG}
+        create_response = test_client.post(
+            ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id),
+            json=agent_data,
+            headers=headers
+        )
+        agent_id = create_response.json()["id"]
+        
+        # Get secondary key
+        response = test_client.get(
+            f"{ENDPOINT_AUTONOMOUS_AGENT_DETAIL.format(tenant_id=tenant_id, autonomous_agent_id=agent_id)}/keys/2",
+            headers=headers
+        )
+        
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert "key" in data
+        assert data["key_number"] == 2
+    
+    def test_get_key_invalid_number(self, test_client: TestClient, test_user_token: Any) -> None:
+        """Test retrieval of key with invalid key number."""
+        tenant_id = create_tenant_for_user(test_client, test_user_token)
+        headers = create_auth_headers(test_user_token, use_cache=False)
+        
+        # Create an autonomous agent
+        agent_data = {"name": "Test Agent", "description": "Test", "type": AGENT_TYPE_N8N, "config": VALID_N8N_CONFIG}
+        create_response = test_client.post(
+            ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id),
+            json=agent_data,
+            headers=headers
+        )
+        agent_id = create_response.json()["id"]
+        
+        # Try to get key 3 (invalid)
+        response = test_client.get(
+            f"{ENDPOINT_AUTONOMOUS_AGENT_DETAIL.format(tenant_id=tenant_id, autonomous_agent_id=agent_id)}/keys/3",
+            headers=headers
+        )
+        
+        # Invalid key_number is a bad request, not not-found
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+    
+    def test_rotate_primary_key_success(self, test_client: TestClient, test_user_token: Any) -> None:
+        """Test successful rotation of primary API key."""
+        tenant_id = create_tenant_for_user(test_client, test_user_token)
+        headers = create_auth_headers(test_user_token, use_cache=False)
+        
+        # Create an autonomous agent
+        agent_data = {"name": "Test Agent", "description": "Test", "type": AGENT_TYPE_N8N, "config": VALID_N8N_CONFIG}
+        create_response = test_client.post(
+            ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id),
+            json=agent_data,
+            headers=headers
+        )
+        agent_id = create_response.json()["id"]
+        
+        # Get original primary key
+        original_key_response = test_client.get(
+            f"{ENDPOINT_AUTONOMOUS_AGENT_DETAIL.format(tenant_id=tenant_id, autonomous_agent_id=agent_id)}/keys/1",
+            headers=headers
+        )
+        original_key = original_key_response.json()["key"]
+        
+        # Rotate primary key
+        rotate_response = test_client.put(
+            f"{ENDPOINT_AUTONOMOUS_AGENT_DETAIL.format(tenant_id=tenant_id, autonomous_agent_id=agent_id)}/keys/1/rotate",
+            headers=headers
+        )
+        
+        assert rotate_response.status_code == status.HTTP_200_OK
+        rotated_data = rotate_response.json()
+        assert "key" in rotated_data
+        assert rotated_data["key_number"] == 1
+        assert rotated_data["key"] != original_key  # New key should be different
+    
+    def test_rotate_secondary_key_success(self, test_client: TestClient, test_user_token: Any) -> None:
+        """Test successful rotation of secondary API key."""
+        tenant_id = create_tenant_for_user(test_client, test_user_token)
+        headers = create_auth_headers(test_user_token, use_cache=False)
+        
+        # Create an autonomous agent
+        agent_data = {"name": "Test Agent", "description": "Test", "type": AGENT_TYPE_N8N, "config": VALID_N8N_CONFIG}
+        create_response = test_client.post(
+            ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id),
+            json=agent_data,
+            headers=headers
+        )
+        agent_id = create_response.json()["id"]
+        
+        # Get original secondary key
+        original_key_response = test_client.get(
+            f"{ENDPOINT_AUTONOMOUS_AGENT_DETAIL.format(tenant_id=tenant_id, autonomous_agent_id=agent_id)}/keys/2",
+            headers=headers
+        )
+        original_key = original_key_response.json()["key"]
+        
+        # Rotate secondary key
+        rotate_response = test_client.put(
+            f"{ENDPOINT_AUTONOMOUS_AGENT_DETAIL.format(tenant_id=tenant_id, autonomous_agent_id=agent_id)}/keys/2/rotate",
+            headers=headers
+        )
+        
+        assert rotate_response.status_code == status.HTTP_200_OK
+        rotated_data = rotate_response.json()
+        assert "key" in rotated_data
+        assert rotated_data["key_number"] == 2
+        assert rotated_data["key"] != original_key
+    
+    def test_rotate_key_invalid_number(self, test_client: TestClient, test_user_token: Any) -> None:
+        """Test rotation of key with invalid key number."""
+        tenant_id = create_tenant_for_user(test_client, test_user_token)
+        headers = create_auth_headers(test_user_token, use_cache=False)
+        
+        # Create an autonomous agent
+        agent_data = {"name": "Test Agent", "description": "Test", "type": AGENT_TYPE_N8N, "config": VALID_N8N_CONFIG}
+        create_response = test_client.post(
+            ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id),
+            json=agent_data,
+            headers=headers
+        )
+        agent_id = create_response.json()["id"]
+        
+        # Try to rotate key 3 (invalid)
+        response = test_client.put(
+            f"{ENDPOINT_AUTONOMOUS_AGENT_DETAIL.format(tenant_id=tenant_id, autonomous_agent_id=agent_id)}/keys/3/rotate",
+            headers=headers
+        )
+        
+        # Invalid key_number is a bad request, not not-found
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+    
+    def test_keys_are_different(self, test_client: TestClient, test_user_token: Any) -> None:
+        """Test that primary and secondary keys are different upon creation."""
+        tenant_id = create_tenant_for_user(test_client, test_user_token)
+        headers = create_auth_headers(test_user_token, use_cache=False)
+        
+        # Create an autonomous agent
+        agent_data = {"name": "Test Agent", "description": "Test", "type": AGENT_TYPE_N8N, "config": VALID_N8N_CONFIG}
+        create_response = test_client.post(
+            ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id),
+            json=agent_data,
+            headers=headers
+        )
+        agent_id = create_response.json()["id"]
+        
+        # Get both keys
+        key1_response = test_client.get(
+            f"{ENDPOINT_AUTONOMOUS_AGENT_DETAIL.format(tenant_id=tenant_id, autonomous_agent_id=agent_id)}/keys/1",
+            headers=headers
+        )
+        key2_response = test_client.get(
+            f"{ENDPOINT_AUTONOMOUS_AGENT_DETAIL.format(tenant_id=tenant_id, autonomous_agent_id=agent_id)}/keys/2",
+            headers=headers
+        )
+        
+        key1 = key1_response.json()["key"]
+        key2 = key2_response.json()["key"]
+        
+        assert key1 != key2  # Primary and secondary keys should be different
+    
+    def test_get_key_agent_not_found(self, test_client: TestClient, test_user_token: Any) -> None:
+        """Test getting key for non-existent agent."""
+        tenant_id = create_tenant_for_user(test_client, test_user_token)
+        headers = create_auth_headers(test_user_token, use_cache=False)
+        
+        response = test_client.get(
+            f"{ENDPOINT_AUTONOMOUS_AGENT_DETAIL.format(tenant_id=tenant_id, autonomous_agent_id=NON_EXISTENT_ID)}/keys/1",
+            headers=headers
+        )
+        
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+
+
+class TestAutonomousAgentConfigValidation:
+    """Test suite for autonomous agent configuration validation."""
+    
+    def test_create_agent_invalid_workflow_endpoint_missing_workflow(self, test_client: TestClient, test_user_token: Any) -> None:
+        """Test creation fails when workflow_endpoint doesn't contain /workflow/."""
+        tenant_id = create_tenant_for_user(test_client, test_user_token)
+        headers = create_auth_headers(test_user_token, use_cache=False)
+        
+        invalid_config = {
+            "workflow_endpoint": "http://localhost:5678/api/test",  # Missing /workflow/
+            "api_api_key_credential_id": "test-cred-id"
+        }
+        
+        response = test_client.post(
+            ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id),
+            json={"name": "Test Agent", "description": "Test", "type": AGENT_TYPE_N8N, "config": invalid_config},
+            headers=headers
+        )
+        
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+    
+    def test_create_agent_invalid_workflow_endpoint_not_url(self, test_client: TestClient, test_user_token: Any) -> None:
+        """Test creation fails when workflow_endpoint is not a valid URL."""
+        tenant_id = create_tenant_for_user(test_client, test_user_token)
+        headers = create_auth_headers(test_user_token, use_cache=False)
+        
+        invalid_config = {
+            "workflow_endpoint": "not-a-valid-url/workflow/test",
+            "api_api_key_credential_id": "test-cred-id"
+        }
+        
+        response = test_client.post(
+            ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id),
+            json={"name": "Test Agent", "description": "Test", "type": AGENT_TYPE_N8N, "config": invalid_config},
+            headers=headers
+        )
+        
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+    
+    def test_create_agent_missing_api_key_credential_id(self, test_client: TestClient, test_user_token: Any) -> None:
+        """Test creation fails when api_api_key_credential_id is missing."""
+        tenant_id = create_tenant_for_user(test_client, test_user_token)
+        headers = create_auth_headers(test_user_token, use_cache=False)
+        
+        invalid_config = {
+            "workflow_endpoint": "http://localhost:5678/workflow/test"
+            # Missing api_api_key_credential_id
+        }
+        
+        response = test_client.post(
+            ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id),
+            json={"name": "Test Agent", "description": "Test", "type": AGENT_TYPE_N8N, "config": invalid_config},
+            headers=headers
+        )
+        
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+    
+    def test_update_agent_config_validation(self, test_client: TestClient, test_user_token: Any) -> None:
+        """Test that config is validated on update."""
+        tenant_id = create_tenant_for_user(test_client, test_user_token)
+        headers = create_auth_headers(test_user_token, use_cache=False)
+        
+        # Create agent with valid config
+        agent_data = {"name": "Test Agent", "description": "Test", "type": AGENT_TYPE_N8N, "config": VALID_N8N_CONFIG}
+        create_response = test_client.post(
+            ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id),
+            json=agent_data,
+            headers=headers
+        )
+        agent_id = create_response.json()["id"]
+        
+        # Try to update with invalid config
+        invalid_config = {
+            "workflow_endpoint": "invalid-url",
+            "api_api_key_credential_id": "test-cred-id"
+        }
+        
+        update_response = test_client.patch(
+            ENDPOINT_AUTONOMOUS_AGENT_DETAIL.format(tenant_id=tenant_id, autonomous_agent_id=agent_id),
+            json={"config": invalid_config},
+            headers=headers
+        )
+        
+        assert update_response.status_code == status.HTTP_400_BAD_REQUEST
+    
+    def test_agent_response_includes_type(self, test_client: TestClient, test_user_token: Any) -> None:
+        """Test that agent response includes type field."""
+        tenant_id = create_tenant_for_user(test_client, test_user_token)
+        headers = create_auth_headers(test_user_token, use_cache=False)
+        
+        agent_data = {"name": "Test Agent", "description": "Test", "type": AGENT_TYPE_N8N, "config": VALID_N8N_CONFIG}
+        create_response = test_client.post(
+            ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id),
+            json=agent_data,
+            headers=headers
+        )
+        
+        assert create_response.status_code == status.HTTP_201_CREATED
+        data = create_response.json()
+        assert "type" in data
+        assert data["type"] == AGENT_TYPE_N8N

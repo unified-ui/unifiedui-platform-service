@@ -42,8 +42,9 @@ def test_client(
     new_cache_dep._cache_client = test_cache_client
     new_cache_dep._cache_initialized = True
     
-    # Set vault client global
+    # Set vault client globals (both _vault_client and _secrets_vault)
     vault_dep._vault_client = mock_vault_client
+    vault_dep._secrets_vault = mock_vault_client
     
     # CRITICAL: Clear the LRU cache to force get_cache_client() to use our test client
     old_cache_dep.get_cache_client.cache_clear()
@@ -79,4 +80,5 @@ def test_client(
     new_cache_dep._cache_client = None
     new_cache_dep._cache_initialized = False
     vault_dep._vault_client = None
+    vault_dep._secrets_vault = None
     logger.info("Singletons reset")

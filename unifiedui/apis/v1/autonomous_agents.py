@@ -9,12 +9,18 @@ from unifiedui.handlers.autonomous_agents import AutonomousAgentHandler
 from unifiedui.handlers.dependencies import get_autonomous_agent_handler
 from unifiedui.schema.requests.autonomous_agents import CreateAutonomousAgentRequest, UpdateAutonomousAgentRequest
 from unifiedui.schema.requests.autonomous_agent_permissions import SetAutonomousAgentPermissionRequest
-from unifiedui.schema.responses.autonomous_agents import AutonomousAgentResponse
+from unifiedui.schema.responses.autonomous_agents import AutonomousAgentResponse, AutonomousAgentKeyResponse
 from unifiedui.schema.responses.principals import (
     PrincipalWithRolesResponse,
     ResourcePrincipalsResponse
 )
-from unifiedui.exc.autonomous_agents import AutonomousAgentNotFoundError, AutonomousAgentPermissionNotFoundError
+from unifiedui.exc.autonomous_agents import (
+    AutonomousAgentNotFoundError, 
+    AutonomousAgentPermissionNotFoundError,
+    AutonomousAgentConfigValidationError,
+    UnsupportedAutonomousAgentTypeError,
+    AutonomousAgentKeyNotFoundError
+)
 from unifiedui.core.middleware.apis.v1.auth import authenticate, check_permissions
 from unifiedui.core.database.enums import TenantRolesEnum, PermissionActionEnum, OrderDirectionEnum, ListViewEnum
 from unifiedui.logger import get_logger
@@ -146,6 +152,16 @@ async def create_autonomous_agent(
             user_id=user_id,
             user=user
         )
+    except AutonomousAgentConfigValidationError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+    except UnsupportedAutonomousAgentTypeError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
     except Exception as e:
         logger.error(f"Failed to create autonomous agent: {e}", exc_info=True)
         raise HTTPException(
@@ -260,6 +276,11 @@ async def update_autonomous_agent(
     except AutonomousAgentNotFoundError as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e)
+        )
+    except AutonomousAgentConfigValidationError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e)
         )
     except Exception as e:
@@ -585,4 +606,161 @@ async def delete_autonomous_agent_permission(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to delete autonomous agent permission"
+        )
+
+
+# ========== API Key Management Endpoints ==========
+
+@router.get(
+    "/{autonomous_agent_id}/keys/{key_number}",
+    response_model=AutonomousAgentKeyResponse,
+    summary="Get autonomous agent API key",
+    description="Get an API key for an autonomous agent (1 = primary, 2 = secondary)"
+)
+@authenticate()
+@check_permissions(
+    entity="autonomous_agent",
+    required_permissions=[
+        TenantRolesEnum.GLOBAL_ADMIN,
+        TenantRolesEnum.AUTONOMOUS_AGENTS_ADMIN,
+        PermissionActionEnum.ADMIN,
+        PermissionActionEnum.WRITE
+    ]
+)
+async def get_autonomous_agent_key(
+    request: Request,
+    tenant_id: str,
+    autonomous_agent_id: str,
+    key_number: int,
+    handler: AutonomousAgentHandler = Depends(get_autonomous_agent_handler)
+) -> AutonomousAgentKeyResponse:
+    """
+    Get an API key for an autonomous agent.
+    
+    Requires WRITE or ADMIN permission on the autonomous agent, or GLOBAL_ADMIN/AUTONOMOUS_AGENTS_ADMIN on tenant.
+    
+    Args:
+        request: FastAPI request with user in state
+        tenant_id: Tenant ID from path
+        autonomous_agent_id: Autonomous agent ID from path
+        key_number: Key number (1 for primary, 2 for secondary)
+        handler: Autonomous agent handler dependency
+        
+    Returns:
+        The API key
+    """
+    try:
+        if key_number not in [1, 2]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="key_number must be 1 or 2"
+            )
+        
+        return handler.get_api_key(
+            tenant_id=tenant_id,
+            autonomous_agent_id=autonomous_agent_id,
+            key_number=key_number
+        )
+    except AutonomousAgentNotFoundError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e)
+        )
+    except AutonomousAgentKeyNotFoundError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e)
+        )
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to get autonomous agent key: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to get autonomous agent key"
+        )
+
+
+@router.put(
+    "/{autonomous_agent_id}/keys/{key_number}/rotate",
+    response_model=AutonomousAgentKeyResponse,
+    summary="Rotate autonomous agent API key",
+    description="Rotate an API key for an autonomous agent (1 = primary, 2 = secondary)"
+)
+@authenticate()
+@check_permissions(
+    entity="autonomous_agent",
+    required_permissions=[
+        TenantRolesEnum.GLOBAL_ADMIN,
+        TenantRolesEnum.AUTONOMOUS_AGENTS_ADMIN,
+        PermissionActionEnum.ADMIN,
+        PermissionActionEnum.WRITE
+    ]
+)
+async def rotate_autonomous_agent_key(
+    request: Request,
+    tenant_id: str,
+    autonomous_agent_id: str,
+    key_number: int,
+    handler: AutonomousAgentHandler = Depends(get_autonomous_agent_handler)
+) -> AutonomousAgentKeyResponse:
+    """
+    Rotate an API key for an autonomous agent.
+    
+    This generates a new random API key and replaces the existing one.
+    Requires WRITE or ADMIN permission on the autonomous agent, or GLOBAL_ADMIN/AUTONOMOUS_AGENTS_ADMIN on tenant.
+    
+    Args:
+        request: FastAPI request with user in state
+        tenant_id: Tenant ID from path
+        autonomous_agent_id: Autonomous agent ID from path
+        key_number: Key number (1 for primary, 2 for secondary)
+        handler: Autonomous agent handler dependency
+        
+    Returns:
+        The new API key
+    """
+    try:
+        if key_number not in [1, 2]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="key_number must be 1 or 2"
+            )
+        
+        user: ContextIdentityUser = request.state.user
+        user_id = user.identity.get_id()
+        
+        return handler.rotate_api_key(
+            tenant_id=tenant_id,
+            autonomous_agent_id=autonomous_agent_id,
+            key_number=key_number,
+            user_id=user_id
+        )
+    except AutonomousAgentNotFoundError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e)
+        )
+    except AutonomousAgentKeyNotFoundError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e)
+        )
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to rotate autonomous agent key: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to rotate autonomous agent key"
         )

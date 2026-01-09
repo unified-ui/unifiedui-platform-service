@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import uuid
+import secrets
 from typing import TYPE_CHECKING, Optional, List, Union
 
 from sqlalchemy import select, or_
@@ -9,7 +10,8 @@ from sqlalchemy.orm import selectinload
 
 from unifiedui.core.database.client import SQLAlchemyClient
 from unifiedui.core.database.models import AutonomousAgent, AutonomousAgentMember, AutonomousAgentTag, Tag
-from unifiedui.core.database.enums import PermissionActionEnum, PrincipalTypeEnum
+from unifiedui.core.database.enums import PermissionActionEnum, PrincipalTypeEnum, AutonomousAgentTypeEnum
+from unifiedui.core.vault.client import BaseVaultClient
 from unifiedui.caching.client import CacheClient
 
 if TYPE_CHECKING:
@@ -19,14 +21,21 @@ if TYPE_CHECKING:
 
 from unifiedui.schema.requests.autonomous_agents import CreateAutonomousAgentRequest, UpdateAutonomousAgentRequest
 from unifiedui.schema.requests.autonomous_agent_permissions import SetAutonomousAgentPermissionRequest
-from unifiedui.schema.responses.autonomous_agents import AutonomousAgentResponse
+from unifiedui.schema.responses.autonomous_agents import AutonomousAgentResponse, AutonomousAgentKeyResponse
 from unifiedui.schema.responses.common import QuickListItemResponse
 from unifiedui.schema.responses.tags import TagSummary
 from unifiedui.schema.responses.principals import (
     PrincipalWithRolesResponse,
     ResourcePrincipalsResponse
 )
-from unifiedui.exc.autonomous_agents import AutonomousAgentNotFoundError, AutonomousAgentPermissionNotFoundError
+from unifiedui.exc.autonomous_agents import (
+    AutonomousAgentNotFoundError, 
+    AutonomousAgentPermissionNotFoundError,
+    AutonomousAgentConfigValidationError,
+    UnsupportedAutonomousAgentTypeError,
+    AutonomousAgentKeyNotFoundError
+)
+from unifiedui.handlers.validators.autonomous_agent_config import AutonomousAgentConfigValidatorFactory
 from unifiedui.logger import get_logger
 
 logger = get_logger(__name__)
@@ -39,6 +48,7 @@ class AutonomousAgentHandler:
         self,
         db_client: SQLAlchemyClient,
         cache_client: Optional[CacheClient] = None,
+        vault_client: Optional[BaseVaultClient] = None,
         permissions_handler: Optional[ResourcePermissionsHandler] = None,
         tags_handler: Optional[ResourceTagsHandler] = None
     ):
@@ -48,11 +58,13 @@ class AutonomousAgentHandler:
         Args:
             db_client: SQLAlchemy database client instance
             cache_client: Optional cache client for Redis caching
+            vault_client: Optional vault client for secret management
             permissions_handler: Optional central permissions handler
             tags_handler: Optional central tags handler
         """
         self.db_client = db_client
         self.cache_client = cache_client
+        self.vault_client = vault_client
         self._permissions_handler = permissions_handler
         self._tags_handler = tags_handler
 
@@ -348,10 +360,46 @@ class AutonomousAgentHandler:
             
         Returns:
             Created autonomous agent response
+            
+        Raises:
+            AutonomousAgentConfigValidationError: If config validation fails
+            UnsupportedAutonomousAgentTypeError: If agent type is not supported
         """
-        logger.info("Creating autonomous agent", extra={"tenant_id": tenant_id, "agent_name": request.name, "user_id": user_id})
+        logger.info("Creating autonomous agent", extra={"tenant_id": tenant_id, "agent_name": request.name, "agent_type": request.type.value, "user_id": user_id})
+        
+        # Validate config based on agent type
+        validated_config = AutonomousAgentConfigValidatorFactory.validate_config(
+            agent_type=request.type,
+            config=request.config
+        )
         
         autonomous_agent_id = str(uuid.uuid4())
+        
+        # Generate API keys and store them in vault
+        primary_key = self._generate_api_key()
+        secondary_key = self._generate_api_key()
+        
+        primary_key_vault_uri = None
+        secondary_key_vault_uri = None
+        
+        if self.vault_client:
+            try:
+                primary_key_vault_uri = self.vault_client.store_secret(
+                    key=f"{tenant_id}/autonomous-agents/{autonomous_agent_id}/primary-key",
+                    value=primary_key,
+                    metadata={"tenant_id": tenant_id, "autonomous_agent_id": autonomous_agent_id, "key_type": "primary"}
+                )
+                secondary_key_vault_uri = self.vault_client.store_secret(
+                    key=f"{tenant_id}/autonomous-agents/{autonomous_agent_id}/secondary-key",
+                    value=secondary_key,
+                    metadata={"tenant_id": tenant_id, "autonomous_agent_id": autonomous_agent_id, "key_type": "secondary"}
+                )
+                logger.info(f"Stored API keys in vault for autonomous agent {autonomous_agent_id}")
+            except Exception as e:
+                logger.error(f"Failed to store API keys in vault: {e}")
+                raise
+        else:
+            logger.warning("No vault client configured - API keys will not be stored")
         
         with self.db_client.get_session() as session:
             # Create autonomous agent
@@ -360,7 +408,11 @@ class AutonomousAgentHandler:
                 tenant_id=tenant_id,
                 name=request.name,
                 description=request.description,
-                config=request.config or {},
+                type=request.type.value,
+                config=validated_config,
+                is_active=request.is_active,
+                primary_key_vault_uri=primary_key_vault_uri,
+                secondary_key_vault_uri=secondary_key_vault_uri,
                 created_by=user_id,
                 updated_by=user_id
             )
@@ -397,6 +449,9 @@ class AutonomousAgentHandler:
         """
         Update an existing autonomous agent.
         
+        Note: type, primary_key_vault_uri, secondary_key_vault_uri, last_full_import 
+        are NOT updatable via this method.
+        
         Args:
             tenant_id: The ID of the tenant
             autonomous_agent_id: The ID of the autonomous agent
@@ -408,6 +463,7 @@ class AutonomousAgentHandler:
             
         Raises:
             AutonomousAgentNotFoundError: If autonomous agent not found
+            AutonomousAgentConfigValidationError: If config validation fails
         """
         logger.info("Updating autonomous agent", extra={"tenant_id": tenant_id, "autonomous_agent_id": autonomous_agent_id, "user_id": user_id})
         
@@ -429,7 +485,12 @@ class AutonomousAgentHandler:
             if request.description is not None:
                 autonomous_agent.description = request.description
             if request.config is not None:
-                autonomous_agent.config = request.config
+                # Validate config based on the existing agent type
+                validated_config = AutonomousAgentConfigValidatorFactory.validate_config(
+                    agent_type=AutonomousAgentTypeEnum(autonomous_agent.type),
+                    config=request.config
+                )
+                autonomous_agent.config = validated_config
             if request.is_active is not None:
                 autonomous_agent.is_active = request.is_active
             
@@ -506,6 +567,191 @@ class AutonomousAgentHandler:
         """Invalidate permissions cache for a specific autonomous agent."""
         if self.cache_client:
             self.cache_client.client.delete(f"autonomous_agents:permissions:tenant:{tenant_id}:agent:{autonomous_agent_id}")
+
+    @staticmethod
+    def _generate_api_key() -> str:
+        """Generate a secure random API key."""
+        return secrets.token_urlsafe(32)
+
+    # ========== API Key Management Methods ==========
+
+    def get_api_key(
+        self,
+        tenant_id: str,
+        autonomous_agent_id: str,
+        key_number: int
+    ) -> AutonomousAgentKeyResponse:
+        """
+        Get an API key for an autonomous agent.
+        
+        Args:
+            tenant_id: The ID of the tenant
+            autonomous_agent_id: The ID of the autonomous agent
+            key_number: Key number (1 for primary, 2 for secondary)
+            
+        Returns:
+            The API key response
+            
+        Raises:
+            AutonomousAgentNotFoundError: If autonomous agent not found
+            AutonomousAgentKeyNotFoundError: If key not found or vault not configured
+        """
+        logger.info("Getting API key", extra={"tenant_id": tenant_id, "autonomous_agent_id": autonomous_agent_id, "key_number": key_number})
+        
+        if key_number not in [1, 2]:
+            raise AutonomousAgentKeyNotFoundError(autonomous_agent_id, key_number)
+        
+        if not self.vault_client:
+            raise AutonomousAgentKeyNotFoundError(autonomous_agent_id, key_number)
+        
+        with self.db_client.get_session() as session:
+            query = select(AutonomousAgent).where(
+                AutonomousAgent.id == autonomous_agent_id,
+                AutonomousAgent.tenant_id == tenant_id
+            )
+            autonomous_agent = session.execute(query).scalar_one_or_none()
+            
+            if not autonomous_agent:
+                raise AutonomousAgentNotFoundError(autonomous_agent_id)
+            
+            vault_uri = autonomous_agent.primary_key_vault_uri if key_number == 1 else autonomous_agent.secondary_key_vault_uri
+            
+            if not vault_uri:
+                raise AutonomousAgentKeyNotFoundError(autonomous_agent_id, key_number)
+            
+            key = self.vault_client.get_secret(vault_uri, use_cache=False)
+            
+            if not key:
+                raise AutonomousAgentKeyNotFoundError(autonomous_agent_id, key_number)
+            
+            return AutonomousAgentKeyResponse(key=key, key_number=key_number)
+
+    def rotate_api_key(
+        self,
+        tenant_id: str,
+        autonomous_agent_id: str,
+        key_number: int,
+        user_id: str
+    ) -> AutonomousAgentKeyResponse:
+        """
+        Rotate an API key for an autonomous agent.
+        
+        Args:
+            tenant_id: The ID of the tenant
+            autonomous_agent_id: The ID of the autonomous agent
+            key_number: Key number (1 for primary, 2 for secondary)
+            user_id: ID of the user rotating the key
+            
+        Returns:
+            The new API key response
+            
+        Raises:
+            AutonomousAgentNotFoundError: If autonomous agent not found
+            AutonomousAgentKeyNotFoundError: If vault not configured
+        """
+        logger.info("Rotating API key", extra={"tenant_id": tenant_id, "autonomous_agent_id": autonomous_agent_id, "key_number": key_number, "user_id": user_id})
+        
+        if key_number not in [1, 2]:
+            raise AutonomousAgentKeyNotFoundError(autonomous_agent_id, key_number)
+        
+        if not self.vault_client:
+            raise AutonomousAgentKeyNotFoundError(autonomous_agent_id, key_number)
+        
+        with self.db_client.get_session() as session:
+            query = select(AutonomousAgent).where(
+                AutonomousAgent.id == autonomous_agent_id,
+                AutonomousAgent.tenant_id == tenant_id
+            )
+            autonomous_agent = session.execute(query).scalar_one_or_none()
+            
+            if not autonomous_agent:
+                raise AutonomousAgentNotFoundError(autonomous_agent_id)
+            
+            # Generate new key
+            new_key = self._generate_api_key()
+            
+            # Determine which vault URI to use
+            vault_uri = autonomous_agent.primary_key_vault_uri if key_number == 1 else autonomous_agent.secondary_key_vault_uri
+            
+            if vault_uri:
+                # Update existing secret
+                success = self.vault_client.update_secret(vault_uri, new_key)
+                if not success:
+                    logger.error(f"Failed to update key {key_number} in vault for autonomous agent {autonomous_agent_id}")
+                    raise RuntimeError(f"Failed to rotate key {key_number}")
+            else:
+                # Create new secret (shouldn't happen normally, but handle gracefully)
+                key_type = "primary" if key_number == 1 else "secondary"
+                vault_uri = self.vault_client.store_secret(
+                    key=f"{tenant_id}/autonomous-agents/{autonomous_agent_id}/{key_type}-key",
+                    value=new_key,
+                    metadata={"tenant_id": tenant_id, "autonomous_agent_id": autonomous_agent_id, "key_type": key_type}
+                )
+                
+                # Update the model with the new vault URI
+                if key_number == 1:
+                    autonomous_agent.primary_key_vault_uri = vault_uri
+                else:
+                    autonomous_agent.secondary_key_vault_uri = vault_uri
+            
+            autonomous_agent.updated_by = user_id
+            session.commit()
+            
+            # Invalidate caches
+            self._invalidate_detail_cache(tenant_id, autonomous_agent_id)
+            
+            logger.info(f"Rotated key {key_number} for autonomous agent {autonomous_agent_id}")
+            return AutonomousAgentKeyResponse(key=new_key, key_number=key_number)
+
+    def update_last_full_import(
+        self,
+        tenant_id: str,
+        autonomous_agent_id: str,
+        user_id: str
+    ) -> AutonomousAgentResponse:
+        """
+        Update the last_full_import timestamp for an autonomous agent.
+        This is a system-only operation.
+        
+        Args:
+            tenant_id: The ID of the tenant
+            autonomous_agent_id: The ID of the autonomous agent
+            user_id: ID of the system user performing the update
+            
+        Returns:
+            Updated autonomous agent response
+            
+        Raises:
+            AutonomousAgentNotFoundError: If autonomous agent not found
+        """
+        from datetime import datetime, timezone
+        
+        logger.info("Updating last_full_import", extra={"tenant_id": tenant_id, "autonomous_agent_id": autonomous_agent_id})
+        
+        with self.db_client.get_session() as session:
+            query = select(AutonomousAgent).options(
+                selectinload(AutonomousAgent.tags).selectinload(AutonomousAgentTag.tag)
+            ).where(
+                AutonomousAgent.id == autonomous_agent_id,
+                AutonomousAgent.tenant_id == tenant_id
+            )
+            autonomous_agent = session.execute(query).scalar_one_or_none()
+            
+            if not autonomous_agent:
+                raise AutonomousAgentNotFoundError(autonomous_agent_id)
+            
+            autonomous_agent.last_full_import = datetime.now(timezone.utc)
+            autonomous_agent.updated_by = user_id
+            
+            session.commit()
+            session.refresh(autonomous_agent)
+            
+            response = self._model_to_response(autonomous_agent)
+            
+            # Invalidate caches
+            self._invalidate_detail_cache(tenant_id, autonomous_agent_id)
+            
+            return response
 
     # ========== Permission Management Methods ==========
 
@@ -764,8 +1010,10 @@ class AutonomousAgentHandler:
             tenant_id=agent.tenant_id,
             name=agent.name,
             description=agent.description,
+            type=AutonomousAgentTypeEnum(agent.type),
             is_active=agent.is_active,
             config=agent.config,
+            last_full_import=agent.last_full_import,
             tags=tags,
             created_at=agent.created_at,
             updated_at=agent.updated_at,

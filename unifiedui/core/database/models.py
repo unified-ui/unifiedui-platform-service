@@ -21,7 +21,7 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship,
 from sqlalchemy.types import JSON, TypeDecorator
 from sqlalchemy import Enum as SAEnum
 
-from unifiedui.core.database.enums import PermissionActionEnum, TenantRolesEnum, PrincipalTypeEnum, ApplicationTypeEnum
+from unifiedui.core.database.enums import PermissionActionEnum, TenantRolesEnum, PrincipalTypeEnum, ApplicationTypeEnum, AutonomousAgentTypeEnum
 
 
 # ---------- Utility functions ----------
@@ -81,6 +81,14 @@ PrincipalTypeSAEnum = SAEnum(
 ApplicationTypeSAEnum = SAEnum(
     *ApplicationTypeEnum.all(),
     name="application_type",
+    native_enum=False,
+    create_constraint=True,
+    validate_strings=True,
+)
+
+AutonomousAgentTypeSAEnum = SAEnum(
+    *AutonomousAgentTypeEnum.all(),
+    name="autonomous_agent_type",
     native_enum=False,
     create_constraint=True,
     validate_strings=True,
@@ -297,8 +305,14 @@ class Conversation(Base, IdNameDescriptionMixin, TenantScopedMixin):
 class AutonomousAgent(Base, IdNameDescriptionMixin, TenantScopedMixin):
     __tablename__ = "autonomous_agents"
 
+    type: Mapped[str] = mapped_column(AutonomousAgentTypeSAEnum, nullable=False)
     config: Mapped[dict] = mapped_column(PortableJSON, nullable=False, default=dict)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    primary_key_vault_uri: Mapped[Optional[str]] = mapped_column(String(2000), nullable=True)
+    secondary_key_vault_uri: Mapped[Optional[str]] = mapped_column(String(2000), nullable=True)
+    last_full_import: Mapped[Optional[datetime]] = mapped_column(
+        HighPrecisionDateTime(), nullable=True, default=None
+    )
 
     members: Mapped[list["AutonomousAgentMember"]] = relationship(
         back_populates="autonomous_agent", cascade="all, delete-orphan"
