@@ -14,8 +14,8 @@ from unifiedui.core.database.models import (
     AutonomousAgentMember,
     CustomGroupMember,
     ConversationMember,
-    DevelopmentPlatformMember,
     ChatWidgetMember,
+    ToolMember,
     Tag
 )
 from unifiedui.handlers.dependencies.database import get_db_client
@@ -520,8 +520,8 @@ def check_permissions(
                     "autonomous_agent": (AutonomousAgentMember, "autonomous_agent_id"),
                     "custom_group": (CustomGroupMember, "custom_group_id"),
                     "conversation": (ConversationMember, "conversation_id"),
-                    "development_platform": (DevelopmentPlatformMember, "development_platform_id"),
-                    "chat_widget": (ChatWidgetMember, "chat_widget_id")
+                    "chat_widget": (ChatWidgetMember, "chat_widget_id"),
+                    "tool": (ToolMember, "tool_id")
                 }
                 
                 if entity not in entity_config:
@@ -570,8 +570,8 @@ def check_permissions(
                         "autonomous_agent": TenantRolesEnum.AUTONOMOUS_AGENTS_ADMIN.value,
                         "custom_group": TenantRolesEnum.CUSTOM_GROUPS_ADMIN.value,
                         "conversation": TenantRolesEnum.CONVERSATIONS_ADMIN.value,
-                        "development_platform": TenantRolesEnum.DEVELOPMENT_PLATFORMS_ADMIN.value,
                         "chat_widget": TenantRolesEnum.CHAT_WIDGETS_ADMIN.value,
+                        "tool": TenantRolesEnum.REACT_AGENT_ADMIN.value,
                     }
                     
                     entity_admin = entity_admin_map.get(entity)

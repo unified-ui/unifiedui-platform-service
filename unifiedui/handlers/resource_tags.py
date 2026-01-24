@@ -8,7 +8,6 @@ Supported resource types:
 - autonomous_agent
 - chat_widget
 - credential
-- development_platform
 
 This handler consolidates tag-related logic that was previously
 duplicated across individual resource handlers.
@@ -27,7 +26,6 @@ from unifiedui.core.database.models import (
     AutonomousAgent, AutonomousAgentTag,
     ChatWidget, ChatWidgetTag,
     Credential, CredentialTag,
-    DevelopmentPlatform, DevelopmentPlatformTag,
 )
 from unifiedui.caching.client import CacheClient
 from unifiedui.logger import get_logger
@@ -63,12 +61,6 @@ RESOURCE_TAG_CONFIG: Dict[str, Dict[str, Any]] = {
         "tag_model": CredentialTag,
         "id_field": "credential_id",
         "cache_prefix": "credentials",
-    },
-    "development_platform": {
-        "resource_model": DevelopmentPlatform,
-        "tag_model": DevelopmentPlatformTag,
-        "id_field": "development_platform_id",
-        "cache_prefix": "development_platforms",
     },
 }
 

@@ -4,14 +4,14 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from unifiedui.apis.v1 import health, identity, tenants, custom_groups, credentials, applications, conversations, autonomous_agents, development_platforms, chat_widgets, tags, user_favorites, principals
+from unifiedui.apis.v1 import health, identity, tenants, custom_groups, credentials, applications, conversations, autonomous_agents, chat_widgets, tags, user_favorites, principals, tools
 from unifiedui.exc.autonomous_agents import AutonomousAgentNotFoundError
 from unifiedui.exc.custom_groups import CustomGroupNotFoundError, CustomGroupError
 from unifiedui.exc.applications import ApplicationNotFoundError
 from unifiedui.exc.credentials import CredentialNotFoundError
 from unifiedui.exc.conversations import ConversationNotFoundError
-from unifiedui.exc.development_platforms import DevelopmentPlatformNotFoundError
 from unifiedui.exc.chat_widgets import ChatWidgetNotFoundError
+from unifiedui.exc.tools import ToolNotFoundError, ToolConfigValidationError, UnsupportedToolTypeError, InvalidToolCredentialError
 from unifiedui.exc.principal import PrincipalNotFoundError
 from unifiedui.exc.tags import TagNotFoundError, TagDeleteNotAllowedError
 from unifiedui.exc.application_config import (
@@ -183,16 +183,6 @@ def create_app() -> FastAPI:
             content={"detail": str(exc)}
         )
     
-    # Development Platform exception handlers
-    
-    @app.exception_handler(DevelopmentPlatformNotFoundError)
-    async def development_platform_not_found_handler(request: Request, exc: DevelopmentPlatformNotFoundError):
-        """Handle development platform not found errors."""
-        return JSONResponse(
-            status_code=404,
-            content={"detail": str(exc)}
-        )
-    
     # Chat Widget exception handlers
     
     @app.exception_handler(ChatWidgetNotFoundError)
@@ -227,6 +217,40 @@ def create_app() -> FastAPI:
         return JSONResponse(
             status_code=404,
             content={"detail": str(exc)}
+        )
+    
+    # Tool exception handlers
+    
+    @app.exception_handler(ToolNotFoundError)
+    async def tool_not_found_handler(request: Request, exc: ToolNotFoundError):
+        """Handle tool not found errors."""
+        return JSONResponse(
+            status_code=404,
+            content={"detail": str(exc)}
+        )
+    
+    @app.exception_handler(ToolConfigValidationError)
+    async def tool_config_validation_handler(request: Request, exc: ToolConfigValidationError):
+        """Handle tool config validation errors."""
+        return JSONResponse(
+            status_code=400,
+            content={"detail": exc.message, "errors": exc.errors}
+        )
+    
+    @app.exception_handler(UnsupportedToolTypeError)
+    async def unsupported_tool_type_handler(request: Request, exc: UnsupportedToolTypeError):
+        """Handle unsupported tool type errors."""
+        return JSONResponse(
+            status_code=400,
+            content={"detail": str(exc)}
+        )
+    
+    @app.exception_handler(InvalidToolCredentialError)
+    async def invalid_tool_credential_handler(request: Request, exc: InvalidToolCredentialError):
+        """Handle invalid tool credential errors."""
+        return JSONResponse(
+            status_code=400,
+            content={"detail": exc.message, "credential_id": exc.credential_id}
         )
 
     # Include routers
@@ -305,18 +329,6 @@ def create_app() -> FastAPI:
     )
     
     app.include_router(
-        tags.development_platforms_tags_list_router,
-        prefix="/api/v1/platform-service/tenants/{tenant_id}",
-        tags=["Development Platforms"]
-    )
-    
-    app.include_router(
-        development_platforms.router,
-        prefix="/api/v1/platform-service/tenants/{tenant_id}",
-        tags=["Development Platforms"]
-    )
-    
-    app.include_router(
         tags.chat_widgets_tags_list_router,
         prefix="/api/v1/platform-service/tenants/{tenant_id}",
         tags=["Chat Widgets"]
@@ -360,10 +372,24 @@ def create_app() -> FastAPI:
         tags=["Credentials"]
     )
     
+    # Tools routes - tags list router MUST be before tools router to avoid path conflicts
     app.include_router(
-        tags.development_platform_tags_router,
+        tags.tools_tags_list_router,
         prefix="/api/v1/platform-service/tenants/{tenant_id}",
-        tags=["Development Platforms"]
+        tags=["Tools"]
+    )
+    
+    app.include_router(
+        tools.router,
+        prefix="/api/v1/platform-service/tenants/{tenant_id}",
+        tags=["Tools"]
+    )
+    
+    # Tool-specific tag routes
+    app.include_router(
+        tags.tool_tags_router,
+        prefix="/api/v1/platform-service/tenants/{tenant_id}",
+        tags=["Tools"]
     )
     
     # User Favorites routes

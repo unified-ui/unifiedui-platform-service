@@ -25,13 +25,13 @@ from unifiedui.handlers.dependencies.credentials import get_credential_handler
 from unifiedui.handlers.dependencies.applications import get_application_handler
 from unifiedui.handlers.dependencies.conversations import get_conversation_handler
 from unifiedui.handlers.dependencies.autonomous_agents import get_autonomous_agent_handler
-from unifiedui.handlers.dependencies.development_platforms import get_development_platform_handler
 from unifiedui.handlers.dependencies.chat_widgets import get_chat_widget_handler
 from unifiedui.handlers.dependencies.tags import get_tag_handler
 from unifiedui.handlers.dependencies.user_favorites import get_user_favorites_handler
 from unifiedui.handlers.dependencies.resource_permissions import get_resource_permissions_handler
 from unifiedui.handlers.dependencies.resource_tags import get_resource_tags_handler
 from unifiedui.handlers.dependencies.principals import get_principal_handler
+from unifiedui.handlers.dependencies.tools import get_tool_handler
 
 __all__ = [
     # Database
@@ -47,11 +47,11 @@ __all__ = [
     "get_application_handler",
     "get_conversation_handler",
     "get_autonomous_agent_handler",
-    "get_development_platform_handler",
     "get_chat_widget_handler",
     "get_tag_handler",
     "get_user_favorites_handler",
     "get_principal_handler",
+    "get_tool_handler",
     # Central Handlers
     "get_resource_permissions_handler",
     "get_resource_tags_handler",

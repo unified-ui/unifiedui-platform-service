@@ -29,7 +29,8 @@ class TestCredentialTypeEnum:
         assert isinstance(types, list)
         assert "API_KEY" in types
         assert "BASIC_AUTH" in types
-        assert len(types) == 2
+        assert "OPENAPI_CONNECTION" in types
+        assert len(types) == 3
 
 
 class TestBasicAuthCredential:

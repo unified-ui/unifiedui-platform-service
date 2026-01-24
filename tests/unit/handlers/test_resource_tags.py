@@ -21,7 +21,7 @@ class TestResourceTagsHandlerConfig:
         """Test that all expected resource types are configured."""
         expected_types = [
             "application", "autonomous_agent", "chat_widget",
-            "credential", "development_platform"
+            "credential"
         ]
         for resource_type in expected_types:
             assert resource_type in RESOURCE_TAG_CONFIG
@@ -42,7 +42,7 @@ class TestResourceTagsHandlerConfig:
         
         assert "application" in types
         assert "credential" in types
-        assert len(types) == 5  # 5 resource types support tags
+        assert len(types) == 4  # 4 resource types support tags
 
 
 class TestResourceTagsHandlerOperations:

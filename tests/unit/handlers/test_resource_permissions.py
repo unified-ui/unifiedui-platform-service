@@ -10,8 +10,7 @@ from unifiedui.handlers.resource_permissions import (
 from unifiedui.core.database.models import (
     Tenant, Principal, Application, ApplicationMember,
     Credential, CredentialMember, AutonomousAgent, AutonomousAgentMember,
-    ChatWidget, ChatWidgetMember, Conversation, ConversationMember,
-    DevelopmentPlatform, DevelopmentPlatformMember
+    ChatWidget, ChatWidgetMember, Conversation, ConversationMember
 )
 from unifiedui.core.database.enums import (
     PermissionActionEnum, PrincipalTypeEnum, TenantRolesEnum
@@ -25,7 +24,7 @@ class TestResourcePermissionsHandlerConfig:
         """Test that all expected resource types are configured."""
         expected_types = [
             "application", "autonomous_agent", "chat_widget",
-            "conversation", "credential", "development_platform", "custom_group"
+            "conversation", "credential", "custom_group"
         ]
         for resource_type in expected_types:
             assert resource_type in RESOURCE_PERMISSION_CONFIG

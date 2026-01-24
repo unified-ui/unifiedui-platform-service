@@ -659,8 +659,6 @@ class PrincipalHandler:
             "CONVERSATIONS_CREATOR": "Conversation Creator",
             "AUTONOMOUS_AGENTS_ADMIN": "Autonomous Agents Administrator",
             "AUTONOMOUS_AGENTS_CREATOR": "Autonomous Agent Creator",
-            "DEVELOPMENT_PLATFORMS_ADMIN": "Development Platforms Administrator",
-            "DEVELOPMENT_PLATFORMS_CREATOR": "Development Platform Creator",
             "CHAT_WIDGETS_ADMIN": "Chat Widgets Administrator",
             "CHAT_WIDGETS_CREATOR": "Chat Widget Creator",
         }

@@ -14,13 +14,22 @@ class TenantRolesEnum(str, Enum):
     CONVERSATIONS_CREATOR = "CONVERSATIONS_CREATOR"
     AUTONOMOUS_AGENTS_ADMIN = "AUTONOMOUS_AGENTS_ADMIN"
     AUTONOMOUS_AGENTS_CREATOR = "AUTONOMOUS_AGENTS_CREATOR"
-    DEVELOPMENT_PLATFORMS_ADMIN = "DEVELOPMENT_PLATFORMS_ADMIN"
-    DEVELOPMENT_PLATFORMS_CREATOR = "DEVELOPMENT_PLATFORMS_CREATOR"
     CHAT_WIDGETS_ADMIN = "CHAT_WIDGETS_ADMIN"
     CHAT_WIDGETS_CREATOR = "CHAT_WIDGETS_CREATOR"
+    REACT_AGENT_ADMIN = "REACT_AGENT_ADMIN"
+    REACT_AGENT_CREATOR = "REACT_AGENT_CREATOR"
 
     def all() -> list[str]:
         return [permission.value for permission in TenantRolesEnum]
+
+
+class ToolTypeEnum(str, Enum):
+    """Supported tool types for ReACT agents."""
+    MCP_SERVER = "MCP_SERVER"
+    OPENAPI_DEFINITION = "OPENAPI_DEFINITION"
+
+    def all() -> list[str]:
+        return [tool_type.value for tool_type in ToolTypeEnum]
 
 
 class ApplicationTypeEnum(str, Enum):

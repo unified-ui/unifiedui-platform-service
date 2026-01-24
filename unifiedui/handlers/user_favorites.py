@@ -9,7 +9,6 @@ from unifiedui.core.database.client import SQLAlchemyClient
 from unifiedui.core.database.models import (
     ApplicationUserFavorite,
     AutonomousAgentUserFavorite,
-    DevelopmentPlatformUserFavorite,
     ConversationUserFavorite
 )
 from unifiedui.caching.client import CacheClient
@@ -32,10 +31,6 @@ RESOURCE_FAVORITE_MAPPING = {
     "autonomous-agents": {
         "model": AutonomousAgentUserFavorite,
         "id_field": "autonomous_agent_id",
-    },
-    "development-platforms": {
-        "model": DevelopmentPlatformUserFavorite,
-        "id_field": "development_platform_id",
     },
     "conversations": {
         "model": ConversationUserFavorite,

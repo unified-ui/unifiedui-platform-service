@@ -13,7 +13,7 @@ from unifiedui.core.database.models import (
     AutonomousAgent, AutonomousAgentTag,
     ChatWidget, ChatWidgetTag,
     Credential, CredentialTag,
-    DevelopmentPlatform, DevelopmentPlatformTag,
+    Tool, ToolTag,
 )
 from unifiedui.caching.client import CacheClient
 from unifiedui.schema.responses.tags import TagResponse, TagSummary
@@ -52,11 +52,11 @@ RESOURCE_TAG_MAPPING = {
         "id_field": "credential_id",
         "cache_key_pattern": "credentials:detail:tenant:{tenant_id}:cred:{resource_id}",
     },
-    "development_platform": {
-        "model": DevelopmentPlatform,
-        "tag_model": DevelopmentPlatformTag,
-        "id_field": "development_platform_id",
-        "cache_key_pattern": "development_platforms:detail:tenant:{tenant_id}:dp:{resource_id}",
+    "tool": {
+        "model": Tool,
+        "tag_model": ToolTag,
+        "id_field": "tool_id",
+        "cache_key_pattern": "tools:detail:tenant:{tenant_id}:tool:{resource_id}",
     },
 }
 

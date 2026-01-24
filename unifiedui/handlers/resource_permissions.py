@@ -9,7 +9,6 @@ Supported resource types:
 - chat_widget
 - conversation
 - credential
-- development_platform
 - custom_group
 
 This handler consolidates duplicate permission logic from individual resource handlers.
@@ -29,8 +28,8 @@ from unifiedui.core.database.models import (
     ChatWidget, ChatWidgetMember,
     Conversation, ConversationMember,
     Credential, CredentialMember,
-    DevelopmentPlatform, DevelopmentPlatformMember,
     CustomGroupMember, Principal,
+    Tool, ToolMember,
 )
 from unifiedui.core.database.enums import PermissionActionEnum, PrincipalTypeEnum, TenantRolesEnum
 from unifiedui.caching.client import CacheClient
@@ -80,19 +79,19 @@ RESOURCE_PERMISSION_CONFIG: Dict[str, Dict[str, Any]] = {
         "cache_prefix": "credentials",
         "tenant_admin_role": TenantRolesEnum.CREDENTIALS_ADMIN,
     },
-    "development_platform": {
-        "resource_model": DevelopmentPlatform,
-        "member_model": DevelopmentPlatformMember,
-        "id_field": "development_platform_id",
-        "cache_prefix": "development_platforms",
-        "tenant_admin_role": TenantRolesEnum.DEVELOPMENT_PLATFORMS_ADMIN,
-    },
     "custom_group": {
         "resource_model": Principal,  # Custom groups are stored in principals table
         "member_model": CustomGroupMember,
         "id_field": "custom_group_id",
         "cache_prefix": "custom_groups",
         "tenant_admin_role": TenantRolesEnum.CUSTOM_GROUPS_ADMIN,
+    },
+    "tool": {
+        "resource_model": Tool,
+        "member_model": ToolMember,
+        "id_field": "tool_id",
+        "cache_prefix": "tools",
+        "tenant_admin_role": TenantRolesEnum.REACT_AGENT_ADMIN,
     },
 }
 

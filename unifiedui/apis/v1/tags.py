@@ -368,64 +368,6 @@ async def list_credential_tags(
         )
 
 
-# Development Platforms Tags Router
-development_platforms_tags_list_router = APIRouter(prefix="/development-platforms/tags")
-
-
-@development_platforms_tags_list_router.get(
-    "",
-    response_model=List[TagSummary],
-    summary="List tags for development platforms",
-    description="Get all tags that are applied to development platforms"
-)
-@authenticate()
-async def list_development_platform_tags(
-    request: Request,
-    tenant_id: str,
-    name: Optional[str] = Query(None, description="Filter by tag name"),
-    skip: int = Query(0, ge=0, description="Number of tags to skip"),
-    limit: int = Query(100, ge=1, le=1000, description="Maximum number of tags to return"),
-    handler: TagHandler = Depends(get_tag_handler)
-) -> List[TagSummary]:
-    """List all tags that are applied to development platforms."""
-    try:
-        user: ContextIdentityUser = request.state.user
-        use_cache = request.headers.get("X-Use-Cache", "true").lower() == "true"
-        
-        logger.info(
-            "API: List tags for development platforms",
-            extra={
-                "tenant_id": tenant_id,
-                "user_id": user.identity.get_id(),
-                "name_filter": name,
-                "skip": skip,
-                "limit": limit
-            }
-        )
-        
-        return handler.list_tags_for_resource(
-            tenant_id=tenant_id,
-            resource_type="development_platform",
-            name_filter=name,
-            skip=skip,
-            limit=limit,
-            use_cache=use_cache
-        )
-    except HTTPException:
-        raise
-    except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e)
-        )
-    except Exception as e:
-        logger.error(f"Failed to list development platform tags: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to list development platform tags"
-        )
-
-
 @router.delete(
     "/{tag_id}",
     status_code=status.HTTP_204_NO_CONTENT,
@@ -1115,158 +1057,218 @@ async def delete_credential_tags(
         )
 
 
-# ========== Development Platform Tag Endpoints ==========
+# ========== Tools Tags List Router ==========
 
-development_platform_tags_router = APIRouter(prefix="/development-platforms/{development_platform_id}/tags")
+tools_tags_list_router = APIRouter(prefix="/tools/tags")
 
 
-@development_platform_tags_router.get(
+@tools_tags_list_router.get(
     "",
-    response_model=List[TagResponse],
-    summary="Get development platform tags",
-    description="Get tags for a development platform"
+    response_model=List[TagSummary],
+    summary="List tags for tools",
+    description="Get all tags that are applied to tools"
 )
 @authenticate()
-@check_permissions(
-    entity="development_platform",
-    required_permissions=[
-        TenantRolesEnum.GLOBAL_ADMIN,
-        TenantRolesEnum.DEVELOPMENT_PLATFORMS_ADMIN,
-        PermissionActionEnum.ADMIN,
-        PermissionActionEnum.WRITE,
-        PermissionActionEnum.READ
-    ]
-)
-async def get_development_platform_tags(
+async def list_tool_tags(
     request: Request,
     tenant_id: str,
-    development_platform_id: str,
+    name: Optional[str] = Query(None, description="Filter by tag name"),
+    skip: int = Query(0, ge=0, description="Number of tags to skip"),
+    limit: int = Query(100, ge=1, le=1000, description="Maximum number of tags to return"),
     handler: TagHandler = Depends(get_tag_handler)
-) -> List[TagResponse]:
-    """Get tags for a development platform."""
+) -> List[TagSummary]:
+    """List all tags that are applied to tools."""
     try:
         user: ContextIdentityUser = request.state.user
         use_cache = request.headers.get("X-Use-Cache", "true").lower() == "true"
         
         logger.info(
-            "API: Get development platform tags",
+            "API: List tags for tools",
             extra={
                 "tenant_id": tenant_id,
-                "development_platform_id": development_platform_id,
+                "user_id": user.identity.get_id(),
+                "name_filter": name,
+                "skip": skip,
+                "limit": limit
+            }
+        )
+        
+        return handler.list_tags_for_resource(
+            tenant_id=tenant_id,
+            resource_type="tool",
+            name_filter=name,
+            skip=skip,
+            limit=limit,
+            use_cache=use_cache
+        )
+    except HTTPException:
+        raise
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+    except Exception as e:
+        logger.error(f"Failed to list tool tags: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to list tool tags"
+        )
+
+
+# ========== Tool Tag Endpoints ==========
+
+tool_tags_router = APIRouter(prefix="/tools/{tool_id}/tags")
+
+
+@tool_tags_router.get(
+    "",
+    response_model=List[TagResponse],
+    summary="Get tool tags",
+    description="Get tags for a tool"
+)
+@authenticate()
+@check_permissions(
+    entity="tool",
+    required_permissions=[
+        TenantRolesEnum.GLOBAL_ADMIN,
+        TenantRolesEnum.REACT_AGENT_ADMIN,
+        PermissionActionEnum.ADMIN,
+        PermissionActionEnum.WRITE,
+        PermissionActionEnum.READ
+    ]
+)
+async def get_tool_tags(
+    request: Request,
+    tenant_id: str,
+    tool_id: str,
+    handler: TagHandler = Depends(get_tag_handler)
+) -> List[TagResponse]:
+    """Get tags for a tool."""
+    try:
+        user: ContextIdentityUser = request.state.user
+        use_cache = request.headers.get("X-Use-Cache", "true").lower() == "true"
+        
+        logger.info(
+            "API: Get tool tags",
+            extra={
+                "tenant_id": tenant_id,
+                "tool_id": tool_id,
                 "user_id": user.identity.get_id()
             }
         )
         
         return handler.get_resource_tags(
             tenant_id=tenant_id,
-            resource_type="development_platform",
-            resource_id=development_platform_id,
+            resource_type="tool",
+            resource_id=tool_id,
+            user=user,
             use_cache=use_cache
         )
     except Exception as e:
-        logger.error(f"Failed to get development platform tags: {e}", exc_info=True)
+        logger.error(f"Failed to get tool tags: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to get development platform tags"
+            detail="Failed to get tool tags"
         )
 
 
-@development_platform_tags_router.put(
+@tool_tags_router.put(
     "",
     response_model=List[TagResponse],
-    summary="Set development platform tags",
-    description="Set tags for a development platform (replaces existing tags)"
+    summary="Set tool tags",
+    description="Set tags for a tool (replaces existing tags)"
 )
 @authenticate()
 @check_permissions(
-    entity="development_platform",
+    entity="tool",
     required_permissions=[
         TenantRolesEnum.GLOBAL_ADMIN,
-        TenantRolesEnum.DEVELOPMENT_PLATFORMS_ADMIN,
+        TenantRolesEnum.REACT_AGENT_ADMIN,
         PermissionActionEnum.ADMIN,
         PermissionActionEnum.WRITE
     ]
 )
-async def set_development_platform_tags(
+async def set_tool_tags(
     request: Request,
     tenant_id: str,
-    development_platform_id: str,
+    tool_id: str,
     tags_request: SetResourceTagsRequest,
     handler: TagHandler = Depends(get_tag_handler)
 ) -> List[TagResponse]:
-    """Set tags for a development platform."""
+    """Set tags for a tool (replaces existing tags)."""
     try:
         user: ContextIdentityUser = request.state.user
         
         logger.info(
-            "API: Set development platform tags",
+            "API: Set tool tags",
             extra={
                 "tenant_id": tenant_id,
-                "development_platform_id": development_platform_id,
-                "user_id": user.identity.get_id(),
-                "tags": tags_request.tags
+                "tool_id": tool_id,
+                "tags": tags_request.tags,
+                "user_id": user.identity.get_id()
             }
         )
         
         return handler.set_resource_tags(
             tenant_id=tenant_id,
-            resource_type="development_platform",
-            resource_id=development_platform_id,
+            resource_type="tool",
+            resource_id=tool_id,
             tag_names=tags_request.tags,
             user=user
         )
     except Exception as e:
-        logger.error(f"Failed to set development platform tags: {e}", exc_info=True)
+        logger.error(f"Failed to set tool tags: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to set development platform tags"
+            detail="Failed to set tool tags"
         )
 
 
-@development_platform_tags_router.delete(
+@tool_tags_router.delete(
     "",
     status_code=status.HTTP_204_NO_CONTENT,
-    summary="Delete development platform tags",
-    description="Remove all tags from a development platform"
+    summary="Delete tool tags",
+    description="Remove all tags from a tool"
 )
 @authenticate()
 @check_permissions(
-    entity="development_platform",
+    entity="tool",
     required_permissions=[
         TenantRolesEnum.GLOBAL_ADMIN,
-        TenantRolesEnum.DEVELOPMENT_PLATFORMS_ADMIN,
+        TenantRolesEnum.REACT_AGENT_ADMIN,
         PermissionActionEnum.ADMIN,
         PermissionActionEnum.WRITE
     ]
 )
-async def delete_development_platform_tags(
+async def delete_tool_tags(
     request: Request,
     tenant_id: str,
-    development_platform_id: str,
+    tool_id: str,
     handler: TagHandler = Depends(get_tag_handler)
 ) -> Response:
-    """Remove all tags from a development platform."""
+    """Remove all tags from a tool."""
     try:
         user: ContextIdentityUser = request.state.user
         
         logger.info(
-            "API: Delete development platform tags",
+            "API: Delete tool tags",
             extra={
                 "tenant_id": tenant_id,
-                "development_platform_id": development_platform_id,
+                "tool_id": tool_id,
                 "user_id": user.identity.get_id()
             }
         )
         
         handler.delete_resource_tags(
             tenant_id=tenant_id,
-            resource_type="development_platform",
-            resource_id=development_platform_id
+            resource_type="tool",
+            resource_id=tool_id
         )
         return Response(status_code=status.HTTP_204_NO_CONTENT)
     except Exception as e:
-        logger.error(f"Failed to delete development platform tags: {e}", exc_info=True)
+        logger.error(f"Failed to delete tool tags: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to delete development platform tags"
+            detail="Failed to delete tool tags"
         )

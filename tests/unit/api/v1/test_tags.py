@@ -10,7 +10,6 @@ from unifiedui.core.database.models import (
     AutonomousAgent, AutonomousAgentMember,
     ChatWidget, ChatWidgetMember,
     Credential, CredentialMember,
-    DevelopmentPlatform, DevelopmentPlatformMember,
 )
 from tests.conftest import create_auth_headers
 
@@ -22,7 +21,6 @@ ENDPOINT_APPLICATION_TAGS = "/api/v1/platform-service/tenants/{tenant_id}/applic
 ENDPOINT_AUTONOMOUS_AGENT_TAGS = "/api/v1/platform-service/tenants/{tenant_id}/autonomous-agents/{autonomous_agent_id}/tags"
 ENDPOINT_CHAT_WIDGET_TAGS = "/api/v1/platform-service/tenants/{tenant_id}/chat-widgets/{chat_widget_id}/tags"
 ENDPOINT_CREDENTIAL_TAGS = "/api/v1/platform-service/tenants/{tenant_id}/credentials/{credential_id}/tags"
-ENDPOINT_DEVELOPMENT_PLATFORM_TAGS = "/api/v1/platform-service/tenants/{tenant_id}/development-platforms/{development_platform_id}/tags"
 
 # Resource endpoints for list with tags filter
 ENDPOINT_APPLICATIONS = "/api/v1/platform-service/tenants/{tenant_id}/applications"
@@ -171,39 +169,6 @@ def create_credential_in_db(test_client: TestClient, tenant_id: str, user_id: st
         session.add(member)
         session.commit()
     return cred_id
-
-
-def create_development_platform_in_db(test_client: TestClient, tenant_id: str, user_id: str, name: str = "Test Platform") -> str:
-    """Helper function to create a development platform directly in DB and return its ID."""
-    platform_id = str(uuid.uuid4())
-    with test_client.db_client.get_session() as session:
-        platform = DevelopmentPlatform(
-            id=platform_id,
-            tenant_id=tenant_id,
-            name=name,
-            description="Test development platform",
-            type="IDE",
-            iframe_url="https://example.com/ide",
-            config={},
-            is_active=True,
-            created_by=user_id,
-            updated_by=user_id
-        )
-        session.add(platform)
-        session.commit()
-
-        member = DevelopmentPlatformMember(
-            id=str(uuid.uuid4()),
-            tenant_id=tenant_id,
-            development_platform_id=platform_id,
-            principal_id=user_id,
-            role=PermissionActionEnum.ADMIN,
-            created_by=user_id,
-            updated_by=user_id
-        )
-        session.add(member)
-        session.commit()
-    return platform_id
 
 
 class TestTagRoutes:
@@ -826,40 +791,6 @@ class TestCredentialTagRoutes:
         # Get tags
         get_response = test_client.get(
             ENDPOINT_CREDENTIAL_TAGS.format(tenant_id=tenant_id, credential_id=cred_id),
-            headers=headers
-        )
-        
-        assert get_response.status_code == status.HTTP_200_OK
-        assert len(get_response.json()) == 2
-
-
-class TestDevelopmentPlatformTagRoutes:
-    """Test suite for development platform tag management."""
-    
-    def test_set_and_get_development_platform_tags(
-        self, 
-        test_client: TestClient, 
-        test_user_token: Any
-    ) -> None:
-        """Test setting and getting tags on a development platform."""
-        tenant_id = create_tenant_for_user(test_client, test_user_token)
-        platform_id = create_development_platform_in_db(test_client, tenant_id, test_user_token.get_id())
-        headers = create_auth_headers(test_user_token, use_cache=False)
-        
-        # Set tags
-        response = test_client.put(
-            ENDPOINT_DEVELOPMENT_PLATFORM_TAGS.format(tenant_id=tenant_id, development_platform_id=platform_id),
-            json={"tags": ["ide", "web-based"]},
-            headers=headers
-        )
-        
-        assert response.status_code == status.HTTP_200_OK
-        data = response.json()
-        assert len(data) == 2
-        
-        # Get tags
-        get_response = test_client.get(
-            ENDPOINT_DEVELOPMENT_PLATFORM_TAGS.format(tenant_id=tenant_id, development_platform_id=platform_id),
             headers=headers
         )
         

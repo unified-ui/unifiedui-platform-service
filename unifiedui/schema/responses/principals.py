@@ -25,7 +25,7 @@ class PrincipalWithRolesResponse(BaseModel):
     
     This is the unified response schema for all resource principal endpoints
     (applications, autonomous_agents, chat_widgets, conversations, credentials, 
-    development_platforms, custom_groups).
+    custom_groups).
     """
     model_config = ConfigDict(from_attributes=True)
     

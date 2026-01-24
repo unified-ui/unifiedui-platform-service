@@ -9,7 +9,6 @@ from unifiedui.core.database.models import (
     Application, ApplicationMember,
     AutonomousAgent, AutonomousAgentMember,
     Conversation, ConversationMember,
-    DevelopmentPlatform, DevelopmentPlatformMember,
 )
 from tests.conftest import create_auth_headers
 
@@ -95,40 +94,6 @@ def create_autonomous_agent_in_db(test_client: TestClient, tenant_id: str, user_
         session.add(member)
         session.commit()
     return agent_id
-
-
-def create_development_platform_in_db(test_client: TestClient, tenant_id: str, user_id: str, name: str = "Test Platform") -> str:
-    """Helper function to create a development platform directly in DB and return its ID."""
-    platform_id = str(uuid.uuid4())
-    with test_client.db_client.get_session() as session:
-        platform = DevelopmentPlatform(
-            id=platform_id,
-            tenant_id=tenant_id,
-            name=name,
-            description="Test development platform",
-            type="IDE",
-            iframe_url="https://example.com/ide",
-            config={},
-            is_active=True,
-            created_by=user_id,
-            updated_by=user_id
-        )
-        session.add(platform)
-        session.commit()
-        
-        # Add user as ADMIN member
-        member = DevelopmentPlatformMember(
-            id=str(uuid.uuid4()),
-            tenant_id=tenant_id,
-            development_platform_id=platform_id,
-            principal_id=user_id,
-            role=PermissionActionEnum.ADMIN,
-            created_by=user_id,
-            updated_by=user_id
-        )
-        session.add(member)
-        session.commit()
-    return platform_id
 
 
 def create_conversation_in_db(test_client: TestClient, tenant_id: str, user_id: str, name: str = "Test Conversation") -> str:
@@ -464,51 +429,6 @@ class TestAutonomousAgentFavorites:
         data = response.json()
         assert data["total"] == 1
         assert data["favorites"][0]["resource_id"] == agent_id
-
-
-class TestDevelopmentPlatformFavorites:
-    """Test suite for development platform favorites."""
-    
-    def test_add_and_list_development_platform_favorite(
-        self, 
-        test_client: TestClient, 
-        test_user_token: Any
-    ) -> None:
-        """Test adding and listing development platform favorites."""
-        tenant_id = create_tenant_for_user(test_client, test_user_token)
-        user_id = test_user_token.get_id()
-        headers = create_auth_headers(test_user_token, use_cache=False)
-        
-        # Create a development platform directly in DB
-        platform_id = create_development_platform_in_db(test_client, tenant_id, user_id)
-        
-        # Add to favorites
-        response = test_client.put(
-            ENDPOINT_USER_FAVORITE_DETAIL.format(
-                tenant_id=tenant_id,
-                user_id=user_id,
-                resource_type="development-platforms",
-                resource_id=platform_id
-            ),
-            headers=headers
-        )
-        
-        assert response.status_code == status.HTTP_200_OK
-        
-        # List favorites
-        response = test_client.get(
-            ENDPOINT_USER_FAVORITES.format(
-                tenant_id=tenant_id,
-                user_id=user_id,
-                resource_type="development-platforms"
-            ),
-            headers=headers
-        )
-        
-        assert response.status_code == status.HTTP_200_OK
-        data = response.json()
-        assert data["total"] == 1
-        assert data["favorites"][0]["resource_id"] == platform_id
 
 
 class TestConversationFavorites:

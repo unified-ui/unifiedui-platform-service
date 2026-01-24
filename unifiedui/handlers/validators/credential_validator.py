@@ -15,6 +15,7 @@ class CredentialTypeEnum(str, Enum):
     """Supported credential types."""
     API_KEY = "API_KEY"
     BASIC_AUTH = "BASIC_AUTH"
+    OPENAPI_CONNECTION = "OPENAPI_CONNECTION"
 
     @classmethod
     def all(cls) -> list[str]:
@@ -25,6 +26,17 @@ class BasicAuthCredential(BaseModel):
     """Pydantic model for BASIC_AUTH credential validation."""
     
     username: str = Field(..., min_length=1, description="Username for basic auth")
+    password: str = Field(..., min_length=1, description="Password for basic auth")
+
+
+class OpenAPIConnectionCredential(BaseModel):
+    """Pydantic model for OPENAPI_CONNECTION credential validation.
+    
+    Used for OpenAPI-based tool connections where an API key/value pair is needed.
+    """
+    
+    key: str = Field(..., min_length=1, description="API header key (e.g., 'x-api-key')")
+    value: str = Field(..., min_length=1, description="API key value")
     password: str = Field(..., min_length=1, description="Password for basic auth")
 
 
@@ -50,11 +62,11 @@ def validate_credential_secret(credential_type: str, secret_value: str) -> str:
     Validate the secret value based on credential type.
     
     Args:
-        credential_type: The type of credential (API_KEY, BASIC_AUTH)
+        credential_type: The type of credential (API_KEY, BASIC_AUTH, OPENAPI_CONNECTION)
         secret_value: The secret value to validate
         
     Returns:
-        The validated secret value (unchanged for API_KEY, validated for BASIC_AUTH)
+        The validated secret value (unchanged for API_KEY, validated for BASIC_AUTH/OPENAPI_CONNECTION)
         
     Raises:
         UnsupportedCredentialTypeError: If credential type is not supported
@@ -92,6 +104,31 @@ def validate_credential_secret(credential_type: str, secret_value: str) -> str:
         except Exception as e:
             raise CredentialValidationError(
                 f"BASIC_AUTH validation failed: {str(e)}. 'username' and 'password' fields must be non-empty strings."
+            )
+        
+        # Return the original string (not re-serialized) as requested
+        return secret_value
+    
+    elif cred_type == CredentialTypeEnum.OPENAPI_CONNECTION.value:
+        # OPENAPI_CONNECTION must be a valid JSON string with key and value
+        try:
+            parsed = json.loads(secret_value)
+        except json.JSONDecodeError as e:
+            raise CredentialValidationError(
+                f"OPENAPI_CONNECTION secret_value must be a valid JSON string with 'key' and 'value' fields. Error: {str(e)}"
+            )
+        
+        if not isinstance(parsed, dict):
+            raise CredentialValidationError(
+                "OPENAPI_CONNECTION secret_value must be a JSON object with 'key' and 'value' fields"
+            )
+        
+        # Validate using Pydantic
+        try:
+            OpenAPIConnectionCredential(**parsed)
+        except Exception as e:
+            raise CredentialValidationError(
+                f"OPENAPI_CONNECTION validation failed: {str(e)}. 'key' and 'value' fields must be non-empty strings."
             )
         
         # Return the original string (not re-serialized) as requested

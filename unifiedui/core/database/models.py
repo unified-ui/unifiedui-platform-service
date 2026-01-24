@@ -470,60 +470,6 @@ class CredentialMember(Base, IdMixin, AuditMixin):
     )
 
 
-# ---------- Development Platforms ----------
-class DevelopmentPlatform(Base, IdNameDescriptionMixin, TenantScopedMixin):
-    """Development platform entity for embedding external development tools."""
-    __tablename__ = "development_platforms"
-
-    type: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
-    iframe_url: Mapped[str] = mapped_column(String(2000), nullable=False)
-    config: Mapped[dict] = mapped_column(PortableJSON, nullable=False, default=dict)
-    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-
-    members: Mapped[list["DevelopmentPlatformMember"]] = relationship(
-        back_populates="development_platform", cascade="all, delete-orphan"
-    )
-    tags: Mapped[list["DevelopmentPlatformTag"]] = relationship(
-        back_populates="development_platform", cascade="all, delete-orphan"
-    )
-    user_favorites: Mapped[list["DevelopmentPlatformUserFavorite"]] = relationship(
-        back_populates="development_platform", cascade="all, delete-orphan"
-    )
-
-    __table_args__ = (Index("ix_development_platforms_tenant", "tenant_id"),)
-
-
-class DevelopmentPlatformMember(Base, IdMixin, AuditMixin):
-    """Development platform membership table."""
-    __tablename__ = "development_platform_members"
-
-    tenant_id: Mapped[str] = mapped_column(String(36), nullable=False)
-    development_platform_id: Mapped[str] = mapped_column(
-        String(36), ForeignKey("development_platforms.id", ondelete="CASCADE"), nullable=False
-    )
-    principal_id: Mapped[str] = mapped_column(String(50), nullable=False)
-
-    role: Mapped[str] = mapped_column(PermissionActionSAEnum, nullable=False)
-
-    development_platform: Mapped["DevelopmentPlatform"] = relationship(back_populates="members")
-    principal: Mapped["Principal"] = relationship(
-        foreign_keys="[DevelopmentPlatformMember.tenant_id, DevelopmentPlatformMember.principal_id]",
-        primaryjoin="and_(DevelopmentPlatformMember.tenant_id == Principal.tenant_id, DevelopmentPlatformMember.principal_id == Principal.principal_id)"
-    )
-
-    __table_args__ = (
-        ForeignKeyConstraint(
-            ["tenant_id", "principal_id"],
-            ["principals.tenant_id", "principals.principal_id"],
-            ondelete="CASCADE",
-            name="fk_development_platform_members_principal"
-        ),
-        UniqueConstraint("development_platform_id", "principal_id", name="uq_development_platform_members"),
-        Index("ix_dpm_development_platform", "development_platform_id"),
-        Index("ix_dpm_principal", "principal_id"),
-    )
-
-
 # ---------- Chat Widgets ----------
 class ChatWidget(Base, IdNameDescriptionMixin, TenantScopedMixin):
     """Chat widget entity for embedding chat interfaces."""
@@ -607,7 +553,7 @@ class Tag(Base, AuditMixin):
     credential_tags: Mapped[list["CredentialTag"]] = relationship(
         back_populates="tag", cascade="all, delete-orphan"
     )
-    development_platform_tags: Mapped[list["DevelopmentPlatformTag"]] = relationship(
+    tool_tags: Mapped[list["ToolTag"]] = relationship(
         back_populates="tag", cascade="all, delete-orphan"
     )
 
@@ -707,27 +653,6 @@ class CredentialTag(Base, AuditMixin):
     )
 
 
-class DevelopmentPlatformTag(Base, AuditMixin):
-    """Junction table for development platform tags."""
-    __tablename__ = "development_platform_tags"
-
-    tenant_id: Mapped[str] = mapped_column(String(36), nullable=False, primary_key=True)
-    tag_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("tags.id", ondelete="CASCADE"), nullable=False, primary_key=True
-    )
-    development_platform_id: Mapped[str] = mapped_column(
-        String(100), ForeignKey("development_platforms.id", ondelete="CASCADE"), nullable=False, primary_key=True
-    )
-
-    tag: Mapped["Tag"] = relationship(back_populates="development_platform_tags")
-    development_platform: Mapped["DevelopmentPlatform"] = relationship(back_populates="tags")
-
-    __table_args__ = (
-        Index("ix_dpt_development_platform", "development_platform_id"),
-        Index("ix_dpt_tag", "tag_id"),
-    )
-
-
 # ---------- User Favorites ----------
 class ApplicationUserFavorite(Base, AuditMixin):
     """User favorites for applications."""
@@ -789,36 +714,6 @@ class AutonomousAgentUserFavorite(Base, AuditMixin):
     )
 
 
-class DevelopmentPlatformUserFavorite(Base, AuditMixin):
-    """User favorites for development platforms."""
-    __tablename__ = "development_platform_user_favorites"
-
-    tenant_id: Mapped[str] = mapped_column(
-        String(36), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False, primary_key=True
-    )
-    user_id: Mapped[str] = mapped_column(String(50), nullable=False, primary_key=True)
-    development_platform_id: Mapped[str] = mapped_column(
-        String(100), ForeignKey("development_platforms.id", ondelete="CASCADE"), nullable=False, primary_key=True
-    )
-
-    development_platform: Mapped["DevelopmentPlatform"] = relationship(back_populates="user_favorites")
-    principal: Mapped["Principal"] = relationship(
-        foreign_keys="[DevelopmentPlatformUserFavorite.tenant_id, DevelopmentPlatformUserFavorite.user_id]",
-        primaryjoin="and_(DevelopmentPlatformUserFavorite.tenant_id == Principal.tenant_id, DevelopmentPlatformUserFavorite.user_id == Principal.principal_id)"
-    )
-
-    __table_args__ = (
-        ForeignKeyConstraint(
-            ["tenant_id", "user_id"],
-            ["principals.tenant_id", "principals.principal_id"],
-            ondelete="CASCADE",
-            name="fk_development_platform_user_favorites_principal"
-        ),
-        Index("ix_dpuf_user", "user_id"),
-        Index("ix_dpuf_development_platform", "development_platform_id"),
-    )
-
-
 class ConversationUserFavorite(Base, AuditMixin):
     """User favorites for conversations."""
     __tablename__ = "conversation_user_favorites"
@@ -847,4 +742,80 @@ class ConversationUserFavorite(Base, AuditMixin):
         Index("ix_cuf_user", "user_id"),
         Index("ix_cuf_conversation", "conversation_id"),
     )
+
+
+# ---------- Tools (ReACT Agent Tools) ----------
+class Tool(Base, IdNameDescriptionMixin, TenantScopedMixin):
+    """Tool entity for ReACT agent tools (MCP servers, OpenAPI definitions)."""
+    __tablename__ = "tools"
+
+    type: Mapped[str] = mapped_column(String(50), nullable=False)
+    config: Mapped[dict] = mapped_column(PortableJSON, nullable=False, default=dict)
+    credential_id: Mapped[Optional[str]] = mapped_column(
+        String(36), ForeignKey("credentials.id", ondelete="SET NULL"), nullable=True
+    )
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+
+    credential: Mapped[Optional["Credential"]] = relationship(foreign_keys=[credential_id])
+    members: Mapped[list["ToolMember"]] = relationship(
+        back_populates="tool", cascade="all, delete-orphan"
+    )
+    tags: Mapped[list["ToolTag"]] = relationship(
+        back_populates="tool", cascade="all, delete-orphan"
+    )
+
+    __table_args__ = (Index("ix_tools_tenant", "tenant_id"),)
+
+
+class ToolMember(Base, IdMixin, AuditMixin):
+    """Tool membership table."""
+    __tablename__ = "tool_members"
+
+    tenant_id: Mapped[str] = mapped_column(String(36), nullable=False)
+    tool_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("tools.id", ondelete="CASCADE"), nullable=False
+    )
+    principal_id: Mapped[str] = mapped_column(String(50), nullable=False)
+
+    role: Mapped[str] = mapped_column(PermissionActionSAEnum, nullable=False)
+
+    tool: Mapped["Tool"] = relationship(back_populates="members")
+    principal: Mapped["Principal"] = relationship(
+        foreign_keys="[ToolMember.tenant_id, ToolMember.principal_id]",
+        primaryjoin="and_(ToolMember.tenant_id == Principal.tenant_id, ToolMember.principal_id == Principal.principal_id)"
+    )
+
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["tenant_id", "principal_id"],
+            ["principals.tenant_id", "principals.principal_id"],
+            ondelete="CASCADE",
+            name="fk_tool_members_principal"
+        ),
+        UniqueConstraint("tool_id", "principal_id", name="uq_tool_members"),
+        Index("ix_tool_members_tool", "tool_id"),
+        Index("ix_tool_members_principal", "principal_id"),
+    )
+
+
+class ToolTag(Base, AuditMixin):
+    """Junction table for tool tags."""
+    __tablename__ = "tool_tags"
+
+    tenant_id: Mapped[str] = mapped_column(String(36), nullable=False, primary_key=True)
+    tag_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("tags.id", ondelete="CASCADE"), nullable=False, primary_key=True
+    )
+    tool_id: Mapped[str] = mapped_column(
+        String(100), ForeignKey("tools.id", ondelete="CASCADE"), nullable=False, primary_key=True
+    )
+
+    tag: Mapped["Tag"] = relationship(back_populates="tool_tags")
+    tool: Mapped["Tool"] = relationship(back_populates="tags")
+
+    __table_args__ = (
+        Index("ix_tt_tool", "tool_id"),
+        Index("ix_tt_tag", "tag_id"),
+    )
+
 
