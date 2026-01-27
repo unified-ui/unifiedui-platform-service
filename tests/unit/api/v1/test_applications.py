@@ -324,7 +324,7 @@ class TestApplicationRoutes:
         
         # Filter by name
         response = test_client.get(
-            f"{ENDPOINT_APPLICATIONS.format(tenant_id=tenant_id)}?name_filter=Production",
+            f"{ENDPOINT_APPLICATIONS.format(tenant_id=tenant_id)}?name=Production",
             headers=headers
         )
         

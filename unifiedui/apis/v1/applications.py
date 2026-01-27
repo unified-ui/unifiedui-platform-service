@@ -44,7 +44,7 @@ async def list_applications(
     tenant_id: str,
     skip: int = Query(0, ge=0, description="Number of items to skip"),
     limit: int = Query(100, ge=1, le=1000, description="Maximum number of items to return"),
-    name_filter: Optional[str] = Query(None, description="Filter by application name"),
+    name: Optional[str] = Query(None, description="Filter by application name"),
     is_active: Optional[int] = Query(None, ge=0, le=1, description="Filter by active status (1=active, 0=inactive)"),
     tags: Optional[str] = Query(None, description="Comma-separated list of tag IDs to filter by (e.g., '10001,10002,10003')"),
     order_by: Optional[str] = Query(None, description="Column name to order by (e.g., 'name', 'created_at', 'updated_at')"),
@@ -63,7 +63,7 @@ async def list_applications(
         tenant_id: Tenant ID from path
         skip: Number of items to skip
         limit: Maximum number of items to return
-        name_filter: Optional filter by application name
+        name: Optional filter by application name
         is_active: Optional filter by active status (None=all, 1=active, 0=inactive)
         tags: Optional comma-separated tag IDs to filter by
         handler: Application handler dependency
@@ -100,7 +100,7 @@ async def list_applications(
             tenant_id=tenant_id,
             skip=skip,
             limit=limit,
-            name_filter=name_filter,
+            name_filter=name,
             is_active=is_active,
             tag_ids=tag_ids,
             order_by=order_by,

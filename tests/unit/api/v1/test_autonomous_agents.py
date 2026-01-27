@@ -334,7 +334,7 @@ class TestAutonomousAgentRoutes:
         
         # Filter by "Agent"
         response = test_client.get(
-            f"{ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id)}?name_filter=Agent",
+            f"{ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id)}?name=Agent",
             headers=headers
         )
         

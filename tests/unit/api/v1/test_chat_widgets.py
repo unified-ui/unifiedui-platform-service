@@ -371,7 +371,7 @@ class TestChatWidgetRoutes:
         
         # Filter by name
         response = test_client.get(
-            f"{ENDPOINT_CHAT_WIDGETS.format(tenant_id=tenant_id)}?name_filter=Production",
+            f"{ENDPOINT_CHAT_WIDGETS.format(tenant_id=tenant_id)}?name=Production",
             headers=headers
         )
         

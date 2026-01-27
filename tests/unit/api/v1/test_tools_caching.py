@@ -283,7 +283,7 @@ class TestToolCaching:
         
         # List filtered tools
         response_filtered = test_client.get(
-            ENDPOINT_TOOLS.format(tenant_id=tenant_id) + "?name_filter=Alpha",
+            ENDPOINT_TOOLS.format(tenant_id=tenant_id) + "?name=Alpha",
             headers=headers_cache
         )
         assert response_filtered.status_code == status.HTTP_200_OK
