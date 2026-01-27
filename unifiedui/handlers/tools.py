@@ -80,6 +80,7 @@ class ToolHandler:
         skip: int = 0,
         limit: int = 100,
         name_filter: Optional[str] = None,
+        type_filter: Optional[List[str]] = None,
         is_active: Optional[int] = None,
         tag_ids: Optional[List[int]] = None,
         order_by: Optional[str] = None,
@@ -96,6 +97,7 @@ class ToolHandler:
             skip: Number of items to skip
             limit: Maximum number of items to return
             name_filter: Optional filter by tool name
+            type_filter: Optional list of tool types to filter by (e.g., ['MCP_SERVER', 'OPENAPI_DEFINITION'])
             is_active: Optional filter by active status (None=all, 1=active, 0=inactive)
             tag_ids: Optional list of tag IDs to filter by
             order_by: Optional column name to order by
@@ -141,7 +143,7 @@ class ToolHandler:
         cache_key = f"tools:list:tenant:{tenant_id}:user:{user_id}:skip:{skip}:limit:{limit}:view:{view_key}:order:{order_key}:active:{is_active_key}"
         
         # Check if any filters are applied
-        has_filters = name_filter is not None or tag_ids is not None
+        has_filters = name_filter is not None or type_filter is not None or tag_ids is not None
         
         # Check cache (disable caching when any filters are applied)
         if use_cache and self.cache_client and not has_filters:
@@ -181,6 +183,10 @@ class ToolHandler:
             
             if name_filter:
                 query = query.where(Tool.name.ilike(f"%{name_filter}%"))
+            
+            # Filter by tool type
+            if type_filter:
+                query = query.where(Tool.type.in_(type_filter))
             
             # Filter by is_active status
             if is_active is not None:

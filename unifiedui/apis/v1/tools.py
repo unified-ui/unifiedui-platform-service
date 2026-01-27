@@ -39,6 +39,7 @@ async def list_tools(
     skip: int = Query(0, ge=0, description="Number of items to skip"),
     limit: int = Query(100, ge=1, le=1000, description="Maximum number of items to return"),
     name_filter: Optional[str] = Query(None, description="Filter by tool name"),
+    type_filter: Optional[str] = Query(None, description="Comma-separated list of tool types to filter by (e.g., 'MCP_SERVER,OPENAPI_DEFINITION')"),
     is_active: Optional[int] = Query(None, ge=0, le=1, description="Filter by active status (1=active, 0=inactive)"),
     tags: Optional[str] = Query(None, description="Comma-separated list of tag IDs to filter by"),
     order_by: Optional[str] = Query(None, description="Column name to order by (e.g., 'name', 'created_at', 'updated_at')"),
@@ -66,6 +67,11 @@ async def list_tools(
                     detail="Invalid tag IDs format. Must be comma-separated integers."
                 )
         
+        # Parse type filter from comma-separated string
+        type_filters = None
+        if type_filter:
+            type_filters = [t.strip() for t in type_filter.split(",") if t.strip()]
+        
         logger.info(
             "API: List tools",
             extra={
@@ -73,7 +79,8 @@ async def list_tools(
                 "user_id": user.identity.get_id(),
                 "skip": skip,
                 "limit": limit,
-                "tags": tag_ids
+                "tags": tag_ids,
+                "type_filter": type_filters
             }
         )
         
@@ -82,6 +89,7 @@ async def list_tools(
             skip=skip,
             limit=limit,
             name_filter=name_filter,
+            type_filter=type_filters,
             is_active=is_active,
             tag_ids=tag_ids,
             order_by=order_by,
