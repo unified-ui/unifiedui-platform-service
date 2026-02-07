@@ -862,7 +862,7 @@ class TestAutonomousAgentKeyRoutes:
         headers = create_auth_headers(test_user_token, use_cache=False)
         
         # Create an autonomous agent
-        agent_data = {"name": "Test Agent", "description": "Test", "type": AGENT_TYPE_N8N, "config": VALID_N8N_CONFIG}
+        agent_data = {"name": "Test Agent", "description": "Test", "type": AGENT_TYPE_N8N, "config": VALID_N8N_CONFIG, "allow_api_keys": True}
         create_response = test_client.post(
             ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id),
             json=agent_data,
@@ -888,7 +888,7 @@ class TestAutonomousAgentKeyRoutes:
         headers = create_auth_headers(test_user_token, use_cache=False)
         
         # Create an autonomous agent
-        agent_data = {"name": "Test Agent", "description": "Test", "type": AGENT_TYPE_N8N, "config": VALID_N8N_CONFIG}
+        agent_data = {"name": "Test Agent", "description": "Test", "type": AGENT_TYPE_N8N, "config": VALID_N8N_CONFIG, "allow_api_keys": True}
         create_response = test_client.post(
             ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id),
             json=agent_data,
@@ -936,7 +936,7 @@ class TestAutonomousAgentKeyRoutes:
         headers = create_auth_headers(test_user_token, use_cache=False)
         
         # Create an autonomous agent
-        agent_data = {"name": "Test Agent", "description": "Test", "type": AGENT_TYPE_N8N, "config": VALID_N8N_CONFIG}
+        agent_data = {"name": "Test Agent", "description": "Test", "type": AGENT_TYPE_N8N, "config": VALID_N8N_CONFIG, "allow_api_keys": True}
         create_response = test_client.post(
             ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id),
             json=agent_data,
@@ -969,7 +969,7 @@ class TestAutonomousAgentKeyRoutes:
         headers = create_auth_headers(test_user_token, use_cache=False)
         
         # Create an autonomous agent
-        agent_data = {"name": "Test Agent", "description": "Test", "type": AGENT_TYPE_N8N, "config": VALID_N8N_CONFIG}
+        agent_data = {"name": "Test Agent", "description": "Test", "type": AGENT_TYPE_N8N, "config": VALID_N8N_CONFIG, "allow_api_keys": True}
         create_response = test_client.post(
             ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id),
             json=agent_data,
@@ -1025,7 +1025,7 @@ class TestAutonomousAgentKeyRoutes:
         headers = create_auth_headers(test_user_token, use_cache=False)
         
         # Create an autonomous agent
-        agent_data = {"name": "Test Agent", "description": "Test", "type": AGENT_TYPE_N8N, "config": VALID_N8N_CONFIG}
+        agent_data = {"name": "Test Agent", "description": "Test", "type": AGENT_TYPE_N8N, "config": VALID_N8N_CONFIG, "allow_api_keys": True}
         create_response = test_client.post(
             ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id),
             json=agent_data,
@@ -1282,7 +1282,7 @@ class TestAutonomousAgentConfigEndpoint:
         headers = create_auth_headers(test_user_token, use_cache=False)
         
         # Create an agent with keys
-        agent_data = {"name": "Test Agent", "type": AGENT_TYPE_N8N, "config": VALID_N8N_CONFIG}
+        agent_data = {"name": "Test Agent", "type": AGENT_TYPE_N8N, "config": VALID_N8N_CONFIG, "allow_api_keys": True}
         create_response = test_client.post(
             ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id),
             json=agent_data,
@@ -1318,7 +1318,7 @@ class TestAutonomousAgentConfigEndpoint:
         headers = create_auth_headers(test_user_token, use_cache=False)
         
         # Create an inactive agent with keys
-        agent_data = {"name": "Test Agent", "type": AGENT_TYPE_N8N, "config": VALID_N8N_CONFIG}
+        agent_data = {"name": "Test Agent", "type": AGENT_TYPE_N8N, "config": VALID_N8N_CONFIG, "allow_api_keys": True}
         create_response = test_client.post(
             ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id),
             json=agent_data,
