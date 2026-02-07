@@ -17,6 +17,7 @@ class AutonomousAgentResponse(BaseModel):
     type: AutonomousAgentTypeEnum = Field(..., description="Type of autonomous agent")
     config: dict = Field(default_factory=dict, description="Autonomous agent configuration")
     is_active: bool = Field(..., description="Whether the autonomous agent is active")
+    allow_api_keys: bool = Field(..., description="Whether API key authentication is allowed for this agent")
     last_full_import: Optional[datetime] = Field(None, description="Timestamp of last full import (system managed)")
     tags: List[TagSummary] = Field(default_factory=list, description="Tags on the autonomous agent")
     created_at: datetime = Field(..., description="Creation timestamp")

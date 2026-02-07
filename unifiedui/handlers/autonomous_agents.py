@@ -33,7 +33,8 @@ from unifiedui.exc.autonomous_agents import (
     AutonomousAgentPermissionNotFoundError,
     AutonomousAgentConfigValidationError,
     UnsupportedAutonomousAgentTypeError,
-    AutonomousAgentKeyNotFoundError
+    AutonomousAgentKeyNotFoundError,
+    AutonomousAgentApiKeysNotAllowedError
 )
 from unifiedui.handlers.validators.autonomous_agent_config import AutonomousAgentConfigValidatorFactory
 from unifiedui.logger import get_logger
@@ -411,6 +412,7 @@ class AutonomousAgentHandler:
                 type=request.type.value,
                 config=validated_config,
                 is_active=request.is_active,
+                allow_api_keys=request.allow_api_keys,
                 primary_key_vault_uri=primary_key_vault_uri,
                 secondary_key_vault_uri=secondary_key_vault_uri,
                 created_by=user_id,
@@ -493,6 +495,8 @@ class AutonomousAgentHandler:
                 autonomous_agent.config = validated_config
             if request.is_active is not None:
                 autonomous_agent.is_active = request.is_active
+            if request.allow_api_keys is not None:
+                autonomous_agent.allow_api_keys = request.allow_api_keys
             
             autonomous_agent.updated_by = user_id
             
@@ -722,6 +726,9 @@ class AutonomousAgentHandler:
             if not autonomous_agent:
                 raise AutonomousAgentNotFoundError(autonomous_agent_id)
             
+            if not autonomous_agent.allow_api_keys:
+                raise AutonomousAgentApiKeysNotAllowedError(autonomous_agent_id)
+            
             vault_uri = autonomous_agent.primary_key_vault_uri if key_number == 1 else autonomous_agent.secondary_key_vault_uri
             
             if not vault_uri:
@@ -774,6 +781,9 @@ class AutonomousAgentHandler:
             
             if not autonomous_agent:
                 raise AutonomousAgentNotFoundError(autonomous_agent_id)
+            
+            if not autonomous_agent.allow_api_keys:
+                raise AutonomousAgentApiKeysNotAllowedError(autonomous_agent_id)
             
             # Generate new key
             new_key = self._generate_api_key()
@@ -1120,6 +1130,7 @@ class AutonomousAgentHandler:
             description=agent.description,
             type=AutonomousAgentTypeEnum(agent.type),
             is_active=agent.is_active,
+            allow_api_keys=agent.allow_api_keys,
             config=agent.config,
             last_full_import=agent.last_full_import,
             tags=tags,

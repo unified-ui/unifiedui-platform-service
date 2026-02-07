@@ -24,7 +24,8 @@ from unifiedui.exc.autonomous_agents import (
     AutonomousAgentPermissionNotFoundError,
     AutonomousAgentConfigValidationError,
     UnsupportedAutonomousAgentTypeError,
-    AutonomousAgentKeyNotFoundError
+    AutonomousAgentKeyNotFoundError,
+    AutonomousAgentApiKeysNotAllowedError
 )
 from unifiedui.exc.application_config import InvalidCredentialError
 from unifiedui.core.middleware.apis.v1.auth import authenticate, check_permissions, authenticate_autonomous_agent_api_key
@@ -672,6 +673,11 @@ async def get_autonomous_agent_key(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=str(e)
         )
+    except AutonomousAgentApiKeysNotAllowedError as e:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(e)
+        )
     except AutonomousAgentKeyNotFoundError as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -750,6 +756,11 @@ async def rotate_autonomous_agent_key(
     except AutonomousAgentNotFoundError as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e)
+        )
+    except AutonomousAgentApiKeysNotAllowedError as e:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
             detail=str(e)
         )
     except AutonomousAgentKeyNotFoundError as e:

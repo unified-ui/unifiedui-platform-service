@@ -308,6 +308,7 @@ class AutonomousAgent(Base, IdNameDescriptionMixin, TenantScopedMixin):
     type: Mapped[str] = mapped_column(AutonomousAgentTypeSAEnum, nullable=False)
     config: Mapped[dict] = mapped_column(PortableJSON, nullable=False, default=dict)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    allow_api_keys: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     primary_key_vault_uri: Mapped[Optional[str]] = mapped_column(String(2000), nullable=True)
     secondary_key_vault_uri: Mapped[Optional[str]] = mapped_column(String(2000), nullable=True)
     last_full_import: Mapped[Optional[datetime]] = mapped_column(

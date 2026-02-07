@@ -161,6 +161,13 @@ def authenticate_autonomous_agent_api_key() -> Callable:
                         detail="Autonomous agent is not active"
                     )
                 
+                # Check if API key authentication is allowed
+                if not autonomous_agent.allow_api_keys:
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail="API key authentication is not allowed for this autonomous agent. Use Bearer token with a service principal instead."
+                    )
+                
                 # Retrieve keys from vault and compare (always fresh, no cache)
                 is_valid = False
                 

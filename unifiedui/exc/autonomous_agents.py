@@ -42,3 +42,11 @@ class AutonomousAgentKeyNotFoundError(Exception):
         self.autonomous_agent_id = autonomous_agent_id
         self.key_number = key_number
         super().__init__(f"Key {key_number} not found for autonomous agent '{autonomous_agent_id}'")
+
+
+class AutonomousAgentApiKeysNotAllowedError(Exception):
+    """Exception raised when API key access is attempted but not allowed for this agent."""
+    
+    def __init__(self, autonomous_agent_id: str):
+        self.autonomous_agent_id = autonomous_agent_id
+        super().__init__(f"API key authentication is not allowed for autonomous agent '{autonomous_agent_id}'. Use Bearer token with a service principal instead.")
