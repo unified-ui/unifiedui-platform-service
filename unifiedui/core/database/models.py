@@ -98,7 +98,7 @@ AutonomousAgentTypeSAEnum = SAEnum(
 # ---------- Mixins ----------
 class IdMixin:
     """Mixin for ID field."""
-    id: Mapped[str] = mapped_column(String(100), primary_key=True)
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
 
 
 class AuditMixin:
@@ -281,7 +281,7 @@ class Conversation(Base, IdNameDescriptionMixin, TenantScopedMixin):
     __tablename__ = "conversations"
 
     application_id: Mapped[str] = mapped_column(
-        String(100), ForeignKey("applications.id", ondelete="CASCADE"), nullable=False
+        String(36), ForeignKey("applications.id", ondelete="CASCADE"), nullable=False
     )
     ext_conversation_id: Mapped[Optional[str]] = mapped_column(
         String(100), nullable=True, default=None
@@ -579,7 +579,7 @@ class ApplicationTag(Base, AuditMixin):
         Integer, ForeignKey("tags.id", ondelete="CASCADE"), nullable=False, primary_key=True
     )
     application_id: Mapped[str] = mapped_column(
-        String(100), ForeignKey("applications.id", ondelete="CASCADE"), nullable=False, primary_key=True
+        String(36), ForeignKey("applications.id", ondelete="CASCADE"), nullable=False, primary_key=True
     )
 
     tag: Mapped["Tag"] = relationship(back_populates="application_tags")
@@ -600,7 +600,7 @@ class AutonomousAgentTag(Base, AuditMixin):
         Integer, ForeignKey("tags.id", ondelete="CASCADE"), nullable=False, primary_key=True
     )
     autonomous_agent_id: Mapped[str] = mapped_column(
-        String(100), ForeignKey("autonomous_agents.id", ondelete="CASCADE"), nullable=False, primary_key=True
+        String(36), ForeignKey("autonomous_agents.id", ondelete="CASCADE"), nullable=False, primary_key=True
     )
 
     tag: Mapped["Tag"] = relationship(back_populates="autonomous_agent_tags")
@@ -621,7 +621,7 @@ class ChatWidgetTag(Base, AuditMixin):
         Integer, ForeignKey("tags.id", ondelete="CASCADE"), nullable=False, primary_key=True
     )
     chat_widget_id: Mapped[str] = mapped_column(
-        String(100), ForeignKey("chat_widgets.id", ondelete="CASCADE"), nullable=False, primary_key=True
+        String(36), ForeignKey("chat_widgets.id", ondelete="CASCADE"), nullable=False, primary_key=True
     )
 
     tag: Mapped["Tag"] = relationship(back_populates="chat_widget_tags")
@@ -642,7 +642,7 @@ class CredentialTag(Base, AuditMixin):
         Integer, ForeignKey("tags.id", ondelete="CASCADE"), nullable=False, primary_key=True
     )
     credential_id: Mapped[str] = mapped_column(
-        String(100), ForeignKey("credentials.id", ondelete="CASCADE"), nullable=False, primary_key=True
+        String(36), ForeignKey("credentials.id", ondelete="CASCADE"), nullable=False, primary_key=True
     )
 
     tag: Mapped["Tag"] = relationship(back_populates="credential_tags")
@@ -664,7 +664,7 @@ class ApplicationUserFavorite(Base, AuditMixin):
     )
     user_id: Mapped[str] = mapped_column(String(50), nullable=False, primary_key=True)
     application_id: Mapped[str] = mapped_column(
-        String(100), ForeignKey("applications.id", ondelete="CASCADE"), nullable=False, primary_key=True
+        String(36), ForeignKey("applications.id", ondelete="CASCADE"), nullable=False, primary_key=True
     )
 
     application: Mapped["Application"] = relationship(back_populates="user_favorites")
@@ -694,7 +694,7 @@ class AutonomousAgentUserFavorite(Base, AuditMixin):
     )
     user_id: Mapped[str] = mapped_column(String(50), nullable=False, primary_key=True)
     autonomous_agent_id: Mapped[str] = mapped_column(
-        String(100), ForeignKey("autonomous_agents.id", ondelete="CASCADE"), nullable=False, primary_key=True
+        String(36), ForeignKey("autonomous_agents.id", ondelete="CASCADE"), nullable=False, primary_key=True
     )
 
     autonomous_agent: Mapped["AutonomousAgent"] = relationship(back_populates="user_favorites")
@@ -724,7 +724,7 @@ class ConversationUserFavorite(Base, AuditMixin):
     )
     user_id: Mapped[str] = mapped_column(String(50), nullable=False, primary_key=True)
     conversation_id: Mapped[str] = mapped_column(
-        String(100), ForeignKey("conversations.id", ondelete="CASCADE"), nullable=False, primary_key=True
+        String(36), ForeignKey("conversations.id", ondelete="CASCADE"), nullable=False, primary_key=True
     )
 
     conversation: Mapped["Conversation"] = relationship(back_populates="user_favorites")
@@ -808,7 +808,7 @@ class ToolTag(Base, AuditMixin):
         Integer, ForeignKey("tags.id", ondelete="CASCADE"), nullable=False, primary_key=True
     )
     tool_id: Mapped[str] = mapped_column(
-        String(100), ForeignKey("tools.id", ondelete="CASCADE"), nullable=False, primary_key=True
+        String(36), ForeignKey("tools.id", ondelete="CASCADE"), nullable=False, primary_key=True
     )
 
     tag: Mapped["Tag"] = relationship(back_populates="tool_tags")
