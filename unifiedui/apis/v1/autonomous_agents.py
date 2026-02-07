@@ -772,6 +772,37 @@ async def rotate_autonomous_agent_key(
         )
 
 
+# ========== API Key Validation Endpoint (Agent Service) ==========
+
+@router.post(
+    "/{autonomous_agent_id}/validate-api-key",
+    summary="Validate autonomous agent API key",
+    description="""
+    Lightweight endpoint to validate an autonomous agent API key without loading
+    the full configuration or credential secrets.
+    
+    **Authentication**: This endpoint uses API key authentication via the 
+    `X-Unified-UI-Autonomous-Agent-API-Key` header (NOT Bearer token).
+    
+    Returns the autonomous agent ID and tenant ID if the API key is valid.
+    This is used by the agent-service to validate API keys for trace ingestion
+    without triggering credential secret resolution.
+    """
+)
+@authenticate_autonomous_agent_api_key()
+async def validate_autonomous_agent_api_key(
+    request: Request,
+    tenant_id: str,
+    autonomous_agent_id: str,
+) -> dict:
+    autonomous_agent = request.state.autonomous_agent
+    return {
+        "valid": True,
+        "autonomous_agent_id": str(autonomous_agent.id),
+        "tenant_id": tenant_id,
+    }
+
+
 # ========== Config Endpoint (Agent Service) ==========
 
 @router.get(
