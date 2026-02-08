@@ -10,6 +10,7 @@ from unifiedui.core.database.client import SQLAlchemyClient
 from unifiedui.core.database.models import Conversation, ConversationMember, Application
 from unifiedui.core.database.enums import PermissionActionEnum, PrincipalTypeEnum, ApplicationTypeEnum
 from unifiedui.caching.client import CacheClient
+from unifiedui.services.agent_service_client import AgentServiceClient
 
 if TYPE_CHECKING:
     from unifiedui.core.identity.users import ContextIdentityUser
@@ -36,7 +37,8 @@ class ConversationHandler:
         self,
         db_client: SQLAlchemyClient,
         cache_client: Optional[CacheClient] = None,
-        permissions_handler: Optional[ResourcePermissionsHandler] = None
+        permissions_handler: Optional[ResourcePermissionsHandler] = None,
+        agent_service_client: Optional[AgentServiceClient] = None
     ):
         """
         Initialize the conversation handler.
@@ -45,10 +47,12 @@ class ConversationHandler:
             db_client: SQLAlchemy database client instance
             cache_client: Optional cache client for Redis caching
             permissions_handler: Optional central permissions handler
+            agent_service_client: Optional agent service client for cascade delete
         """
         self.db_client = db_client
         self.cache_client = cache_client
         self._permissions_handler = permissions_handler
+        self._agent_service_client = agent_service_client
 
     @property
     def permissions_handler(self) -> ResourcePermissionsHandler:
@@ -422,7 +426,7 @@ class ConversationHandler:
         conversation_id: str
     ) -> None:
         """
-        Delete a conversation.
+        Delete a conversation and cascade delete associated data in agent service.
         
         Args:
             tenant_id: The ID of the tenant
@@ -442,6 +446,9 @@ class ConversationHandler:
             
             if not conversation:
                 raise ConversationNotFoundError(conversation_id)
+            
+            if self._agent_service_client:
+                self._agent_service_client.delete_conversation_data(tenant_id, conversation_id)
             
             session.delete(conversation)
             session.commit()

@@ -13,6 +13,7 @@ from unifiedui.core.database.models import AutonomousAgent, AutonomousAgentMembe
 from unifiedui.core.database.enums import PermissionActionEnum, PrincipalTypeEnum, AutonomousAgentTypeEnum
 from unifiedui.core.vault.client import BaseVaultClient
 from unifiedui.caching.client import CacheClient
+from unifiedui.services.agent_service_client import AgentServiceClient
 
 if TYPE_CHECKING:
     from unifiedui.core.identity.users import ContextIdentityUser
@@ -51,7 +52,8 @@ class AutonomousAgentHandler:
         cache_client: Optional[CacheClient] = None,
         vault_client: Optional[BaseVaultClient] = None,
         permissions_handler: Optional[ResourcePermissionsHandler] = None,
-        tags_handler: Optional[ResourceTagsHandler] = None
+        tags_handler: Optional[ResourceTagsHandler] = None,
+        agent_service_client: Optional[AgentServiceClient] = None
     ):
         """
         Initialize the autonomous agent handler.
@@ -62,12 +64,14 @@ class AutonomousAgentHandler:
             vault_client: Optional vault client for secret management
             permissions_handler: Optional central permissions handler
             tags_handler: Optional central tags handler
+            agent_service_client: Optional agent service client for cascade delete
         """
         self.db_client = db_client
         self.cache_client = cache_client
         self.vault_client = vault_client
         self._permissions_handler = permissions_handler
         self._tags_handler = tags_handler
+        self._agent_service_client = agent_service_client
 
     @property
     def permissions_handler(self) -> ResourcePermissionsHandler:
@@ -526,7 +530,7 @@ class AutonomousAgentHandler:
         autonomous_agent_id: str
     ) -> None:
         """
-        Delete an autonomous agent.
+        Delete an autonomous agent and cascade delete associated data.
         
         Args:
             tenant_id: The ID of the tenant
@@ -547,6 +551,8 @@ class AutonomousAgentHandler:
             if not autonomous_agent:
                 raise AutonomousAgentNotFoundError(autonomous_agent_id)
             
+            self._cascade_delete_agent_data(tenant_id, autonomous_agent_id, autonomous_agent)
+            
             session.delete(autonomous_agent)
             session.commit()
             
@@ -556,6 +562,35 @@ class AutonomousAgentHandler:
             self._invalidate_permissions_cache(tenant_id, autonomous_agent_id)
             
             logger.info(f"Deleted autonomous agent {autonomous_agent_id}")
+
+    def _cascade_delete_agent_data(
+        self,
+        tenant_id: str,
+        autonomous_agent_id: str,
+        autonomous_agent: AutonomousAgent
+    ) -> None:
+        """
+        Cascade delete agent service data and vault secrets (best-effort).
+        
+        Args:
+            tenant_id: Tenant ID
+            autonomous_agent_id: Agent ID
+            autonomous_agent: Agent model instance
+        """
+        if self._agent_service_client:
+            self._agent_service_client.delete_autonomous_agent_data(tenant_id, autonomous_agent_id)
+
+        if self.vault_client:
+            for vault_uri_attr in ("primary_key_vault_uri", "secondary_key_vault_uri"):
+                vault_uri = getattr(autonomous_agent, vault_uri_attr, None)
+                if vault_uri:
+                    try:
+                        self.vault_client.delete_secret(vault_uri)
+                    except Exception:
+                        logger.warning(
+                            f"Failed to delete vault secret {vault_uri_attr}",
+                            extra={"autonomous_agent_id": autonomous_agent_id}
+                        )
 
     def _invalidate_list_cache(self, tenant_id: str) -> None:
         """Invalidate all list caches for a tenant."""

@@ -27,11 +27,11 @@ logger = get_logger(__name__)
 
 def _validate_service_key(request: Request, required_service_auth_key: str) -> bool:
     """
-    Validate X-Service-Key header against settings or environment variable.
+    Validate X-Service-Key header against the app vault or settings fallback.
     
     Args:
         request: FastAPI request object
-        required_service_auth_key: Key name in settings/env (e.g., "X_AGENT_SERVICE_KEY")
+        required_service_auth_key: Key name mapping (e.g., "X_AGENT_SERVICE_KEY")
         
     Returns:
         True if service key is valid
@@ -39,6 +39,8 @@ def _validate_service_key(request: Request, required_service_auth_key: str) -> b
     Raises:
         HTTPException: If service key is missing, invalid, or not configured
     """
+    from unifiedui.handlers.dependencies.vault import get_app_service_vault
+
     service_key_header = request.headers.get("X-Service-Key")
     
     if not service_key_header:
@@ -48,12 +50,10 @@ def _validate_service_key(request: Request, required_service_auth_key: str) -> b
             detail="X-Service-Key header missing for service authentication"
         )
     
-    # Get expected key from settings (which reads from environment variables)
-    # Service keys are NOT stored in vault - they are configuration values
-    expected_key = getattr(settings, required_service_auth_key.lower(), None)
+    expected_key = _resolve_service_key(required_service_auth_key)
     
     if not expected_key:
-        logger.error(f"Service key {required_service_auth_key} not configured in settings")
+        logger.error(f"Service key {required_service_auth_key} not configured")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Service authentication not configured: {required_service_auth_key}"
@@ -67,6 +67,41 @@ def _validate_service_key(request: Request, required_service_auth_key: str) -> b
         )
     
     return True
+
+
+_SERVICE_KEY_VAULT_MAP = {
+    "x_agent_service_key": "app_vault_agent_to_platform_key",
+}
+
+
+def _resolve_service_key(required_service_auth_key: str) -> Optional[str]:
+    """
+    Resolve service key from app vault, falling back to settings.
+    
+    Args:
+        required_service_auth_key: Key name (e.g., "X_AGENT_SERVICE_KEY")
+        
+    Returns:
+        The resolved service key value or None
+    """
+    from unifiedui.handlers.dependencies.vault import get_app_service_vault
+
+    key_lower = required_service_auth_key.lower()
+    vault_config_attr = _SERVICE_KEY_VAULT_MAP.get(key_lower)
+
+    if vault_config_attr:
+        app_vault = get_app_service_vault()
+        if app_vault:
+            vault_key_name = getattr(settings, vault_config_attr, None)
+            if vault_key_name:
+                try:
+                    secret = app_vault.get_secret(f"dotenv://{vault_key_name}", use_cache=False)
+                    if secret:
+                        return secret
+                except Exception:
+                    logger.warning(f"Failed to retrieve service key from app vault for {key_lower}")
+
+    return getattr(settings, key_lower, None)
 
 
 def authenticate_autonomous_agent_api_key() -> Callable:

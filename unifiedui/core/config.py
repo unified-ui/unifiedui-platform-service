@@ -49,7 +49,15 @@ class Settings(BaseSettings):
     secrets_encryption_key: Optional[str] = None
     
     # Service-to-Service Authentication Keys
-    x_agent_service_key: Optional[str] = None  # Service key for agent-service authentication
+    x_agent_service_key: Optional[str] = None  # DEPRECATED: use app vault instead
+    
+    # App Vault Key Names (logical key names used to retrieve service keys from vault)
+    app_vault_agent_to_platform_key: str = "agent-to-platform-service-key"
+    app_vault_platform_to_agent_key: str = "platform-to-agent-service-key"
+    
+    # Agent Service Configuration
+    agent_service_url: str = "http://localhost:8085"
+    agent_service_timeout: int = 30
     
     # API Configuration
     api_title: str = "unified-ui API"
@@ -60,7 +68,17 @@ class Settings(BaseSettings):
     cors_origins: list[str] = ["*"]
     cors_allow_credentials: bool = True
     cors_allow_methods: list[str] = ["*"]
-    cors_allow_headers: list[str] = ["*"]
+    cors_allow_headers: list[str] = [
+        "Authorization",
+        "Content-Type",
+        "Accept",
+        "X-Service-Key",
+        "X-Request-ID",
+        "X-Correlation-ID",
+        "X-Unified-UI-Autonomous-Agent-API-Key",
+        "X-Use-Cache",
+        "Cache-Control",
+    ]
     
     # Logging Configuration
     log_level: str = "INFO"
