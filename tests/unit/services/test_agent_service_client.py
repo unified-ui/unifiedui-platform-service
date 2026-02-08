@@ -2,8 +2,6 @@
 from typing import Any
 from unittest.mock import patch, MagicMock
 
-import pytest
-
 from unifiedui.services.agent_service_client import AgentServiceClient
 
 

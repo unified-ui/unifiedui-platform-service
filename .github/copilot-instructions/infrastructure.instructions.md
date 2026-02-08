@@ -72,14 +72,16 @@ handlers/dependencies/vault.py → get_app_service_vault(), get_secrets_vault()
 
 ### Dual Vault Architecture
 
-The system uses **two separate vault instances**:
+The system uses **two separate vault instances**, each with their own credentials:
 
-| Vault | Factory | Config | Purpose |
-|-------|---------|--------|---------|
-| **App Vault** | `get_app_service_vault()` | `APP_VAULT_TYPE` (fallback: `VAULT_TYPE`) | Service-to-service keys |
-| **Secrets Vault** | `get_secrets_vault()` | `SECRETS_VAULT_TYPE` (fallback: `VAULT_TYPE`) | Credential secrets (API keys, tokens) |
+| Vault | Factory | Type Config | Credentials Config | Purpose |
+|-------|---------|-------------|--------------------|---------|
+| **App Vault** | `get_app_service_vault()` | `APP_VAULT_TYPE` (fallback: `VAULT_TYPE`) | `APP_HASHICORP_VAULT_ADDR`, `APP_HASHICORP_VAULT_TOKEN`, `APP_AZURE_KEYVAULT_URL` | Service-to-service keys |
+| **Secrets Vault** | `get_secrets_vault()` | `SECRETS_VAULT_TYPE` (fallback: `VAULT_TYPE`) | `SECRETS_HASHICORP_VAULT_ADDR`, `SECRETS_HASHICORP_VAULT_TOKEN`, `SECRETS_AZURE_KEYVAULT_URL` | Credential secrets (API keys, tokens) |
 
-Both can use the same vault type for local development. In production, they can point to different vault backends.
+Both can point to the same vault instance or to completely different backends/addresses.
+
+The factory `_create_vault_client()` takes per-purpose credentials as arguments — it does NOT read global settings.
 
 ### Vault Interface
 ```python
@@ -191,10 +193,19 @@ class Settings(BaseSettings):
     redis_db: int = 0
     
     # Vault (dual vault support)
-    vault_type: str = "dotenv"  # dotenv | hashicorp | azure
-    app_vault_type: Optional[str] = None    # Override for app vault (fallback: vault_type)
+    vault_type: str = "dotenv"  # DOTENV | HASHICORP_VAULT | AZURE_KEYVAULT
+    app_vault_type: Optional[str] = None     # Override for app vault (fallback: vault_type)
     secrets_vault_type: Optional[str] = None # Override for secrets vault (fallback: vault_type)
-    vault_url: Optional[str] = None
+    
+    # App Vault Credentials
+    app_hashicorp_vault_addr: Optional[str] = None
+    app_hashicorp_vault_token: Optional[str] = None
+    app_azure_keyvault_url: Optional[str] = None
+    
+    # Secrets Vault Credentials
+    secrets_hashicorp_vault_addr: Optional[str] = None
+    secrets_hashicorp_vault_token: Optional[str] = None
+    secrets_azure_keyvault_url: Optional[str] = None
     
     # Identity
     azure_tenant_id: str
