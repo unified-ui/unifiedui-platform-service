@@ -43,6 +43,9 @@ class MockVault(BaseVault):
     def close(self) -> None:
         pass
 
+    def build_secret_uri(self, key_name: str) -> str:
+        return f"vault://secrets/{key_name}"
+
 
 class TestBaseVault:
     """Test suite for BaseVault abstract base class."""

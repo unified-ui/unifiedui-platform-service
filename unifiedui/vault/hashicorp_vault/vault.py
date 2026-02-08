@@ -72,8 +72,12 @@ class HashiCorpVault(BaseVault):
             logger.error(f"Failed to store secret in HashiCorp Vault: {e}")
             raise
 
+    def build_secret_uri(self, key_name: str) -> str:
+        """Build a HashiCorp vault URI for the given key name."""
+        host = self.url.split("//")[1] if "//" in self.url else self.url
+        return f"vault://{host}/{self.mount_point}/{key_name}"
+
     def get_secret(self, uri: str) -> Optional[str]:
-        """Retrieve a secret from HashiCorp Vault."""
         try:
             # Parse URI: vault://host/mount_point/path
             parts = uri.replace("vault://", "").split("/", 2)

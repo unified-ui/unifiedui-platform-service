@@ -59,36 +59,72 @@ user:{user_id}:custom_groups
 ```
 core/vault/
 ├── vault.py            → BaseVault (interface)
-├── client.py           → BaseVaultClient (interface)
+├── client.py           → BaseVaultClient (encrypted caching, URI building)
 └── config.py           → VaultConfig
 
 vault/
 ├── azure_keyvault/     → Azure Key Vault implementation
 ├── hashicorp_vault/    → HashiCorp Vault implementation
 └── dotenv/             → DotEnv vault (development only)
+
+handlers/dependencies/vault.py → get_app_service_vault(), get_secrets_vault()
 ```
+
+### Dual Vault Architecture
+
+The system uses **two separate vault instances**:
+
+| Vault | Factory | Config | Purpose |
+|-------|---------|--------|---------|
+| **App Vault** | `get_app_service_vault()` | `APP_VAULT_TYPE` (fallback: `VAULT_TYPE`) | Service-to-service keys |
+| **Secrets Vault** | `get_secrets_vault()` | `SECRETS_VAULT_TYPE` (fallback: `VAULT_TYPE`) | Credential secrets (API keys, tokens) |
+
+Both can use the same vault type for local development. In production, they can point to different vault backends.
 
 ### Vault Interface
 ```python
-class BaseVault:
-    """Base vault interface for secret management."""
-    
+class BaseVault(ABC):
+    def store_secret(self, key, value, metadata=None) -> str: ...
+    def get_secret(self, uri) -> Optional[str]: ...
+    def update_secret(self, uri, value, metadata=None) -> bool: ...
+    def delete_secret(self, uri) -> bool: ...
+    def build_secret_uri(self, key_name: str) -> str: ...  # URI construction
     def ping(self) -> bool: ...
-    def get_secret(self, key: str, use_cache: bool = True) -> str: ...
-    def store_secret(self, key: str, value: str) -> str: ...
-    def update_secret(self, key: str, value: str) -> str: ...
-    def delete_secret(self, key: str) -> None: ...
-    def list_secrets(self) -> list[str]: ...
+    def close(self) -> None: ...
+    def list_secrets(self) -> list: ...
 ```
 
+### URI Scheme per Vault Type
+| Vault | URI Format | Example |
+|-------|-----------|--------|
+| DotEnv | `dotenv://{key}` | `dotenv://PLATFORM_TO_AGENT_SERVICE_KEY` |
+| HashiCorp | `vault://{host}/{mount}/{key}` | `vault://127.0.0.1:8200/secret/my-key` |
+| Azure KV | `azurekv://{vault_name}/{secret}` | `azurekv://uui-vault/my-key` |
+
+**Never hardcode URI prefixes.** Always use `vault.build_secret_uri(key_name)` to construct URIs.
+
+### Vault Caching (BaseVaultClient)
+- `get_secret(uri, use_cache=True)` → AES-encrypted Redis cache, 1h TTL
+- Requires `SECRETS_ENCRYPTION_KEY` env var for encryption
+- `update_secret()` / `delete_secret()` auto-invalidate cache
+- **Service keys always use `use_cache=False`** (key rotation must be immediate)
+
+### Service-to-Service Keys
+| Key Name | Direction |
+|----------|----------|
+| `PLATFORM_TO_AGENT_SERVICE_KEY` | Platform → Agent Service |
+| `AGENT_TO_PLATFORM_SERVICE_KEY` | Agent → Platform Service |
+
+Used in `auth.py` middleware and `AgentServiceClient`. Both resolve via `app_vault.build_secret_uri(key_name)`.
+
 ### Usage
-- **Credentials**: Secret values stored in vault, metadata in PostgreSQL
-- **API Keys**: Autonomous agent primary/secondary keys stored in vault
-- **Never cache API keys**: `use_cache=False` for API key validation (rotation support)
-- **Development**: DotEnv vault uses file-based storage (`.env`)
+- **Credentials**: Secret values stored in secrets vault, metadata in PostgreSQL
+- **API Keys**: Autonomous agent keys stored in secrets vault
+- **Service keys**: Stored in app vault, validated with `use_cache=False`
+- **Development**: DotEnv vault reads from environment variables via `os.getenv()`
 
 ### Test Mock
-Tests use `MockVault` from `tests/fixtures/vault.py` — in-memory dict storage.
+Tests use `MockVault` from `tests/fixtures/vault.py` — in-memory dict storage with `mock://` URI scheme.
 
 ---
 
@@ -154,8 +190,10 @@ class Settings(BaseSettings):
     redis_password: str = ""
     redis_db: int = 0
     
-    # Vault
+    # Vault (dual vault support)
     vault_type: str = "dotenv"  # dotenv | hashicorp | azure
+    app_vault_type: Optional[str] = None    # Override for app vault (fallback: vault_type)
+    secrets_vault_type: Optional[str] = None # Override for secrets vault (fallback: vault_type)
     vault_url: Optional[str] = None
     
     # Identity
@@ -165,8 +203,9 @@ class Settings(BaseSettings):
     # CORS
     cors_origins: list[str] = ["*"]
     
-    # Service Keys
-    x_agent_service_key: str = ""
+    # Agent Service Connection
+    agent_service_url: str = "http://localhost:8085"
+    agent_service_timeout: int = 30
     
     model_config = SettingsConfigDict(env_file=".env")
 ```

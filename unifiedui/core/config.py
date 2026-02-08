@@ -35,15 +35,20 @@ class Settings(BaseSettings):
     rabbitmq_user: Optional[str] = None
     rabbitmq_password: Optional[str] = None
     
-    # HashiCorp Vault Configuration (Optional)
-    vault_addr: Optional[str] = None
-    vault_token: Optional[str] = None
-    
-    # Azure KeyVault Configuration (Optional)
-    azure_keyvault_vault_name: Optional[str] = None
-    
     # Vault Type Selection
     vault_type: Optional[str] = None  # AZURE_KEYVAULT, HASHICORP_VAULT, or DOTENV
+    app_vault_type: Optional[str] = None  # Override vault type for app service keys (defaults to vault_type)
+    secrets_vault_type: Optional[str] = None  # Override vault type for credential secrets (defaults to vault_type)
+    
+    # App Vault Configuration (service-to-service keys)
+    app_hashicorp_vault_addr: Optional[str] = None
+    app_hashicorp_vault_token: Optional[str] = None
+    app_azure_keyvault_url: Optional[str] = None
+    
+    # Secrets Vault Configuration (credential secrets)
+    secrets_hashicorp_vault_addr: Optional[str] = None
+    secrets_hashicorp_vault_token: Optional[str] = None
+    secrets_azure_keyvault_url: Optional[str] = None
     
     # Secret Encryption Key (for caching secrets)
     secrets_encryption_key: Optional[str] = None
@@ -52,8 +57,8 @@ class Settings(BaseSettings):
     x_agent_service_key: Optional[str] = None  # DEPRECATED: use app vault instead
     
     # App Vault Key Names (logical key names used to retrieve service keys from vault)
-    app_vault_agent_to_platform_key: str = "agent-to-platform-service-key"
-    app_vault_platform_to_agent_key: str = "platform-to-agent-service-key"
+    app_vault_agent_to_platform_key: str = "AGENT_TO_PLATFORM_SERVICE_KEY"
+    app_vault_platform_to_agent_key: str = "PLATFORM_TO_AGENT_SERVICE_KEY"
     
     # Agent Service Configuration
     agent_service_url: str = "http://localhost:8085"

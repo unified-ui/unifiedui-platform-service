@@ -51,6 +51,10 @@ class DotEnvVault(BaseVault):
             logger.debug(f"Stored secret in DotEnv vault: {key}")
             return uri
 
+    def build_secret_uri(self, key_name: str) -> str:
+        """Build a dotenv URI for the given key name."""
+        return f"dotenv://{key_name}"
+
     def get_secret(self, uri: str) -> Optional[str]:
         """
         Retrieve a secret from environment variables or in-memory store.

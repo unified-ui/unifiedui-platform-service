@@ -20,12 +20,21 @@ _app_service_vault: Optional[BaseVaultClient] = None
 _secrets_vault: Optional[BaseVaultClient] = None
 
 
-def _create_vault_client(vault_type: str, cache_client: Optional[any] = None) -> BaseVaultClient:
+def _create_vault_client(
+    vault_type: str,
+    hashicorp_addr: Optional[str] = None,
+    hashicorp_token: Optional[str] = None,
+    azure_keyvault_url: Optional[str] = None,
+    cache_client: Optional[any] = None,
+) -> BaseVaultClient:
     """
-    Create a vault client based on type.
+    Create a vault client based on type with per-purpose credentials.
     
     Args:
         vault_type: Vault type (AZURE_KEYVAULT, HASHICORP_VAULT, DOTENV)
+        hashicorp_addr: HashiCorp Vault address for this purpose
+        hashicorp_token: HashiCorp Vault token for this purpose
+        azure_keyvault_url: Azure Key Vault URL for this purpose
         cache_client: Optional cache client for caching encrypted secrets
         
     Returns:
@@ -37,24 +46,23 @@ def _create_vault_client(vault_type: str, cache_client: Optional[any] = None) ->
     vault_type_upper = vault_type.upper()
     
     if vault_type_upper == "AZURE_KEYVAULT":
-        if not settings.azure_keyvault_vault_name:
-            logger.error("Azure KeyVault name not configured")
-            raise RuntimeError("azure_keyvault_vault_name must be set when using Azure KeyVault")
+        if not azure_keyvault_url:
+            logger.error("Azure KeyVault URL not configured")
+            raise RuntimeError("Azure KeyVault URL must be set when using Azure KeyVault")
         
-        vault_url = f"https://{settings.azure_keyvault_vault_name}.vault.azure.net/"
         return AzureKeyVaultClient(
-            vault_url=vault_url,
+            vault_url=azure_keyvault_url,
             cache_client=cache_client
         )
     
     elif vault_type_upper == "HASHICORP_VAULT":
-        if not settings.vault_addr:
+        if not hashicorp_addr:
             logger.error("HashiCorp Vault address not configured")
-            raise RuntimeError("vault_addr must be set when using HashiCorp Vault")
+            raise RuntimeError("HashiCorp Vault address must be set when using HashiCorp Vault")
         
         return HashiCorpVaultClient(
-            url=settings.vault_addr,
-            token=settings.vault_token,
+            url=hashicorp_addr,
+            token=hashicorp_token,
             cache_client=cache_client
         )
     
@@ -98,7 +106,13 @@ def get_vault_client() -> Optional[BaseVaultClient]:
     if settings.cache_enabled and settings.secrets_encryption_key:
         cache_client = get_cache_client()
     
-    return _create_vault_client(vault_type, cache_client)
+    return _create_vault_client(
+        vault_type,
+        hashicorp_addr=settings.secrets_hashicorp_vault_addr,
+        hashicorp_token=settings.secrets_hashicorp_vault_token,
+        azure_keyvault_url=settings.secrets_azure_keyvault_url,
+        cache_client=cache_client,
+    )
 
 
 def get_app_service_vault() -> Optional[BaseVaultClient]:
@@ -116,7 +130,7 @@ def get_app_service_vault() -> Optional[BaseVaultClient]:
     if _app_service_vault is not None:
         return _app_service_vault
     
-    vault_type = settings.vault_type
+    vault_type = settings.app_vault_type or settings.vault_type
     if not vault_type:
         logger.info("No app service vault configured (vault_type not set)")
         return None
@@ -124,7 +138,12 @@ def get_app_service_vault() -> Optional[BaseVaultClient]:
     logger.info(f"Initializing app service vault: {vault_type}")
     
     # App service vault typically doesn't need caching as keys are long-lived
-    _app_service_vault = _create_vault_client(vault_type, cache_client=None)
+    _app_service_vault = _create_vault_client(
+        vault_type,
+        hashicorp_addr=settings.app_hashicorp_vault_addr,
+        hashicorp_token=settings.app_hashicorp_vault_token,
+        azure_keyvault_url=settings.app_azure_keyvault_url,
+    )
     return _app_service_vault
 
 
@@ -143,7 +162,7 @@ def get_secrets_vault() -> Optional[BaseVaultClient]:
     if _secrets_vault is not None:
         return _secrets_vault
     
-    vault_type = settings.vault_type
+    vault_type = settings.secrets_vault_type or settings.vault_type
     if not vault_type:
         logger.info("No secrets vault configured (vault_type not set)")
         return None
@@ -155,7 +174,13 @@ def get_secrets_vault() -> Optional[BaseVaultClient]:
     if settings.cache_enabled and settings.secrets_encryption_key:
         cache_client = get_cache_client()
     
-    _secrets_vault = _create_vault_client(vault_type, cache_client)
+    _secrets_vault = _create_vault_client(
+        vault_type,
+        hashicorp_addr=settings.secrets_hashicorp_vault_addr,
+        hashicorp_token=settings.secrets_hashicorp_vault_token,
+        azure_keyvault_url=settings.secrets_azure_keyvault_url,
+        cache_client=cache_client,
+    )
     return _secrets_vault
 
 

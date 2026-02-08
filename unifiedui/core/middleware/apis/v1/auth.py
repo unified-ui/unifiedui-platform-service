@@ -95,7 +95,8 @@ def _resolve_service_key(required_service_auth_key: str) -> Optional[str]:
             vault_key_name = getattr(settings, vault_config_attr, None)
             if vault_key_name:
                 try:
-                    secret = app_vault.get_secret(f"dotenv://{vault_key_name}", use_cache=False)
+                    uri = app_vault.build_secret_uri(vault_key_name)
+                    secret = app_vault.get_secret(uri, use_cache=False)
                     if secret:
                         return secret
                 except Exception:

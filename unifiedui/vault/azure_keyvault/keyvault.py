@@ -55,8 +55,13 @@ class AzureKeyVault(BaseVault):
             logger.error(f"Failed to store secret in Azure Key Vault: {e}")
             raise
 
+    def build_secret_uri(self, key_name: str) -> str:
+        """Build an Azure Key Vault URI for the given key name."""
+        vault_name = self.vault_url.split("//")[1].split(".")[0] if "//" in self.vault_url else self.vault_url
+        secret_name = key_name.replace("_", "-").replace(".", "-")
+        return f"azurekv://{vault_name}/{secret_name}"
+
     def get_secret(self, uri: str) -> Optional[str]:
-        """Retrieve a secret from Azure Key Vault."""
         try:
             # Parse URI: azurekv://vaultname/secretname/version
             parts = uri.replace("azurekv://", "").split("/")

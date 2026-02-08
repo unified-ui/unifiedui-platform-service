@@ -30,7 +30,9 @@ class TestGetVaultClient:
     def test_get_vault_client_azure_keyvault(self, mock_cache, mock_vault_class, mock_settings):
         """Test Azure KeyVault client initialization."""
         mock_settings.vault_type = "AZURE_KEYVAULT"
-        mock_settings.azure_keyvault_vault_name = "my-vault"
+        mock_settings.secrets_azure_keyvault_url = "https://my-vault.vault.azure.net/"
+        mock_settings.secrets_hashicorp_vault_addr = None
+        mock_settings.secrets_hashicorp_vault_token = None
         mock_settings.cache_enabled = True
         mock_settings.secrets_encryption_key = "encryption-key"
         mock_cache_client = Mock()
@@ -51,7 +53,9 @@ class TestGetVaultClient:
     def test_get_vault_client_azure_keyvault_no_cache(self, mock_vault_class, mock_settings):
         """Test Azure KeyVault without caching."""
         mock_settings.vault_type = "azure_keyvault"  # Test case-insensitive
-        mock_settings.azure_keyvault_vault_name = "test-vault"
+        mock_settings.secrets_azure_keyvault_url = "https://test-vault.vault.azure.net/"
+        mock_settings.secrets_hashicorp_vault_addr = None
+        mock_settings.secrets_hashicorp_vault_token = None
         mock_settings.cache_enabled = False
         mock_vault_instance = Mock()
         mock_vault_class.return_value = mock_vault_instance
@@ -65,15 +69,18 @@ class TestGetVaultClient:
         )
 
     @patch('unifiedui.handlers.dependencies.vault.settings')
-    def test_get_vault_client_azure_keyvault_missing_name(self, mock_settings):
-        """Test Azure KeyVault without vault name raises error."""
+    def test_get_vault_client_azure_keyvault_missing_url(self, mock_settings):
+        """Test Azure KeyVault without URL raises error."""
         mock_settings.vault_type = "AZURE_KEYVAULT"
-        mock_settings.azure_keyvault_vault_name = None
+        mock_settings.secrets_azure_keyvault_url = None
+        mock_settings.secrets_hashicorp_vault_addr = None
+        mock_settings.secrets_hashicorp_vault_token = None
+        mock_settings.cache_enabled = False
         
         with pytest.raises(RuntimeError) as exc_info:
             get_vault_client()
         
-        assert "azure_keyvault_vault_name must be set" in str(exc_info.value)
+        assert "Azure KeyVault URL must be set" in str(exc_info.value)
 
     @patch('unifiedui.handlers.dependencies.vault.settings')
     @patch('unifiedui.handlers.dependencies.vault.HashiCorpVaultClient')
@@ -81,8 +88,9 @@ class TestGetVaultClient:
     def test_get_vault_client_hashicorp(self, mock_cache, mock_vault_class, mock_settings):
         """Test HashiCorp Vault client initialization."""
         mock_settings.vault_type = "HASHICORP_VAULT"
-        mock_settings.vault_addr = "http://vault.example.com:8200"
-        mock_settings.vault_token = "test-token"
+        mock_settings.secrets_hashicorp_vault_addr = "http://vault.example.com:8200"
+        mock_settings.secrets_hashicorp_vault_token = "test-token"
+        mock_settings.secrets_azure_keyvault_url = None
         mock_settings.cache_enabled = True
         mock_settings.secrets_encryption_key = "key"
         mock_cache_client = Mock()
@@ -103,17 +111,24 @@ class TestGetVaultClient:
     def test_get_vault_client_hashicorp_missing_addr(self, mock_settings):
         """Test HashiCorp Vault without address raises error."""
         mock_settings.vault_type = "hashicorp_vault"  # Test case-insensitive
-        mock_settings.vault_addr = None
+        mock_settings.secrets_hashicorp_vault_addr = None
+        mock_settings.secrets_hashicorp_vault_token = None
+        mock_settings.secrets_azure_keyvault_url = None
+        mock_settings.cache_enabled = False
         
         with pytest.raises(RuntimeError) as exc_info:
             get_vault_client()
         
-        assert "vault_addr must be set" in str(exc_info.value)
+        assert "HashiCorp Vault address must be set" in str(exc_info.value)
 
     @patch('unifiedui.handlers.dependencies.vault.settings')
     def test_get_vault_client_unsupported_type(self, mock_settings):
         """Test unsupported vault type raises error."""
         mock_settings.vault_type = "UNKNOWN_VAULT"
+        mock_settings.secrets_hashicorp_vault_addr = None
+        mock_settings.secrets_hashicorp_vault_token = None
+        mock_settings.secrets_azure_keyvault_url = None
+        mock_settings.cache_enabled = False
         
         with pytest.raises(RuntimeError) as exc_info:
             get_vault_client()
@@ -126,7 +141,9 @@ class TestGetVaultClient:
     def test_get_vault_client_cached(self, mock_vault_class, mock_settings):
         """Test that vault client is cached (lru_cache)."""
         mock_settings.vault_type = "AZURE_KEYVAULT"
-        mock_settings.azure_keyvault_vault_name = "vault"
+        mock_settings.secrets_azure_keyvault_url = "https://vault.vault.azure.net/"
+        mock_settings.secrets_hashicorp_vault_addr = None
+        mock_settings.secrets_hashicorp_vault_token = None
         mock_settings.cache_enabled = False
         mock_vault_instance = Mock()
         mock_vault_class.return_value = mock_vault_instance

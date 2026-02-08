@@ -47,9 +47,8 @@ class AgentServiceClient:
         if self._app_vault:
             vault_key_name = settings.app_vault_platform_to_agent_key
             try:
-                return self._app_vault.get_secret(
-                    f"dotenv://{vault_key_name}", use_cache=False
-                )
+                uri = self._app_vault.build_secret_uri(vault_key_name)
+                return self._app_vault.get_secret(uri, use_cache=False)
             except Exception:
                 logger.warning("Failed to retrieve platform-to-agent service key from app vault")
 

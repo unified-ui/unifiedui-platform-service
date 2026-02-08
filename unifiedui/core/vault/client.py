@@ -119,6 +119,18 @@ class BaseVaultClient(ABC):
         """
         return self.get_vault().store_secret(key, value, metadata)
 
+    def build_secret_uri(self, key_name: str) -> str:
+        """
+        Build a vault-specific URI for a given key name.
+        
+        Args:
+            key_name: Logical secret key name
+            
+        Returns:
+            Fully qualified URI for use with get_secret/update_secret/delete_secret
+        """
+        return self.get_vault().build_secret_uri(key_name)
+
     def get_secret(self, uri: str, use_cache: bool = True) -> Optional[str]:
         """
         Retrieve a secret from vault with optional encrypted caching.

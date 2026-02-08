@@ -106,6 +106,7 @@ class TestAgentServiceClient:
     def test_service_key_from_vault(self) -> None:
         """Test that service key is retrieved from app vault."""
         mock_vault = MagicMock()
+        mock_vault.build_secret_uri.return_value = "dotenv://PLATFORM_TO_AGENT_SERVICE_KEY"
         mock_vault.get_secret.return_value = "vault-service-key"
 
         client = self._create_client(app_vault=mock_vault)
@@ -148,6 +149,7 @@ class TestAgentServiceClient:
     def test_vault_exception_does_not_propagate(self) -> None:
         """Test that vault errors are handled gracefully (no X-Service-Key sent)."""
         mock_vault = MagicMock()
+        mock_vault.build_secret_uri.return_value = "dotenv://PLATFORM_TO_AGENT_SERVICE_KEY"
         mock_vault.get_secret.side_effect = Exception("vault unavailable")
 
         client = self._create_client(app_vault=mock_vault)

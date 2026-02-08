@@ -60,6 +60,19 @@ class BaseVault(ABC):
         pass
 
     @abstractmethod
+    def build_secret_uri(self, key_name: str) -> str:
+        """
+        Build a vault-specific URI for a given key name.
+        
+        Args:
+            key_name: Logical secret key name
+            
+        Returns:
+            Fully qualified URI for use with get_secret/update_secret/delete_secret
+        """
+        pass
+
+    @abstractmethod
     def delete_secret(self, uri: str) -> bool:
         """
         Delete a secret from the vault.

@@ -99,6 +99,18 @@ class MockVault(BaseVault):
         """
         return list(self._secrets.keys())
 
+    def build_secret_uri(self, key_name: str) -> str:
+        """
+        Build a mock secret URI.
+
+        Args:
+            key_name: Secret key name
+
+        Returns:
+            Mock URI string
+        """
+        return f"mock://{key_name}"
+
 
 class MockVaultClient(BaseVaultClient):
     """Mock vault client for testing."""
