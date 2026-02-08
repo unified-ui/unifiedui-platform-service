@@ -691,6 +691,13 @@ class AutonomousAgentHandler:
                     message=f"Invalid or inaccessible API credential with ID '{api_credential_id}'"
                 )
             
+            if api_secret is None:
+                logger.error(f"Credential secret is None for credential '{api_credential_id}' — vault may be unavailable")
+                raise InvalidCredentialError(
+                    credential_id=api_credential_id,
+                    message=f"Could not retrieve secret for credential '{api_credential_id}'. Ensure the vault is running and the secret exists."
+                )
+            
             api_credentials = CredentialSecretResponse(
                 id=api_credential.id,
                 credentials_uri=api_credential.credential_uri,
