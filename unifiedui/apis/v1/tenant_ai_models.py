@@ -44,8 +44,8 @@ async def list_tenant_ai_models(
     skip: int = Query(0, ge=0, description="Number of items to skip"),
     limit: int = Query(100, ge=1, le=1000, description="Maximum number of items to return"),
     name: Optional[str] = Query(None, description="Filter by model name"),
-    type: Optional[str] = Query(None, description="Filter by model type (LLM_MODEL, EMBEDDING_MODEL)"),
-    provider: Optional[str] = Query(None, description="Filter by provider"),
+    type: Optional[str] = Query(None, description="Comma-separated list of model types to filter by (e.g., 'LLM_MODEL,EMBEDDING_MODEL')"),
+    provider: Optional[str] = Query(None, description="Comma-separated list of providers to filter by (e.g., 'OPENAI,AZURE_OPENAI')"),
     is_active: Optional[int] = Query(None, ge=0, le=1, description="Filter by active status (1=active, 0=inactive)"),
     order_by: Optional[str] = Query(None, description="Column name to order by"),
     order_direction: Optional[OrderDirectionEnum] = Query(None, description="Sort direction: 'asc' or 'desc'"),
@@ -63,13 +63,22 @@ async def list_tenant_ai_models(
                 "limit": limit,
             }
         )
+
+        types = None
+        if type:
+            types = [t.strip() for t in type.split(",") if t.strip()]
+
+        providers = None
+        if provider:
+            providers = [p.strip() for p in provider.split(",") if p.strip()]
+
         return handler.list_tenant_ai_models(
             tenant_id=tenant_id,
             skip=skip,
             limit=limit,
             name_filter=name,
-            type_filter=type,
-            provider_filter=provider,
+            type_filter=types,
+            provider_filter=providers,
             is_active=is_active,
             order_by=order_by,
             order_direction=order_direction.value if order_direction else None,

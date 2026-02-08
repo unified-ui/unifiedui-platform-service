@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import json
 import uuid
-from typing import TYPE_CHECKING, Optional, List, Union
+from typing import TYPE_CHECKING, Optional, List, Sequence, Union
 
 from sqlalchemy import select
 
@@ -54,8 +54,8 @@ class TenantAIModelHandler:
         skip: int = 0,
         limit: int = 100,
         name_filter: Optional[str] = None,
-        type_filter: Optional[str] = None,
-        provider_filter: Optional[str] = None,
+        type_filter: Optional[Sequence[str]] = None,
+        provider_filter: Optional[Sequence[str]] = None,
         is_active: Optional[int] = None,
         order_by: Optional[str] = None,
         order_direction: Optional[str] = None,
@@ -68,8 +68,8 @@ class TenantAIModelHandler:
             skip: Number of items to skip.
             limit: Maximum number of items to return.
             name_filter: Optional filter by name.
-            type_filter: Optional filter by model type.
-            provider_filter: Optional filter by provider.
+            type_filter: Optional list of model types to filter by.
+            provider_filter: Optional list of providers to filter by.
             is_active: Optional filter by active status.
             order_by: Optional column to order by.
             order_direction: Optional sort direction.
@@ -100,9 +100,9 @@ class TenantAIModelHandler:
             if name_filter:
                 query = query.where(TenantAIModel.name.ilike(f"%{name_filter}%"))
             if type_filter:
-                query = query.where(TenantAIModel.type == type_filter)
+                query = query.where(TenantAIModel.type.in_(type_filter))
             if provider_filter:
-                query = query.where(TenantAIModel.provider == provider_filter)
+                query = query.where(TenantAIModel.provider.in_(provider_filter))
             if is_active is not None:
                 query = query.where(TenantAIModel.is_active == bool(is_active))
 
