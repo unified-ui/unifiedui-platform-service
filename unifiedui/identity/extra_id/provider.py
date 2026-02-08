@@ -1,3 +1,5 @@
+import base64
+import json
 import requests
 
 from unifiedui.core.identity.providers import BaseIdentityProvider, BaseIdentityToken
@@ -13,19 +15,49 @@ class ExtraIDIdentityProvider(BaseIdentityProvider, APIJSONBearerClient):
         BaseIdentityProvider.__init__(self, identity_token)
         APIJSONBearerClient.__init__(self, base_url="https://graph.microsoft.com/v1.0")
 
+    def _decode_token_payload(self, token: str) -> dict:
+        """Decode JWT token payload without signature validation."""
+        parts = token.split('.')
+        if len(parts) != 3:
+            return {}
+        
+        payload = parts[1]
+        padding = 4 - (len(payload) % 4)
+        if padding != 4:
+            payload += '=' * padding
+        
+        try:
+            decoded = base64.urlsafe_b64decode(payload)
+            return json.loads(decoded)
+        except Exception:
+            return {}
+
+    def _is_service_principal_token(self) -> bool:
+        """Check if the current token belongs to a service principal (app) or user."""
+        payload = self._decode_token_payload(self.identity_token.token)
+        return payload.get("idtyp") == "app" or (payload.get("appid") and not payload.get("upn"))
+
+    def _get_oid_from_token(self) -> str | None:
+        """Extract object ID (oid) from token."""
+        payload = self._decode_token_payload(self.identity_token.token)
+        return payload.get("oid")
+
     def get_current_user_security_groups(
         self,
         query: APIFilterQuery | None = None
     ) -> list[IdentityGroupResponse]:
         """
-        Get security groups for the current authenticated user.
+        Get security groups for the current authenticated user or service principal.
+        
+        For user tokens: Uses /me/memberOf
+        For service principal tokens: Uses /servicePrincipals/{oid}/memberOf
         
         Args:
-            identity_token: User's identity token
+            identity_token: User's or service principal's identity token
             query: Query parameters (search, top, next_link)
             
         Returns:
-            List of identity groups the user belongs to
+            List of identity groups the user/service principal belongs to
         """
         query = query or APIFilterQuery()
         headers = self._get_headers(self.identity_token.token)
@@ -34,7 +66,14 @@ class ExtraIDIdentityProvider(BaseIdentityProvider, APIJSONBearerClient):
             url = query.next_link
             params = {}
         else:
-            url = self._url("/me/memberOf/microsoft.graph.group")
+            if self._is_service_principal_token():
+                oid = self._get_oid_from_token()
+                if not oid:
+                    return []
+                url = self._url(f"/servicePrincipals/{oid}/memberOf/microsoft.graph.group")
+            else:
+                url = self._url("/me/memberOf/microsoft.graph.group")
+            
             params = {
                 "$select": "displayName,id",
                 "$top": query.top
@@ -133,7 +172,7 @@ class ExtraIDIdentityProvider(BaseIdentityProvider, APIJSONBearerClient):
         return [
             IdentityGroupResponse(
                 id=item["id"],
-                display_name=item["displayName"]
+                display_name=item.get("displayName") or item["id"]
             )
             for item in data.get("value", [])
         ]

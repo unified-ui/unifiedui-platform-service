@@ -347,6 +347,37 @@ class AutonomousAgentHandler:
             
             return response
 
+    def get_autonomous_agent_model(
+        self,
+        tenant_id: str,
+        autonomous_agent_id: str
+    ) -> AutonomousAgent:
+        """
+        Get the raw autonomous agent DB model by ID.
+        
+        Args:
+            tenant_id: The ID of the tenant
+            autonomous_agent_id: The ID of the autonomous agent
+            
+        Returns:
+            AutonomousAgent SQLAlchemy model (detached from session)
+            
+        Raises:
+            AutonomousAgentNotFoundError: If autonomous agent not found
+        """
+        with self.db_client.get_session() as session:
+            query = select(AutonomousAgent).where(
+                AutonomousAgent.id == autonomous_agent_id,
+                AutonomousAgent.tenant_id == tenant_id
+            )
+            autonomous_agent = session.execute(query).scalar_one_or_none()
+            
+            if not autonomous_agent:
+                raise AutonomousAgentNotFoundError(autonomous_agent_id)
+            
+            session.expunge(autonomous_agent)
+            return autonomous_agent
+
     def create_autonomous_agent(
         self,
         tenant_id: str,

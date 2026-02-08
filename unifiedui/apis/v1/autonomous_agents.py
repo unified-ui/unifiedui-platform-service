@@ -819,7 +819,7 @@ async def validate_autonomous_agent_api_key(
 @router.get(
     "/{autonomous_agent_id}/config",
     response_model=AutonomousAgentConfigResponse,
-    summary="Get autonomous agent configuration",
+    summary="Get autonomous agent configuration (API Key)",
     description="""
     Get the full autonomous agent configuration including credential secrets.
     
@@ -844,10 +844,7 @@ async def get_autonomous_agent_config(
     credential_handler: CredentialHandler = Depends(get_credential_handler)
 ) -> AutonomousAgentConfigResponse:
     """
-    Get autonomous agent configuration with resolved credentials.
-    
-    This endpoint is authenticated via X-Unified-UI-Autonomous-Agent-API-Key header.
-    The autonomous agent must be active.
+    Get autonomous agent configuration with resolved credentials via API Key auth.
     
     Args:
         request: FastAPI request with autonomous_agent in state
@@ -860,9 +857,83 @@ async def get_autonomous_agent_config(
         AutonomousAgentConfigResponse with full config including secrets
     """
     try:
-        # The autonomous agent is already validated and stored in request.state
-        # by the authenticate_autonomous_agent_api_key decorator
         autonomous_agent = request.state.autonomous_agent
+        
+        return handler.get_autonomous_agent_config(
+            tenant_id=tenant_id,
+            autonomous_agent_id=autonomous_agent_id,
+            autonomous_agent=autonomous_agent,
+            credential_handler=credential_handler
+        )
+    except InvalidCredentialError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+    except AutonomousAgentNotFoundError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e)
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to get autonomous agent config: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to get autonomous agent configuration"
+        )
+
+
+@router.get(
+    "/{autonomous_agent_id}/config/bearer",
+    response_model=AutonomousAgentConfigResponse,
+    summary="Get autonomous agent configuration (Bearer)",
+    description="""
+    Get the full autonomous agent configuration including credential secrets.
+    
+    **Authentication**: This endpoint uses Bearer token authentication.
+    Requires WRITE or ADMIN permission on the autonomous agent (direct or via group).
+    
+    This enables users and service principals to fetch agent configuration
+    for trace import operations without needing the agent's API key.
+    """
+)
+@authenticate("X_AGENT_SERVICE_KEY")
+@check_permissions(
+    entity="autonomous_agent",
+    required_permissions=[
+        TenantRolesEnum.GLOBAL_ADMIN,
+        TenantRolesEnum.AUTONOMOUS_AGENTS_ADMIN,
+        PermissionActionEnum.ADMIN,
+        PermissionActionEnum.WRITE
+    ]
+)
+async def get_autonomous_agent_config_bearer(
+    request: Request,
+    tenant_id: str,
+    autonomous_agent_id: str,
+    handler: AutonomousAgentHandler = Depends(get_autonomous_agent_handler),
+    credential_handler: CredentialHandler = Depends(get_credential_handler)
+) -> AutonomousAgentConfigResponse:
+    """
+    Get autonomous agent configuration with resolved credentials via Bearer auth.
+    
+    Args:
+        request: FastAPI request with user in state
+        tenant_id: Tenant ID from path
+        autonomous_agent_id: Autonomous agent ID from path
+        handler: Autonomous agent handler dependency
+        credential_handler: Credential handler for fetching secrets
+        
+    Returns:
+        AutonomousAgentConfigResponse with full config including secrets
+    """
+    try:
+        autonomous_agent = handler.get_autonomous_agent_model(
+            tenant_id=tenant_id,
+            autonomous_agent_id=autonomous_agent_id
+        )
         
         return handler.get_autonomous_agent_config(
             tenant_id=tenant_id,
