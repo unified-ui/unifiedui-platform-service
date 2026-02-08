@@ -18,6 +18,7 @@ class TenantRolesEnum(str, Enum):
     CHAT_WIDGETS_CREATOR = "CHAT_WIDGETS_CREATOR"
     REACT_AGENT_ADMIN = "REACT_AGENT_ADMIN"
     REACT_AGENT_CREATOR = "REACT_AGENT_CREATOR"
+    TENANT_AI_MODELS_ADMIN = "TENANT_AI_MODELS_ADMIN"
 
     def all() -> list[str]:
         return [permission.value for permission in TenantRolesEnum]
@@ -99,3 +100,38 @@ class ListViewEnum(str, Enum):
 
     def all() -> list[str]:
         return [view.value for view in ListViewEnum]
+
+
+class AIModelTypeEnum(str, Enum):
+    """Supported AI model types."""
+    LLM_MODEL = "LLM_MODEL"
+    EMBEDDING_MODEL = "EMBEDDING_MODEL"
+
+    def all() -> list[str]:
+        return [t.value for t in AIModelTypeEnum]
+
+
+class AIModelProviderEnum(str, Enum):
+    """Supported AI model providers."""
+    AZURE_OPENAI = "AZURE_OPENAI"
+    OPENAI = "OPENAI"
+    ANTHROPIC = "ANTHROPIC"
+    GOOGLE_GENAI = "GOOGLE_GENAI"
+    OLLAMA = "OLLAMA"
+    MISTRAL = "MISTRAL"
+    GROQ = "GROQ"
+
+    def all() -> list[str]:
+        return [p.value for p in AIModelProviderEnum]
+
+
+class AIModelPurposeGroupEnum(str, Enum):
+    """Supported AI model purpose groups."""
+    CONVERSATION_TITLE_GENERATION = "CONVERSATION_TITLE_GENERATION"
+    CONVERSATION_SUMMARIZATION = "CONVERSATION_SUMMARIZATION"
+    DESCRIPTION_GENERATION = "DESCRIPTION_GENERATION"
+    TRACE_ANALYSIS = "TRACE_ANALYSIS"
+    GENERAL = "GENERAL"
+
+    def all() -> list[str]:
+        return [g.value for g in AIModelPurposeGroupEnum]

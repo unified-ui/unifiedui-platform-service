@@ -192,6 +192,19 @@ Config validators live in `handlers/validators/`. Used to validate runtime confi
 | `AutonomousAgentConfigValidator` | Validates autonomous agent configs |
 | `CredentialValidator` | Validates credential data |
 | `ToolValidator` | Validates tool (MCP / OpenAPI) configs |
+| `TenantAIModelValidator` | Validates AI model provider configs |
+
+---
+
+## Non-Standard Handler: TenantAIModelHandler
+
+Unlike standard resource handlers, `TenantAIModelHandler` does **not** use RBAC member filtering:
+
+- No `{Resource}Member` table — AI models are tenant-scoped, not user-scoped
+- CRUD endpoints use `@authenticate()` with tenant admin check (no `@check_permissions`)
+- S2S endpoint `get_models_by_purpose()` uses `@authenticate_service_key()` — no user context
+- Resolves credential secrets from vault with JSON fallback: `{"api_key": secret_str}`
+- Has a dedicated dependency: `handlers/dependencies/tenant_ai_models.py`
 
 ---
 

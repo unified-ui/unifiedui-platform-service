@@ -4,7 +4,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from unifiedui.apis.v1 import health, identity, tenants, custom_groups, credentials, applications, conversations, autonomous_agents, chat_widgets, tags, user_favorites, principals, tools
+from unifiedui.apis.v1 import health, identity, tenants, custom_groups, credentials, applications, conversations, autonomous_agents, chat_widgets, tags, user_favorites, principals, tools, tenant_ai_models
 from unifiedui.exc.autonomous_agents import AutonomousAgentNotFoundError
 from unifiedui.exc.custom_groups import CustomGroupNotFoundError, CustomGroupError
 from unifiedui.exc.applications import ApplicationNotFoundError
@@ -12,6 +12,12 @@ from unifiedui.exc.credentials import CredentialNotFoundError
 from unifiedui.exc.conversations import ConversationNotFoundError
 from unifiedui.exc.chat_widgets import ChatWidgetNotFoundError
 from unifiedui.exc.tools import ToolNotFoundError, ToolConfigValidationError, UnsupportedToolTypeError, InvalidToolCredentialError
+from unifiedui.exc.tenant_ai_models import (
+    TenantAIModelNotFoundError,
+    TenantAIModelConfigValidationError,
+    UnsupportedAIModelProviderError,
+    InvalidAIModelCredentialError,
+)
 from unifiedui.exc.principal import PrincipalNotFoundError
 from unifiedui.exc.tags import TagNotFoundError, TagDeleteNotAllowedError
 from unifiedui.exc.application_config import (
@@ -253,6 +259,38 @@ def create_app() -> FastAPI:
             content={"detail": exc.message, "credential_id": exc.credential_id}
         )
 
+    @app.exception_handler(TenantAIModelNotFoundError)
+    async def tenant_ai_model_not_found_handler(request: Request, exc: TenantAIModelNotFoundError):
+        """Handle tenant AI model not found errors."""
+        return JSONResponse(
+            status_code=404,
+            content={"detail": str(exc)}
+        )
+
+    @app.exception_handler(TenantAIModelConfigValidationError)
+    async def tenant_ai_model_config_validation_handler(request: Request, exc: TenantAIModelConfigValidationError):
+        """Handle tenant AI model config validation errors."""
+        return JSONResponse(
+            status_code=400,
+            content={"detail": exc.message}
+        )
+
+    @app.exception_handler(UnsupportedAIModelProviderError)
+    async def unsupported_ai_model_provider_handler(request: Request, exc: UnsupportedAIModelProviderError):
+        """Handle unsupported AI model provider errors."""
+        return JSONResponse(
+            status_code=400,
+            content={"detail": str(exc)}
+        )
+
+    @app.exception_handler(InvalidAIModelCredentialError)
+    async def invalid_ai_model_credential_handler(request: Request, exc: InvalidAIModelCredentialError):
+        """Handle invalid AI model credential errors."""
+        return JSONResponse(
+            status_code=400,
+            content={"detail": str(exc), "credential_id": exc.credential_id}
+        )
+
     # Include routers
     app.include_router(
         health.router,
@@ -397,6 +435,13 @@ def create_app() -> FastAPI:
         user_favorites.router,
         prefix="/api/v1/platform-service/tenants/{tenant_id}",
         tags=["User Favorites"]
+    )
+    
+    # Tenant AI Models routes
+    app.include_router(
+        tenant_ai_models.router,
+        prefix="/api/v1/platform-service/tenants/{tenant_id}",
+        tags=["Tenant AI Models"]
     )
     
     return app

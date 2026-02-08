@@ -30,7 +30,8 @@ class TestCredentialTypeEnum:
         assert "API_KEY" in types
         assert "BASIC_AUTH" in types
         assert "OPENAPI_CONNECTION" in types
-        assert len(types) == 3
+        assert "AI_MODEL_PROVIDER" in types
+        assert len(types) == 4
 
 
 class TestBasicAuthCredential:

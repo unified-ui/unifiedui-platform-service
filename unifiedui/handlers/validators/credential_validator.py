@@ -16,6 +16,7 @@ class CredentialTypeEnum(str, Enum):
     API_KEY = "API_KEY"
     BASIC_AUTH = "BASIC_AUTH"
     OPENAPI_CONNECTION = "OPENAPI_CONNECTION"
+    AI_MODEL_PROVIDER = "AI_MODEL_PROVIDER"
 
     @classmethod
     def all(cls) -> list[str]:
@@ -30,14 +31,17 @@ class BasicAuthCredential(BaseModel):
 
 
 class OpenAPIConnectionCredential(BaseModel):
-    """Pydantic model for OPENAPI_CONNECTION credential validation.
-    
-    Used for OpenAPI-based tool connections where an API key/value pair is needed.
-    """
+    """Pydantic model for OPENAPI_CONNECTION credential validation."""
     
     key: str = Field(..., min_length=1, description="API header key (e.g., 'x-api-key')")
     value: str = Field(..., min_length=1, description="API key value")
     password: str = Field(..., min_length=1, description="Password for basic auth")
+
+
+class AIModelProviderCredential(BaseModel):
+    """Pydantic model for AI_MODEL_PROVIDER credential validation."""
+    
+    api_key: str = Field(..., min_length=1, description="API key for the AI model provider")
 
 
 class CredentialValidationError(Exception):
@@ -132,6 +136,28 @@ def validate_credential_secret(credential_type: str, secret_value: str) -> str:
             )
         
         # Return the original string (not re-serialized) as requested
+        return secret_value
+    
+    elif cred_type == CredentialTypeEnum.AI_MODEL_PROVIDER.value:
+        try:
+            parsed = json.loads(secret_value)
+        except json.JSONDecodeError as e:
+            raise CredentialValidationError(
+                f"AI_MODEL_PROVIDER secret_value must be a valid JSON string with 'api_key' field. Error: {str(e)}"
+            )
+        
+        if not isinstance(parsed, dict):
+            raise CredentialValidationError(
+                "AI_MODEL_PROVIDER secret_value must be a JSON object with 'api_key' field"
+            )
+        
+        try:
+            AIModelProviderCredential(**parsed)
+        except Exception as e:
+            raise CredentialValidationError(
+                f"AI_MODEL_PROVIDER validation failed: {str(e)}. 'api_key' field must be a non-empty string."
+            )
+        
         return secret_value
     
     raise UnsupportedCredentialTypeError(credential_type)

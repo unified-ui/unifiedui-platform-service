@@ -21,7 +21,7 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship,
 from sqlalchemy.types import JSON, TypeDecorator
 from sqlalchemy import Enum as SAEnum
 
-from unifiedui.core.database.enums import PermissionActionEnum, TenantRolesEnum, PrincipalTypeEnum, ApplicationTypeEnum, AutonomousAgentTypeEnum
+from unifiedui.core.database.enums import PermissionActionEnum, TenantRolesEnum, PrincipalTypeEnum, ApplicationTypeEnum, AutonomousAgentTypeEnum, AIModelTypeEnum, AIModelProviderEnum
 
 
 # ---------- Utility functions ----------
@@ -89,6 +89,22 @@ ApplicationTypeSAEnum = SAEnum(
 AutonomousAgentTypeSAEnum = SAEnum(
     *AutonomousAgentTypeEnum.all(),
     name="autonomous_agent_type",
+    native_enum=False,
+    create_constraint=True,
+    validate_strings=True,
+)
+
+AIModelTypeSAEnum = SAEnum(
+    *AIModelTypeEnum.all(),
+    name="ai_model_type",
+    native_enum=False,
+    create_constraint=True,
+    validate_strings=True,
+)
+
+AIModelProviderSAEnum = SAEnum(
+    *AIModelProviderEnum.all(),
+    name="ai_model_provider",
     native_enum=False,
     create_constraint=True,
     validate_strings=True,
@@ -766,6 +782,25 @@ class Tool(Base, IdNameDescriptionMixin, TenantScopedMixin):
     )
 
     __table_args__ = (Index("ix_tools_tenant", "tenant_id"),)
+
+
+class TenantAIModel(Base, IdNameDescriptionMixin, TenantScopedMixin):
+    """Tenant AI model entity for LLM and embedding model configurations."""
+    __tablename__ = "tenant_ai_models"
+
+    type: Mapped[str] = mapped_column(AIModelTypeSAEnum, nullable=False)
+    provider: Mapped[str] = mapped_column(AIModelProviderSAEnum, nullable=False)
+    purpose_groups: Mapped[list] = mapped_column(PortableJSON, nullable=False, default=list)
+    config: Mapped[dict] = mapped_column(PortableJSON, nullable=False, default=dict)
+    credential_id: Mapped[Optional[str]] = mapped_column(
+        String(36), ForeignKey("credentials.id", ondelete="SET NULL"), nullable=True
+    )
+    priority: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+
+    credential: Mapped[Optional["Credential"]] = relationship(foreign_keys=[credential_id])
+
+    __table_args__ = (Index("ix_tenant_ai_models_tenant", "tenant_id"),)
 
 
 class ToolMember(Base, IdMixin, AuditMixin):

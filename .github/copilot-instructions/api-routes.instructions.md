@@ -182,12 +182,32 @@ async def validate_api_key(request: Request, tenant_id: str, autonomous_agent_id
     ...
 ```
 
-### Service-to-Service Authentication
+### Service-to-Service Authentication (Bearer + Service Key)
 ```python
 @router.get("/{resource_id}/config")
-@authenticate(required_service_auth_key="X_AGENT_SERVICE_KEY")
+@authenticate(required_service_auth_key="AGENT_TO_PLATFORM_SERVICE_KEY")
 @check_permissions(entity="resource", required_permissions=[PermissionActionEnum.READ])
 async def get_config(request: Request, ...):
     # Requires BOTH X-Service-Key header AND Bearer token
     ...
 ```
+
+### Service-to-Service Authentication (Service Key Only)
+```python
+@router.get("/by-purpose/{purpose_group}")
+@authenticate_service_key(required_service_auth_key="AGENT_TO_PLATFORM_SERVICE_KEY")
+async def get_models_by_purpose(request: Request, tenant_id: str, purpose_group: str, ...):
+    # Requires ONLY X-Service-Key header — no Bearer token, no user context
+    # Used for S2S-only endpoints (e.g., AI model lookup by agent-service)
+    ...
+```
+
+---
+
+## Non-Standard Resources
+
+### TenantAIModel (S2S-only, no RBAC)
+- No `@check_permissions()` — all endpoints use `@authenticate()` or `@authenticate_service_key()`
+- No member table — scoped only by tenant
+- CRUD by tenant admin users via `@authenticate()`, lookup by purpose via `@authenticate_service_key()`
+- Routes registered at: `/api/v1/platform-service/tenants/{tenant_id}/ai-models`

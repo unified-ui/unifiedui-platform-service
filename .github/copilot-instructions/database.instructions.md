@@ -14,7 +14,7 @@ Tenant-level roles that can be assigned to tenant members:
 - `{RESOURCE}_ADMIN` — Full access to specific resource type (e.g., `APPLICATIONS_ADMIN`)
 - `{RESOURCE}_CREATOR` — Can create new instances of resource type (e.g., `APPLICATIONS_CREATOR`)
 
-Supported resources: applications, credentials, conversations, autonomous_agents, chat_widgets, custom_groups, react_agent (tools)
+Supported resources: applications, credentials, conversations, autonomous_agents, chat_widgets, custom_groups, react_agent (tools), tenant_ai_models
 
 ### PermissionActionEnum
 Resource-level roles (one per member entry in `{resource}_members` table):
@@ -35,6 +35,9 @@ Who can receive permissions:
 - `AutonomousAgentTypeEnum`: `N8N`
 - `ChatWidgetTypeEnum`: `IFRAME`, `FORM`
 - `ToolTypeEnum`: `MCP_SERVER`, `OPENAPI_DEFINITION`
+- `AIModelTypeEnum`: `LLM_MODEL`, `EMBEDDING_MODEL`
+- `AIModelProviderEnum`: `AZURE_OPENAI`, `OPENAI`, `ANTHROPIC`, `GOOGLE_GENAI`, `OLLAMA`, `MISTRAL`, `GROQ`
+- `AIModelPurposeGroupEnum`: `CONVERSATION_TITLE_GENERATION`, `CONVERSATION_SUMMARIZATION`, `DESCRIPTION_GENERATION`, `TRACE_ANALYSIS`, `GENERAL`
 - `UserPermissionEnum`: `IS_CREATOR` (special — used for tag/favorite ownership)
 - `OrderDirectionEnum`: `asc`, `desc`
 - `ListViewEnum`: `full`, `quick-list`
@@ -110,6 +113,7 @@ class ApplicationMember(Base, IdMixin, AuditMixin):
 | ChatWidget | ChatWidgetMember | — | Yes |
 | CustomGroup | CustomGroupMember | — | No |
 | Tool | ToolMember | ToolValidator | No |
+| TenantAIModel | — (no RBAC, S2S-only via `@authenticate_service_key`) | TenantAIModelValidator | No |
 | Tag | — (uses `created_by` for ownership) | — | N/A |
 | UserFavorite | — (scoped by user_id) | — | No |
 

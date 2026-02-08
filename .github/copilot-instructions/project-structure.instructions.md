@@ -40,7 +40,7 @@ unified-ui-platform-service/
 │   │   ├── config.py           # Settings (pydantic-settings, env vars)
 │   │   ├── security.py         # Security utilities
 │   │   ├── database/           # DB models, enums, client interface
-│   │   │   ├── models.py       # SQLAlchemy models (~822 lines)
+│   │   │   ├── models.py       # SQLAlchemy models (~840 lines)
 │   │   │   ├── enums.py        # All enums (roles, permissions, types)
 │   │   │   ├── client.py       # SQLAlchemyClient 
 │   │   │   └── config.py       # DatabaseConfig
@@ -111,6 +111,7 @@ All `Depends()` factories live in `handlers/dependencies/`:
 | `principals.py` | `get_principals_handler()` |
 | `tags.py` | `get_tags_handler()` |
 | `user_favorites.py` | `get_user_favorites_handler()` |
+| `tenant_ai_models.py` | `get_tenant_ai_model_handler()` |
 
 ---
 

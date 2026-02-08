@@ -37,7 +37,7 @@ Every resource in `tests/unit/api/v1/` has **exactly three test files**:
 | `test_{resource}_caching.py` | Cache hit/miss, invalidation, isolation | `use_cache=True` (default) |
 
 ### Resources with three-file pattern:
-applications, autonomous_agents, chat_widgets, conversations, credentials, custom_groups, identity, principals, tags, tenants, tools, user_favorites
+applications, autonomous_agents, chat_widgets, conversations, credentials, custom_groups, identity, principals, tags, tenant_ai_models, tenants, tools, user_favorites
 
 ---
 
@@ -357,7 +357,7 @@ tests/
     │   ├── test_autonomous_agents.py
     │   ├── test_autonomous_agents_rbac.py
     │   ├── test_autonomous_agents_caching.py
-    │   ├── ... (same for all resources)
+    │   ├── ... (same for all resources)\n    │   ├── test_tenant_ai_models.py\n    │   ├── test_tenant_ai_models_rbac.py\n    │   ├── test_tenant_ai_models_caching.py
     ├── handlers/                        # Handler unit tests
     ├── caching/                         # Cache infrastructure tests
     ├── core/                            # Core module tests

@@ -253,6 +253,45 @@ def authenticate_autonomous_agent_api_key() -> Callable:
     return decorator
 
 
+def authenticate_service_key(required_service_auth_key: str) -> Callable:
+    """Decorator factory for service-to-service authentication via X-Service-Key header only.
+
+    Unlike authenticate(), this does NOT require a Bearer token.
+    Use for internal S2S endpoints where only machine-to-machine auth is needed.
+
+    Args:
+        required_service_auth_key: Key name in settings/vault (e.g., "X_AGENT_SERVICE_KEY").
+
+    Usage:
+        @authenticate_service_key("X_AGENT_SERVICE_KEY")
+        async def internal_handler(request: Request): ...
+    """
+    def decorator(func: Callable) -> Callable:
+        @wraps(func)
+        async def wrapper(*args: Any, **kwargs: Any) -> Any:
+            request: Request | None = kwargs.get("request")
+            if request is None:
+                for arg in args:
+                    if isinstance(arg, Request):
+                        request = arg
+                        break
+
+            if request is None:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Request object not found"
+                )
+
+            _validate_service_key(request, required_service_auth_key)
+            request.state.service_authenticated = True
+            request.state.service_key_name = required_service_auth_key
+
+            return await func(*args, **kwargs)
+
+        return wrapper
+    return decorator
+
+
 def authenticate(required_service_auth_key: Optional[str] = None) -> Callable:
     """
     Decorator factory to authenticate users via Bearer token from Authorization header.

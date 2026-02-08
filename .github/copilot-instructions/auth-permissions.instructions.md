@@ -5,7 +5,7 @@ All auth middleware: `unifiedui/core/middleware/apis/v1/auth.py`
 
 ---
 
-## Three Auth Decorators
+## Four Auth Decorators
 
 ### 1. `@authenticate()`
 Standard user authentication via Bearer token.
@@ -54,6 +54,8 @@ Permission check applied after `@authenticate()`.
 | `tag` | (uses IS_CREATOR check) | `tag_id` |
 | `user_favorite` | (uses IS_CREATOR check) | `user_id` |
 
+**Note**: `tenant_ai_model` uses `@authenticate_service_key()` instead of `@check_permissions()` — no member table, no RBAC. Only agent-service can access via service key.
+
 ### 3. `@authenticate_autonomous_agent_api_key()`
 API key authentication without Bearer token.
 
@@ -61,6 +63,18 @@ API key authentication without Bearer token.
 - Retrieves primary/secondary keys from vault (never cached for rotation support)
 - Stores `request.state.autonomous_agent` and `request.state.authenticated_via_api_key = True`
 - Requires `tenant_id` and `autonomous_agent_id` in path params
+
+### 4. `@authenticate_service_key(required_service_auth_key)`
+Service-to-service authentication via `X-Service-Key` only. **No Bearer token required.**
+
+```python
+@authenticate_service_key(required_service_auth_key="AGENT_TO_PLATFORM_SERVICE_KEY")
+```
+
+- Validates only the `X-Service-Key` header against vault-resolved key
+- No `ContextIdentityUser` is created — no user context available
+- Used for endpoints that only agent-service calls (e.g., AI model lookup by purpose)
+- Key resolved from vault via `app_vault.build_secret_uri(key_name)`
 
 ---
 
@@ -98,16 +112,28 @@ All properties use Redis cache when `use_cache=True` (controlled by `X-Use-Cache
 
 ## Service Key Authentication
 
-For internal service-to-service calls:
+For internal service-to-service calls, two patterns exist:
+
+### 1. Service key + Bearer token (both required)
 
 ```python
-@authenticate(required_service_auth_key="X_AGENT_SERVICE_KEY")
+@authenticate(required_service_auth_key="AGENT_TO_PLATFORM_SERVICE_KEY")
 ```
 
-- Service key stored in environment variable / `Settings`
-- Header: `X-Service-Key: <key>`
-- Both service key AND Bearer token required
-- Use case: Agent service calling platform service endpoints
+- Both `X-Service-Key` AND `Authorization: Bearer` must be valid
+- Use case: Endpoints where the agent-service acts on behalf of a user
+
+### 2. Service key only (no Bearer token)
+
+```python
+@authenticate_service_key(required_service_auth_key="AGENT_TO_PLATFORM_SERVICE_KEY")
+```
+
+- Only `X-Service-Key` is validated
+- No user context available — no `ContextIdentityUser`
+- Use case: Endpoints called by agent-service that don't need user identity (e.g., fetching AI models by purpose)
+
+Service keys are stored in the **app vault** and resolved via `app_vault.build_secret_uri(key_name)`.
 
 ---
 
