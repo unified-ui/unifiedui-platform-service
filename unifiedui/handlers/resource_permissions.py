@@ -30,6 +30,7 @@ from unifiedui.core.database.models import (
     Credential, CredentialMember,
     CustomGroupMember, Principal,
     Tool, ToolMember,
+    ReActAgent, ReActAgentMember,
 )
 from unifiedui.core.database.enums import PermissionActionEnum, PrincipalTypeEnum, TenantRolesEnum
 from unifiedui.caching.client import CacheClient
@@ -91,6 +92,13 @@ RESOURCE_PERMISSION_CONFIG: Dict[str, Dict[str, Any]] = {
         "member_model": ToolMember,
         "id_field": "tool_id",
         "cache_prefix": "tools",
+        "tenant_admin_role": TenantRolesEnum.REACT_AGENT_ADMIN,
+    },
+    "re_act_agent": {
+        "resource_model": ReActAgent,
+        "member_model": ReActAgentMember,
+        "id_field": "re_act_agent_id",
+        "cache_prefix": "re_act_agents",
         "tenant_admin_role": TenantRolesEnum.REACT_AGENT_ADMIN,
     },
 }

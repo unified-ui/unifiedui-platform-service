@@ -37,7 +37,7 @@ Who can receive permissions:
 - `ToolTypeEnum`: `MCP_SERVER`, `OPENAPI_DEFINITION`
 - `AIModelTypeEnum`: `LLM_MODEL`, `EMBEDDING_MODEL`
 - `AIModelProviderEnum`: `AZURE_OPENAI`, `OPENAI`, `ANTHROPIC`, `GOOGLE_GENAI`, `OLLAMA`, `MISTRAL`, `GROQ`
-- `AIModelPurposeGroupEnum`: `CONVERSATION_TITLE_GENERATION`, `CONVERSATION_SUMMARIZATION`, `DESCRIPTION_GENERATION`, `TRACE_ANALYSIS`, `GENERAL`
+- `AIModelPurposeGroupEnum`: `CONVERSATION_TITLE_GENERATION`, `CONVERSATION_SUMMARIZATION`, `DESCRIPTION_GENERATION`, `TRACE_ANALYSIS`, `GENERAL`, `REACT_AGENT`
 - `UserPermissionEnum`: `IS_CREATOR` (special — used for tag/favorite ownership)
 - `OrderDirectionEnum`: `asc`, `desc`
 - `ListViewEnum`: `full`, `quick-list`
@@ -113,6 +113,7 @@ class ApplicationMember(Base, IdMixin, AuditMixin):
 | ChatWidget | ChatWidgetMember | — | Yes |
 | CustomGroup | CustomGroupMember | — | No |
 | Tool | ToolMember | ToolValidator | No |
+| ReActAgent | ReActAgentMember | — | Yes |
 | TenantAIModel | — (no RBAC, S2S-only via `@authenticate_service_key`) | TenantAIModelValidator | No |
 | Tag | — (uses `created_by` for ownership) | — | N/A |
 | UserFavorite | — (scoped by user_id) | — | No |

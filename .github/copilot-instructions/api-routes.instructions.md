@@ -211,3 +211,34 @@ async def get_models_by_purpose(request: Request, tenant_id: str, purpose_group:
 - No member table — scoped only by tenant
 - CRUD by tenant admin users via `@authenticate()`, lookup by purpose via `@authenticate_service_key()`
 - Routes registered at: `/api/v1/platform-service/tenants/{tenant_id}/ai-models`
+
+### ReACT Agent (Standard RBAC Resource)
+- Full CRUD + permission management + tags support
+- Same decorator pattern as Application/AutonomousAgent (authenticate + check_permissions)
+- Routes registered at: `/api/v1/platform-service/tenants/{tenant_id}/re-act-agents`
+
+### Dashboard (Aggregation endpoint)
+- `GET /dashboard/stats` — returns aggregated counts (total + active) for applications, autonomous_agents, conversations
+- RBAC-filtered: only counts entities the user has access to
+- Cached for 120s via Redis
+- Routes registered at: `/api/v1/platform-service/tenants/{tenant_id}/dashboard`
+
+### Global Search
+- `GET /search?q=...&types=...&limit=10` — searches across applications, autonomous_agents, conversations, credentials by name (ILIKE)
+- RBAC-filtered: only returns entities the user has access to
+- Routes registered at: `/api/v1/platform-service/tenants/{tenant_id}/search`
+
+### Notifications
+- `GET /notifications` — list notifications (paginated, optional `is_read` filter, ordered by created_at desc)
+- `GET /notifications/unread-count` — get count of unread notifications
+- `PUT /notifications/{id}/read` — mark single notification as read
+- `PUT /notifications/read-all` — mark all notifications as read
+- `DELETE /notifications/{id}` — delete notification
+- `POST /notifications` — create notification (admin use)
+- `POST /notifications/bulk` — create bulk notifications (admin use)
+- Routes registered at: `/api/v1/platform-service/tenants/{tenant_id}/notifications`
+
+### Recent Visits
+- `GET /users/{user_id}/recent-visits` — list user's recent visits (up to 50)
+- `POST /users/{user_id}/recent-visits/sync` — sync visits from client (upsert + cleanup)
+- Routes registered at: `/api/v1/platform-service/tenants/{tenant_id}/recent-visits`

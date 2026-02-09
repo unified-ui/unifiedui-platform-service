@@ -20,7 +20,8 @@ class TenantRolesEnum(str, Enum):
     REACT_AGENT_CREATOR = "REACT_AGENT_CREATOR"
     TENANT_AI_MODELS_ADMIN = "TENANT_AI_MODELS_ADMIN"
 
-    def all() -> list[str]:
+    @classmethod
+    def all(cls) -> list[str]:
         return [permission.value for permission in TenantRolesEnum]
 
 
@@ -29,7 +30,8 @@ class ToolTypeEnum(str, Enum):
     MCP_SERVER = "MCP_SERVER"
     OPENAPI_DEFINITION = "OPENAPI_DEFINITION"
 
-    def all() -> list[str]:
+    @classmethod
+    def all(cls) -> list[str]:
         return [tool_type.value for tool_type in ToolTypeEnum]
 
 
@@ -38,7 +40,8 @@ class ApplicationTypeEnum(str, Enum):
     MICROSOFT_FOUNDRY = "MICROSOFT_FOUNDRY"
     REST_API = "REST_API"
 
-    def all() -> list[str]:
+    @classmethod
+    def all(cls) -> list[str]:
         return [app_type.value for app_type in ApplicationTypeEnum]
 
 
@@ -46,7 +49,8 @@ class AutonomousAgentTypeEnum(str, Enum):
     """Supported autonomous agent types."""
     N8N = "N8N"
 
-    def all() -> list[str]:
+    @classmethod
+    def all(cls) -> list[str]:
         return [agent_type.value for agent_type in AutonomousAgentTypeEnum]
 
 
@@ -54,7 +58,8 @@ class ChatWidgetTypeEnum(str, Enum):
     IFRAME = "IFRAME"
     FORM = "FORM"
 
-    def all() -> list[str]:
+    @classmethod
+    def all(cls) -> list[str]:
         return [widget_type.value for widget_type in ChatWidgetTypeEnum]
 
 
@@ -63,7 +68,8 @@ class PermissionActionEnum(str, Enum):
     WRITE = "WRITE"
     ADMIN = "ADMIN"
 
-    def all() -> list[str]:
+    @classmethod
+    def all(cls) -> list[str]:
         return [action.value for action in PermissionActionEnum]
 
 
@@ -72,7 +78,8 @@ class PrincipalTypeEnum(str, Enum):
     IDENTITY_GROUP = "IDENTITY_GROUP"
     CUSTOM_GROUP = "CUSTOM_GROUP"
 
-    def all() -> list[str]:
+    @classmethod
+    def all(cls) -> list[str]:
         return [principal_type.value for principal_type in PrincipalTypeEnum]
 
 
@@ -80,7 +87,8 @@ class UserPermissionEnum(str, Enum):
     """Special user-level permissions for resource access."""
     IS_CREATOR = "IS_CREATOR"
 
-    def all() -> list[str]:
+    @classmethod
+    def all(cls) -> list[str]:
         return [perm.value for perm in UserPermissionEnum]
 
 
@@ -89,7 +97,8 @@ class OrderDirectionEnum(str, Enum):
     ASC = "asc"
     DESC = "desc"
 
-    def all() -> list[str]:
+    @classmethod
+    def all(cls) -> list[str]:
         return [direction.value for direction in OrderDirectionEnum]
 
 
@@ -98,7 +107,8 @@ class ListViewEnum(str, Enum):
     FULL = "full"
     QUICK_LIST = "quick-list"
 
-    def all() -> list[str]:
+    @classmethod
+    def all(cls) -> list[str]:
         return [view.value for view in ListViewEnum]
 
 
@@ -107,7 +117,8 @@ class AIModelTypeEnum(str, Enum):
     LLM_MODEL = "LLM_MODEL"
     EMBEDDING_MODEL = "EMBEDDING_MODEL"
 
-    def all() -> list[str]:
+    @classmethod
+    def all(cls) -> list[str]:
         return [t.value for t in AIModelTypeEnum]
 
 
@@ -121,7 +132,8 @@ class AIModelProviderEnum(str, Enum):
     MISTRAL = "MISTRAL"
     GROQ = "GROQ"
 
-    def all() -> list[str]:
+    @classmethod
+    def all(cls) -> list[str]:
         return [p.value for p in AIModelProviderEnum]
 
 
@@ -132,6 +144,19 @@ class AIModelPurposeGroupEnum(str, Enum):
     DESCRIPTION_GENERATION = "DESCRIPTION_GENERATION"
     TRACE_ANALYSIS = "TRACE_ANALYSIS"
     GENERAL = "GENERAL"
+    REACT_AGENT = "REACT_AGENT"
 
-    def all() -> list[str]:
+    @classmethod
+    def all(cls) -> list[str]:
         return [g.value for g in AIModelPurposeGroupEnum]
+
+
+class NotificationTypeEnum(str, Enum):
+    """Supported notification types."""
+    AGENT_RUN_FAILED = "AGENT_RUN_FAILED"
+    CREDENTIAL_EXPIRING = "CREDENTIAL_EXPIRING"
+    TRACE_IMPORTED = "TRACE_IMPORTED"
+
+    @classmethod
+    def all(cls) -> list[str]:
+        return [t.value for t in NotificationTypeEnum]

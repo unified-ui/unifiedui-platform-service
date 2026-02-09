@@ -21,7 +21,7 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship,
 from sqlalchemy.types import JSON, TypeDecorator
 from sqlalchemy import Enum as SAEnum
 
-from unifiedui.core.database.enums import PermissionActionEnum, TenantRolesEnum, PrincipalTypeEnum, ApplicationTypeEnum, AutonomousAgentTypeEnum, AIModelTypeEnum, AIModelProviderEnum
+from unifiedui.core.database.enums import PermissionActionEnum, TenantRolesEnum, PrincipalTypeEnum, ApplicationTypeEnum, AutonomousAgentTypeEnum, AIModelTypeEnum, AIModelProviderEnum, NotificationTypeEnum
 
 
 # ---------- Utility functions ----------
@@ -105,6 +105,14 @@ AIModelTypeSAEnum = SAEnum(
 AIModelProviderSAEnum = SAEnum(
     *AIModelProviderEnum.all(),
     name="ai_model_provider",
+    native_enum=False,
+    create_constraint=True,
+    validate_strings=True,
+)
+
+NotificationTypeSAEnum = SAEnum(
+    *NotificationTypeEnum.all(),
+    name="notification_type",
     native_enum=False,
     create_constraint=True,
     validate_strings=True,
@@ -573,6 +581,9 @@ class Tag(Base, AuditMixin):
     tool_tags: Mapped[list["ToolTag"]] = relationship(
         back_populates="tag", cascade="all, delete-orphan"
     )
+    re_act_agent_tags: Mapped[list["ReActAgentTag"]] = relationship(
+        back_populates="tag", cascade="all, delete-orphan"
+    )
 
     @validates('name')
     def convert_upper(self, key, value):
@@ -855,3 +866,121 @@ class ToolTag(Base, AuditMixin):
     )
 
 
+# ---------- ReACT Agents ----------
+class ReActAgent(Base, IdNameDescriptionMixin, TenantScopedMixin):
+    """ReACT Agent entity for LLM-based agent configurations."""
+    __tablename__ = "re_act_agents"
+
+    ai_model_ids: Mapped[list] = mapped_column(PortableJSON, nullable=False, default=list)
+    system_prompt: Mapped[Optional[str]] = mapped_column(String(8000), nullable=True)
+    tool_ids: Mapped[list] = mapped_column(PortableJSON, nullable=False, default=list)
+    security_prompt: Mapped[Optional[str]] = mapped_column(String(8000), nullable=True)
+    tool_use_prompt: Mapped[Optional[str]] = mapped_column(String(8000), nullable=True)
+    response_prompt: Mapped[Optional[str]] = mapped_column(String(8000), nullable=True)
+    greeting_messages: Mapped[list] = mapped_column(PortableJSON, nullable=False, default=list)
+    config: Mapped[dict] = mapped_column(PortableJSON, nullable=False, default=dict)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+
+    members: Mapped[list["ReActAgentMember"]] = relationship(
+        back_populates="re_act_agent", cascade="all, delete-orphan"
+    )
+    tags: Mapped[list["ReActAgentTag"]] = relationship(
+        back_populates="re_act_agent", cascade="all, delete-orphan"
+    )
+
+    __table_args__ = (Index("ix_re_act_agents_tenant", "tenant_id"),)
+
+
+class ReActAgentMember(Base, IdMixin, AuditMixin):
+    """ReACT Agent membership table."""
+    __tablename__ = "re_act_agent_members"
+
+    tenant_id: Mapped[str] = mapped_column(String(36), nullable=False)
+    re_act_agent_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("re_act_agents.id", ondelete="CASCADE"), nullable=False
+    )
+    principal_id: Mapped[str] = mapped_column(String(50), nullable=False)
+    role: Mapped[str] = mapped_column(PermissionActionSAEnum, nullable=False)
+
+    re_act_agent: Mapped["ReActAgent"] = relationship(back_populates="members")
+    principal: Mapped["Principal"] = relationship(
+        foreign_keys="[ReActAgentMember.tenant_id, ReActAgentMember.principal_id]",
+        primaryjoin="and_(ReActAgentMember.tenant_id == Principal.tenant_id, ReActAgentMember.principal_id == Principal.principal_id)"
+    )
+
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["tenant_id", "principal_id"],
+            ["principals.tenant_id", "principals.principal_id"],
+            ondelete="CASCADE",
+            name="fk_re_act_agent_members_principal"
+        ),
+        UniqueConstraint("re_act_agent_id", "principal_id", name="uq_re_act_agent_members"),
+        Index("ix_re_act_agent_members_agent", "re_act_agent_id"),
+        Index("ix_re_act_agent_members_principal", "principal_id"),
+    )
+
+
+class ReActAgentTag(Base, AuditMixin):
+    """Junction table for ReACT agent tags."""
+    __tablename__ = "re_act_agent_tags"
+
+    tenant_id: Mapped[str] = mapped_column(String(36), nullable=False, primary_key=True)
+    tag_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("tags.id", ondelete="CASCADE"), nullable=False, primary_key=True
+    )
+    re_act_agent_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("re_act_agents.id", ondelete="CASCADE"), nullable=False, primary_key=True
+    )
+
+    tag: Mapped["Tag"] = relationship(back_populates="re_act_agent_tags")
+    re_act_agent: Mapped["ReActAgent"] = relationship(back_populates="tags")
+
+    __table_args__ = (
+        Index("ix_rat_agent", "re_act_agent_id"),
+        Index("ix_rat_tag", "tag_id"),
+    )
+
+
+# ---------- Notifications ----------
+class Notification(Base, IdMixin, TenantScopedMixin):
+    """Notification entity for in-app notifications."""
+    __tablename__ = "notifications"
+
+    user_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    type: Mapped[str] = mapped_column(NotificationTypeSAEnum, nullable=False)
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    message: Mapped[Optional[str]] = mapped_column(String(2000), nullable=True)
+    resource_type: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    resource_id: Mapped[Optional[str]] = mapped_column(String(36), nullable=True)
+    is_read: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    created_at: Mapped[datetime] = mapped_column(
+        HighPrecisionDateTime(), nullable=False, default=utc_now
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        HighPrecisionDateTime(), nullable=False, default=utc_now, onupdate=utc_now
+    )
+
+    __table_args__ = (
+        Index("ix_notifications_tenant_user_read", "tenant_id", "user_id", "is_read", "created_at"),
+        Index("ix_notifications_tenant_created", "tenant_id", "created_at"),
+    )
+
+
+# ---------- Recent Visits ----------
+class RecentVisit(Base, IdMixin, TenantScopedMixin):
+    """Recent visit tracking for users."""
+    __tablename__ = "recent_visits"
+
+    user_id: Mapped[str] = mapped_column(String(255), nullable=False)
+    resource_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    resource_id: Mapped[str] = mapped_column(String(36), nullable=False)
+    resource_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    visited_at: Mapped[datetime] = mapped_column(
+        HighPrecisionDateTime(), nullable=False, default=utc_now
+    )
+
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "user_id", "resource_type", "resource_id", name="uq_recent_visits"),
+        Index("ix_recent_visits_user_time", "tenant_id", "user_id", "visited_at"),
+    )

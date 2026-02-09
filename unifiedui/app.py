@@ -4,7 +4,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from unifiedui.apis.v1 import health, identity, tenants, custom_groups, credentials, applications, conversations, autonomous_agents, chat_widgets, tags, user_favorites, principals, tools, tenant_ai_models
+from unifiedui.apis.v1 import health, identity, tenants, custom_groups, credentials, applications, conversations, autonomous_agents, chat_widgets, tags, user_favorites, principals, tools, tenant_ai_models, dashboard, search, notifications, recent_visits, re_act_agents
 from unifiedui.exc.autonomous_agents import AutonomousAgentNotFoundError
 from unifiedui.exc.custom_groups import CustomGroupNotFoundError, CustomGroupError
 from unifiedui.exc.applications import ApplicationNotFoundError
@@ -12,6 +12,7 @@ from unifiedui.exc.credentials import CredentialNotFoundError
 from unifiedui.exc.conversations import ConversationNotFoundError
 from unifiedui.exc.chat_widgets import ChatWidgetNotFoundError
 from unifiedui.exc.tools import ToolNotFoundError, ToolConfigValidationError, UnsupportedToolTypeError, InvalidToolCredentialError
+from unifiedui.exc.re_act_agents import ReActAgentNotFoundError
 from unifiedui.exc.tenant_ai_models import (
     TenantAIModelNotFoundError,
     TenantAIModelConfigValidationError,
@@ -259,6 +260,14 @@ def create_app() -> FastAPI:
             content={"detail": exc.message, "credential_id": exc.credential_id}
         )
 
+    @app.exception_handler(ReActAgentNotFoundError)
+    async def re_act_agent_not_found_handler(request: Request, exc: ReActAgentNotFoundError):
+        """Handle ReACT agent not found errors."""
+        return JSONResponse(
+            status_code=404,
+            content={"detail": str(exc)}
+        )
+
     @app.exception_handler(TenantAIModelNotFoundError)
     async def tenant_ai_model_not_found_handler(request: Request, exc: TenantAIModelNotFoundError):
         """Handle tenant AI model not found errors."""
@@ -430,6 +439,26 @@ def create_app() -> FastAPI:
         tags=["Tools"]
     )
     
+    # ReACT Agent routes - tags list router MUST be before re_act_agents router to avoid path conflicts
+    app.include_router(
+        tags.re_act_agents_tags_list_router,
+        prefix="/api/v1/platform-service/tenants/{tenant_id}",
+        tags=["ReACT Agents"]
+    )
+    
+    app.include_router(
+        re_act_agents.router,
+        prefix="/api/v1/platform-service/tenants/{tenant_id}",
+        tags=["ReACT Agents"]
+    )
+    
+    # ReACT Agent-specific tag routes
+    app.include_router(
+        tags.re_act_agent_tags_router,
+        prefix="/api/v1/platform-service/tenants/{tenant_id}",
+        tags=["ReACT Agents"]
+    )
+    
     # User Favorites routes
     app.include_router(
         user_favorites.router,
@@ -442,6 +471,34 @@ def create_app() -> FastAPI:
         tenant_ai_models.router,
         prefix="/api/v1/platform-service/tenants/{tenant_id}",
         tags=["Tenant AI Models"]
+    )
+    
+    # Dashboard routes
+    app.include_router(
+        dashboard.router,
+        prefix="/api/v1/platform-service/tenants/{tenant_id}",
+        tags=["Dashboard"]
+    )
+    
+    # Search routes
+    app.include_router(
+        search.router,
+        prefix="/api/v1/platform-service/tenants/{tenant_id}",
+        tags=["Search"]
+    )
+    
+    # Notifications routes
+    app.include_router(
+        notifications.router,
+        prefix="/api/v1/platform-service/tenants/{tenant_id}",
+        tags=["Notifications"]
+    )
+    
+    # Recent Visits routes
+    app.include_router(
+        recent_visits.router,
+        prefix="/api/v1/platform-service/tenants/{tenant_id}",
+        tags=["Recent Visits"]
     )
     
     return app

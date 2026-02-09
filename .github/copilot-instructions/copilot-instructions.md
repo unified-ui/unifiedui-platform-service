@@ -6,7 +6,7 @@ applyTo: '**'
 
 ## Project Overview
 
-**unified-ui** is a multi-tenant integration platform for AI agent systems with role-based access control (RBAC). This platform service is the core backend providing management APIs for tenants, applications, autonomous agents, conversations, credentials, chat widgets, tools, tags, permissions, and tenant AI models.
+**unified-ui** is a multi-tenant integration platform for AI agent systems with role-based access control (RBAC). This platform service is the core backend providing management APIs for tenants, applications, autonomous agents, ReACT agents, conversations, credentials, chat widgets, tools, tags, permissions, tenant AI models, notifications, recent visits, dashboard, and global search.
 
 **Tech Stack**: Python 3.13+ · FastAPI · SQLAlchemy · PostgreSQL · Redis · HashiCorp Vault / Azure Key Vault · MSAL · Pydantic v2 · Alembic
 
@@ -74,8 +74,8 @@ Read the relevant instruction file **before** working in that area.
 - **Migrations**: `alembic upgrade head` / `alembic revision --autogenerate -m "description"`
 - **Entry point**: `unifiedui/app.py` → `create_app()`
 - **Config**: `unifiedui/core/config.py` → `Settings` (Pydantic-Settings, env vars)
-- **Models**: `unifiedui/core/database/models.py` (~840 lines)
-- **Enums**: `unifiedui/core/database/enums.py`
+- **Models**: `unifiedui/core/database/models.py` (~985 lines, includes Notification + RecentVisit + ReActAgent)
+- **Enums**: `unifiedui/core/database/enums.py` (includes NotificationTypeEnum)
 - **Auth middleware**: `unifiedui/core/middleware/apis/v1/auth.py` (4 decorators: `authenticate`, `authenticate_service_key`, `authenticate_autonomous_agent_api_key`, `check_permissions`)
 
 ---

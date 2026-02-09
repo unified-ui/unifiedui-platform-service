@@ -32,6 +32,7 @@ from unifiedui.handlers.dependencies.resource_permissions import get_resource_pe
 from unifiedui.handlers.dependencies.resource_tags import get_resource_tags_handler
 from unifiedui.handlers.dependencies.principals import get_principal_handler
 from unifiedui.handlers.dependencies.tools import get_tool_handler
+from unifiedui.handlers.dependencies.re_act_agents import get_re_act_agent_handler
 
 __all__ = [
     # Database
@@ -52,6 +53,7 @@ __all__ = [
     "get_user_favorites_handler",
     "get_principal_handler",
     "get_tool_handler",
+    "get_re_act_agent_handler",
     # Central Handlers
     "get_resource_permissions_handler",
     "get_resource_tags_handler",
