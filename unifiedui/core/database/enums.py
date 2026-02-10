@@ -151,12 +151,4 @@ class AIModelPurposeGroupEnum(str, Enum):
         return [g.value for g in AIModelPurposeGroupEnum]
 
 
-class NotificationTypeEnum(str, Enum):
-    """Supported notification types."""
-    AGENT_RUN_FAILED = "AGENT_RUN_FAILED"
-    CREDENTIAL_EXPIRING = "CREDENTIAL_EXPIRING"
-    TRACE_IMPORTED = "TRACE_IMPORTED"
 
-    @classmethod
-    def all(cls) -> list[str]:
-        return [t.value for t in NotificationTypeEnum]

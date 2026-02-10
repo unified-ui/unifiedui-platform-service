@@ -4,7 +4,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from unifiedui.apis.v1 import health, identity, tenants, custom_groups, credentials, applications, conversations, autonomous_agents, chat_widgets, tags, user_favorites, principals, tools, tenant_ai_models, dashboard, search, notifications, recent_visits, re_act_agents
+from unifiedui.apis.v1 import health, identity, tenants, custom_groups, credentials, applications, conversations, autonomous_agents, chat_widgets, tags, user_favorites, principals, tools, tenant_ai_models, dashboard, search, recent_visits, re_act_agents
 from unifiedui.exc.autonomous_agents import AutonomousAgentNotFoundError
 from unifiedui.exc.custom_groups import CustomGroupNotFoundError, CustomGroupError
 from unifiedui.exc.applications import ApplicationNotFoundError
@@ -485,13 +485,6 @@ def create_app() -> FastAPI:
         search.router,
         prefix="/api/v1/platform-service/tenants/{tenant_id}",
         tags=["Search"]
-    )
-    
-    # Notifications routes
-    app.include_router(
-        notifications.router,
-        prefix="/api/v1/platform-service/tenants/{tenant_id}",
-        tags=["Notifications"]
     )
     
     # Recent Visits routes

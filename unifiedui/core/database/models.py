@@ -21,7 +21,7 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship,
 from sqlalchemy.types import JSON, TypeDecorator
 from sqlalchemy import Enum as SAEnum
 
-from unifiedui.core.database.enums import PermissionActionEnum, TenantRolesEnum, PrincipalTypeEnum, ApplicationTypeEnum, AutonomousAgentTypeEnum, AIModelTypeEnum, AIModelProviderEnum, NotificationTypeEnum
+from unifiedui.core.database.enums import PermissionActionEnum, TenantRolesEnum, PrincipalTypeEnum, ApplicationTypeEnum, AutonomousAgentTypeEnum, AIModelTypeEnum, AIModelProviderEnum
 
 
 # ---------- Utility functions ----------
@@ -109,15 +109,6 @@ AIModelProviderSAEnum = SAEnum(
     create_constraint=True,
     validate_strings=True,
 )
-
-NotificationTypeSAEnum = SAEnum(
-    *NotificationTypeEnum.all(),
-    name="notification_type",
-    native_enum=False,
-    create_constraint=True,
-    validate_strings=True,
-)
-
 
 # ---------- Mixins ----------
 class IdMixin:
@@ -1005,31 +996,6 @@ class ReActAgentTag(Base, AuditMixin):
     __table_args__ = (
         Index("ix_rat_agent", "re_act_agent_id"),
         Index("ix_rat_tag", "tag_id"),
-    )
-
-
-# ---------- Notifications ----------
-class Notification(Base, IdMixin, TenantScopedMixin):
-    """Notification entity for in-app notifications."""
-    __tablename__ = "notifications"
-
-    user_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
-    type: Mapped[str] = mapped_column(NotificationTypeSAEnum, nullable=False)
-    title: Mapped[str] = mapped_column(String(255), nullable=False)
-    message: Mapped[Optional[str]] = mapped_column(String(2000), nullable=True)
-    resource_type: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
-    resource_id: Mapped[Optional[str]] = mapped_column(String(36), nullable=True)
-    is_read: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-    created_at: Mapped[datetime] = mapped_column(
-        HighPrecisionDateTime(), nullable=False, default=utc_now
-    )
-    updated_at: Mapped[datetime] = mapped_column(
-        HighPrecisionDateTime(), nullable=False, default=utc_now, onupdate=utc_now
-    )
-
-    __table_args__ = (
-        Index("ix_notifications_tenant_user_read", "tenant_id", "user_id", "is_read", "created_at"),
-        Index("ix_notifications_tenant_created", "tenant_id", "created_at"),
     )
 
 

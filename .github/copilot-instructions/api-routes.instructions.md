@@ -228,16 +228,6 @@ async def get_models_by_purpose(request: Request, tenant_id: str, purpose_group:
 - RBAC-filtered: only returns entities the user has access to
 - Routes registered at: `/api/v1/platform-service/tenants/{tenant_id}/search`
 
-### Notifications
-- `GET /notifications` — list notifications (paginated, optional `is_read` filter, ordered by created_at desc)
-- `GET /notifications/unread-count` — get count of unread notifications
-- `PUT /notifications/{id}/read` — mark single notification as read
-- `PUT /notifications/read-all` — mark all notifications as read
-- `DELETE /notifications/{id}` — delete notification
-- `POST /notifications` — create notification (admin use)
-- `POST /notifications/bulk` — create bulk notifications (admin use)
-- Routes registered at: `/api/v1/platform-service/tenants/{tenant_id}/notifications`
-
 ### Recent Visits
 - `GET /users/{user_id}/recent-visits` — list user's recent visits (up to 50)
 - `POST /users/{user_id}/recent-visits/sync` — sync visits from client (upsert + cleanup)
