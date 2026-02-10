@@ -18,8 +18,7 @@ if TYPE_CHECKING:
 
 from unifiedui.schema.requests.conversations import CreateConversationRequest, UpdateConversationRequest
 from unifiedui.schema.requests.conversation_permissions import SetConversationPermissionRequest
-from unifiedui.schema.responses.conversations import ConversationResponse
-from unifiedui.schema.responses.common import QuickListItemResponse
+from unifiedui.schema.responses.conversations import ConversationResponse, ConversationQuickListItemResponse
 from unifiedui.schema.responses.principals import (
     PrincipalWithRolesResponse,
     ResourcePrincipalsResponse
@@ -195,7 +194,7 @@ class ConversationHandler:
             
             # Return quick-list format if requested
             if view == "quick-list":
-                quick_result = [QuickListItemResponse(id=conv.id, name=conv.name) for conv in conversations]
+                quick_result = [ConversationQuickListItemResponse(id=conv.id, name=conv.name, application_id=conv.application_id) for conv in conversations]
                 if use_cache and self.cache_client and not has_filters:
                     try:
                         data = [r.model_dump() for r in quick_result]

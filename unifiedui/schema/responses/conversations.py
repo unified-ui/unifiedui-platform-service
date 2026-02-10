@@ -4,6 +4,16 @@ from typing import Optional
 from pydantic import BaseModel, Field, ConfigDict
 
 
+class ConversationQuickListItemResponse(BaseModel):
+    """Minimal response model for conversation quick-list view."""
+    
+    id: str = Field(..., description="Conversation ID")
+    name: str = Field(..., description="Conversation name")
+    application_id: str = Field(..., description="Application ID this conversation belongs to")
+    
+    model_config = ConfigDict(from_attributes=True)
+
+
 class ConversationResponse(BaseModel):
     """Response model for a conversation."""
     

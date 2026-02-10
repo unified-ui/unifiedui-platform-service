@@ -9,7 +9,7 @@ from unifiedui.handlers.conversations import ConversationHandler
 from unifiedui.handlers.dependencies import get_conversation_handler
 from unifiedui.schema.requests.conversations import CreateConversationRequest, UpdateConversationRequest
 from unifiedui.schema.requests.conversation_permissions import SetConversationPermissionRequest
-from unifiedui.schema.responses.conversations import ConversationResponse
+from unifiedui.schema.responses.conversations import ConversationResponse, ConversationQuickListItemResponse
 from unifiedui.schema.responses.principals import (
     PrincipalWithRolesResponse,
     ResourcePrincipalsResponse
@@ -17,7 +17,6 @@ from unifiedui.schema.responses.principals import (
 from unifiedui.exc.conversations import ConversationNotFoundError, FoundryConversationCreationError
 from unifiedui.core.middleware.apis.v1.auth import authenticate, check_permissions
 from unifiedui.core.database.enums import TenantRolesEnum, PermissionActionEnum, OrderDirectionEnum, ListViewEnum
-from unifiedui.schema.responses.common import QuickListItemResponse
 from unifiedui.logger import get_logger
 
 logger = get_logger(__name__)
