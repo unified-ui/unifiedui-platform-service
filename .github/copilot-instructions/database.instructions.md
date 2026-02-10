@@ -116,7 +116,7 @@ class ApplicationMember(Base, IdMixin, AuditMixin):
 | ReActAgent | ReActAgentMember | — | Yes |
 | TenantAIModel | — (no RBAC, S2S-only via `@authenticate_service_key`) | TenantAIModelValidator | No |
 | Tag | — (uses `created_by` for ownership) | — | N/A |
-| UserFavorite | — (scoped by user_id) | — | No |
+| UserFavorite | — (scoped by user_id, per resource: `ApplicationUserFavorite`, `AutonomousAgentUserFavorite`, `ChatWidgetUserFavorite`, `ConversationUserFavorite`, `ReActAgentUserFavorite`) | — | No |
 
 ---
 

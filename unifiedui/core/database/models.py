@@ -510,6 +510,9 @@ class ChatWidget(Base, IdNameDescriptionMixin, TenantScopedMixin):
     tags: Mapped[list["ChatWidgetTag"]] = relationship(
         back_populates="chat_widget", cascade="all, delete-orphan"
     )
+    user_favorites: Mapped[list["ChatWidgetUserFavorite"]] = relationship(
+        back_populates="chat_widget", cascade="all, delete-orphan"
+    )
 
     __table_args__ = (Index("ix_chat_widgets_tenant", "tenant_id"),)
 
@@ -772,6 +775,66 @@ class ConversationUserFavorite(Base, AuditMixin):
     )
 
 
+class ChatWidgetUserFavorite(Base, AuditMixin):
+    """User favorites for chat widgets."""
+    __tablename__ = "chat_widget_user_favorites"
+
+    tenant_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False, primary_key=True
+    )
+    user_id: Mapped[str] = mapped_column(String(50), nullable=False, primary_key=True)
+    chat_widget_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("chat_widgets.id", ondelete="CASCADE"), nullable=False, primary_key=True
+    )
+
+    chat_widget: Mapped["ChatWidget"] = relationship(back_populates="user_favorites")
+    principal: Mapped["Principal"] = relationship(
+        foreign_keys="[ChatWidgetUserFavorite.tenant_id, ChatWidgetUserFavorite.user_id]",
+        primaryjoin="and_(ChatWidgetUserFavorite.tenant_id == Principal.tenant_id, ChatWidgetUserFavorite.user_id == Principal.principal_id)"
+    )
+
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["tenant_id", "user_id"],
+            ["principals.tenant_id", "principals.principal_id"],
+            ondelete="CASCADE",
+            name="fk_chat_widget_user_favorites_principal"
+        ),
+        Index("ix_cwuf_user", "user_id"),
+        Index("ix_cwuf_chat_widget", "chat_widget_id"),
+    )
+
+
+class ReActAgentUserFavorite(Base, AuditMixin):
+    """User favorites for ReACT agents."""
+    __tablename__ = "re_act_agent_user_favorites"
+
+    tenant_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False, primary_key=True
+    )
+    user_id: Mapped[str] = mapped_column(String(50), nullable=False, primary_key=True)
+    re_act_agent_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("re_act_agents.id", ondelete="CASCADE"), nullable=False, primary_key=True
+    )
+
+    re_act_agent: Mapped["ReActAgent"] = relationship(back_populates="user_favorites")
+    principal: Mapped["Principal"] = relationship(
+        foreign_keys="[ReActAgentUserFavorite.tenant_id, ReActAgentUserFavorite.user_id]",
+        primaryjoin="and_(ReActAgentUserFavorite.tenant_id == Principal.tenant_id, ReActAgentUserFavorite.user_id == Principal.principal_id)"
+    )
+
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["tenant_id", "user_id"],
+            ["principals.tenant_id", "principals.principal_id"],
+            ondelete="CASCADE",
+            name="fk_re_act_agent_user_favorites_principal"
+        ),
+        Index("ix_rauf_user", "user_id"),
+        Index("ix_rauf_re_act_agent", "re_act_agent_id"),
+    )
+
+
 # ---------- Tools (ReACT Agent Tools) ----------
 class Tool(Base, IdNameDescriptionMixin, TenantScopedMixin):
     """Tool entity for ReACT agent tools (MCP servers, OpenAPI definitions)."""
@@ -885,6 +948,9 @@ class ReActAgent(Base, IdNameDescriptionMixin, TenantScopedMixin):
         back_populates="re_act_agent", cascade="all, delete-orphan"
     )
     tags: Mapped[list["ReActAgentTag"]] = relationship(
+        back_populates="re_act_agent", cascade="all, delete-orphan"
+    )
+    user_favorites: Mapped[list["ReActAgentUserFavorite"]] = relationship(
         back_populates="re_act_agent", cascade="all, delete-orphan"
     )
 

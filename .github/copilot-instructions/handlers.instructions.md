@@ -153,6 +153,23 @@ Generic handler for tag operations. Uses `RESOURCE_TAG_CONFIG` dict.
 
 Provides: `get_resource_tags()`, `set_resource_tags()`, `add_resource_tag()`, `remove_resource_tag()`
 
+### UserFavoritesHandler
+**Location**: `handlers/user_favorites.py`
+
+Generic handler for user favorite operations. Uses `RESOURCE_FAVORITE_MAPPING` dict.
+
+```python
+RESOURCE_FAVORITE_MAPPING = {
+    "applications": {"model": ApplicationUserFavorite, "id_field": "application_id"},
+    "autonomous-agents": {"model": AutonomousAgentUserFavorite, "id_field": "autonomous_agent_id"},
+    "chat-widgets": {"model": ChatWidgetUserFavorite, "id_field": "chat_widget_id"},
+    "conversations": {"model": ConversationUserFavorite, "id_field": "conversation_id"},
+    "re-act-agents": {"model": ReActAgentUserFavorite, "id_field": "re_act_agent_id"},
+}
+```
+
+Provides: `list_user_favorites()`, `add_user_favorite()`, `remove_user_favorite()`
+
 ---
 
 ## Dependency Factories

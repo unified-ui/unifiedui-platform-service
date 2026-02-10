@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import uuid
-from typing import TYPE_CHECKING, Optional, List
+from typing import TYPE_CHECKING, Optional, List, Union
 
 from sqlalchemy import select
 
@@ -19,6 +19,7 @@ if TYPE_CHECKING:
 from unifiedui.schema.requests.conversations import CreateConversationRequest, UpdateConversationRequest
 from unifiedui.schema.requests.conversation_permissions import SetConversationPermissionRequest
 from unifiedui.schema.responses.conversations import ConversationResponse
+from unifiedui.schema.responses.common import QuickListItemResponse
 from unifiedui.schema.responses.principals import (
     PrincipalWithRolesResponse,
     ResourcePrincipalsResponse
@@ -72,8 +73,9 @@ class ConversationHandler:
         is_active: Optional[int] = None,
         order_by: Optional[str] = None,
         order_direction: Optional[str] = None,
+        view: Optional[str] = None,
         use_cache: bool = True
-    ) -> List[ConversationResponse]:
+    ) -> Union[List[ConversationResponse], List[QuickListItemResponse]]:
         """
         Get a list of conversations for a tenant (filtered by permissions).
         
@@ -86,10 +88,11 @@ class ConversationHandler:
             is_active: Optional filter by active status (None=all, 1=active, 0=inactive)
             order_by: Optional column name to order by
             order_direction: Optional sort direction ('asc' or 'desc')
+            view: Optional view type ('full' or 'quick-list')
             use_cache: Whether to use caching
             
         Returns:
-            List of conversation responses
+            List of conversation responses or quick-list items
         """
         from unifiedui.core.database.enums import TenantRolesEnum
         
@@ -126,10 +129,13 @@ class ConversationHandler:
             ]
         
         # Build cache key (without filters - caching only for unfiltered results)
-        cache_key = f"conversations:list:tenant:{tenant_id}:user:{user_id}:skip:{skip}:limit:{limit}"
+        view_key = view or "full"
+        order_key = f"{order_by or 'default'}:{order_direction or 'asc'}"
+        is_active_key = "all" if is_active is None else str(is_active)
+        cache_key = f"conversations:list:tenant:{tenant_id}:user:{user_id}:skip:{skip}:limit:{limit}:view:{view_key}:order:{order_key}:active:{is_active_key}"
         
         # Check if any filters are applied
-        has_filters = name_filter is not None or is_active is not None or order_by is not None
+        has_filters = name_filter is not None
         
         # Check cache (disable caching when any filters are applied)
         if use_cache and self.cache_client and not has_filters:
@@ -137,6 +143,8 @@ class ConversationHandler:
                 cached_data = self.cache_client.client.get(cache_key)
                 if cached_data is not None:
                     logger.debug(f"Returning cached conversation list")
+                    if view == "quick-list":
+                        return [QuickListItemResponse(**item) for item in cached_data]
                     return [ConversationResponse(**item) for item in cached_data]
             except Exception as e:
                 logger.warning(f"Failed to get cached conversation list: {e}")
@@ -184,6 +192,18 @@ class ConversationHandler:
             conversations = session.execute(query).scalars().all()
             
             logger.info("Retrieved conversations", extra={"count": len(conversations)})
+            
+            # Return quick-list format if requested
+            if view == "quick-list":
+                quick_result = [QuickListItemResponse(id=conv.id, name=conv.name) for conv in conversations]
+                if use_cache and self.cache_client and not has_filters:
+                    try:
+                        data = [r.model_dump() for r in quick_result]
+                        self.cache_client.client.set(cache_key, data, ttl=300)
+                    except Exception as e:
+                        logger.warning(f"Failed to cache conversation list: {e}")
+                return quick_result
+            
             result = [self._model_to_response(conv) for conv in conversations]
             
             # Cache the result (only when no filters are applied)

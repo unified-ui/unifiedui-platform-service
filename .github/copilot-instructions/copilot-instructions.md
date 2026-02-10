@@ -74,7 +74,7 @@ Read the relevant instruction file **before** working in that area.
 - **Migrations**: `alembic upgrade head` / `alembic revision --autogenerate -m "description"`
 - **Entry point**: `unifiedui/app.py` → `create_app()`
 - **Config**: `unifiedui/core/config.py` → `Settings` (Pydantic-Settings, env vars)
-- **Models**: `unifiedui/core/database/models.py` (~985 lines, includes Notification + RecentVisit + ReActAgent)
+- **Models**: `unifiedui/core/database/models.py` (~1050 lines, includes Notification + RecentVisit + ReActAgent + UserFavorites for all 5 resource types)
 - **Enums**: `unifiedui/core/database/enums.py` (includes NotificationTypeEnum)
 - **Auth middleware**: `unifiedui/core/middleware/apis/v1/auth.py` (4 decorators: `authenticate`, `authenticate_service_key`, `authenticate_autonomous_agent_api_key`, `check_permissions`)
 

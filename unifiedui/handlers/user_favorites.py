@@ -9,7 +9,9 @@ from unifiedui.core.database.client import SQLAlchemyClient
 from unifiedui.core.database.models import (
     ApplicationUserFavorite,
     AutonomousAgentUserFavorite,
-    ConversationUserFavorite
+    ChatWidgetUserFavorite,
+    ConversationUserFavorite,
+    ReActAgentUserFavorite
 )
 from unifiedui.caching.client import CacheClient
 
@@ -32,9 +34,17 @@ RESOURCE_FAVORITE_MAPPING = {
         "model": AutonomousAgentUserFavorite,
         "id_field": "autonomous_agent_id",
     },
+    "chat-widgets": {
+        "model": ChatWidgetUserFavorite,
+        "id_field": "chat_widget_id",
+    },
     "conversations": {
         "model": ConversationUserFavorite,
         "id_field": "conversation_id",
+    },
+    "re-act-agents": {
+        "model": ReActAgentUserFavorite,
+        "id_field": "re_act_agent_id",
     },
 }
 
