@@ -9,12 +9,12 @@ from unifiedui.core.vault.client import BaseVaultClient
 from unifiedui.caching.client import CacheClient
 from unifiedui.handlers.dependencies.database import get_db_client
 from unifiedui.handlers.dependencies.cache import get_cache_client
-from unifiedui.handlers.dependencies.vault import get_vault_client
+from unifiedui.handlers.dependencies.vault import get_secrets_vault
 
 
 def get_credential_handler(
     db_client: SQLAlchemyClient = Depends(get_db_client),
-    vault_client: BaseVaultClient = Depends(get_vault_client),
+    vault_client: BaseVaultClient = Depends(get_secrets_vault),
     cache_client: Optional[CacheClient] = Depends(get_cache_client)
 ) -> CredentialHandler:
     """
