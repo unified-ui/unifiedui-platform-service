@@ -215,9 +215,11 @@ async def get_autonomous_agent(
         Autonomous agent details
     """
     try:
+        user: ContextIdentityUser = request.state.user
         return handler.get_autonomous_agent(
             tenant_id=tenant_id,
-            autonomous_agent_id=autonomous_agent_id
+            autonomous_agent_id=autonomous_agent_id,
+            user=user
         )
     except AutonomousAgentNotFoundError as e:
         raise HTTPException(

@@ -218,7 +218,8 @@ async def get_chat_widget(
         )
         return handler.get_chat_widget(
             tenant_id=tenant_id,
-            chat_widget_id=chat_widget_id
+            chat_widget_id=chat_widget_id,
+            user=user
         )
     except ChatWidgetNotFoundError as e:
         logger.warning(f"Chat widget not found: {e}")

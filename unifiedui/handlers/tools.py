@@ -11,6 +11,7 @@ from unifiedui.core.database.client import SQLAlchemyClient
 from unifiedui.core.database.models import Tool, ToolMember, ToolTag, Tag, Credential
 from unifiedui.core.database.enums import PermissionActionEnum, PrincipalTypeEnum, ToolTypeEnum
 from unifiedui.caching.client import CacheClient
+from unifiedui.handlers.permission_resolver import resolve_my_permissions_bulk, resolve_my_permission, get_principal_ids, check_is_admin
 
 if TYPE_CHECKING:
     from unifiedui.core.identity.users import ContextIdentityUser
@@ -222,7 +223,20 @@ class ToolHandler:
                 return [QuickListItemResponse(id=tool.id, name=tool.name) for tool in tools]
             
             result = [self._model_to_response(tool) for tool in tools]
-            
+
+            if is_admin:
+                for r in result:
+                    r.my_permission = PermissionActionEnum.ADMIN.value
+            else:
+                resource_ids = [r.id for r in result]
+                if resource_ids:
+                    permissions = resolve_my_permissions_bulk(
+                        session, ToolMember, "tool_id",
+                        tenant_id, resource_ids, principal_ids
+                    )
+                    for r in result:
+                        r.my_permission = permissions.get(r.id)
+
             # Cache the result
             if use_cache and self.cache_client and not has_filters:
                 try:
@@ -238,6 +252,7 @@ class ToolHandler:
         self,
         tenant_id: str,
         tool_id: str,
+        user: Optional[ContextIdentityUser] = None,
         use_cache: bool = True
     ) -> ToolResponse:
         """
@@ -246,6 +261,7 @@ class ToolHandler:
         Args:
             tenant_id: The ID of the tenant
             tool_id: The ID of the tool
+            user: Optional user context for permission resolution
             use_cache: Whether to use caching
             
         Returns:
@@ -264,7 +280,13 @@ class ToolHandler:
                 cached_data = self.cache_client.client.get(cache_key)
                 if cached_data is not None:
                     logger.debug("Returning cached tool")
-                    return ToolResponse(**cached_data)
+                    result = ToolResponse(**cached_data)
+                    if user:
+                        with self.db_client.get_session() as session:
+                            result.my_permission = self._resolve_user_permission(
+                                session, tenant_id, tool_id, user
+                            )
+                    return result
             except Exception as e:
                 logger.warning(f"Failed to get cached tool: {e}")
         
@@ -289,6 +311,11 @@ class ToolHandler:
                     logger.debug("Cached tool detail")
                 except Exception as e:
                     logger.warning(f"Failed to cache tool: {e}")
+
+            if user:
+                result.my_permission = self._resolve_user_permission(
+                    session, tenant_id, tool_id, user
+                )
             
             return result
 
@@ -703,6 +730,33 @@ class ToolHandler:
             )
         except ValueError as e:
             raise ToolNotFoundError(str(e)) from e
+
+    def _resolve_user_permission(
+        self,
+        session: object,
+        tenant_id: str,
+        tool_id: str,
+        user: ContextIdentityUser
+    ) -> Optional[str]:
+        """Resolve the user's permission level on a specific tool.
+
+        Args:
+            session: SQLAlchemy session
+            tenant_id: Tenant ID
+            tool_id: Tool ID
+            user: The authenticated user context
+
+        Returns:
+            Permission action string or None
+        """
+        from unifiedui.core.database.enums import TenantRolesEnum
+        if check_is_admin(user, tenant_id, [TenantRolesEnum.GLOBAL_ADMIN, TenantRolesEnum.REACT_AGENT_ADMIN]):
+            return PermissionActionEnum.ADMIN.value
+        principal_ids = get_principal_ids(user)
+        return resolve_my_permission(
+            session, ToolMember, "tool_id",
+            tenant_id, tool_id, principal_ids
+        )
 
     @staticmethod
     def _model_to_response(tool: Tool) -> ToolResponse:

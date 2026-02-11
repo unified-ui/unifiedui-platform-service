@@ -14,6 +14,7 @@ from unifiedui.core.database.enums import PermissionActionEnum, PrincipalTypeEnu
 from unifiedui.core.vault.client import BaseVaultClient
 from unifiedui.caching.client import CacheClient
 from unifiedui.services.agent_service_client import AgentServiceClient
+from unifiedui.handlers.permission_resolver import resolve_my_permissions_bulk, resolve_my_permission, get_principal_ids, check_is_admin
 
 if TYPE_CHECKING:
     from unifiedui.core.identity.users import ContextIdentityUser
@@ -135,9 +136,9 @@ class AutonomousAgentHandler:
         
         is_admin = False
         if matching_tenant:
-            tenant_permissions = matching_tenant.get("permissions", [])
+            user_roles = matching_tenant["roles"]
             is_admin = any(
-                p in tenant_permissions 
+                p in user_roles 
                 for p in [TenantRolesEnum.GLOBAL_ADMIN.value, TenantRolesEnum.AUTONOMOUS_AGENTS_ADMIN.value]
             )
         
@@ -276,7 +277,25 @@ class AutonomousAgentHandler:
             
             # Convert to response models
             responses = [self._model_to_response(agent) for agent in autonomous_agents]
-            
+
+            if is_admin:
+                for r in responses:
+                    r.my_permission = PermissionActionEnum.ADMIN.value
+            else:
+                resource_ids = [r.id for r in responses]
+                if resource_ids:
+                    principal_ids = [user_id]
+                    if identity_group_ids:
+                        principal_ids.extend(identity_group_ids)
+                    if custom_group_ids:
+                        principal_ids.extend(custom_group_ids)
+                    permissions = resolve_my_permissions_bulk(
+                        session, AutonomousAgentMember, "autonomous_agent_id",
+                        tenant_id, resource_ids, principal_ids
+                    )
+                    for r in responses:
+                        r.my_permission = permissions.get(r.id)
+
             # Cache the results (only when no filters are applied)
             if use_cache and self.cache_client and not has_filters:
                 try:
@@ -292,6 +311,7 @@ class AutonomousAgentHandler:
         self,
         tenant_id: str,
         autonomous_agent_id: str,
+        user: Optional[ContextIdentityUser] = None,
         use_cache: bool = True
     ) -> AutonomousAgentResponse:
         """
@@ -300,6 +320,7 @@ class AutonomousAgentHandler:
         Args:
             tenant_id: The ID of the tenant
             autonomous_agent_id: The ID of the autonomous agent
+            user: Optional user context for permission resolution
             use_cache: Whether to use caching
             
         Returns:
@@ -319,7 +340,13 @@ class AutonomousAgentHandler:
                 cached_data = self.cache_client.client.get(cache_key)
                 if cached_data is not None:
                     logger.debug(f"Returning cached autonomous agent {autonomous_agent_id}")
-                    return AutonomousAgentResponse(**cached_data)
+                    result = AutonomousAgentResponse(**cached_data)
+                    if user:
+                        with self.db_client.get_session() as session:
+                            result.my_permission = self._resolve_user_permission(
+                                session, tenant_id, autonomous_agent_id, user
+                            )
+                    return result
             except Exception as e:
                 logger.warning(f"Failed to get cached autonomous agent: {e}")
         
@@ -335,17 +362,22 @@ class AutonomousAgentHandler:
             if not autonomous_agent:
                 raise AutonomousAgentNotFoundError(autonomous_agent_id)
             
-            response = self._model_to_response(autonomous_agent)
+            result = self._model_to_response(autonomous_agent)
             
             # Cache the result
             if use_cache and self.cache_client:
                 try:
-                    self.cache_client.client.set(cache_key, response.model_dump(), ttl=300)
+                    self.cache_client.client.set(cache_key, result.model_dump(), ttl=300)
                     logger.debug(f"Cached autonomous agent {autonomous_agent_id}")
                 except Exception as e:
                     logger.warning(f"Failed to cache autonomous agent: {e}")
+
+            if user:
+                result.my_permission = self._resolve_user_permission(
+                    session, tenant_id, autonomous_agent_id, user
+                )
             
-            return response
+            return result
 
     def get_autonomous_agent_model(
         self,
@@ -1211,6 +1243,23 @@ class AutonomousAgentHandler:
             updated_at=agent.updated_at,
             created_by=agent.created_by,
             updated_by=agent.updated_by
+        )
+
+    def _resolve_user_permission(
+        self,
+        session: object,
+        tenant_id: str,
+        autonomous_agent_id: str,
+        user: ContextIdentityUser
+    ) -> Optional[str]:
+        """Resolve the user's permission level on a specific autonomous agent."""
+        from unifiedui.core.database.enums import TenantRolesEnum
+        if check_is_admin(user, tenant_id, [TenantRolesEnum.GLOBAL_ADMIN, TenantRolesEnum.AUTONOMOUS_AGENTS_ADMIN]):
+            return PermissionActionEnum.ADMIN.value
+        principal_ids = get_principal_ids(user)
+        return resolve_my_permission(
+            session, AutonomousAgentMember, "autonomous_agent_id",
+            tenant_id, autonomous_agent_id, principal_ids
         )
 
     @staticmethod

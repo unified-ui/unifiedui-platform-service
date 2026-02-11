@@ -214,7 +214,8 @@ async def get_conversation(
         )
         return handler.get_conversation(
             tenant_id=tenant_id,
-            conversation_id=conversation_id
+            conversation_id=conversation_id,
+            user=user
         )
     except ConversationNotFoundError as e:
         logger.warning(f"Conversation not found: {e}")

@@ -27,5 +27,6 @@ class ReActAgentResponse(BaseModel):
     updated_at: datetime = Field(..., description="Last update timestamp")
     created_by: Optional[str] = Field(None, description="Creator user ID")
     updated_by: Optional[str] = Field(None, description="Last updater user ID")
+    my_permission: Optional[str] = Field(None, description="User's permission level on this resource")
 
     model_config = ConfigDict(from_attributes=True)

@@ -226,7 +226,8 @@ async def get_application(
         )
         return handler.get_application(
             tenant_id=tenant_id,
-            application_id=application_id
+            application_id=application_id,
+            user=user
         )
     except ApplicationNotFoundError as e:
         logger.warning(f"Application not found: {e}")

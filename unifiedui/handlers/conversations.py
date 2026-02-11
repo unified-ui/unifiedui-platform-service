@@ -11,6 +11,7 @@ from unifiedui.core.database.models import Conversation, ConversationMember, App
 from unifiedui.core.database.enums import PermissionActionEnum, PrincipalTypeEnum, ApplicationTypeEnum
 from unifiedui.caching.client import CacheClient
 from unifiedui.services.agent_service_client import AgentServiceClient
+from unifiedui.handlers.permission_resolver import resolve_my_permissions_bulk, resolve_my_permission, get_principal_ids, check_is_admin
 
 if TYPE_CHECKING:
     from unifiedui.core.identity.users import ContextIdentityUser
@@ -19,6 +20,7 @@ if TYPE_CHECKING:
 from unifiedui.schema.requests.conversations import CreateConversationRequest, UpdateConversationRequest
 from unifiedui.schema.requests.conversation_permissions import SetConversationPermissionRequest
 from unifiedui.schema.responses.conversations import ConversationResponse, ConversationQuickListItemResponse
+from unifiedui.schema.responses.common import QuickListItemResponse
 from unifiedui.schema.responses.principals import (
     PrincipalWithRolesResponse,
     ResourcePrincipalsResponse
@@ -107,9 +109,9 @@ class ConversationHandler:
         
         is_admin = False
         if matching_tenant:
-            tenant_permissions = matching_tenant.get("permissions", matching_tenant.get("roles", []))
+            user_roles = matching_tenant["roles"]
             is_admin = any(
-                p in tenant_permissions 
+                p in user_roles 
                 for p in [TenantRolesEnum.GLOBAL_ADMIN.value, TenantRolesEnum.CONVERSATIONS_ADMIN.value]
             )
         
@@ -204,7 +206,20 @@ class ConversationHandler:
                 return quick_result
             
             result = [self._model_to_response(conv) for conv in conversations]
-            
+
+            if is_admin:
+                for r in result:
+                    r.my_permission = PermissionActionEnum.ADMIN.value
+            else:
+                resource_ids = [r.id for r in result]
+                if resource_ids:
+                    permissions = resolve_my_permissions_bulk(
+                        session, ConversationMember, "conversation_id",
+                        tenant_id, resource_ids, principal_ids
+                    )
+                    for r in result:
+                        r.my_permission = permissions.get(r.id)
+
             # Cache the result (only when no filters are applied)
             if use_cache and self.cache_client and not has_filters:
                 try:
@@ -220,6 +235,7 @@ class ConversationHandler:
         self,
         tenant_id: str,
         conversation_id: str,
+        user: Optional[ContextIdentityUser] = None,
         use_cache: bool = True
     ) -> ConversationResponse:
         """
@@ -228,6 +244,7 @@ class ConversationHandler:
         Args:
             tenant_id: The ID of the tenant
             conversation_id: The ID of the conversation
+            user: Optional user context for permission resolution
             use_cache: Whether to use caching
             
         Returns:
@@ -247,7 +264,13 @@ class ConversationHandler:
                 cached_data = self.cache_client.client.get(cache_key)
                 if cached_data is not None:
                     logger.debug(f"Returning cached conversation")
-                    return ConversationResponse(**cached_data)
+                    result = ConversationResponse(**cached_data)
+                    if user:
+                        with self.db_client.get_session() as session:
+                            result.my_permission = self._resolve_user_permission(
+                                session, tenant_id, conversation_id, user
+                            )
+                    return result
             except Exception as e:
                 logger.warning(f"Failed to get cached conversation: {e}")
         
@@ -270,6 +293,11 @@ class ConversationHandler:
                     logger.debug(f"Cached conversation detail")
                 except Exception as e:
                     logger.warning(f"Failed to cache conversation: {e}")
+
+            if user:
+                result.my_permission = self._resolve_user_permission(
+                    session, tenant_id, conversation_id, user
+                )
             
             return result
 
@@ -712,6 +740,33 @@ class ConversationHandler:
             )
         except ValueError as e:
             raise ConversationNotFoundError(str(e)) from e
+
+    def _resolve_user_permission(
+        self,
+        session: object,
+        tenant_id: str,
+        conversation_id: str,
+        user: ContextIdentityUser
+    ) -> Optional[str]:
+        """Resolve the user's permission level on a specific conversation.
+
+        Args:
+            session: SQLAlchemy session
+            tenant_id: Tenant ID
+            conversation_id: Conversation ID
+            user: The authenticated user context
+
+        Returns:
+            Permission action string or None
+        """
+        from unifiedui.core.database.enums import TenantRolesEnum
+        if check_is_admin(user, tenant_id, [TenantRolesEnum.GLOBAL_ADMIN, TenantRolesEnum.CONVERSATIONS_ADMIN]):
+            return PermissionActionEnum.ADMIN.value
+        principal_ids = get_principal_ids(user)
+        return resolve_my_permission(
+            session, ConversationMember, "conversation_id",
+            tenant_id, conversation_id, principal_ids
+        )
 
     @staticmethod
     def _model_to_response(conversation: Conversation) -> ConversationResponse:

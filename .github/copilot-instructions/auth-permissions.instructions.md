@@ -142,3 +142,64 @@ Service keys are stored in the **app vault** and resolved via `app_vault.build_s
 - `X-Use-Cache: true` (default) — ContextIdentityUser uses Redis cache for tenants/groups
 - `X-Use-Cache: false` — Forces fresh DB queries for user context
 - **Tests always use `use_cache=False`** except for caching-specific tests
+
+---
+
+## Permission Resolver (`my_permission`)
+
+**File**: `unifiedui/handlers/permission_resolver.py`
+
+Returns the calling user's effective permission on each resource in API responses. Every resource response schema includes `my_permission: Optional[str]` (`'ADMIN'` | `'WRITE'` | `'READ'` | `None`).
+
+### Functions
+
+| Function | Purpose |
+|----------|---------|
+| `get_principal_ids(user, db, tenant_id)` | Collects all principal IDs for the user (user_id + identity groups + custom groups) |
+| `check_is_admin(user, tenant_id, resource_type)` | Checks tenant-level admin bypass (GLOBAL_ADMIN or {RESOURCE}_ADMIN) |
+| `resolve_my_permission(db, member_model, resource_id, principal_ids, is_admin)` | Resolves the highest permission for a single resource |
+| `resolve_my_permissions_bulk(db, member_model, resource_ids, principal_ids, is_admin)` | Resolves permissions for multiple resources in a single query |
+
+### Resolution Logic
+
+1. If `is_admin` → return `'ADMIN'` immediately
+2. Query `{resource}_members` table for matching `principal_id` + `resource_id`
+3. Return the highest permission found (`ADMIN` > `WRITE` > `READ`)
+4. If no membership → return `None`
+
+### Usage in Handlers
+
+```python
+principal_ids = await get_principal_ids(user, db, tenant_id)
+is_admin = check_is_admin(user, tenant_id, "application")
+
+# Single resource
+my_perm = resolve_my_permission(db, ApplicationMember, app.id, principal_ids, is_admin)
+
+# Bulk (list endpoints)
+perms = resolve_my_permissions_bulk(db, ApplicationMember, app_ids, principal_ids, is_admin)
+```
+
+### Response Schema
+
+All 7 RBAC resource response schemas include:
+
+```python
+class ApplicationResponse(BaseModel):
+    # ... other fields ...
+    my_permission: Optional[str] = None
+```
+
+### Supported Resources
+
+Application, AutonomousAgent, ChatWidget, ReActAgent, Conversation, Credential, Tool.
+
+### Adding New Roles
+
+When adding new `TenantPermissionEnum` roles:
+
+1. Add the enum value in `core/database/enums.py`
+2. Create an Alembic migration
+3. Update `permission_resolver.py` if the role affects `check_is_admin` logic
+4. Update the **frontend** `usePermissions.ts` hook (CREATOR_ROLES, ADMIN_ROLES maps) and `api/types.ts` (`TenantPermissionEnum`)
+5. Document the new role in both platform and frontend instruction files

@@ -200,7 +200,8 @@ async def get_tool(
         )
         return handler.get_tool(
             tenant_id=tenant_id,
-            tool_id=tool_id
+            tool_id=tool_id,
+            user=user
         )
     except ToolNotFoundError as e:
         logger.warning(f"Tool not found: {e}")

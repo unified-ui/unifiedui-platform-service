@@ -127,5 +127,6 @@ After completing work, evaluate whether documentation needs updating. Full rules
 - New auth pattern → update `auth-permissions.instructions.md`
 - New infrastructure component → update `infrastructure.instructions.md`
 - New test pattern → update `testing.instructions.md`
+- **New tenant role added** → update `core/database/enums.py`, create Alembic migration, update `permission_resolver.py` if needed, update `auth-permissions.instructions.md`, and notify frontend-service to update `usePermissions.ts`, `api/types.ts`, and `ui-patterns.instructions.md`
 
 **Never update docs for:** bug fixes, simple field changes, one-off endpoint tweaks.

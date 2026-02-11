@@ -173,7 +173,8 @@ async def get_re_act_agent(
         )
         return handler.get_re_act_agent(
             tenant_id=tenant_id,
-            re_act_agent_id=re_act_agent_id
+            re_act_agent_id=re_act_agent_id,
+            user=user
         )
     except ReActAgentNotFoundError as e:
         logger.warning(f"ReACT agent not found: {e}")

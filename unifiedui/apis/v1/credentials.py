@@ -220,7 +220,8 @@ async def get_credential(
         )
         return handler.get_credential(
             tenant_id=tenant_id,
-            credential_id=credential_id
+            credential_id=credential_id,
+            user=user
         )
     except CredentialNotFoundError as e:
         logger.warning(f"Credential not found: {e}")

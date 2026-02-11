@@ -9,7 +9,9 @@ from sqlalchemy.orm import selectinload
 
 from unifiedui.core.database.client import SQLAlchemyClient
 from unifiedui.core.database.models import ReActAgent, ReActAgentMember, ReActAgentTag
+from unifiedui.core.database.enums import PermissionActionEnum
 from unifiedui.caching.client import CacheClient
+from unifiedui.handlers.permission_resolver import resolve_my_permissions_bulk, resolve_my_permission, get_principal_ids, check_is_admin
 
 if TYPE_CHECKING:
     from unifiedui.core.identity.users import ContextIdentityUser
@@ -203,6 +205,19 @@ class ReActAgentHandler:
 
             result = [self._model_to_response(agent) for agent in agents]
 
+            if is_admin:
+                for r in result:
+                    r.my_permission = PermissionActionEnum.ADMIN.value
+            else:
+                resource_ids = [r.id for r in result]
+                if resource_ids:
+                    permissions = resolve_my_permissions_bulk(
+                        session, ReActAgentMember, "re_act_agent_id",
+                        tenant_id, resource_ids, principal_ids
+                    )
+                    for r in result:
+                        r.my_permission = permissions.get(r.id)
+
             if use_cache and self.cache_client and not has_filters:
                 try:
                     data = [r.model_dump() for r in result]
@@ -217,6 +232,7 @@ class ReActAgentHandler:
         self,
         tenant_id: str,
         re_act_agent_id: str,
+        user: Optional[ContextIdentityUser] = None,
         use_cache: bool = True
     ) -> ReActAgentResponse:
         """Get a specific ReACT agent by ID.
@@ -224,6 +240,7 @@ class ReActAgentHandler:
         Args:
             tenant_id: Tenant ID for scoping
             re_act_agent_id: ReACT agent ID
+            user: Optional authenticated user context for permission resolution
             use_cache: Whether to use cache
 
         Returns:
@@ -238,7 +255,13 @@ class ReActAgentHandler:
                 cached_data = self.cache_client.client.get(cache_key)
                 if cached_data is not None:
                     logger.debug("Returning cached ReACT agent")
-                    return ReActAgentResponse(**cached_data)
+                    result = ReActAgentResponse(**cached_data)
+                    if user:
+                        with self.db_client.get_session() as session:
+                            result.my_permission = self._resolve_user_permission(
+                                session, tenant_id, re_act_agent_id, user
+                            )
+                    return result
             except Exception as e:
                 logger.warning(f"Failed to get cached ReACT agent: {e}")
 
@@ -262,6 +285,11 @@ class ReActAgentHandler:
                     logger.debug("Cached ReACT agent detail")
                 except Exception as e:
                     logger.warning(f"Failed to cache ReACT agent: {e}")
+
+            if user:
+                result.my_permission = self._resolve_user_permission(
+                    session, tenant_id, re_act_agent_id, user
+                )
 
             return result
 
@@ -656,6 +684,33 @@ class ReActAgentHandler:
             )
         except ValueError as e:
             raise ReActAgentNotFoundError(str(e)) from e
+
+    def _resolve_user_permission(
+        self,
+        session: object,
+        tenant_id: str,
+        re_act_agent_id: str,
+        user: ContextIdentityUser
+    ) -> Optional[str]:
+        """Resolve the user's permission level on a specific ReACT agent.
+
+        Args:
+            session: SQLAlchemy session
+            tenant_id: Tenant ID
+            re_act_agent_id: ReACT agent ID
+            user: The authenticated user context
+
+        Returns:
+            Permission action string or None
+        """
+        from unifiedui.core.database.enums import TenantRolesEnum
+        if check_is_admin(user, tenant_id, [TenantRolesEnum.GLOBAL_ADMIN, TenantRolesEnum.REACT_AGENT_ADMIN]):
+            return PermissionActionEnum.ADMIN.value
+        principal_ids = get_principal_ids(user)
+        return resolve_my_permission(
+            session, ReActAgentMember, "re_act_agent_id",
+            tenant_id, re_act_agent_id, principal_ids
+        )
 
     @staticmethod
     def _model_to_response(agent: ReActAgent) -> ReActAgentResponse:

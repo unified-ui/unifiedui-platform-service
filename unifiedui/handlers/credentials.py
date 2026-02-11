@@ -12,6 +12,7 @@ from unifiedui.core.database.models import Credential, CredentialMember, Credent
 from unifiedui.core.database.enums import PermissionActionEnum, PrincipalTypeEnum
 from unifiedui.core.vault.client import BaseVaultClient
 from unifiedui.caching.client import CacheClient
+from unifiedui.handlers.permission_resolver import resolve_my_permissions_bulk, resolve_my_permission, get_principal_ids, check_is_admin
 
 if TYPE_CHECKING:
     from unifiedui.core.identity.users import ContextIdentityUser
@@ -224,7 +225,20 @@ class CredentialHandler:
                 return [QuickListItemResponse(id=cred.id, name=cred.name) for cred in credentials]
             
             result = [self._model_to_response(cred) for cred in credentials]
-            
+
+            if is_admin:
+                for r in result:
+                    r.my_permission = PermissionActionEnum.ADMIN.value
+            else:
+                resource_ids = [r.id for r in result]
+                if resource_ids:
+                    permissions = resolve_my_permissions_bulk(
+                        session, CredentialMember, "credential_id",
+                        tenant_id, resource_ids, principal_ids
+                    )
+                    for r in result:
+                        r.my_permission = permissions.get(r.id)
+
             # Cache the result (only when no filters are applied)
             if self.cache_client and not has_filters:
                 try:
@@ -240,6 +254,7 @@ class CredentialHandler:
         self,
         tenant_id: str,
         credential_id: str,
+        user: Optional[ContextIdentityUser] = None,
         use_cache: bool = True
     ) -> CredentialResponse:
         """
@@ -248,6 +263,7 @@ class CredentialHandler:
         Args:
             tenant_id: The ID of the tenant
             credential_id: The ID of the credential
+            user: Optional user context for permission resolution
             use_cache: Whether to use caching
             
         Returns:
@@ -267,7 +283,13 @@ class CredentialHandler:
                 cached_data = self.cache_client.client.get(cache_key)
                 if cached_data is not None:
                     logger.debug(f"Returning cached credential {credential_id}")
-                    return CredentialResponse(**cached_data)
+                    result = CredentialResponse(**cached_data)
+                    if user:
+                        with self.db_client.get_session() as session:
+                            result.my_permission = self._resolve_user_permission(
+                                session, tenant_id, credential_id, user
+                            )
+                    return result
             except Exception as e:
                 logger.warning(f"Failed to get cached credential: {e}")
         
@@ -294,6 +316,11 @@ class CredentialHandler:
                     logger.debug(f"Cached credential {credential_id} (TTL: 60s)")
                 except Exception as e:
                     logger.warning(f"Failed to cache credential: {e}")
+
+            if user:
+                result.my_permission = self._resolve_user_permission(
+                    session, tenant_id, credential_id, user
+                )
             
             return result
 
@@ -804,6 +831,33 @@ class CredentialHandler:
             )
         except ValueError as e:
             raise CredentialNotFoundError(str(e)) from e
+
+    def _resolve_user_permission(
+        self,
+        session: object,
+        tenant_id: str,
+        credential_id: str,
+        user: ContextIdentityUser
+    ) -> Optional[str]:
+        """Resolve the user's permission level on a specific credential.
+
+        Args:
+            session: SQLAlchemy session
+            tenant_id: Tenant ID
+            credential_id: Credential ID
+            user: The authenticated user context
+
+        Returns:
+            Permission action string or None
+        """
+        from unifiedui.core.database.enums import TenantRolesEnum
+        if check_is_admin(user, tenant_id, [TenantRolesEnum.GLOBAL_ADMIN, TenantRolesEnum.CREDENTIALS_ADMIN]):
+            return PermissionActionEnum.ADMIN.value
+        principal_ids = get_principal_ids(user)
+        return resolve_my_permission(
+            session, CredentialMember, "credential_id",
+            tenant_id, credential_id, principal_ids
+        )
 
     @staticmethod
     def _model_to_response(credential: Credential) -> CredentialResponse:

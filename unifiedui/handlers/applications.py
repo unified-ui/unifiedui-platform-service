@@ -12,6 +12,7 @@ from unifiedui.core.database.models import Application, ApplicationMember, Appli
 from unifiedui.core.database.enums import PermissionActionEnum, PrincipalTypeEnum, ApplicationTypeEnum
 from unifiedui.caching.client import CacheClient
 from unifiedui.core.vault.client import BaseVaultClient
+from unifiedui.handlers.permission_resolver import resolve_my_permissions_bulk, resolve_my_permission, get_principal_ids, check_is_admin
 
 if TYPE_CHECKING:
     from unifiedui.core.identity.users import ContextIdentityUser
@@ -226,7 +227,20 @@ class ApplicationHandler:
                 return [QuickListItemResponse(id=app.id, name=app.name) for app in applications]
             
             result = [self._model_to_response(app) for app in applications]
-            
+
+            if is_admin:
+                for r in result:
+                    r.my_permission = PermissionActionEnum.ADMIN.value
+            else:
+                resource_ids = [r.id for r in result]
+                if resource_ids:
+                    permissions = resolve_my_permissions_bulk(
+                        session, ApplicationMember, "application_id",
+                        tenant_id, resource_ids, principal_ids
+                    )
+                    for r in result:
+                        r.my_permission = permissions.get(r.id)
+
             # Cache the result (only when no filters are applied)
             if use_cache and self.cache_client and not has_filters:
                 try:
@@ -242,6 +256,7 @@ class ApplicationHandler:
         self,
         tenant_id: str,
         application_id: str,
+        user: Optional[ContextIdentityUser] = None,
         use_cache: bool = True
     ) -> ApplicationResponse:
         """
@@ -250,6 +265,7 @@ class ApplicationHandler:
         Args:
             tenant_id: The ID of the tenant
             application_id: The ID of the application
+            user: Optional user context for permission resolution
             use_cache: Whether to use caching
             
         Returns:
@@ -269,7 +285,13 @@ class ApplicationHandler:
                 cached_data = self.cache_client.client.get(cache_key)
                 if cached_data is not None:
                     logger.debug(f"Returning cached application")
-                    return ApplicationResponse(**cached_data)
+                    result = ApplicationResponse(**cached_data)
+                    if user:
+                        with self.db_client.get_session() as session:
+                            result.my_permission = self._resolve_user_permission(
+                                session, tenant_id, application_id, user
+                            )
+                    return result
             except Exception as e:
                 logger.warning(f"Failed to get cached application: {e}")
         
@@ -294,6 +316,11 @@ class ApplicationHandler:
                     logger.debug(f"Cached application detail")
                 except Exception as e:
                     logger.warning(f"Failed to cache application: {e}")
+
+            if user:
+                result.my_permission = self._resolve_user_permission(
+                    session, tenant_id, application_id, user
+                )
             
             return result
 
@@ -953,4 +980,31 @@ class ApplicationHandler:
             updated_at=application.updated_at,
             created_by=application.created_by,
             updated_by=application.updated_by
+        )
+
+    def _resolve_user_permission(
+        self,
+        session: object,
+        tenant_id: str,
+        application_id: str,
+        user: ContextIdentityUser
+    ) -> Optional[str]:
+        """Resolve the user's permission level on a specific application.
+
+        Args:
+            session: SQLAlchemy session
+            tenant_id: Tenant ID
+            application_id: Application ID
+            user: The authenticated user context
+
+        Returns:
+            Permission action string or None
+        """
+        from unifiedui.core.database.enums import TenantRolesEnum
+        if check_is_admin(user, tenant_id, [TenantRolesEnum.GLOBAL_ADMIN, TenantRolesEnum.APPLICATIONS_ADMIN]):
+            return PermissionActionEnum.ADMIN.value
+        principal_ids = get_principal_ids(user)
+        return resolve_my_permission(
+            session, ApplicationMember, "application_id",
+            tenant_id, application_id, principal_ids
         )
