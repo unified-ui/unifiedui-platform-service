@@ -85,6 +85,12 @@ class Settings(BaseSettings):
         "Cache-Control",
     ]
     
+    # Identity / Token Validation
+    identity_client_id: Optional[str] = None
+    identity_jwks_url: str = "https://login.microsoftonline.com/common/discovery/v2.0/keys"
+    identity_token_algorithms: list[str] = ["RS256"]
+    identity_verify_signature: bool = True
+    
     # Logging Configuration
     log_level: str = "INFO"
     
