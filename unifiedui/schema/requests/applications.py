@@ -13,6 +13,7 @@ class CreateApplicationRequest(BaseModel):
     type: ApplicationTypeEnum = Field(..., description="Application type (N8N, MICROSOFT_FOUNDRY, REST_API)")
     config: Optional[dict] = Field(default_factory=dict, description="Application configuration")
     is_active: bool = Field(False, description="Whether the application is active")
+    embed_allowed_origins: Optional[str] = Field(None, max_length=2000, description="Semicolon-separated list of allowed origins for embed iframe")
 
 
 class UpdateApplicationRequest(BaseModel):
@@ -23,3 +24,4 @@ class UpdateApplicationRequest(BaseModel):
     type: Optional[ApplicationTypeEnum] = Field(None, description="Application type (N8N, MICROSOFT_FOUNDRY, REST_API)")
     config: Optional[dict] = Field(None, description="Application configuration")
     is_active: Optional[bool] = Field(None, description="Whether the application is active")
+    embed_allowed_origins: Optional[str] = Field(None, max_length=2000, description="Semicolon-separated list of allowed origins for embed iframe")

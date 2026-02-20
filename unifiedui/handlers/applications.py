@@ -369,6 +369,7 @@ class ApplicationHandler:
                 type=request.type.value,
                 config=validated_config,
                 is_active=request.is_active,
+                embed_allowed_origins=request.embed_allowed_origins,
                 created_by=user_id,
                 updated_by=user_id
             )
@@ -451,6 +452,8 @@ class ApplicationHandler:
                 application.config = validated_config
             if request.is_active is not None:
                 application.is_active = request.is_active
+            if request.embed_allowed_origins is not None:
+                application.embed_allowed_origins = request.embed_allowed_origins
             
             application.updated_by = user_id
             
@@ -974,6 +977,7 @@ class ApplicationHandler:
             description=application.description,
             type=application.type,
             is_active=application.is_active,
+            embed_allowed_origins=application.embed_allowed_origins,
             config=application.config,
             tags=tags,
             created_at=application.created_at,

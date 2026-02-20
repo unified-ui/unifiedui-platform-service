@@ -17,6 +17,7 @@ class ApplicationResponse(BaseModel):
     type: ApplicationTypeEnum = Field(..., description="Application type")
     config: dict = Field(default_factory=dict, description="Application configuration")
     is_active: bool = Field(..., description="Whether the application is active")
+    embed_allowed_origins: Optional[str] = Field(None, description="Semicolon-separated list of allowed origins for embed iframe")
     tags: List[TagSummary] = Field(default_factory=list, description="Tags on the application")
     created_at: datetime = Field(..., description="Creation timestamp")
     updated_at: datetime = Field(..., description="Last update timestamp")

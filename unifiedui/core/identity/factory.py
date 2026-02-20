@@ -95,7 +95,10 @@ class IdentityTokenFactory:
             verified_claims = verifier.verify_and_decode(token)
             return ExtraIDIdentityTokenSerializer(token, verified_claims)
 
-        logger.warning("Token signature verification is DISABLED — not recommended for production")
+        logger.debug(
+            "Token signature verification is disabled — "
+            "expected when using delegated Microsoft Graph access tokens"
+        )
         unverified_claims: dict = jwt.decode(token, options={"verify_signature": False})
 
         exp = unverified_claims.get("exp")

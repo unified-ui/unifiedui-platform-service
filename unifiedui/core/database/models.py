@@ -278,6 +278,7 @@ class Application(Base, IdNameDescriptionMixin, TenantScopedMixin):
     type: Mapped[str] = mapped_column(ApplicationTypeSAEnum, nullable=False)
     config: Mapped[dict] = mapped_column(PortableJSON, nullable=False, default=dict)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    embed_allowed_origins: Mapped[Optional[str]] = mapped_column(String(2000), nullable=True, default=None)
 
     members: Mapped[list["ApplicationMember"]] = relationship(
         back_populates="application", cascade="all, delete-orphan"
