@@ -13,9 +13,7 @@ ENDPOINT_ORGANIZATIONS = "/api/v1/platform-service/organizations"
 ENDPOINT_ORGANIZATION_DETAIL = "/api/v1/platform-service/organizations/{organization_id}"
 ENDPOINT_ORGANIZATION_MEMBERS = "/api/v1/platform-service/organizations/{organization_id}/members"
 ENDPOINT_ORGANIZATION_TENANTS = "/api/v1/platform-service/organizations/{organization_id}/tenants"
-ENDPOINT_ORGANIZATION_TENANT_DETAIL = (
-    "/api/v1/platform-service/organizations/{organization_id}/tenants/{tenant_id}"
-)
+ENDPOINT_ORGANIZATION_TENANT_DETAIL = "/api/v1/platform-service/organizations/{organization_id}/tenants/{tenant_id}"
 
 # Common Test IDs
 NON_EXISTENT_ID = "non-existent-id"
@@ -73,9 +71,7 @@ class TestOrganizationRBAC:
 
     def test_unauthenticated_cannot_get_org(self, test_client: TestClient) -> None:
         """Test that unauthenticated users cannot get an organization."""
-        response = test_client.get(
-            ENDPOINT_ORGANIZATION_DETAIL.format(organization_id="some-org-id")
-        )
+        response = test_client.get(ENDPOINT_ORGANIZATION_DETAIL.format(organization_id="some-org-id"))
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
     def test_unauthenticated_cannot_update_org(self, test_client: TestClient) -> None:
@@ -88,9 +84,7 @@ class TestOrganizationRBAC:
 
     def test_unauthenticated_cannot_list_members(self, test_client: TestClient) -> None:
         """Test that unauthenticated users cannot list org members."""
-        response = test_client.get(
-            ENDPOINT_ORGANIZATION_MEMBERS.format(organization_id="some-org-id")
-        )
+        response = test_client.get(ENDPOINT_ORGANIZATION_MEMBERS.format(organization_id="some-org-id"))
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
     def test_unauthenticated_cannot_set_member(self, test_client: TestClient) -> None:
@@ -120,9 +114,7 @@ class TestOrganizationRBAC:
 
     def test_unauthenticated_cannot_list_tenants(self, test_client: TestClient) -> None:
         """Test that unauthenticated users cannot list org tenants."""
-        response = test_client.get(
-            ENDPOINT_ORGANIZATION_TENANTS.format(organization_id="some-org-id")
-        )
+        response = test_client.get(ENDPOINT_ORGANIZATION_TENANTS.format(organization_id="some-org-id"))
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
     def test_unauthenticated_cannot_create_tenant(self, test_client: TestClient) -> None:
@@ -137,9 +129,7 @@ class TestOrganizationRBAC:
         """Test that unauthenticated users cannot delete org tenants."""
         response = test_client.request(
             "DELETE",
-            ENDPOINT_ORGANIZATION_TENANT_DETAIL.format(
-                organization_id="some-org-id", tenant_id="some-tenant"
-            ),
+            ENDPOINT_ORGANIZATION_TENANT_DETAIL.format(organization_id="some-org-id", tenant_id="some-tenant"),
         )
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
@@ -151,9 +141,7 @@ class TestOrganizationRBAC:
         org = _create_org(test_client, headers, identity_tenant_id="rbac-idp-creator")
 
         # Verify creator has GLOBAL_ADMIN
-        members_resp = test_client.get(
-            ENDPOINT_ORGANIZATION_MEMBERS.format(organization_id=org["id"]), headers=headers
-        )
+        members_resp = test_client.get(ENDPOINT_ORGANIZATION_MEMBERS.format(organization_id=org["id"]), headers=headers)
         assert members_resp.status_code == status.HTTP_200_OK
 
         members = members_resp.json()["members"]
@@ -164,23 +152,17 @@ class TestOrganizationRBAC:
 
     def test_creator_gets_global_admin_on_default_tenant(self, test_client: TestClient) -> None:
         """Test that org creator gets GLOBAL_ADMIN on the auto-created default tenant."""
-        from unifiedui.core.database.enums import TenantRolesEnum
-
         user_token = test_client.create_test_user("rbac-def-tenant-1", "RBAC Def Tenant")
         headers = create_auth_headers(user_token, use_cache=False)
 
         org = _create_org(test_client, headers, identity_tenant_id="rbac-idp-def-tenant", slug="rbac-def-tenant")
 
         # Get default tenant
-        tenants_resp = test_client.get(
-            ENDPOINT_ORGANIZATION_TENANTS.format(organization_id=org["id"]), headers=headers
-        )
+        tenants_resp = test_client.get(ENDPOINT_ORGANIZATION_TENANTS.format(organization_id=org["id"]), headers=headers)
         default_tenant = tenants_resp.json()[0]
 
         # The user should be able to access the default tenant via normal tenant routes
         # since they were assigned GLOBAL_ADMIN on it
-        from tests.conftest import create_auth_headers as cah
-
         tenant_detail_resp = test_client.get(
             f"/api/v1/platform-service/tenants/{default_tenant['id']}", headers=headers
         )
@@ -228,15 +210,21 @@ class TestOrganizationRBAC:
 
         # User 1 creates org
         org1 = _create_org(
-            test_client, headers1,
-            name="User1 Org", slug="user1-org", identity_tenant_id="rbac-idp-u1",
+            test_client,
+            headers1,
+            name="User1 Org",
+            slug="user1-org",
+            identity_tenant_id="rbac-idp-u1",
         )
         assert org1["created_by"] == "rbac-user-1"
 
         # User 2 creates org
         org2 = _create_org(
-            test_client, headers2,
-            name="User2 Org", slug="user2-org", identity_tenant_id="rbac-idp-u2",
+            test_client,
+            headers2,
+            name="User2 Org",
+            slug="user2-org",
+            identity_tenant_id="rbac-idp-u2",
         )
         assert org2["created_by"] == "rbac-user-2"
 
@@ -252,9 +240,7 @@ class TestOrganizationRBAC:
         org_id = org["id"]
 
         # Get org
-        resp_get = test_client.get(
-            ENDPOINT_ORGANIZATION_DETAIL.format(organization_id=org_id), headers=headers
-        )
+        resp_get = test_client.get(ENDPOINT_ORGANIZATION_DETAIL.format(organization_id=org_id), headers=headers)
         assert resp_get.status_code == status.HTTP_200_OK
 
         # Update org
@@ -266,9 +252,7 @@ class TestOrganizationRBAC:
         assert resp_upd.status_code == status.HTTP_200_OK
 
         # List members
-        resp_mem = test_client.get(
-            ENDPOINT_ORGANIZATION_MEMBERS.format(organization_id=org_id), headers=headers
-        )
+        resp_mem = test_client.get(ENDPOINT_ORGANIZATION_MEMBERS.format(organization_id=org_id), headers=headers)
         assert resp_mem.status_code == status.HTTP_200_OK
 
         # Set member
@@ -289,9 +273,7 @@ class TestOrganizationRBAC:
         assert resp_del.status_code == status.HTTP_204_NO_CONTENT
 
         # List tenants
-        resp_ten = test_client.get(
-            ENDPOINT_ORGANIZATION_TENANTS.format(organization_id=org_id), headers=headers
-        )
+        resp_ten = test_client.get(ENDPOINT_ORGANIZATION_TENANTS.format(organization_id=org_id), headers=headers)
         assert resp_ten.status_code == status.HTTP_200_OK
 
         # Create tenant
@@ -317,8 +299,10 @@ class TestOrganizationRBAC:
         admin_headers = create_auth_headers(admin_token, use_cache=False)
 
         org = _create_org(
-            test_client, admin_headers,
-            identity_tenant_id="rbac-idp-flow", slug="rbac-flow",
+            test_client,
+            admin_headers,
+            identity_tenant_id="rbac-idp-flow",
+            slug="rbac-flow",
         )
         org_id = org["id"]
 
@@ -346,9 +330,7 @@ class TestOrganizationRBAC:
         members_resp = test_client.get(
             ENDPOINT_ORGANIZATION_MEMBERS.format(organization_id=org_id), headers=admin_headers
         )
-        flow_member = next(
-            (m for m in members_resp.json()["members"] if m["principal_id"] == "flow-user"), None
-        )
+        flow_member = next((m for m in members_resp.json()["members"] if m["principal_id"] == "flow-user"), None)
         assert flow_member is not None
         roles = [r["role"] for r in flow_member["roles"]]
         assert ROLE_ORG_MEMBER in roles
@@ -367,9 +349,7 @@ class TestOrganizationRBAC:
         members_resp2 = test_client.get(
             ENDPOINT_ORGANIZATION_MEMBERS.format(organization_id=org_id), headers=admin_headers
         )
-        flow_member2 = next(
-            (m for m in members_resp2.json()["members"] if m["principal_id"] == "flow-user"), None
-        )
+        flow_member2 = next((m for m in members_resp2.json()["members"] if m["principal_id"] == "flow-user"), None)
         assert flow_member2 is not None
         roles2 = [r["role"] for r in flow_member2["roles"]]
         assert ROLE_ORG_MEMBER not in roles2
@@ -381,21 +361,19 @@ class TestOrganizationRBAC:
         headers = create_auth_headers(user_token, use_cache=False)
 
         org = _create_org(
-            test_client, headers,
-            identity_tenant_id="rbac-idp-nodeldef", slug="rbac-nodeldef",
+            test_client,
+            headers,
+            identity_tenant_id="rbac-idp-nodeldef",
+            slug="rbac-nodeldef",
         )
         org_id = org["id"]
 
-        tenants_resp = test_client.get(
-            ENDPOINT_ORGANIZATION_TENANTS.format(organization_id=org_id), headers=headers
-        )
+        tenants_resp = test_client.get(ENDPOINT_ORGANIZATION_TENANTS.format(organization_id=org_id), headers=headers)
         default_tenant = next(t for t in tenants_resp.json() if t["is_default"])
 
         response = test_client.request(
             "DELETE",
-            ENDPOINT_ORGANIZATION_TENANT_DETAIL.format(
-                organization_id=org_id, tenant_id=default_tenant["id"]
-            ),
+            ENDPOINT_ORGANIZATION_TENANT_DETAIL.format(organization_id=org_id, tenant_id=default_tenant["id"]),
             headers=headers,
         )
         assert response.status_code == status.HTTP_403_FORBIDDEN
@@ -406,8 +384,10 @@ class TestOrganizationRBAC:
         headers = create_auth_headers(user_token, use_cache=False)
 
         org = _create_org(
-            test_client, headers,
-            identity_tenant_id="rbac-idp-delok", slug="rbac-delok",
+            test_client,
+            headers,
+            identity_tenant_id="rbac-idp-delok",
+            slug="rbac-delok",
         )
         org_id = org["id"]
 
@@ -431,8 +411,10 @@ class TestOrganizationRBAC:
         headers = create_auth_headers(user_token, use_cache=False)
 
         org = _create_org(
-            test_client, headers,
-            identity_tenant_id="rbac-idp-grp", slug="rbac-grp",
+            test_client,
+            headers,
+            identity_tenant_id="rbac-idp-grp",
+            slug="rbac-grp",
         )
         org_id = org["id"]
 

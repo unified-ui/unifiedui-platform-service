@@ -15,7 +15,6 @@ from unifiedui.core.database.models import (
     ConversationMember,
     CredentialMember,
     CustomGroupMember,
-    OrganizationMember,
     ReActAgentMember,
     Tag,
     ToolMember,

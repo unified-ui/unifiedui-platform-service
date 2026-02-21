@@ -8,8 +8,8 @@ from typing import TYPE_CHECKING
 from sqlalchemy import select
 
 from unifiedui.core.database.models import Principal, Tenant, TenantMember
-from unifiedui.exc.tenants import TenantNotFoundError
 from unifiedui.exc.organizations import TenantCannotBeDeletedError
+from unifiedui.exc.tenants import TenantNotFoundError
 from unifiedui.handlers.principals_helper import ensure_principal_exists
 from unifiedui.logger import get_logger
 from unifiedui.schema.responses.tenants import TenantResponse
