@@ -144,6 +144,31 @@ class AIModelProviderEnum(StrEnum):
         return [p.value for p in AIModelProviderEnum]
 
 
+class OrganizationRoleEnum(StrEnum):
+    """Organization-level roles."""
+
+    ORGANISATION_GLOBAL_ADMIN = "ORGANISATION_GLOBAL_ADMIN"
+    ORGANISATION_ADMIN = "ORGANISATION_ADMIN"
+    ORGANISATION_TENANT_ADMIN = "ORGANISATION_TENANT_ADMIN"
+    ORGANISATION_TENANT_CREATOR = "ORGANISATION_TENANT_CREATOR"
+    ORGANISATION_MEMBER = "ORGANISATION_MEMBER"
+
+    @classmethod
+    def all(cls) -> list[str]:
+        return [role.value for role in OrganizationRoleEnum]
+
+
+class EnvironmentTypeEnum(StrEnum):
+    """Tenant environment types."""
+
+    SANDBOX = "SANDBOX"
+    PRODUCTION = "PRODUCTION"
+
+    @classmethod
+    def all(cls) -> list[str]:
+        return [env.value for env in EnvironmentTypeEnum]
+
+
 class AIModelPurposeGroupEnum(StrEnum):
     """Supported AI model purpose groups."""
 

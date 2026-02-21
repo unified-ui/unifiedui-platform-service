@@ -9,6 +9,7 @@ from sqlalchemy import select
 
 from unifiedui.core.database.models import Principal, Tenant, TenantMember
 from unifiedui.exc.tenants import TenantNotFoundError
+from unifiedui.exc.organizations import TenantCannotBeDeletedError
 from unifiedui.handlers.principals_helper import ensure_principal_exists
 from unifiedui.logger import get_logger
 from unifiedui.schema.responses.tenants import TenantResponse
@@ -255,6 +256,7 @@ class TenantHandler:
 
         Raises:
             TenantNotFoundError: If tenant not found
+            TenantCannotBeDeletedError: If tenant has can_be_deleted=False
         """
         logger.info("Deleting tenant", extra={"tenant_id": tenant_id})
 
@@ -264,6 +266,10 @@ class TenantHandler:
             if not tenant:
                 logger.warning("Tenant not found for deletion", extra={"tenant_id": tenant_id})
                 raise TenantNotFoundError(tenant_id)
+
+            if not tenant.can_be_deleted:
+                logger.warning("Tenant cannot be deleted", extra={"tenant_id": tenant_id})
+                raise TenantCannotBeDeletedError(tenant_id)
 
             session.delete(tenant)
             # Commit happens automatically in context manager

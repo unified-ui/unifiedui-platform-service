@@ -13,6 +13,7 @@ from unifiedui.apis.v1 import (
     dashboard,
     health,
     identity,
+    organizations,
     principals,
     re_act_agents,
     recent_visits,
@@ -35,6 +36,16 @@ from unifiedui.exc.chat_widgets import ChatWidgetNotFoundError
 from unifiedui.exc.conversations import ConversationNotFoundError
 from unifiedui.exc.credentials import CredentialNotFoundError
 from unifiedui.exc.custom_groups import CustomGroupError, CustomGroupNotFoundError
+from unifiedui.exc.organizations import (
+    OrganizationAlreadyExistsError,
+    OrganizationError,
+    OrganizationLimitExceededError,
+    OrganizationMemberAlreadyExistsError,
+    OrganizationMemberNotFoundError,
+    OrganizationNotFoundError,
+    OrganizationSlugAlreadyExistsError,
+    TenantCannotBeDeletedError,
+)
 from unifiedui.exc.permissions import PermissionDeniedError
 from unifiedui.exc.principal import PrincipalNotFoundError
 from unifiedui.exc.re_act_agents import ReActAgentNotFoundError
@@ -100,6 +111,48 @@ def create_app() -> FastAPI:
     @app.exception_handler(TenantError)
     async def tenant_error_handler(request: Request, exc: TenantError):
         """Handle general tenant errors."""
+        return JSONResponse(status_code=400, content={"detail": str(exc)})
+
+    # Organization exception handlers
+
+    @app.exception_handler(OrganizationNotFoundError)
+    async def organization_not_found_handler(request: Request, exc: OrganizationNotFoundError):
+        """Handle organization not found errors."""
+        return JSONResponse(status_code=404, content={"detail": str(exc)})
+
+    @app.exception_handler(OrganizationAlreadyExistsError)
+    async def organization_already_exists_handler(request: Request, exc: OrganizationAlreadyExistsError):
+        """Handle organization already exists errors."""
+        return JSONResponse(status_code=409, content={"detail": str(exc)})
+
+    @app.exception_handler(OrganizationSlugAlreadyExistsError)
+    async def organization_slug_exists_handler(request: Request, exc: OrganizationSlugAlreadyExistsError):
+        """Handle organization slug already exists errors."""
+        return JSONResponse(status_code=409, content={"detail": str(exc)})
+
+    @app.exception_handler(OrganizationMemberNotFoundError)
+    async def organization_member_not_found_handler(request: Request, exc: OrganizationMemberNotFoundError):
+        """Handle organization member not found errors."""
+        return JSONResponse(status_code=404, content={"detail": str(exc)})
+
+    @app.exception_handler(OrganizationMemberAlreadyExistsError)
+    async def organization_member_exists_handler(request: Request, exc: OrganizationMemberAlreadyExistsError):
+        """Handle organization member already exists errors."""
+        return JSONResponse(status_code=409, content={"detail": str(exc)})
+
+    @app.exception_handler(OrganizationLimitExceededError)
+    async def organization_limit_handler(request: Request, exc: OrganizationLimitExceededError):
+        """Handle organization limit exceeded errors."""
+        return JSONResponse(status_code=400, content={"detail": str(exc)})
+
+    @app.exception_handler(TenantCannotBeDeletedError)
+    async def tenant_cannot_be_deleted_handler(request: Request, exc: TenantCannotBeDeletedError):
+        """Handle tenant cannot be deleted errors."""
+        return JSONResponse(status_code=403, content={"detail": str(exc)})
+
+    @app.exception_handler(OrganizationError)
+    async def organization_error_handler(request: Request, exc: OrganizationError):
+        """Handle general organization errors."""
         return JSONResponse(status_code=400, content={"detail": str(exc)})
 
     # Custom Group exception handlers
@@ -244,6 +297,10 @@ def create_app() -> FastAPI:
     app.include_router(health.router, prefix="/api/v1/platform-service", tags=["Health"])
 
     app.include_router(identity.router, prefix="/api/v1/platform-service/identity", tags=["Identity"])
+
+    app.include_router(
+        organizations.router, prefix="/api/v1/platform-service/organizations", tags=["Organizations"]
+    )
 
     app.include_router(tenants.router, prefix="/api/v1/platform-service/tenants", tags=["Tenants"])
 

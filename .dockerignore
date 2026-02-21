@@ -1,0 +1,80 @@
+# Git
+.git
+.gitignore
+
+# Documentation
+*.md
+docs/
+LICENSE
+MARKETING.md
+CONCEPT.md
+SETUP.md
+
+# Test files
+tests/
+conftest.py
+pytest.ini
+.pytest_cache/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Python artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# Coverage
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+*.cover
+.hypothesis/
+
+# Environment
+.env
+.env.*
+*.env
+
+# Docker local dev
+docker/local/
+
+# Misc
+.DS_Store
+Thumbs.db
+
+# Makefiles and configs only needed for dev
+Makefile
+.pre-commit-config.yaml
+.ruff.toml
+
+# Notebooks
+notebooks/
+*.ipynb

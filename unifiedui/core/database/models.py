@@ -24,6 +24,8 @@ from unifiedui.core.database.enums import (
     AIModelTypeEnum,
     AutonomousAgentTypeEnum,
     ChatAgentTypeEnum,
+    EnvironmentTypeEnum,
+    OrganizationRoleEnum,
     PermissionActionEnum,
     PrincipalTypeEnum,
     TenantRolesEnum,
@@ -117,6 +119,22 @@ AIModelProviderSAEnum = SAEnum(
     validate_strings=True,
 )
 
+OrganizationRoleSAEnum = SAEnum(
+    *OrganizationRoleEnum.all(),
+    name="organization_role",
+    native_enum=False,
+    create_constraint=True,
+    validate_strings=True,
+)
+
+EnvironmentTypeSAEnum = SAEnum(
+    *EnvironmentTypeEnum.all(),
+    name="environment_type",
+    native_enum=False,
+    create_constraint=True,
+    validate_strings=True,
+)
+
 
 # ---------- Mixins ----------
 class IdMixin:
@@ -147,10 +165,76 @@ class TenantScopedMixin:
     tenant_id: Mapped[str] = mapped_column(String(36), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False)
 
 
+# ---------- Organization ----------
+class Organization(Base, IdMixin, AuditMixin):
+    """Organization entity representing a company or customer."""
+
+    __tablename__ = "organizations"
+
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    slug: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
+    description: Mapped[str | None] = mapped_column(String(2000))
+
+    identity_provider: Mapped[str] = mapped_column(String(50), nullable=False)
+    identity_tenant_id: Mapped[str] = mapped_column(String(255), nullable=False)
+
+    subscription_tier: Mapped[str] = mapped_column(String(50), nullable=False, default="free")
+    max_tenants: Mapped[int] = mapped_column(Integer, nullable=False, default=10)
+    max_users: Mapped[int] = mapped_column(Integer, nullable=False, default=100)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+
+    members: Mapped[list[OrganizationMember]] = relationship(
+        back_populates="organization", cascade="all, delete-orphan"
+    )
+    tenants: Mapped[list[Tenant]] = relationship(back_populates="organization", cascade="all, delete-orphan")
+
+    __table_args__ = (
+        UniqueConstraint("identity_provider", "identity_tenant_id", name="uq_org_idp"),
+        Index("ix_org_slug", "slug"),
+        Index("ix_org_idp", "identity_provider", "identity_tenant_id"),
+    )
+
+
+class OrganizationMember(Base, IdMixin, AuditMixin):
+    """Organization membership and roles."""
+
+    __tablename__ = "organization_members"
+
+    organization_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False
+    )
+    principal_id: Mapped[str] = mapped_column(String(50), nullable=False)
+    principal_type: Mapped[str] = mapped_column(PrincipalTypeSAEnum, nullable=False)
+    role: Mapped[str] = mapped_column(OrganizationRoleSAEnum, nullable=False)
+
+    organization: Mapped[Organization] = relationship(back_populates="members")
+
+    __table_args__ = (
+        UniqueConstraint("organization_id", "principal_id", "role", name="uq_org_member"),
+        Index("ix_org_member_org", "organization_id"),
+        Index("ix_org_member_principal", "principal_id"),
+    )
+
+
 # ---------- Core ----------
 class Tenant(Base, IdNameDescriptionMixin):
+    """Tenant entity representing an environment within an organization."""
+
     __tablename__ = "tenants"
 
+    organization_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=True
+    )
+    environment_type: Mapped[str] = mapped_column(
+        EnvironmentTypeSAEnum, nullable=False, default=EnvironmentTypeEnum.SANDBOX.value
+    )
+    previous_stage_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("tenants.id", ondelete="SET NULL"), nullable=True
+    )
+    is_default: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    can_be_deleted: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+
+    organization: Mapped[Organization | None] = relationship(back_populates="tenants")
     members: Mapped[list[TenantMember]] = relationship(back_populates="tenant", cascade="all, delete-orphan")
     principals: Mapped[list[Principal]] = relationship(back_populates="tenant", cascade="all, delete-orphan")
 

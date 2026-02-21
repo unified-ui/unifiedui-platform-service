@@ -20,6 +20,7 @@ from unifiedui.handlers.dependencies.conversations import get_conversation_handl
 from unifiedui.handlers.dependencies.credentials import get_credential_handler
 from unifiedui.handlers.dependencies.custom_groups import get_custom_group_handler
 from unifiedui.handlers.dependencies.database import get_db_client
+from unifiedui.handlers.dependencies.organizations import get_organization_handler
 from unifiedui.handlers.dependencies.principals import get_principal_handler
 from unifiedui.handlers.dependencies.re_act_agents import get_re_act_agent_handler
 from unifiedui.handlers.dependencies.resource_permissions import get_resource_permissions_handler
@@ -45,6 +46,7 @@ __all__ = [
     "get_custom_group_handler",
     # Database
     "get_db_client",
+    "get_organization_handler",
     "get_principal_handler",
     "get_re_act_agent_handler",
     # Central Handlers

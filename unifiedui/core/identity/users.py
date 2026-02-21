@@ -8,6 +8,7 @@ from unifiedui.core.identity.factory import IdentityProviderFactory, IdentityTok
 from unifiedui.handlers.tenants import TenantHandler
 from unifiedui.logger import get_logger
 from unifiedui.schema.responses.identity import IdentityGroupResponse, IdentityUserResponse
+from unifiedui.schema.responses.organizations import OrganizationContextResponse
 from unifiedui.utils.api_query import APIFilterQuery
 
 logger = get_logger(__name__)
@@ -29,6 +30,7 @@ class ContextIdentityUser:
         self._identity_groups = None
         self._idp_group_ids = None
         self._tenants = None
+        self._organization_context = None
         self._cache = cache_client
         self._database_client = database_client
 
@@ -226,12 +228,39 @@ class ContextIdentityUser:
 
         return self._tenants
 
+    @property
+    def organization_context(self) -> OrganizationContextResponse | None:
+        """Get the organization context for the current user based on IDP tenant."""
+        if self._organization_context is not None:
+            return self._organization_context
+
+        if not self._database_client:
+            return None
+
+        identity_provider = self.identity.get_identity_provider()
+        identity_tenant_id = self.identity.get_identity_tenant_id()
+
+        if not identity_provider or not identity_tenant_id:
+            return None
+
+        from unifiedui.handlers.organizations import OrganizationHandler
+
+        handler = OrganizationHandler(self._database_client, self._cache)
+        user_id = self.identity.get_id()
+        idp_group_ids = self._get_idp_group_ids()
+
+        self._organization_context = handler.get_user_organization_context(
+            identity_provider=identity_provider,
+            identity_tenant_id=identity_tenant_id,
+            user_id=user_id,
+            identity_group_ids=idp_group_ids,
+        )
+
+        return self._organization_context
+
     def get_me(self) -> IdentityUserResponse:
         """Get the current user's identity information."""
-        # Tenants are already dicts with 'tenant' and 'permissions' keys
         tenants_with_permissions = self.tenants
-
-        # Get principal_name from identity provider
 
         return IdentityUserResponse(
             id=self.identity.get_id(),
@@ -242,6 +271,7 @@ class ContextIdentityUser:
             mail=self.identity.get_mail(),
             firstname=self.identity.get_firstname(),
             lastname=self.identity.get_lastname(),
+            organization=self.organization_context,
             tenants=tenants_with_permissions,
             groups=self.groups,
         )

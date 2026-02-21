@@ -91,6 +91,12 @@ class Settings(BaseSettings):
     identity_token_algorithms: list[str] = ["RS256"]
     identity_verify_signature: bool = True
 
+    # Deployment Mode
+    deployment_mode: str = "self-hosted"
+    system_admin_emails: list[str] = []
+    auto_create_organization: bool = True
+    default_organization_name: str = "Default Organization"
+
     # Logging Configuration
     log_level: str = "INFO"
 

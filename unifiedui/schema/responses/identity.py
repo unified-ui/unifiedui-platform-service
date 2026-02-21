@@ -2,6 +2,8 @@ from typing import TypeVar
 
 from pydantic import BaseModel, Field
 
+from unifiedui.schema.responses.organizations import OrganizationContextResponse
+
 
 class IdentityGroupResponse(BaseModel):
     """Identity group response model."""
@@ -23,6 +25,7 @@ class IdentityUserResponse(BaseModel):
     firstname: str | None = None
     lastname: str | None = None
     mail: str | None = None
+    organization: OrganizationContextResponse | None = None
     tenants: list[dict] | None = None
     groups: list[IdentityGroupResponse] | None = None
 

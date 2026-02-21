@@ -15,6 +15,7 @@ from unifiedui.core.database.models import (
     ConversationMember,
     CredentialMember,
     CustomGroupMember,
+    OrganizationMember,
     ReActAgentMember,
     Tag,
     ToolMember,
@@ -386,6 +387,56 @@ def authenticate(required_service_auth_key: str | None = None) -> Callable:
             request.state.user = user
             request.state.use_cache = use_cache
 
+            # Load organization context via JOIN (identity_provider + identity_tenant_id)
+            try:
+                identity_provider = user.identity.get_identity_provider()
+                identity_tenant_id = user.identity.get_identity_tenant_id()
+                user_id = user.identity.get_id()
+
+                if identity_provider and identity_tenant_id:
+                    from unifiedui.core.database.models import Organization, OrganizationMember
+
+                    db = get_db_client()
+                    with db.get_session() as session:
+                        org = session.execute(
+                            select(Organization).where(
+                                Organization.identity_provider == identity_provider,
+                                Organization.identity_tenant_id == identity_tenant_id,
+                            )
+                        ).scalar_one_or_none()
+
+                        if org:
+                            # Get user's org roles (direct + via groups)
+                            identity_group_ids = [g.id for g in user.groups if g.principal_type == "IDENTITY_GROUP"]
+                            all_principal_ids = [user_id, *identity_group_ids]
+
+                            org_members = (
+                                session.execute(
+                                    select(OrganizationMember).where(
+                                        OrganizationMember.organization_id == org.id,
+                                        OrganizationMember.principal_id.in_(all_principal_ids),
+                                    )
+                                )
+                                .scalars()
+                                .all()
+                            )
+
+                            org_roles = sorted({m.role for m in org_members})
+
+                            request.state.organization_context = {
+                                "id": org.id,
+                                "name": org.name,
+                                "slug": org.slug,
+                                "roles": org_roles,
+                            }
+                        else:
+                            request.state.organization_context = None
+                else:
+                    request.state.organization_context = None
+            except Exception as e:
+                logger.warning(f"Failed to load organization context: {e}")
+                request.state.organization_context = None
+
             # Check tenant access if tenant_id is in path parameters
             tenant_id = request.path_params.get("tenant_id")
             if tenant_id:
@@ -406,18 +457,22 @@ def authenticate(required_service_auth_key: str | None = None) -> Callable:
 def check_permissions(
     entity: str = "tenant",
     required_permissions: list[TenantRolesEnum | PermissionActionEnum | UserPermissionEnum] | None = None,
+    required_org_roles: list[str] | None = None,
 ) -> Callable:
     """
     Decorator factory to check if the authenticated user has the required permissions.
 
     Args:
         entity: The entity type to check permissions for
-               Options: "tenant", "chat_agent", "credential", "autonomous_agent", "custom_group", "conversation", "tag"
+               Options: "tenant", "organization", "chat_agent", "credential", "autonomous_agent",
+                        "custom_group", "conversation", "tag"
         required_permissions: List of required permission enums
                             - For tenant: [TenantPermissionEnum.GLOBAL_ADMIN, TenantPermissionEnum.READER, etc.]
                             - For resources: [PermissionActionEnum.READ, PermissionActionEnum.WRITE, PermissionActionEnum.ADMIN]
                             - Special: [UserPermissions.IS_CREATOR] - allows access if user is the creator
                             If None or empty, no permission check is performed
+        required_org_roles: List of required organization role strings (from OrganizationRoleEnum).
+                           If provided, user must have one of these org roles.
 
     Raises:
         HTTPException: 401 if user not authenticated, 403 if permissions not met
@@ -425,6 +480,10 @@ def check_permissions(
     Example:
         @check_permissions(entity="tenant", required_permissions=[TenantPermissionEnum.GLOBAL_ADMIN])
         async def update_tenant(...):
+            ...
+
+        @check_permissions(entity="organization", required_org_roles=["ORGANISATION_GLOBAL_ADMIN", "ORGANISATION_ADMIN"])
+        async def update_organization(...):
             ...
 
         @check_permissions(entity="chat_agent", required_permissions=[PermissionActionEnum.WRITE, PermissionActionEnum.ADMIN])
@@ -457,8 +516,22 @@ def check_permissions(
             user: ContextIdentityUser = request.state.user
 
             # If no permissions required, allow access
-            if not required_permissions:
+            if not required_permissions and not required_org_roles:
                 return await func(*args, **kwargs)
+
+            # Check organization-level roles if required
+            if required_org_roles:
+                org_context = getattr(request.state, "organization_context", None)
+                if org_context:
+                    user_org_roles = org_context.get("roles", [])
+                    if any(role in user_org_roles for role in required_org_roles):
+                        return await func(*args, **kwargs)
+
+                # If org roles were required but not met, deny
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=f"Access denied: User does not have required organization roles. Required one of: {required_org_roles}",
+                )
 
             # Check permissions based on entity type
             if entity == "tenant":

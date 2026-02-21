@@ -72,6 +72,7 @@ The **Platform Service** is the central authority in the unified-ui architecture
 ### Prerequisites
 
 - Python 3.13+
+- uv (recommended) or pip
 - Docker & Docker Compose
 - PostgreSQL
 - Redis
@@ -83,12 +84,11 @@ The **Platform Service** is the central authority in the unified-ui architecture
 git clone https://github.com/enricogoerlitz/unified-ui-backend.git
 cd unified-ui-backend
 
-# Set up Python environment
-python -m venv .venv
-source .venv/bin/activate  # Windows: .venv\Scripts\activate
+# Install uv (recommended)
+curl -LsSf https://astral.sh/uv/install.sh | sh
 
 # Install dependencies
-pip install -e ".[test]"
+uv sync
 
 # Start infrastructure
 docker-compose up -d
@@ -97,7 +97,7 @@ docker-compose up -d
 alembic upgrade head
 
 # Start the server
-uvicorn unifiedui.app:app --reload
+uv run uvicorn unifiedui.app:app --reload
 ```
 
 The API is available at `http://localhost:8000`
@@ -106,11 +106,14 @@ The API is available at `http://localhost:8000`
 
 | Command | Description |
 |---------|-------------|
-| `uvicorn unifiedui.app:app --reload` | Start dev server |
+| `uv run uvicorn unifiedui.app:app --reload` | Start dev server |
 | `alembic upgrade head` | Run migrations |
 | `alembic revision --autogenerate -m "msg"` | Create migration |
-| `pytest` | Run tests |
-| `pytest -n auto` | Run tests in parallel |
+| `pytest tests/ -n auto` | Run tests in parallel |
+| `ruff check .` | Run linter |
+| `ruff format .` | Format code |
+
+> **See [TOOLING.md](TOOLING.md)** for detailed tooling documentation, pre-commit hooks, and code quality guidelines.
 
 ---
 
