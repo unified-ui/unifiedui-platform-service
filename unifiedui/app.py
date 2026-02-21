@@ -298,9 +298,7 @@ def create_app() -> FastAPI:
 
     app.include_router(identity.router, prefix="/api/v1/platform-service/identity", tags=["Identity"])
 
-    app.include_router(
-        organizations.router, prefix="/api/v1/platform-service/organizations", tags=["Organizations"]
-    )
+    app.include_router(organizations.router, prefix="/api/v1/platform-service/organizations", tags=["Organizations"])
 
     app.include_router(tenants.router, prefix="/api/v1/platform-service/tenants", tags=["Tenants"])
 

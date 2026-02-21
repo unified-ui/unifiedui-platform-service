@@ -67,9 +67,7 @@ class OrganizationHandler:
             org = self._validate_organization_exists(session, organization_id)
             return self._org_to_response(org)
 
-    def get_organization_by_idp(
-        self, identity_provider: str, identity_tenant_id: str
-    ) -> OrganizationResponse | None:
+    def get_organization_by_idp(self, identity_provider: str, identity_tenant_id: str) -> OrganizationResponse | None:
         """Get organization by identity provider and tenant ID."""
         logger.info(
             "Fetching organization by IDP",
@@ -88,9 +86,7 @@ class OrganizationHandler:
                 return None
             return self._org_to_response(org)
 
-    def create_organization(
-        self, request: CreateOrganizationRequest, user_id: str
-    ) -> OrganizationResponse:
+    def create_organization(self, request: CreateOrganizationRequest, user_id: str) -> OrganizationResponse:
         """Create a new organization with a default tenant."""
         logger.info("Creating organization", extra={"org_name": request.name, "user_id": user_id})
 
@@ -354,11 +350,7 @@ class OrganizationHandler:
             self._validate_organization_exists(session, organization_id)
 
             tenants = (
-                session.execute(
-                    select(Tenant)
-                    .where(Tenant.organization_id == organization_id)
-                    .order_by(Tenant.name)
-                )
+                session.execute(select(Tenant).where(Tenant.organization_id == organization_id).order_by(Tenant.name))
                 .scalars()
                 .all()
             )
@@ -383,11 +375,7 @@ class OrganizationHandler:
 
             # Check tenant limit
             tenant_count = (
-                session.execute(
-                    select(Tenant).where(Tenant.organization_id == organization_id)
-                )
-                .scalars()
-                .all()
+                session.execute(select(Tenant).where(Tenant.organization_id == organization_id)).scalars().all()
             )
             if len(tenant_count) >= org.max_tenants:
                 raise OrganizationLimitExceededError("tenants", len(tenant_count), org.max_tenants)
@@ -438,9 +426,7 @@ class OrganizationHandler:
 
             return self._tenant_to_extended_response(tenant)
 
-    def delete_tenant_in_organization(
-        self, organization_id: str, tenant_id: str
-    ) -> None:
+    def delete_tenant_in_organization(self, organization_id: str, tenant_id: str) -> None:
         """Delete a tenant within an organization (respecting can_be_deleted flag)."""
         logger.info(
             "Deleting tenant in organization",

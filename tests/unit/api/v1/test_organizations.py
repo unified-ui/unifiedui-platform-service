@@ -13,9 +13,7 @@ ENDPOINT_ORGANIZATIONS = "/api/v1/platform-service/organizations"
 ENDPOINT_ORGANIZATION_DETAIL = "/api/v1/platform-service/organizations/{organization_id}"
 ENDPOINT_ORGANIZATION_MEMBERS = "/api/v1/platform-service/organizations/{organization_id}/members"
 ENDPOINT_ORGANIZATION_TENANTS = "/api/v1/platform-service/organizations/{organization_id}/tenants"
-ENDPOINT_ORGANIZATION_TENANT_DETAIL = (
-    "/api/v1/platform-service/organizations/{organization_id}/tenants/{tenant_id}"
-)
+ENDPOINT_ORGANIZATION_TENANT_DETAIL = "/api/v1/platform-service/organizations/{organization_id}/tenants/{tenant_id}"
 
 # Common Test IDs
 NON_EXISTENT_ID = "non-existent-id"
@@ -102,9 +100,7 @@ class TestOrganizationRoutes:
         org_id = org["id"]
 
         # List tenants in org
-        response = test_client.get(
-            ENDPOINT_ORGANIZATION_TENANTS.format(organization_id=org_id), headers=headers
-        )
+        response = test_client.get(ENDPOINT_ORGANIZATION_TENANTS.format(organization_id=org_id), headers=headers)
         assert response.status_code == status.HTTP_200_OK
         tenants = response.json()
 
@@ -125,18 +121,14 @@ class TestOrganizationRoutes:
         org_id = org["id"]
 
         # List members
-        response = test_client.get(
-            ENDPOINT_ORGANIZATION_MEMBERS.format(organization_id=org_id), headers=headers
-        )
+        response = test_client.get(ENDPOINT_ORGANIZATION_MEMBERS.format(organization_id=org_id), headers=headers)
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
 
         assert data["organization_id"] == org_id
         assert len(data["members"]) >= 1
 
-        creator_member = next(
-            (m for m in data["members"] if m["principal_id"] == "org-creator-3"), None
-        )
+        creator_member = next((m for m in data["members"] if m["principal_id"] == "org-creator-3"), None)
         assert creator_member is not None
         role_values = [r["role"] for r in creator_member["roles"]]
         assert ROLE_ORG_GLOBAL_ADMIN in role_values
@@ -202,9 +194,7 @@ class TestOrganizationRoutes:
         _create_org(test_client, headers, identity_tenant_id="dup-idp-tenant", slug="org-dup-a")
 
         # Second creation with same identity_tenant_id should fail
-        org_data2 = _create_org_data(
-            name="Second Org", slug="org-dup-b", identity_tenant_id="dup-idp-tenant"
-        )
+        org_data2 = _create_org_data(name="Second Org", slug="org-dup-b", identity_tenant_id="dup-idp-tenant")
         response = test_client.post(ENDPOINT_ORGANIZATIONS, json=org_data2, headers=headers)
         assert response.status_code == status.HTTP_409_CONFLICT
 
@@ -215,9 +205,7 @@ class TestOrganizationRoutes:
 
         _create_org(test_client, headers, identity_tenant_id="idp-slug-a", slug="same-slug")
 
-        org_data2 = _create_org_data(
-            name="Second Org", slug="same-slug", identity_tenant_id="idp-slug-b"
-        )
+        org_data2 = _create_org_data(name="Second Org", slug="same-slug", identity_tenant_id="idp-slug-b")
         response = test_client.post(ENDPOINT_ORGANIZATIONS, json=org_data2, headers=headers)
         assert response.status_code == status.HTTP_409_CONFLICT
 
@@ -229,9 +217,7 @@ class TestOrganizationRoutes:
         org = _create_org(test_client, headers, identity_tenant_id="idp-get-1", slug="get-org-1")
         org_id = org["id"]
 
-        response = test_client.get(
-            ENDPOINT_ORGANIZATION_DETAIL.format(organization_id=org_id), headers=headers
-        )
+        response = test_client.get(ENDPOINT_ORGANIZATION_DETAIL.format(organization_id=org_id), headers=headers)
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
 
@@ -276,8 +262,7 @@ class TestOrganizationRoutes:
         headers = create_auth_headers(user_token, use_cache=False)
 
         org = _create_org(
-            test_client, headers, identity_tenant_id="idp-upd-p", slug="upd-org-p",
-            description="Original description"
+            test_client, headers, identity_tenant_id="idp-upd-p", slug="upd-org-p", description="Original description"
         )
         org_id = org["id"]
 
@@ -353,9 +338,7 @@ class TestOrganizationMemberRoutes:
         org = _create_org(test_client, headers, identity_tenant_id="idp-mem-list-1", slug="mem-list-org")
         org_id = org["id"]
 
-        response = test_client.get(
-            ENDPOINT_ORGANIZATION_MEMBERS.format(organization_id=org_id), headers=headers
-        )
+        response = test_client.get(ENDPOINT_ORGANIZATION_MEMBERS.format(organization_id=org_id), headers=headers)
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
 
@@ -423,9 +406,7 @@ class TestOrganizationMemberRoutes:
         assert response.status_code == status.HTTP_201_CREATED
 
         # List members and verify both roles
-        list_response = test_client.get(
-            ENDPOINT_ORGANIZATION_MEMBERS.format(organization_id=org_id), headers=headers
-        )
+        list_response = test_client.get(ENDPOINT_ORGANIZATION_MEMBERS.format(organization_id=org_id), headers=headers)
         members = list_response.json()["members"]
         multi_member = next((m for m in members if m["principal_id"] == "multi-user"), None)
         assert multi_member is not None
@@ -678,9 +659,7 @@ class TestOrganizationTenantRoutes:
         org = _create_org(test_client, headers, identity_tenant_id="idp-ten-list-1", slug="ten-list-org")
         org_id = org["id"]
 
-        response = test_client.get(
-            ENDPOINT_ORGANIZATION_TENANTS.format(organization_id=org_id), headers=headers
-        )
+        response = test_client.get(ENDPOINT_ORGANIZATION_TENANTS.format(organization_id=org_id), headers=headers)
         assert response.status_code == status.HTTP_200_OK
         tenants = response.json()
         assert len(tenants) == 1  # default tenant
@@ -752,7 +731,10 @@ class TestOrganizationTenantRoutes:
         headers = create_auth_headers(user_token, use_cache=False)
 
         org = _create_org(
-            test_client, headers, identity_tenant_id="idp-ten-stage-1", slug="ten-stage-org",
+            test_client,
+            headers,
+            identity_tenant_id="idp-ten-stage-1",
+            slug="ten-stage-org",
             max_tenants=10,
         )
         org_id = org["id"]
@@ -812,7 +794,10 @@ class TestOrganizationTenantRoutes:
 
         # Create org with max_tenants=2 (1 default + 1 allowed)
         org = _create_org(
-            test_client, headers, identity_tenant_id="idp-ten-lim-1", slug="ten-lim-org",
+            test_client,
+            headers,
+            identity_tenant_id="idp-ten-lim-1",
+            slug="ten-lim-org",
             max_tenants=2,
         )
         org_id = org["id"]
@@ -871,9 +856,7 @@ class TestOrganizationTenantRoutes:
         assert response.status_code == status.HTTP_204_NO_CONTENT
 
         # Verify it's gone
-        list_resp = test_client.get(
-            ENDPOINT_ORGANIZATION_TENANTS.format(organization_id=org_id), headers=headers
-        )
+        list_resp = test_client.get(ENDPOINT_ORGANIZATION_TENANTS.format(organization_id=org_id), headers=headers)
         tenant_ids = [t["id"] for t in list_resp.json()]
         assert tenant_id not in tenant_ids
 
@@ -886,18 +869,14 @@ class TestOrganizationTenantRoutes:
         org_id = org["id"]
 
         # Get the default tenant ID
-        list_resp = test_client.get(
-            ENDPOINT_ORGANIZATION_TENANTS.format(organization_id=org_id), headers=headers
-        )
+        list_resp = test_client.get(ENDPOINT_ORGANIZATION_TENANTS.format(organization_id=org_id), headers=headers)
         default_tenant = next(t for t in list_resp.json() if t["is_default"] is True)
         default_tenant_id = default_tenant["id"]
 
         # Try to delete default tenant
         response = test_client.request(
             "DELETE",
-            ENDPOINT_ORGANIZATION_TENANT_DETAIL.format(
-                organization_id=org_id, tenant_id=default_tenant_id
-            ),
+            ENDPOINT_ORGANIZATION_TENANT_DETAIL.format(organization_id=org_id, tenant_id=default_tenant_id),
             headers=headers,
         )
         assert response.status_code == status.HTTP_403_FORBIDDEN
@@ -912,9 +891,7 @@ class TestOrganizationTenantRoutes:
 
         response = test_client.request(
             "DELETE",
-            ENDPOINT_ORGANIZATION_TENANT_DETAIL.format(
-                organization_id=org_id, tenant_id=NON_EXISTENT_ID
-            ),
+            ENDPOINT_ORGANIZATION_TENANT_DETAIL.format(organization_id=org_id, tenant_id=NON_EXISTENT_ID),
             headers=headers,
         )
         # 403 because auth middleware checks tenant_id access before handler runs
@@ -927,9 +904,7 @@ class TestOrganizationTenantRoutes:
 
         response = test_client.request(
             "DELETE",
-            ENDPOINT_ORGANIZATION_TENANT_DETAIL.format(
-                organization_id=NON_EXISTENT_ID, tenant_id="some-tenant-id"
-            ),
+            ENDPOINT_ORGANIZATION_TENANT_DETAIL.format(organization_id=NON_EXISTENT_ID, tenant_id="some-tenant-id"),
             headers=headers,
         )
         # 403 because auth middleware checks tenant_id access before handler runs
@@ -941,7 +916,10 @@ class TestOrganizationTenantRoutes:
         headers = create_auth_headers(user_token, use_cache=False)
 
         org = _create_org(
-            test_client, headers, identity_tenant_id="idp-ten-multi-1", slug="ten-multi-org",
+            test_client,
+            headers,
+            identity_tenant_id="idp-ten-multi-1",
+            slug="ten-multi-org",
             max_tenants=5,
         )
         org_id = org["id"]
@@ -956,7 +934,5 @@ class TestOrganizationTenantRoutes:
             assert resp.status_code == status.HTTP_201_CREATED
 
         # List should show 4 (1 default + 3 new)
-        list_resp = test_client.get(
-            ENDPOINT_ORGANIZATION_TENANTS.format(organization_id=org_id), headers=headers
-        )
+        list_resp = test_client.get(ENDPOINT_ORGANIZATION_TENANTS.format(organization_id=org_id), headers=headers)
         assert len(list_resp.json()) == 4

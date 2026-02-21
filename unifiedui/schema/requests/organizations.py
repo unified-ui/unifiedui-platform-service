@@ -57,9 +57,7 @@ class UpdateOrganizationRequest(BaseModel):
     is_active: bool | None = Field(None, description="Whether the organization is active")
 
     model_config = {
-        "json_schema_extra": {
-            "examples": [{"name": "Updated Org Name", "description": "Updated description"}]
-        }
+        "json_schema_extra": {"examples": [{"name": "Updated Org Name", "description": "Updated description"}]}
     }
 
 

@@ -20,9 +20,7 @@ class OrganizationAlreadyExistsError(OrganizationError):
 
     def __init__(self, identity_tenant_id: str):
         self.identity_tenant_id = identity_tenant_id
-        super().__init__(
-            f"Organization for identity tenant '{identity_tenant_id}' already exists"
-        )
+        super().__init__(f"Organization for identity tenant '{identity_tenant_id}' already exists")
 
 
 class OrganizationSlugAlreadyExistsError(OrganizationError):
@@ -56,9 +54,7 @@ class OrganizationMemberAlreadyExistsError(OrganizationError):
     def __init__(self, principal_id: str, role: str):
         self.principal_id = principal_id
         self.role = role
-        super().__init__(
-            f"Principal '{principal_id}' already has role '{role}' in organization"
-        )
+        super().__init__(f"Principal '{principal_id}' already has role '{role}' in organization")
 
 
 class OrganizationLimitExceededError(OrganizationError):
@@ -68,9 +64,7 @@ class OrganizationLimitExceededError(OrganizationError):
         self.limit_type = limit_type
         self.current = current
         self.maximum = maximum
-        super().__init__(
-            f"Organization {limit_type} limit exceeded: {current}/{maximum}"
-        )
+        super().__init__(f"Organization {limit_type} limit exceeded: {current}/{maximum}")
 
 
 class TenantCannotBeDeletedError(OrganizationError):
@@ -78,6 +72,4 @@ class TenantCannotBeDeletedError(OrganizationError):
 
     def __init__(self, tenant_id: str):
         self.tenant_id = tenant_id
-        super().__init__(
-            f"Tenant '{tenant_id}' cannot be deleted (is_default or can_be_deleted=false)"
-        )
+        super().__init__(f"Tenant '{tenant_id}' cannot be deleted (is_default or can_be_deleted=false)")
