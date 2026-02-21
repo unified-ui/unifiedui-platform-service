@@ -1,10 +1,14 @@
+from typing import TYPE_CHECKING
+
 from pymongo import MongoClient
-from pymongo.database import Database
 
 from unifiedui.core.docdatabase.base import BaseDatabaseClient
-from unifiedui.docdatabase.mongo.collections.tenants import MongoDBTenantsCollection
-from unifiedui.docdatabase.mongo.collections.permissions import MongoDBPermissionsCollection
 from unifiedui.docdatabase.mongo.collections.custom_groups import MongoDBCustomGroupsCollection
+from unifiedui.docdatabase.mongo.collections.permissions import MongoDBPermissionsCollection
+from unifiedui.docdatabase.mongo.collections.tenants import MongoDBTenantsCollection
+
+if TYPE_CHECKING:
+    from pymongo.database import Database
 
 
 class MongoDBDatabaseClient(BaseDatabaseClient):
@@ -36,7 +40,7 @@ class MongoDBDatabaseClient(BaseDatabaseClient):
         try:
             if self._client is not None:
                 # Ping the database
-                self._client.admin.command('ping')
+                self._client.admin.command("ping")
                 return True
             return False
         except Exception:
@@ -46,25 +50,25 @@ class MongoDBDatabaseClient(BaseDatabaseClient):
         """Get the tenants collection."""
         if self._db is None:
             raise RuntimeError("Database not connected. Call connect() first.")
-        
+
         if self._tenants_collection is None:
             self._tenants_collection = MongoDBTenantsCollection(self._db)
-        
+
         return self._tenants_collection
 
     def permissions(self) -> MongoDBPermissionsCollection:
         """Get the permissions collection."""
         if self._db is None:
             raise RuntimeError("Database not connected. Call connect() first.")
-        
+
         return MongoDBPermissionsCollection(self._db)
 
     def custom_groups(self) -> MongoDBCustomGroupsCollection:
         """Get the custom groups collection."""
         if self._db is None:
             raise RuntimeError("Database not connected. Call connect() first.")
-        
+
         if self._custom_groups_collection is None:
             self._custom_groups_collection = MongoDBCustomGroupsCollection(self._db["custom_groups"])
-        
+
         return self._custom_groups_collection

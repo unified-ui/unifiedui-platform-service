@@ -1,9 +1,11 @@
+from typing import TypeVar
+
 from pydantic import BaseModel, Field
-from typing import Generic, TypeVar
 
 
 class IdentityGroupResponse(BaseModel):
     """Identity group response model."""
+
     id: str
     display_name: str
     principal_name: str | None = None
@@ -12,6 +14,7 @@ class IdentityGroupResponse(BaseModel):
 
 class IdentityUserResponse(BaseModel):
     """Identity user response model."""
+
     id: str
     identity_provider: str
     identity_tenant_id: str | None = None
@@ -24,22 +27,25 @@ class IdentityUserResponse(BaseModel):
     groups: list[IdentityGroupResponse] | None = None
 
 
-T = TypeVar('T')
+T = TypeVar("T")
 
 
-class PaginatedIdentityResponse(BaseModel, Generic[T]):
+class PaginatedIdentityResponse[T](BaseModel):
     """Paginated response model for identity resources."""
+
     value: list[T] = Field(description="List of items")
     next_link: str | None = Field(default=None, description="Link to the next page of results")
 
 
 class IdentityUsersResponse(BaseModel):
     """Paginated response for users."""
+
     value: list[IdentityUserResponse] = Field(description="List of users")
     next_link: str | None = Field(default=None, description="Link to the next page of results")
 
 
 class IdentityGroupsResponse(BaseModel):
     """Paginated response for groups."""
+
     value: list[IdentityGroupResponse] = Field(description="List of groups")
     next_link: str | None = Field(default=None, description="Link to the next page of results")

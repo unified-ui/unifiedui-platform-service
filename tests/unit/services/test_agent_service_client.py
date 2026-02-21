@@ -1,6 +1,7 @@
 """Tests for AgentServiceClient."""
+
 from typing import Any
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 from unifiedui.services.agent_service_client import AgentServiceClient
 
@@ -10,11 +11,7 @@ class TestAgentServiceClient:
 
     def _create_client(self, app_vault: Any = None) -> AgentServiceClient:
         """Create an AgentServiceClient with test defaults."""
-        return AgentServiceClient(
-            base_url="http://agent-service:8085",
-            app_vault=app_vault,
-            timeout=5
-        )
+        return AgentServiceClient(base_url="http://agent-service:8085", app_vault=app_vault, timeout=5)
 
     def test_delete_conversation_data_success(self) -> None:
         """Test successful cascade delete of conversation data."""

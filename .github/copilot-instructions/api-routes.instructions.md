@@ -143,7 +143,7 @@ except {Resource}NotFoundError:
     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="...")
 except {Resource}ConfigValidationError as e:
     raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
-except UnsupportedApplicationTypeError as e:
+except UnsupportedChatAgentTypeError as e:
     raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 except InvalidCredentialError as e:
     raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
@@ -214,17 +214,17 @@ async def get_models_by_purpose(request: Request, tenant_id: str, purpose_group:
 
 ### ReACT Agent (Standard RBAC Resource)
 - Full CRUD + permission management + tags support
-- Same decorator pattern as Application/AutonomousAgent (authenticate + check_permissions)
+- Same decorator pattern as ChatAgent/AutonomousAgent (authenticate + check_permissions)
 - Routes registered at: `/api/v1/platform-service/tenants/{tenant_id}/re-act-agents`
 
 ### Dashboard (Aggregation endpoint)
-- `GET /dashboard/stats` — returns aggregated counts (total + active) for applications, autonomous_agents, conversations
+- `GET /dashboard/stats` — returns aggregated counts (total + active) for chat_agents, autonomous_agents, conversations
 - RBAC-filtered: only counts entities the user has access to
 - Cached for 120s via Redis
 - Routes registered at: `/api/v1/platform-service/tenants/{tenant_id}/dashboard`
 
 ### Global Search
-- `GET /search?q=...&types=...&limit=10` — searches across applications, autonomous_agents, conversations, credentials by name (ILIKE)
+- `GET /search?q=...&types=...&limit=10` — searches across chat_agents, autonomous_agents, conversations, credentials by name (ILIKE)
 - RBAC-filtered: only returns entities the user has access to
 - Routes registered at: `/api/v1/platform-service/tenants/{tenant_id}/search`
 

@@ -1,20 +1,23 @@
 """Business logic handlers for recent visit operations."""
+
 from __future__ import annotations
 
 import uuid as uuid_mod
-from typing import Optional
+from typing import TYPE_CHECKING
 
-from sqlalchemy import select, func, delete
+from sqlalchemy import delete, func, select
 
-from unifiedui.core.database.client import SQLAlchemyClient
 from unifiedui.core.database.models import RecentVisit, utc_now
-from unifiedui.caching.client import CacheClient
-from unifiedui.schema.requests.recent_visits import SyncRecentVisitsRequest
-from unifiedui.schema.responses.recent_visits import (
-    RecentVisitResponse,
-    RecentVisitListResponse,
-)
 from unifiedui.logger import get_logger
+from unifiedui.schema.responses.recent_visits import (
+    RecentVisitListResponse,
+    RecentVisitResponse,
+)
+
+if TYPE_CHECKING:
+    from unifiedui.caching.client import CacheClient
+    from unifiedui.core.database.client import SQLAlchemyClient
+    from unifiedui.schema.requests.recent_visits import SyncRecentVisitsRequest
 
 logger = get_logger(__name__)
 
@@ -27,7 +30,7 @@ class RecentVisitsHandler:
     def __init__(
         self,
         db_client: SQLAlchemyClient,
-        cache_client: Optional[CacheClient] = None,
+        cache_client: CacheClient | None = None,
     ):
         """Initialize the recent visits handler.
 
@@ -128,9 +131,7 @@ class RecentVisitsHandler:
             )
             oldest_ids = [row[0] for row in session.execute(oldest_ids_query).all()]
             if oldest_ids:
-                session.execute(
-                    delete(RecentVisit).where(RecentVisit.id.in_(oldest_ids))
-                )
+                session.execute(delete(RecentVisit).where(RecentVisit.id.in_(oldest_ids)))
 
     def sync_recent_visits(
         self,

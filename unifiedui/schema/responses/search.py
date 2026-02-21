@@ -1,7 +1,6 @@
 """Response schemas for global search."""
-from __future__ import annotations
 
-from typing import Optional
+from __future__ import annotations
 
 from pydantic import BaseModel
 
@@ -12,9 +11,9 @@ class SearchResultItem(BaseModel):
     type: str
     id: str
     name: str
-    description: Optional[str] = None
+    description: str | None = None
     match_field: str
-    is_active: Optional[bool] = None
+    is_active: bool | None = None
     tags: list[str] = []
 
 

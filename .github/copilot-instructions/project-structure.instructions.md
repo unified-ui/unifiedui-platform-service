@@ -98,7 +98,7 @@ All `Depends()` factories live in `handlers/dependencies/`:
 | `database.py` | `get_db_client()` |
 | `cache.py` | `get_cache_client()` |
 | `vault.py` | `get_vault_client()`, `get_secrets_vault()` |
-| `applications.py` | `get_application_handler()` |
+| `chat_agents.py` | `get_chat_agent_handler()` |
 | `autonomous_agents.py` | `get_autonomous_agent_handler()` |
 | `conversations.py` | `get_conversation_handler()` |
 | `credentials.py` | `get_credential_handler()` |

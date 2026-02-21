@@ -1,6 +1,7 @@
 """Dependency injection for search handler."""
+
+from unifiedui.handlers.dependencies import get_cache_client, get_db_client
 from unifiedui.handlers.search import SearchHandler
-from unifiedui.handlers.dependencies import get_db_client, get_cache_client
 
 
 def get_search_handler() -> SearchHandler:

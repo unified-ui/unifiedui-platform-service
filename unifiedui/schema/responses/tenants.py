@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import List, Optional
+
 from pydantic import BaseModel, Field
 
 # filepath: /Users/enricogoerlitz/Developer/repos/unifiedui/unifiedui/schema/responses/tenants.py
@@ -17,9 +17,10 @@ class TenantResponse(BaseModel):
 
 class TenantRoleDetailResponse(BaseModel):
     """Detailed role response including display name and creation info."""
+
     role: str = Field(..., description="Role type (e.g., GLOBAL_ADMIN, READER)")
-    display_name: Optional[str] = Field(None, description="Human-readable role name")
-    created_at: Optional[datetime] = Field(None, description="When this role was assigned")
+    display_name: str | None = Field(None, description="Human-readable role name")
+    created_at: datetime | None = Field(None, description="When this role was assigned")
 
 
 class TenantRoleResponse(BaseModel):
@@ -33,31 +34,36 @@ class TenantRoleResponse(BaseModel):
 
 class TenantWithRolesResponse(BaseModel):
     tenant: TenantResponse = Field(..., description="Tenant information")
-    roles: List[TenantRoleResponse] = Field(..., description="List of roles the principal has on this tenant")
+    roles: list[TenantRoleResponse] = Field(..., description="List of roles the principal has on this tenant")
 
 
 class TenantPrincipalResponse(BaseModel):
     """Response for a single principal with their roles on a tenant."""
+
     principal_id: str = Field(..., description="The principal ID")
     principal_type: str = Field(..., description="Type of principal (IDENTITY_USER, IDENTITY_GROUP, CUSTOM_GROUP)")
-    display_name: Optional[str] = Field(None, description="Display name of the principal")
-    principal_name: Optional[str] = Field(None, description="Principal name (email for users)")
-    mail: Optional[str] = Field(None, description="Email address if available")
-    description: Optional[str] = Field(None, description="Description of the principal")
+    display_name: str | None = Field(None, description="Display name of the principal")
+    principal_name: str | None = Field(None, description="Principal name (email for users)")
+    mail: str | None = Field(None, description="Email address if available")
+    description: str | None = Field(None, description="Description of the principal")
     is_active: bool = Field(True, description="Whether the principal is active")
-    roles: List[TenantRoleDetailResponse] = Field(..., description="List of roles with details")
+    roles: list[TenantRoleDetailResponse] = Field(..., description="List of roles with details")
 
 
 class PrincipalsResponse(BaseModel):
     """Response containing all roles for a principal on a specific tenant."""
+
     tenant_id: str = Field(..., description="The tenant ID")
     principal_id: str = Field(..., description="The principal ID")
-    principal_type: str | None = Field(None, description="The type of principal (IDENTITY_USER, IDENTITY_GROUP, CUSTOM_GROUP)")
+    principal_type: str | None = Field(
+        None, description="The type of principal (IDENTITY_USER, IDENTITY_GROUP, CUSTOM_GROUP)"
+    )
     is_active: bool = Field(True, description="Whether the principal is active")
-    roles: List[str] = Field(..., description="List of roles the principal has on this tenant")
+    roles: list[str] = Field(..., description="List of roles the principal has on this tenant")
 
 
 class TenantPrincipalsResponse(BaseModel):
     """Response containing all principals and their roles for a tenant."""
+
     tenant_id: str = Field(..., description="The tenant ID")
-    principals: List[TenantPrincipalResponse] = Field(..., description="List of principals with their roles")
+    principals: list[TenantPrincipalResponse] = Field(..., description="List of principals with their roles")

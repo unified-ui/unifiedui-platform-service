@@ -11,10 +11,10 @@ SQLAlchemy with declarative models in `unifiedui/core/database/models.py`.
 Tenant-level roles that can be assigned to tenant members:
 - `READER` — View-only access to the tenant
 - `GLOBAL_ADMIN` — Full access to everything
-- `{RESOURCE}_ADMIN` — Full access to specific resource type (e.g., `APPLICATIONS_ADMIN`)
-- `{RESOURCE}_CREATOR` — Can create new instances of resource type (e.g., `APPLICATIONS_CREATOR`)
+- `{RESOURCE}_ADMIN` — Full access to specific resource type (e.g., `CHAT_AGENTS_ADMIN`)
+- `{RESOURCE}_CREATOR` — Can create new instances of resource type (e.g., `CHAT_AGENTS_CREATOR`)
 
-Supported resources: applications, credentials, conversations, autonomous_agents, chat_widgets, custom_groups, react_agent (tools), tenant_ai_models
+Supported resources: chat_agents, credentials, conversations, autonomous_agents, chat_widgets, custom_groups, react_agent (tools), tenant_ai_models
 
 ### PermissionActionEnum
 Resource-level roles (one per member entry in `{resource}_members` table):
@@ -31,7 +31,7 @@ Who can receive permissions:
 - `CUSTOM_GROUP` — Custom group defined within unifiedui
 
 ### Other Enums
-- `ApplicationTypeEnum`: `N8N`, `MICROSOFT_FOUNDRY`, `REST_API`
+- `ChatAgentTypeEnum`: `N8N`, `MICROSOFT_FOUNDRY`, `REST_API`
 - `AutonomousAgentTypeEnum`: `N8N`
 - `ChatWidgetTypeEnum`: `IFRAME`, `FORM`
 - `ToolTypeEnum`: `MCP_SERVER`, `OPENAPI_DEFINITION`
@@ -59,9 +59,9 @@ Who can receive permissions:
 ### Standard Resource Model
 
 ```python
-class Application(Base, IdNameDescriptionMixin, TenantScopedMixin):
-    """Application entity model."""
-    __tablename__ = "applications"
+class ChatAgent(Base, IdNameDescriptionMixin, TenantScopedMixin):
+    """Chat agent entity model."""
+    __tablename__ = "chat_agents"
     
     type: Mapped[str] = mapped_column(...)
     config: Mapped[dict] = mapped_column(PortableJSON, default=dict)
@@ -74,20 +74,20 @@ class Application(Base, IdNameDescriptionMixin, TenantScopedMixin):
     updated_by: Mapped[str] = ...
     
     # Relationships
-    members: Mapped[list["ApplicationMember"]] = relationship(...)
-    tags: Mapped[list["ApplicationTag"]] = relationship(...)
+    members: Mapped[list["ChatAgentMember"]] = relationship(...)
+    tags: Mapped[list["ChatAgentTag"]] = relationship(...)
 ```
 
 ### Standard Member Model (RBAC)
 
 ```python
-class ApplicationMember(Base, IdMixin, AuditMixin):
-    """Application member/permission model."""
-    __tablename__ = "application_members"
+class ChatAgentMember(Base, IdMixin, AuditMixin):
+    """Chat agent member/permission model."""
+    __tablename__ = "chat_agent_members"
     
     tenant_id: Mapped[str] = mapped_column(...)
-    application_id: Mapped[str] = mapped_column(
-        ForeignKey("applications.id", ondelete="CASCADE")
+    chat_agent_id: Mapped[str] = mapped_column(
+        ForeignKey("chat_agents.id", ondelete="CASCADE")
     )
     principal_id: Mapped[str] = mapped_column(String(50))
     principal_type: Mapped[str] = mapped_column(PrincipalTypeSAEnum)
@@ -95,7 +95,7 @@ class ApplicationMember(Base, IdMixin, AuditMixin):
     
     # Unique constraint: one role per principal per resource
     __table_args__ = (
-        UniqueConstraint("application_id", "principal_id", "principal_type", "role"),
+        UniqueConstraint("chat_agent_id", "principal_id", "principal_type", "role"),
     )
 ```
 
@@ -106,7 +106,7 @@ class ApplicationMember(Base, IdMixin, AuditMixin):
 | Entity | Member Table | Config Validator | Tags Support |
 |--------|-------------|-----------------|--------------|
 | Tenant | TenantMember + TenantMemberRole | — | No |
-| Application | ApplicationMember | ApplicationConfigValidatorFactory | Yes |
+| ChatAgent | ChatAgentMember | ChatAgentConfigValidatorFactory | Yes |
 | Credential | CredentialMember | CredentialValidator | Yes |
 | AutonomousAgent | AutonomousAgentMember | AutonomousAgentConfigValidator | Yes |
 | Conversation | ConversationMember | — | No |
@@ -116,7 +116,7 @@ class ApplicationMember(Base, IdMixin, AuditMixin):
 | ReActAgent | ReActAgentMember | — | Yes |
 | TenantAIModel | — (no RBAC, S2S-only via `@authenticate_service_key`) | TenantAIModelValidator | No |
 | Tag | — (uses `created_by` for ownership) | — | N/A |
-| UserFavorite | — (scoped by user_id, per resource: `ApplicationUserFavorite`, `AutonomousAgentUserFavorite`, `ChatWidgetUserFavorite`, `ConversationUserFavorite`, `ReActAgentUserFavorite`) | — | No |
+| UserFavorite | — (scoped by user_id, per resource: `ChatAgentUserFavorite`, `AutonomousAgentUserFavorite`, `ChatWidgetUserFavorite`, `ConversationUserFavorite`, `ReActAgentUserFavorite`) | — | No |
 
 ---
 
@@ -124,7 +124,7 @@ class ApplicationMember(Base, IdMixin, AuditMixin):
 
 Tenants use a **different permission model**:
 - `TenantMember` — Links user/group to tenant
-- `TenantMemberRole` — Supports **multiple roles per member** (e.g., `READER` + `APPLICATIONS_CREATOR`)
+- `TenantMemberRole` — Supports **multiple roles per member** (e.g., `READER` + `CHAT_AGENTS_CREATOR`)
 - Uses `TenantRolesEnum` (not `PermissionActionEnum`)
 
 ---
@@ -135,7 +135,7 @@ Tenants use a **different permission model**:
 
 ```python
 with db_client.get_session() as session:
-    result = session.execute(select(Application).where(...))
+    result = session.execute(select(ChatAgent).where(...))
     app = result.scalar_one_or_none()
 ```
 

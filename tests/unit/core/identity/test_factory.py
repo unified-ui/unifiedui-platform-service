@@ -1,16 +1,17 @@
 """Unit tests for unifiedui/core/identity/factory.py - Identity Token & Provider Factories."""
+
 import time
-import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 import jwt as pyjwt
+import pytest
 
-from unifiedui.core.identity.factory import IdentityTokenFactory, IdentityProviderFactory
 from unifiedui.core.identity.enums import IdenityProviderEnum
-from unifiedui.identity.extra_id.token import ExtraIDIdentityTokenSerializer
+from unifiedui.core.identity.factory import IdentityProviderFactory, IdentityTokenFactory
 from unifiedui.identity.extra_id.provider import ExtraIDIdentityProvider
-from unifiedui.identity.mock.token import MockIdentityToken
+from unifiedui.identity.extra_id.token import ExtraIDIdentityTokenSerializer
 from unifiedui.identity.mock.provider import MockIdentityProvider
+from unifiedui.identity.mock.token import MockIdentityToken
 
 
 def _create_mock_jwt(claims: dict, secret: str = "test-secret") -> str:

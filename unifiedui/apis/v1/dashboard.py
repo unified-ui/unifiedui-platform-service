@@ -1,12 +1,17 @@
 """API routes for dashboard endpoints."""
+
+from typing import TYPE_CHECKING
+
 from fastapi import APIRouter, Depends, HTTPException, Request
 
+from unifiedui.core.middleware.apis.v1.auth import authenticate
 from unifiedui.handlers.dashboard import DashboardHandler
 from unifiedui.handlers.dependencies.dashboard import get_dashboard_handler
-from unifiedui.core.middleware.apis.v1.auth import authenticate
-from unifiedui.core.identity.users import ContextIdentityUser
-from unifiedui.schema.responses.dashboard import DashboardStatsResponse
 from unifiedui.logger import get_logger
+from unifiedui.schema.responses.dashboard import DashboardStatsResponse
+
+if TYPE_CHECKING:
+    from unifiedui.core.identity.users import ContextIdentityUser
 
 logger = get_logger(__name__)
 
@@ -22,7 +27,7 @@ async def get_dashboard_stats(
 ):
     """Get dashboard quick stats for the tenant.
 
-    Returns counts of applications, autonomous agents, and conversations
+    Returns counts of chat agents, autonomous agents, and conversations
     that the authenticated user has access to.
     """
     try:

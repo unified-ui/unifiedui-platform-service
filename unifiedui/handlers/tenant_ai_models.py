@@ -1,29 +1,31 @@
 """Business logic handlers for tenant AI model operations."""
+
 from __future__ import annotations
 
+import contextlib
 import json
 import uuid
-from typing import TYPE_CHECKING, Optional, List, Sequence, Union
+from typing import TYPE_CHECKING
 
 from sqlalchemy import select
 
-from unifiedui.core.database.client import SQLAlchemyClient
-from unifiedui.core.database.models import TenantAIModel, Credential
-from unifiedui.core.database.enums import TenantRolesEnum, AIModelPurposeGroupEnum
-from unifiedui.caching.client import CacheClient
-from unifiedui.core.vault.client import BaseVaultClient
-
-if TYPE_CHECKING:
-    from unifiedui.core.identity.users import ContextIdentityUser
-
-from unifiedui.schema.requests.tenant_ai_models import CreateTenantAIModelRequest, UpdateTenantAIModelRequest
-from unifiedui.schema.responses.tenant_ai_models import TenantAIModelResponse, AIModelWithSecretResponse
+from unifiedui.core.database.enums import AIModelPurposeGroupEnum
+from unifiedui.core.database.models import Credential, TenantAIModel
 from unifiedui.exc.tenant_ai_models import (
-    TenantAIModelNotFoundError,
     InvalidAIModelCredentialError,
+    TenantAIModelNotFoundError,
 )
 from unifiedui.handlers.validators.tenant_ai_model_validator import AIModelConfigValidatorFactory
 from unifiedui.logger import get_logger
+from unifiedui.schema.responses.tenant_ai_models import AIModelWithSecretResponse, TenantAIModelResponse
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+    from unifiedui.caching.client import CacheClient
+    from unifiedui.core.database.client import SQLAlchemyClient
+    from unifiedui.core.vault.client import BaseVaultClient
+    from unifiedui.schema.requests.tenant_ai_models import CreateTenantAIModelRequest, UpdateTenantAIModelRequest
 
 logger = get_logger(__name__)
 
@@ -34,8 +36,8 @@ class TenantAIModelHandler:
     def __init__(
         self,
         db_client: SQLAlchemyClient,
-        cache_client: Optional[CacheClient] = None,
-        vault_client: Optional[BaseVaultClient] = None,
+        cache_client: CacheClient | None = None,
+        vault_client: BaseVaultClient | None = None,
     ):
         """Initialize the tenant AI model handler.
 
@@ -53,14 +55,14 @@ class TenantAIModelHandler:
         tenant_id: str,
         skip: int = 0,
         limit: int = 100,
-        name_filter: Optional[str] = None,
-        type_filter: Optional[Sequence[str]] = None,
-        provider_filter: Optional[Sequence[str]] = None,
-        is_active: Optional[int] = None,
-        order_by: Optional[str] = None,
-        order_direction: Optional[str] = None,
+        name_filter: str | None = None,
+        type_filter: Sequence[str] | None = None,
+        provider_filter: Sequence[str] | None = None,
+        is_active: int | None = None,
+        order_by: str | None = None,
+        order_direction: str | None = None,
         use_cache: bool = True,
-    ) -> List[TenantAIModelResponse]:
+    ) -> list[TenantAIModelResponse]:
         """Get a list of tenant AI models.
 
         Args:
@@ -82,7 +84,9 @@ class TenantAIModelHandler:
 
         order_key = f"{order_by or 'default'}:{order_direction or 'asc'}"
         is_active_key = "all" if is_active is None else str(is_active)
-        cache_key = f"ai_models:list:tenant:{tenant_id}:skip:{skip}:limit:{limit}:order:{order_key}:active:{is_active_key}"
+        cache_key = (
+            f"ai_models:list:tenant:{tenant_id}:skip:{skip}:limit:{limit}:order:{order_key}:active:{is_active_key}"
+        )
 
         has_filters = name_filter is not None or type_filter is not None or provider_filter is not None
 
@@ -108,10 +112,7 @@ class TenantAIModelHandler:
 
             if order_by and hasattr(TenantAIModel, order_by):
                 column = getattr(TenantAIModel, order_by)
-                if order_direction == "desc":
-                    query = query.order_by(column.desc())
-                else:
-                    query = query.order_by(column.asc())
+                query = query.order_by(column.desc()) if order_direction == "desc" else query.order_by(column.asc())
 
             query = query.offset(skip).limit(limit)
             models = session.execute(query).scalars().all()
@@ -285,6 +286,7 @@ class TenantAIModelHandler:
                 ai_model.purpose_groups = [pg.value for pg in request.purpose_groups]
             if request.config is not None:
                 from unifiedui.core.database.enums import AIModelProviderEnum
+
                 provider = AIModelProviderEnum(ai_model.provider)
                 validated_config = AIModelConfigValidatorFactory.validate_config(
                     provider=provider,
@@ -356,8 +358,8 @@ class TenantAIModelHandler:
         self,
         tenant_id: str,
         purpose_group: str,
-        model_type: Optional[str] = None,
-    ) -> List[AIModelWithSecretResponse]:
+        model_type: str | None = None,
+    ) -> list[AIModelWithSecretResponse]:
         """Get active AI models by purpose group with decrypted credentials (S2S only).
 
         Args:
@@ -368,14 +370,12 @@ class TenantAIModelHandler:
         Returns:
             List of AI models with decrypted credential secrets.
         """
-        logger.info("Getting AI models by purpose", extra={
-            "tenant_id": tenant_id, "purpose_group": purpose_group
-        })
+        logger.info("Getting AI models by purpose", extra={"tenant_id": tenant_id, "purpose_group": purpose_group})
 
         with self.db_client.get_session() as session:
             query = select(TenantAIModel).where(
                 TenantAIModel.tenant_id == tenant_id,
-                TenantAIModel.is_active == True,
+                TenantAIModel.is_active,
             )
 
             if model_type:
@@ -400,9 +400,7 @@ class TenantAIModelHandler:
                     ).scalar_one_or_none()
                     if credential and credential.credential_uri:
                         try:
-                            secret_str = self.vault_client.get_secret(
-                                credential.credential_uri, use_cache=False
-                            )
+                            secret_str = self.vault_client.get_secret(credential.credential_uri, use_cache=False)
                             if secret_str:
                                 try:
                                     credential_secret = json.loads(secret_str)
@@ -411,14 +409,16 @@ class TenantAIModelHandler:
                         except Exception as e:
                             logger.error(f"Failed to decrypt credential secret: {e}")
 
-                result.append(AIModelWithSecretResponse(
-                    id=model.id,
-                    type=model.type,
-                    provider=model.provider,
-                    config=model.config or {},
-                    credential_secret=credential_secret,
-                    priority=model.priority,
-                ))
+                result.append(
+                    AIModelWithSecretResponse(
+                        id=model.id,
+                        type=model.type,
+                        provider=model.provider,
+                        config=model.config or {},
+                        credential_secret=credential_secret,
+                        priority=model.priority,
+                    )
+                )
 
             return result
 
@@ -461,10 +461,8 @@ class TenantAIModelHandler:
         purpose_groups = model.purpose_groups or []
         purpose_group_enums = []
         for pg in purpose_groups:
-            try:
+            with contextlib.suppress(ValueError):
                 purpose_group_enums.append(AIModelPurposeGroupEnum(pg))
-            except ValueError:
-                pass
 
         return TenantAIModelResponse(
             id=model.id,

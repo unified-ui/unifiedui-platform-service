@@ -1,11 +1,12 @@
 """Unit tests for unifiedui/core/identity/token_verifier.py - JWKS Token Verifier."""
+
 import time
-import pytest
-from unittest.mock import patch, MagicMock, PropertyMock
+from unittest.mock import MagicMock, patch
 
 import jwt as pyjwt
-from cryptography.hazmat.primitives.asymmetric import rsa
+import pytest
 from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
 
 from unifiedui.core.identity.token_verifier import JWKSTokenVerifier, get_token_verifier, reset_token_verifier
 
@@ -157,13 +158,15 @@ class TestJWKSTokenVerifier:
             audience="test-client-id",
         )
 
-        with patch.object(
-            verifier._jwks_client,
-            "get_signing_key_from_jwt",
-            side_effect=Exception("Network error"),
+        with (
+            patch.object(
+                verifier._jwks_client,
+                "get_signing_key_from_jwt",
+                side_effect=Exception("Network error"),
+            ),
+            pytest.raises(ValueError, match="Failed to retrieve signing key"),
         ):
-            with pytest.raises(ValueError, match="Failed to retrieve signing key"):
-                verifier.verify_and_decode("some.jwt.token")
+            verifier.verify_and_decode("some.jwt.token")
 
     def test_verify_and_decode_no_audience_validation(self):
         """Test that audience is not validated when audience is None."""

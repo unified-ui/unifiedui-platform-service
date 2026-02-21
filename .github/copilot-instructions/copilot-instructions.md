@@ -6,7 +6,7 @@ applyTo: '**'
 
 ## Project Overview
 
-**unified-ui** is a multi-tenant integration platform for AI agent systems with role-based access control (RBAC). This platform service is the core backend providing management APIs for tenants, applications, autonomous agents, ReACT agents, conversations, credentials, chat widgets, tools, tags, permissions, tenant AI models, recent visits, dashboard, and global search.
+**unified-ui** is a multi-tenant integration platform for AI agent systems with role-based access control (RBAC). This platform service is the core backend providing management APIs for tenants, chat agents, autonomous agents, ReACT agents, conversations, credentials, chat widgets, tools, tags, permissions, tenant AI models, recent visits, dashboard, and global search.
 
 **Tech Stack**: Python 3.13+ · FastAPI · SQLAlchemy · PostgreSQL · Redis · HashiCorp Vault / Azure Key Vault · MSAL · Pydantic v2 · Alembic
 
@@ -25,6 +25,7 @@ Read the relevant instruction file **before** working in that area.
 | [auth-permissions.instructions.md](./auth-permissions.instructions.md) | Touching auth middleware, RBAC, permission checks, or tenant access |
 | [infrastructure.instructions.md](./infrastructure.instructions.md) | Working with caching, vault, identity providers, or document DB |
 | [testing.instructions.md](./testing.instructions.md) | Writing tests, running tests, or understanding test patterns |
+| [github-pipelines.instructions.md](./github-pipelines.instructions.md) | Working with CI/CD workflows, adding pipelines, coverage thresholds |
 | [instruction-management.instructions.md](./instruction-management.instructions.md) | After completing work — decides if/how to update docs |
 
 ---
@@ -40,7 +41,7 @@ Read the relevant instruction file **before** working in that area.
 7. **Dependency injection** — Never instantiate DB/cache/vault clients in handlers. Always inject via `Depends()` or constructor.
 8. **Keep files under 400 lines** — Split large handlers into helper methods or separate sub-handlers.
 9. **Custom exceptions** — Use typed exceptions from `exc/` for every error case. Never raise generic `Exception`.
-10. **Run tests after changes** — After significant changes or when asked to test, run: `pytest tests/ -n auto --no-header -q`. Always run tests in parallel (`-n auto`) since there are many tests.
+10. **Run tests and lint after changes** — After significant changes or when asked to test, run: `pytest tests/ -n auto --no-header -q`. Always run tests in parallel (`-n auto`) since there are many tests. Run `ruff check . && ruff format --check .` to verify linting passes.
 
 ---
 
@@ -48,20 +49,20 @@ Read the relevant instruction file **before** working in that area.
 
 | What | Pattern | Example |
 |------|---------|---------|
-| Route file | `{resource}.py` in `apis/v1/` | `applications.py` |
-| Handler file | `{resource}.py` in `handlers/` | `applications.py` |
-| Schema (request) | `{Resource}Request` in `schema/requests/` | `CreateApplicationRequest` |
-| Schema (response) | `{Resource}Response` in `schema/responses/` | `ApplicationResponse` |
-| DB model | `{Resource}` in `core/database/models.py` | `Application` |
-| Member model | `{Resource}Member` | `ApplicationMember` |
-| Exception | `{Resource}{Error}Error` in `exc/` | `ApplicationNotFoundError` |
-| Handler class | `{Resource}Handler` | `ApplicationHandler` |
-| Dependency | `get_{resource}_handler` in `handlers/dependencies/` | `get_application_handler` |
-| Validator | `{Resource}ConfigValidator` in `handlers/validators/` | `ApplicationConfigValidator` |
+| Route file | `{resource}.py` in `apis/v1/` | `chat_agents.py` |
+| Handler file | `{resource}.py` in `handlers/` | `chat_agents.py` |
+| Schema (request) | `{Resource}Request` in `schema/requests/` | `CreateChatAgentRequest` |
+| Schema (response) | `{Resource}Response` in `schema/responses/` | `ChatAgentResponse` |
+| DB model | `{Resource}` in `core/database/models.py` | `ChatAgent` |
+| Member model | `{Resource}Member` | `ChatAgentMember` |
+| Exception | `{Resource}{Error}Error` in `exc/` | `ChatAgentNotFoundError` |
+| Handler class | `{Resource}Handler` | `ChatAgentHandler` |
+| Dependency | `get_{resource}_handler` in `handlers/dependencies/` | `get_chat_agent_handler` |
+| Validator | `{Resource}ConfigValidator` in `handlers/validators/` | `ChatAgentConfigValidator` |
 | Enum | `{Name}Enum` in `core/database/enums.py` | `PermissionActionEnum` |
-| Test file (CRUD) | `test_{resource}.py` | `test_applications.py` |
-| Test file (RBAC) | `test_{resource}_rbac.py` | `test_applications_rbac.py` |
-| Test file (Cache) | `test_{resource}_caching.py` | `test_applications_caching.py` |
+| Test file (CRUD) | `test_{resource}.py` | `test_chat_agents.py` |
+| Test file (RBAC) | `test_{resource}_rbac.py` | `test_chat_agents_rbac.py` |
+| Test file (Cache) | `test_{resource}_caching.py` | `test_chat_agents_caching.py` |
 
 ---
 
@@ -70,6 +71,9 @@ Read the relevant instruction file **before** working in that area.
 - **Dev server**: `uvicorn unifiedui.app:app --reload`
 - **Run tests**: `pytest tests/ -n auto --no-header -q`
 - **Run tests with coverage**: `pytest tests/ -n auto --cov=unifiedui --cov-report=html`
+- **Lint**: `ruff check .`
+- **Format**: `ruff format .`
+- **Lint + Format check (CI)**: `ruff check . && ruff format --check .`
 - **Type check**: `mypy unifiedui/`
 - **Migrations**: `alembic upgrade head` / `alembic revision --autogenerate -m "description"`
 - **Entry point**: `unifiedui/app.py` → `create_app()`
@@ -84,26 +88,26 @@ Read the relevant instruction file **before** working in that area.
 
 ### Mandatory docstrings:
 ```python
-class ApplicationHandler:
-    """Handler class for application business logic."""
+class ChatAgentHandler:
+    """Handler class for chat agent business logic."""
 
-    def create_application(
+    def create_chat_agent(
         self,
         tenant_id: str,
-        request: CreateApplicationRequest,
+        request: CreateChatAgentRequest,
         user_id: str,
         user: ContextIdentityUser
-    ) -> ApplicationResponse:
-        """Create a new application with the given configuration.
+    ) -> ChatAgentResponse:
+        """Create a new chat agent with the given configuration.
         
         Args:
             tenant_id: Tenant ID for scoping
-            request: Application creation request data
+            request: Chat agent creation request data
             user_id: ID of the creating user
             user: Authenticated user context
             
         Returns:
-            Created application response
+            Created chat agent response
         """
 ```
 

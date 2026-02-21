@@ -1,35 +1,33 @@
 """API routes for credential management."""
-from typing import Optional, List
 
-from fastapi import APIRouter, Depends, HTTPException, status, Request, Query
+from typing import TYPE_CHECKING
+
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import Response
 
-from unifiedui.core.identity.users import ContextIdentityUser
+from unifiedui.core.database.enums import ListViewEnum, OrderDirectionEnum, PermissionActionEnum, TenantRolesEnum
+from unifiedui.core.middleware.apis.v1.auth import authenticate, check_permissions
+from unifiedui.exc.credentials import CredentialNotFoundError
 from unifiedui.handlers.credentials import CredentialHandler
 from unifiedui.handlers.dependencies import get_credential_handler
-from unifiedui.schema.requests.credentials import CreateCredentialRequest, UpdateCredentialRequest
-from unifiedui.schema.requests.credential_permissions import SetCredentialPermissionRequest
-from unifiedui.schema.responses.credentials import CredentialResponse, CredentialSecretResponse
-from unifiedui.schema.responses.principals import (
-    PrincipalWithRolesResponse,
-    ResourcePrincipalsResponse
-)
-from unifiedui.exc.credentials import CredentialNotFoundError
-from unifiedui.core.middleware.apis.v1.auth import authenticate, check_permissions
-from unifiedui.core.database.enums import TenantRolesEnum, PermissionActionEnum, OrderDirectionEnum, ListViewEnum
 from unifiedui.logger import get_logger
+from unifiedui.schema.requests.credential_permissions import SetCredentialPermissionRequest
+from unifiedui.schema.requests.credentials import CreateCredentialRequest, UpdateCredentialRequest
+from unifiedui.schema.responses.credentials import CredentialResponse, CredentialSecretResponse
+from unifiedui.schema.responses.principals import PrincipalWithRolesResponse, ResourcePrincipalsResponse
+
+if TYPE_CHECKING:
+    from unifiedui.core.identity.users import ContextIdentityUser
 
 logger = get_logger(__name__)
 
-router = APIRouter(
-    prefix="/credentials"
-)
+router = APIRouter(prefix="/credentials")
 
 
 @router.get(
     "",
     summary="List credentials",
-    description="Get a paginated list of credentials for the current tenant. Use view=quick-list to get only id and name."
+    description="Get a paginated list of credentials for the current tenant. Use view=quick-list to get only id and name.",
 )
 @authenticate()
 async def list_credentials(
@@ -37,20 +35,26 @@ async def list_credentials(
     tenant_id: str,
     skip: int = Query(0, ge=0, description="Number of items to skip"),
     limit: int = Query(100, ge=1, le=1000, description="Maximum number of items to return"),
-    name: Optional[str] = Query(None, description="Filter by credential name"),
-    is_active: Optional[int] = Query(None, ge=0, le=1, description="Filter by active status (1=active, 0=inactive)"),
-    tags: Optional[str] = Query(None, description="Comma-separated list of tag IDs to filter by (e.g., '10001,10002,10003')"),
-    order_by: Optional[str] = Query(None, description="Column name to order by (e.g., 'name', 'created_at', 'updated_at')"),
-    order_direction: Optional[OrderDirectionEnum] = Query(None, description="Sort direction: 'asc' or 'desc'"),
-    view: Optional[ListViewEnum] = Query(None, description="View type: 'full' (default) or 'quick-list' (returns only id and name)"),
-    handler: CredentialHandler = Depends(get_credential_handler)
+    name: str | None = Query(None, description="Filter by credential name"),
+    is_active: int | None = Query(None, ge=0, le=1, description="Filter by active status (1=active, 0=inactive)"),
+    tags: str | None = Query(
+        None, description="Comma-separated list of tag IDs to filter by (e.g., '10001,10002,10003')"
+    ),
+    order_by: str | None = Query(
+        None, description="Column name to order by (e.g., 'name', 'created_at', 'updated_at')"
+    ),
+    order_direction: OrderDirectionEnum | None = Query(None, description="Sort direction: 'asc' or 'desc'"),
+    view: ListViewEnum | None = Query(
+        None, description="View type: 'full' (default) or 'quick-list' (returns only id and name)"
+    ),
+    handler: CredentialHandler = Depends(get_credential_handler),
 ):
     """
     List credentials for a tenant.
-    
+
     Users see only credentials they have permissions for, unless they have
     GLOBAL_ADMIN or CREDENTIALS_ADMIN on tenant level.
-    
+
     Args:
         request: FastAPI request with user in state
         tenant_id: Tenant ID from path
@@ -60,7 +64,7 @@ async def list_credentials(
         is_active: Optional filter by active status (None=all, 1=active, 0=inactive)
         tags: Optional comma-separated tag IDs to filter by
         handler: Credential handler dependency
-        
+
     Returns:
         List of credentials (without secret values)
     """
@@ -73,21 +77,16 @@ async def list_credentials(
             except ValueError:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Invalid tag IDs format. Must be comma-separated integers."
+                    detail="Invalid tag IDs format. Must be comma-separated integers.",
                 )
-        
+
         user: ContextIdentityUser = request.state.user
-        
+
         logger.info(
             "API: List credentials",
-            extra={
-                "tenant_id": tenant_id,
-                "user_id": user.identity.get_id(),
-                "skip": skip,
-                "limit": limit
-            }
+            extra={"tenant_id": tenant_id, "user_id": user.identity.get_id(), "skip": skip, "limit": limit},
         )
-        
+
         return handler.list_credentials(
             tenant_id=tenant_id,
             skip=skip,
@@ -98,16 +97,13 @@ async def list_credentials(
             tag_ids=tag_ids,
             order_by=order_by,
             order_direction=order_direction.value if order_direction else None,
-            view=view.value if view else None
+            view=view.value if view else None,
         )
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Failed to list credentials: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to list credentials"
-        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to list credentials")
 
 
 @router.post(
@@ -115,7 +111,7 @@ async def list_credentials(
     response_model=CredentialResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Create credential",
-    description="Create a new credential and store secret in vault"
+    description="Create a new credential and store secret in vault",
 )
 @authenticate()
 @check_permissions(
@@ -123,27 +119,27 @@ async def list_credentials(
     required_permissions=[
         TenantRolesEnum.GLOBAL_ADMIN,
         TenantRolesEnum.CREDENTIALS_ADMIN,
-        TenantRolesEnum.CREDENTIALS_CREATOR
-    ]
+        TenantRolesEnum.CREDENTIALS_CREATOR,
+    ],
 )
 async def create_credential(
     request: Request,
     tenant_id: str,
     create_request: CreateCredentialRequest,
-    handler: CredentialHandler = Depends(get_credential_handler)
+    handler: CredentialHandler = Depends(get_credential_handler),
 ) -> CredentialResponse:
     """
     Create a new credential.
-    
+
     The secret value will be stored securely in the configured vault.
     Only the vault URI will be stored in the database.
-    
+
     Args:
         request: FastAPI request with user in state
         tenant_id: Tenant ID from path
         create_request: Credential creation data
         handler: Credential handler dependency
-        
+
     Returns:
         Created credential (without secret value)
     """
@@ -151,23 +147,15 @@ async def create_credential(
         user: ContextIdentityUser = request.state.user
         logger.info(
             "API: Create credential",
-            extra={
-                "tenant_id": tenant_id,
-                "user_id": user.identity.get_id(),
-                "credential_name": create_request.name
-            }
+            extra={"tenant_id": tenant_id, "user_id": user.identity.get_id(), "credential_name": create_request.name},
         )
         return handler.create_credential(
-            tenant_id=tenant_id,
-            request=create_request,
-            user_id=user.identity.get_id(),
-            user=user
+            tenant_id=tenant_id, request=create_request, user_id=user.identity.get_id(), user=user
         )
     except Exception as e:
         logger.error(f"Failed to create credential: {e}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to create credential: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to create credential: {e!s}"
         )
 
 
@@ -175,36 +163,28 @@ async def create_credential(
     "/{credential_id}",
     response_model=CredentialResponse,
     summary="Get credential",
-    description="Get a specific credential by ID (without secret value)"
+    description="Get a specific credential by ID (without secret value)",
 )
 @authenticate()
-@check_permissions(
-    entity="credential",
-    required_permissions=[
-        PermissionActionEnum.READ
-    ]
-)
+@check_permissions(entity="credential", required_permissions=[PermissionActionEnum.READ])
 async def get_credential(
-    request: Request,
-    tenant_id: str,
-    credential_id: str,
-    handler: CredentialHandler = Depends(get_credential_handler)
+    request: Request, tenant_id: str, credential_id: str, handler: CredentialHandler = Depends(get_credential_handler)
 ) -> CredentialResponse:
     """
     Get a specific credential.
-    
+
     Note: The secret value is NOT included in the response.
     Use the internal get_credential_secret method for application use.
-    
+
     Args:
         request: FastAPI request with user in state
         tenant_id: Tenant ID from path
         credential_id: Credential ID from path
         handler: Credential handler dependency
-        
+
     Returns:
         Credential details (without secret value)
-        
+
     Raises:
         HTTPException: If credential not found or access denied
     """
@@ -212,36 +192,22 @@ async def get_credential(
         user: ContextIdentityUser = request.state.user
         logger.info(
             "API: Get credential",
-            extra={
-                "tenant_id": tenant_id,
-                "credential_id": credential_id,
-                "user_id": user.identity.get_id()
-            }
+            extra={"tenant_id": tenant_id, "credential_id": credential_id, "user_id": user.identity.get_id()},
         )
-        return handler.get_credential(
-            tenant_id=tenant_id,
-            credential_id=credential_id,
-            user=user
-        )
+        return handler.get_credential(tenant_id=tenant_id, credential_id=credential_id, user=user)
     except CredentialNotFoundError as e:
         logger.warning(f"Credential not found: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e)
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
         logger.error(f"Failed to get credential: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to get credential"
-        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to get credential")
 
 
 @router.get(
     "/{credential_id}/secret",
     response_model=CredentialSecretResponse,
     summary="Get credential secret",
-    description="Get the secret value of a credential from the vault"
+    description="Get the secret value of a credential from the vault",
 )
 @authenticate()
 @check_permissions(
@@ -250,31 +216,28 @@ async def get_credential(
         TenantRolesEnum.GLOBAL_ADMIN,
         TenantRolesEnum.CREDENTIALS_ADMIN,
         PermissionActionEnum.WRITE,
-        PermissionActionEnum.ADMIN
-    ]
+        PermissionActionEnum.ADMIN,
+    ],
 )
 async def get_credential_secret(
-    request: Request,
-    tenant_id: str,
-    credential_id: str,
-    handler: CredentialHandler = Depends(get_credential_handler)
+    request: Request, tenant_id: str, credential_id: str, handler: CredentialHandler = Depends(get_credential_handler)
 ) -> CredentialSecretResponse:
     """
     Get the secret value of a credential.
-    
+
     This endpoint returns the actual secret value from the vault.
-    Requires WRITE or ADMIN permission on the credential, 
+    Requires WRITE or ADMIN permission on the credential,
     or GLOBAL_ADMIN/CREDENTIALS_ADMIN on the tenant.
-    
+
     Args:
         request: FastAPI request with user in state
         tenant_id: Tenant ID from path
         credential_id: Credential ID from path
         handler: Credential handler dependency
-        
+
     Returns:
         The credential secret value
-        
+
     Raises:
         HTTPException: If credential not found or access denied
     """
@@ -282,79 +245,55 @@ async def get_credential_secret(
         user: ContextIdentityUser = request.state.user
         logger.info(
             "API: Get credential secret",
-            extra={
-                "tenant_id": tenant_id,
-                "credential_id": credential_id,
-                "user_id": user.identity.get_id()
-            }
+            extra={"tenant_id": tenant_id, "credential_id": credential_id, "user_id": user.identity.get_id()},
         )
-        secret_value = handler.get_credential_secret(
-            tenant_id=tenant_id,
-            credential_id=credential_id
-        )
-        
+        secret_value = handler.get_credential_secret(tenant_id=tenant_id, credential_id=credential_id)
+
         if secret_value is None:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Secret not found in vault"
-            )
-        
-        return CredentialSecretResponse(
-            credential_id=credential_id,
-            secret_value=secret_value
-        )
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Secret not found in vault")
+
+        return CredentialSecretResponse(credential_id=credential_id, secret_value=secret_value)
     except CredentialNotFoundError as e:
         logger.warning(f"Credential not found: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e)
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Failed to get credential secret: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to get credential secret"
-        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to get credential secret")
 
 
 @router.patch(
     "/{credential_id}",
     response_model=CredentialResponse,
     summary="Update credential",
-    description="Update an existing credential and optionally update the secret"
+    description="Update an existing credential and optionally update the secret",
 )
 @authenticate()
-@check_permissions(
-    entity="credential",
-    required_permissions=[
-        PermissionActionEnum.WRITE
-    ]
-)
+@check_permissions(entity="credential", required_permissions=[PermissionActionEnum.WRITE])
 async def update_credential(
     request: Request,
     tenant_id: str,
     credential_id: str,
     update_request: UpdateCredentialRequest,
-    handler: CredentialHandler = Depends(get_credential_handler)
+    handler: CredentialHandler = Depends(get_credential_handler),
 ) -> CredentialResponse:
     """
     Update a credential.
-    
+
     If secret_value is provided, the secret in the vault will be updated.
     Other fields are optional and only updated if provided.
-    
+
     Args:
         request: FastAPI request with user in state
         tenant_id: Tenant ID from path
         credential_id: Credential ID from path
         update_request: Credential update data
         handler: Credential handler dependency
-        
+
     Returns:
         Updated credential (without secret value)
-        
+
     Raises:
         HTTPException: If credential not found or update fails
     """
@@ -362,29 +301,18 @@ async def update_credential(
         user: ContextIdentityUser = request.state.user
         logger.info(
             "API: Update credential",
-            extra={
-                "tenant_id": tenant_id,
-                "credential_id": credential_id,
-                "user_id": user.identity.get_id()
-            }
+            extra={"tenant_id": tenant_id, "credential_id": credential_id, "user_id": user.identity.get_id()},
         )
         return handler.update_credential(
-            tenant_id=tenant_id,
-            credential_id=credential_id,
-            request=update_request,
-            user_id=user.identity.get_id()
+            tenant_id=tenant_id, credential_id=credential_id, request=update_request, user_id=user.identity.get_id()
         )
     except CredentialNotFoundError as e:
         logger.warning(f"Credential not found: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e)
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
         logger.error(f"Failed to update credential: {e}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to update credential: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to update credential: {e!s}"
         )
 
 
@@ -392,36 +320,28 @@ async def update_credential(
     "/{credential_id}",
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Delete credential",
-    description="Delete a credential and its secret from the vault"
+    description="Delete a credential and its secret from the vault",
 )
 @authenticate()
-@check_permissions(
-    entity="credential",
-    required_permissions=[
-        PermissionActionEnum.ADMIN
-    ]
-)
+@check_permissions(entity="credential", required_permissions=[PermissionActionEnum.ADMIN])
 async def delete_credential(
-    request: Request,
-    tenant_id: str,
-    credential_id: str,
-    handler: CredentialHandler = Depends(get_credential_handler)
+    request: Request, tenant_id: str, credential_id: str, handler: CredentialHandler = Depends(get_credential_handler)
 ) -> Response:
     """
     Delete a credential.
-    
+
     This will remove both the credential metadata from the database
     and the secret from the vault.
-    
+
     Args:
         request: FastAPI request with user in state
         tenant_id: Tenant ID from path
         credential_id: Credential ID from path
         handler: Credential handler dependency
-        
+
     Returns:
         No content (204)
-        
+
     Raises:
         HTTPException: If credential not found or deletion fails
     """
@@ -429,64 +349,47 @@ async def delete_credential(
         user: ContextIdentityUser = request.state.user
         logger.info(
             "API: Delete credential",
-            extra={
-                "tenant_id": tenant_id,
-                "credential_id": credential_id,
-                "user_id": user.identity.get_id()
-            }
+            extra={"tenant_id": tenant_id, "credential_id": credential_id, "user_id": user.identity.get_id()},
         )
-        handler.delete_credential(
-            tenant_id=tenant_id,
-            credential_id=credential_id
-        )
+        handler.delete_credential(tenant_id=tenant_id, credential_id=credential_id)
         return Response(status_code=status.HTTP_204_NO_CONTENT)
     except CredentialNotFoundError as e:
         logger.warning(f"Credential not found: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e)
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
         logger.error(f"Failed to delete credential: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to delete credential"
-        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to delete credential")
 
 
 # ========== Credential Permission Endpoints ==========
+
 
 @router.get(
     "/{credential_id}/principals",
     response_model=ResourcePrincipalsResponse,
     summary="List credential permissions",
-    description="Get all principals with permissions for a credential"
+    description="Get all principals with permissions for a credential",
 )
 @authenticate()
-@check_permissions(
-    entity="credential",
-    required_permissions=[
-        PermissionActionEnum.READ
-    ]
-)
+@check_permissions(entity="credential", required_permissions=[PermissionActionEnum.READ])
 async def list_credential_permissions(
     request: Request,
     tenant_id: str,
     credential_id: str,
     skip: int = Query(0, ge=0, description="Number of principals to skip"),
     limit: int = Query(100, ge=1, le=500, description="Maximum number of principals to return"),
-    search: Optional[str] = Query(None, description="Search term for display_name, principal_name, or mail"),
-    roles: Optional[str] = Query(None, description="Comma-separated roles to filter by (OR logic)"),
-    is_active: Optional[bool] = Query(None, description="Filter by is_active status"),
-    order_by: Optional[str] = Query(None, enum=["display_name"], description="Column to order by"),
-    order_direction: Optional[str] = Query("asc", enum=["asc", "desc"], description="Sort direction"),
-    handler: CredentialHandler = Depends(get_credential_handler)
+    search: str | None = Query(None, description="Search term for display_name, principal_name, or mail"),
+    roles: str | None = Query(None, description="Comma-separated roles to filter by (OR logic)"),
+    is_active: bool | None = Query(None, description="Filter by is_active status"),
+    order_by: str | None = Query(None, enum=["display_name"], description="Column to order by"),
+    order_direction: str | None = Query("asc", enum=["asc", "desc"], description="Sort direction"),
+    handler: CredentialHandler = Depends(get_credential_handler),
 ) -> ResourcePrincipalsResponse:
     """
     List all permissions for a credential.
-    
+
     Requires ADMIN permission on the credential or CREDENTIALS_ADMIN on tenant.
-    
+
     Args:
         request: FastAPI request with user in state
         tenant_id: Tenant ID from path
@@ -499,7 +402,7 @@ async def list_credential_permissions(
         order_by: Column to order by
         order_direction: Sort direction
         handler: Credential handler dependency
-        
+
     Returns:
         Grouped principals with their permissions
     """
@@ -507,16 +410,12 @@ async def list_credential_permissions(
         user: ContextIdentityUser = request.state.user
         logger.info(
             "API: List credential permissions",
-            extra={
-                "tenant_id": tenant_id,
-                "credential_id": credential_id,
-                "user_id": user.identity.get_id()
-            }
+            extra={"tenant_id": tenant_id, "credential_id": credential_id, "user_id": user.identity.get_id()},
         )
-        
+
         # Parse comma-separated roles
         roles_list = [r.strip() for r in roles.split(",")] if roles else None
-        
+
         return handler.list_credential_permissions(
             tenant_id=tenant_id,
             credential_id=credential_id,
@@ -526,19 +425,15 @@ async def list_credential_permissions(
             roles=roles_list,
             is_active=is_active,
             order_by=order_by,
-            order_direction=order_direction
+            order_direction=order_direction,
         )
     except CredentialNotFoundError as e:
         logger.warning(f"Credential not found: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e)
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
         logger.error(f"Failed to list credential permissions: {e}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to list credential permissions"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to list credential permissions"
         )
 
 
@@ -546,32 +441,29 @@ async def list_credential_permissions(
     "/{credential_id}/principals/{principal_id}",
     response_model=PrincipalWithRolesResponse,
     summary="Get credential permissions for principal",
-    description="Get all permissions for a specific principal on a credential"
+    description="Get all permissions for a specific principal on a credential",
 )
 @authenticate()
-@check_permissions(
-    entity="credential", required_permissions=[
-        PermissionActionEnum.READ
-    ])
+@check_permissions(entity="credential", required_permissions=[PermissionActionEnum.READ])
 async def get_credential_permission(
     request: Request,
     tenant_id: str,
     credential_id: str,
     principal_id: str,
-    handler: CredentialHandler = Depends(get_credential_handler)
+    handler: CredentialHandler = Depends(get_credential_handler),
 ) -> PrincipalWithRolesResponse:
     """
     Get all permissions for a specific principal on a credential.
-    
+
     Requires ADMIN permission on the credential or CREDENTIALS_ADMIN on tenant.
-    
+
     Args:
         request: FastAPI request with user in state
         tenant_id: Tenant ID from path
         credential_id: Credential ID from path
         principal_id: Principal ID from path
         handler: Credential handler dependency
-        
+
     Returns:
         Principal with all their permissions
     """
@@ -583,25 +475,19 @@ async def get_credential_permission(
                 "tenant_id": tenant_id,
                 "credential_id": credential_id,
                 "principal_id": principal_id,
-                "user_id": user.identity.get_id()
-            }
+                "user_id": user.identity.get_id(),
+            },
         )
         return handler.get_credential_permission(
-            tenant_id=tenant_id,
-            credential_id=credential_id,
-            principal_id=principal_id
+            tenant_id=tenant_id, credential_id=credential_id, principal_id=principal_id
         )
     except CredentialNotFoundError as e:
         logger.warning(f"Permission not found: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e)
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
         logger.error(f"Failed to get credential permission: {e}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to get credential permission"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to get credential permission"
         )
 
 
@@ -609,33 +495,29 @@ async def get_credential_permission(
     "/{credential_id}/principals",
     response_model=PrincipalWithRolesResponse,
     summary="Set credential permission",
-    description="Set or update a principal's permission for a credential"
+    description="Set or update a principal's permission for a credential",
 )
 @authenticate()
-@check_permissions(
-    entity="credential", required_permissions=[
-        PermissionActionEnum.ADMIN
-    ]
-)
+@check_permissions(entity="credential", required_permissions=[PermissionActionEnum.ADMIN])
 async def set_credential_permission(
     request: Request,
     tenant_id: str,
     credential_id: str,
     permission_request: SetCredentialPermissionRequest,
-    handler: CredentialHandler = Depends(get_credential_handler)
+    handler: CredentialHandler = Depends(get_credential_handler),
 ) -> PrincipalWithRolesResponse:
     """
     Set or update a credential permission.
-    
+
     Requires ADMIN permission on the credential or CREDENTIALS_ADMIN on tenant.
-    
+
     Args:
         request: FastAPI request with user in state
         tenant_id: Tenant ID from path
         credential_id: Credential ID from path
         permission_request: Permission data
         handler: Credential handler dependency
-        
+
     Returns:
         Created or updated permission
     """
@@ -647,27 +529,23 @@ async def set_credential_permission(
                 "tenant_id": tenant_id,
                 "credential_id": credential_id,
                 "principal_id": permission_request.principal_id,
-                "user_id": user.identity.get_id()
-            }
+                "user_id": user.identity.get_id(),
+            },
         )
         return handler.set_credential_permission(
             tenant_id=tenant_id,
             credential_id=credential_id,
             request=permission_request,
             user_id=user.identity.get_id(),
-            user=user
+            user=user,
         )
     except CredentialNotFoundError as e:
         logger.warning(f"Credential not found: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e)
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
         logger.error(f"Failed to set credential permission: {e}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to set credential permission: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to set credential permission: {e!s}"
         )
 
 
@@ -675,34 +553,29 @@ async def set_credential_permission(
     "/{credential_id}/principals",
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Delete credential permission",
-    description="Remove a principal's permission for a credential"
+    description="Remove a principal's permission for a credential",
 )
 @authenticate()
-@check_permissions(
-    entity="credential",
-    required_permissions=[
-        PermissionActionEnum.ADMIN
-    ]
-)
+@check_permissions(entity="credential", required_permissions=[PermissionActionEnum.ADMIN])
 async def delete_credential_permission(
     request: Request,
     tenant_id: str,
     credential_id: str,
     delete_request: SetCredentialPermissionRequest,
-    handler: CredentialHandler = Depends(get_credential_handler)
+    handler: CredentialHandler = Depends(get_credential_handler),
 ) -> Response:
     """
     Delete a credential permission.
-    
+
     Requires ADMIN permission on the credential or CREDENTIALS_ADMIN on tenant.
-    
+
     Args:
         request: FastAPI request with user in state
         tenant_id: Tenant ID from path
         credential_id: Credential ID from path
         delete_request: Permission deletion data (principal_id, principal_type, permission)
         handler: Credential handler dependency
-        
+
     Returns:
         No content (204)
     """
@@ -714,26 +587,22 @@ async def delete_credential_permission(
                 "tenant_id": tenant_id,
                 "credential_id": credential_id,
                 "principal_id": delete_request.principal_id,
-                "user_id": user.identity.get_id()
-            }
+                "user_id": user.identity.get_id(),
+            },
         )
         handler.delete_credential_permission(
             tenant_id=tenant_id,
             credential_id=credential_id,
             principal_id=delete_request.principal_id,
             principal_type=delete_request.principal_type,
-            permission=delete_request.role  # Changed from .permission to .role
+            permission=delete_request.role,  # Changed from .permission to .role
         )
         return Response(status_code=status.HTTP_204_NO_CONTENT)
     except CredentialNotFoundError as e:
         logger.warning(f"Permission not found: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e)
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
         logger.error(f"Failed to delete credential permission: {e}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to delete credential permission"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to delete credential permission"
         )

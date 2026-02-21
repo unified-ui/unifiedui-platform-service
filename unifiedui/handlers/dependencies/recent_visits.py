@@ -1,6 +1,7 @@
 """Dependency injection for recent visits handler."""
+
+from unifiedui.handlers.dependencies import get_cache_client, get_db_client
 from unifiedui.handlers.recent_visits import RecentVisitsHandler
-from unifiedui.handlers.dependencies import get_db_client, get_cache_client
 
 
 def get_recent_visits_handler() -> RecentVisitsHandler:

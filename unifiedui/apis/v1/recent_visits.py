@@ -1,13 +1,18 @@
 """API routes for recent visit endpoints."""
+
+from typing import TYPE_CHECKING
+
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
-from unifiedui.handlers.recent_visits import RecentVisitsHandler
-from unifiedui.handlers.dependencies.recent_visits import get_recent_visits_handler
 from unifiedui.core.middleware.apis.v1.auth import authenticate
-from unifiedui.core.identity.users import ContextIdentityUser
+from unifiedui.handlers.dependencies.recent_visits import get_recent_visits_handler
+from unifiedui.handlers.recent_visits import RecentVisitsHandler
+from unifiedui.logger import get_logger
 from unifiedui.schema.requests.recent_visits import SyncRecentVisitsRequest
 from unifiedui.schema.responses.recent_visits import RecentVisitListResponse
-from unifiedui.logger import get_logger
+
+if TYPE_CHECKING:
+    from unifiedui.core.identity.users import ContextIdentityUser
 
 logger = get_logger(__name__)
 

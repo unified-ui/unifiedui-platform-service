@@ -133,12 +133,12 @@ Generic handler for permission CRUD on any resource type. Uses `RESOURCE_PERMISS
 
 ```python
 RESOURCE_PERMISSION_CONFIG = {
-    "application": {
-        "model": Application,
-        "member_model": ApplicationMember,
-        "id_field": "application_id",
-        "cache_prefix": "app",
-        "tenant_admin_role": TenantRolesEnum.APPLICATIONS_ADMIN,
+    "chat_agent": {
+        "model": ChatAgent,
+        "member_model": ChatAgentMember,
+        "id_field": "chat_agent_id",
+        "cache_prefix": "chat_agent",
+        "tenant_admin_role": TenantRolesEnum.CHAT_AGENTS_ADMIN,
     },
     # ... one entry per resource
 }
@@ -160,7 +160,7 @@ Generic handler for user favorite operations. Uses `RESOURCE_FAVORITE_MAPPING` d
 
 ```python
 RESOURCE_FAVORITE_MAPPING = {
-    "applications": {"model": ApplicationUserFavorite, "id_field": "application_id"},
+    "chat-agents": {"model": ChatAgentUserFavorite, "id_field": "chat_agent_id"},
     "autonomous-agents": {"model": AutonomousAgentUserFavorite, "id_field": "autonomous_agent_id"},
     "chat-widgets": {"model": ChatWidgetUserFavorite, "id_field": "chat_widget_id"},
     "conversations": {"model": ConversationUserFavorite, "id_field": "conversation_id"},
@@ -205,7 +205,7 @@ Config validators live in `handlers/validators/`. Used to validate runtime confi
 
 | Validator | Purpose |
 |-----------|---------|
-| `ApplicationConfigValidatorFactory` | Validates N8N / Foundry / REST API configs |
+| `ChatAgentConfigValidatorFactory` | Validates N8N / Foundry / REST API configs |
 | `AutonomousAgentConfigValidator` | Validates autonomous agent configs |
 | `CredentialValidator` | Validates credential data |
 | `ToolValidator` | Validates tool (MCP / OpenAPI) configs |

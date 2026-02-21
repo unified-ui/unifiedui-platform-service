@@ -1,7 +1,6 @@
-from abc import ABC
 from dataclasses import dataclass
 
-from unifiedui.core.database.models.application_config.base import BaseApplicationConfig
+from unifiedui.core.database.chat_agent_config.base import BaseChatAgentConfig
 
 
 @dataclass
@@ -12,7 +11,7 @@ class N8NAuthenticationConfig:
 
 
 @dataclass
-class N8NApplicationConfig(BaseApplicationConfig):
+class N8NChatAgentConfig(BaseChatAgentConfig):
     type: str = "n8n"
     n8n_base_url: str
     authentication: N8NAuthenticationConfig

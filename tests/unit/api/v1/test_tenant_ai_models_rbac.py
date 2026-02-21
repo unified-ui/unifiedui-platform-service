@@ -1,11 +1,12 @@
 """Tests for tenant AI models RBAC (Role-Based Access Control)."""
+
 from typing import Any
+
 from fastapi import status
 from starlette.testclient import TestClient
-
-from unifiedui.core.database.enums import PrincipalTypeEnum
 from tests.conftest import create_auth_headers
 
+from unifiedui.core.database.enums import PrincipalTypeEnum
 
 ENDPOINT_TENANTS = "/api/v1/platform-service/tenants"
 ENDPOINT_AI_MODELS = "/api/v1/platform-service/tenants/{tenant_id}/ai-models"
@@ -105,8 +106,11 @@ class TestTenantAIModelRBAC:
 
         ai_admin_token = test_client.create_test_user("rbac-ai-admin", "AI Admin")
         add_user_to_tenant(
-            test_client, tenant_id, admin_headers,
-            "rbac-ai-admin", "TENANT_AI_MODELS_ADMIN",
+            test_client,
+            tenant_id,
+            admin_headers,
+            "rbac-ai-admin",
+            "TENANT_AI_MODELS_ADMIN",
         )
 
         ai_admin_headers = create_auth_headers(ai_admin_token, use_cache=False)
@@ -230,7 +234,7 @@ class TestTenantAIModelRBAC:
     def test_non_member_cannot_list(self, test_client: TestClient) -> None:
         """Test that non-members cannot list AI models."""
         admin_token = test_client.create_test_user("rbac-admin-8", "Tenant Admin")
-        admin_headers = create_auth_headers(admin_token, use_cache=False)
+        create_auth_headers(admin_token, use_cache=False)
         tenant_id = create_tenant_for_user(test_client, admin_token)
 
         outsider_token = test_client.create_test_user("rbac-outsider-1", "Outsider")
@@ -273,8 +277,11 @@ class TestTenantAIModelRBAC:
 
         ai_admin_token = test_client.create_test_user("rbac-ai-admin-2", "AI Admin 2")
         add_user_to_tenant(
-            test_client, tenant_id, admin_headers,
-            "rbac-ai-admin-2", "TENANT_AI_MODELS_ADMIN",
+            test_client,
+            tenant_id,
+            admin_headers,
+            "rbac-ai-admin-2",
+            "TENANT_AI_MODELS_ADMIN",
         )
 
         ai_admin_headers = create_auth_headers(ai_admin_token, use_cache=False)
@@ -298,8 +305,11 @@ class TestTenantAIModelRBAC:
 
         ai_admin_token = test_client.create_test_user("rbac-ai-admin-3", "AI Admin 3")
         add_user_to_tenant(
-            test_client, tenant_id, admin_headers,
-            "rbac-ai-admin-3", "TENANT_AI_MODELS_ADMIN",
+            test_client,
+            tenant_id,
+            admin_headers,
+            "rbac-ai-admin-3",
+            "TENANT_AI_MODELS_ADMIN",
         )
 
         ai_admin_headers = create_auth_headers(ai_admin_token, use_cache=False)

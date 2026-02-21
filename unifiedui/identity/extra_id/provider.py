@@ -1,5 +1,6 @@
 import base64
 import json
+
 import requests
 
 from unifiedui.core.identity.providers import BaseIdentityProvider, BaseIdentityToken
@@ -10,22 +11,22 @@ from unifiedui.utils.api_query import APIFilterQuery
 
 class ExtraIDIdentityProvider(BaseIdentityProvider, APIJSONBearerClient):
     """Microsoft Entra ID (formerly Azure AD) identity provider implementation."""
-    
+
     def __init__(self, identity_token: BaseIdentityToken):
         BaseIdentityProvider.__init__(self, identity_token)
         APIJSONBearerClient.__init__(self, base_url="https://graph.microsoft.com/v1.0")
 
     def _decode_token_payload(self, token: str) -> dict:
         """Decode JWT token payload without signature validation."""
-        parts = token.split('.')
+        parts = token.split(".")
         if len(parts) != 3:
             return {}
-        
+
         payload = parts[1]
         padding = 4 - (len(payload) % 4)
         if padding != 4:
-            payload += '=' * padding
-        
+            payload += "=" * padding
+
         try:
             decoded = base64.urlsafe_b64decode(payload)
             return json.loads(decoded)
@@ -42,26 +43,23 @@ class ExtraIDIdentityProvider(BaseIdentityProvider, APIJSONBearerClient):
         payload = self._decode_token_payload(self.identity_token.token)
         return payload.get("oid")
 
-    def get_current_user_security_groups(
-        self,
-        query: APIFilterQuery | None = None
-    ) -> list[IdentityGroupResponse]:
+    def get_current_user_security_groups(self, query: APIFilterQuery | None = None) -> list[IdentityGroupResponse]:
         """
         Get security groups for the current authenticated user or service principal.
-        
+
         For user tokens: Uses /me/memberOf
         For service principal tokens: Uses /servicePrincipals/{oid}/memberOf
-        
+
         Args:
             identity_token: User's or service principal's identity token
             query: Query parameters (search, top, next_link)
-            
+
         Returns:
             List of identity groups the user/service principal belongs to
         """
         query = query or APIFilterQuery()
         headers = self._get_headers(self.identity_token.token)
-        
+
         if query.next_link:
             url = query.next_link
             params = {}
@@ -73,129 +71,110 @@ class ExtraIDIdentityProvider(BaseIdentityProvider, APIJSONBearerClient):
                 url = self._url(f"/servicePrincipals/{oid}/memberOf/microsoft.graph.group")
             else:
                 url = self._url("/me/memberOf/microsoft.graph.group")
-            
-            params = {
-                "$select": "displayName,id",
-                "$top": query.top
-            }
-        
+
+            params = {"$select": "displayName,id", "$top": query.top}
+
         response = requests.get(url, headers=headers, params=params)
         response.raise_for_status()
-        
+
         return self._parse_groups_response(response.json())
 
     def get_security_groups(
-        self,
-        query: APIFilterQuery | None = None
+        self, query: APIFilterQuery | None = None
     ) -> tuple[list[IdentityGroupResponse], str | None]:
         """
         Get all security groups from the directory.
-        
+
         Args:
             identity_token: User's identity token
             query: Query parameters (search, top, next_link)
-            
+
         Returns:
             Tuple of (list of security groups, next_link)
         """
         query = query or APIFilterQuery()
         headers = self._get_headers(self.identity_token.token)
-        
+
         if query.search:
             headers["ConsistencyLevel"] = "eventual"
-        
+
         if query.next_link:
             url = query.next_link
             params = {}
         else:
             url = self._url("/groups")
-            params = {
-                "$select": "displayName,id",
-                "$top": query.top,
-                "$filter": "securityEnabled eq true"
-            }
+            params = {"$select": "displayName,id", "$top": query.top, "$filter": "securityEnabled eq true"}
             if query.search:
                 params["$search"] = f'"displayName:{query.search}"'
-        
+
         response = requests.get(url, headers=headers, params=params)
         response.raise_for_status()
-        
+
         data = response.json()
         groups = self._parse_groups_response(data)
         next_link = data.get("@odata.nextLink")
-        
+
         return groups, next_link
 
-    def get_users(
-        self,
-        query: APIFilterQuery | None = None
-    ) -> tuple[list[IdentityUserResponse], str | None]:
+    def get_users(self, query: APIFilterQuery | None = None) -> tuple[list[IdentityUserResponse], str | None]:
         """
         Get users from the directory.
-        
+
         Args:
             identity_token: User's identity token
             query: Query parameters (search, top, next_link)
-            
+
         Returns:
             Tuple of (list of users, next_link)
         """
         query = query or APIFilterQuery()
         headers = self._get_headers(self.identity_token.token)
-        
+
         if query.search:
             headers["ConsistencyLevel"] = "eventual"
-        
+
         if query.next_link:
             url = query.next_link
             params = {}
         else:
             url = self._url("/users")
-            params = {
-                "$select": "displayName,id,userPrincipalName",
-                "$top": query.top
-            }
+            params = {"$select": "displayName,id,userPrincipalName", "$top": query.top}
             if query.search:
                 params["$search"] = f'"displayName:{query.search}" OR "userPrincipalName:{query.search}"'
 
         response = requests.get(url, headers=headers, params=params)
         response.raise_for_status()
-        
+
         data = response.json()
         users = self._parse_users_response(data)
         next_link = data.get("@odata.nextLink")
-        
+
         return users, next_link
 
     def _parse_groups_response(self, data: dict) -> list[IdentityGroupResponse]:
         """Parse Microsoft Graph API groups response."""
         return [
-            IdentityGroupResponse(
-                id=item["id"],
-                display_name=item.get("displayName") or item["id"]
-            )
+            IdentityGroupResponse(id=item["id"], display_name=item.get("displayName") or item["id"])
             for item in data.get("value", [])
         ]
 
     def get_user_by_id(self, user_id: str) -> IdentityUserResponse:
         """
         Get a specific user by ID.
-        
+
         Args:
             user_id: The user ID to retrieve
-            
+
         Returns:
             IdentityUserResponse with user details
         """
         headers = self._get_headers(self.identity_token.token)
         url = self._url(f"/users/{user_id}")
-        params = {
-            "$select": "displayName,id,userPrincipalName,givenName,surname,mail"
-        }
-        
+        params = {"$select": "displayName,id,userPrincipalName,givenName,surname,mail"}
+
         response = requests.get(url, headers=headers, params=params)
         response.raise_for_status()
-        
+
         data = response.json()
         return IdentityUserResponse(
             id=data["id"],
@@ -205,33 +184,28 @@ class ExtraIDIdentityProvider(BaseIdentityProvider, APIJSONBearerClient):
             firstname=data.get("givenName"),
             lastname=data.get("surname"),
             mail=data.get("mail"),
-            principal_name=data.get("userPrincipalName")
+            principal_name=data.get("userPrincipalName"),
         )
 
     def get_group_by_id(self, group_id: str) -> IdentityGroupResponse:
         """
         Get a specific group by ID.
-        
+
         Args:
             group_id: The group ID to retrieve
-            
+
         Returns:
             IdentityGroupResponse with group details
         """
         headers = self._get_headers(self.identity_token.token)
         url = self._url(f"/groups/{group_id}")
-        params = {
-            "$select": "displayName,id"
-        }
-        
+        params = {"$select": "displayName,id"}
+
         response = requests.get(url, headers=headers, params=params)
         response.raise_for_status()
-        
+
         data = response.json()
-        return IdentityGroupResponse(
-            id=data["id"],
-            display_name=data["displayName"]
-        )
+        return IdentityGroupResponse(id=data["id"], display_name=data["displayName"])
 
     def _parse_users_response(self, data: dict) -> list[IdentityUserResponse]:
         """Parse Microsoft Graph API users response."""
@@ -240,7 +214,7 @@ class ExtraIDIdentityProvider(BaseIdentityProvider, APIJSONBearerClient):
                 id=item["id"],
                 identity_provider=self.identity_token.get_identity_provider(),
                 display_name=item.get("displayName", item.get("userPrincipalName", "")),
-                principal_name=item.get("userPrincipalName")
+                principal_name=item.get("userPrincipalName"),
             )
             for item in data.get("value", [])
         ]

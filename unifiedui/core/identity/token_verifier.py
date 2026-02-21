@@ -78,6 +78,7 @@ def get_token_verifier() -> JWKSTokenVerifier:
     global _verifier_instance
     if _verifier_instance is None:
         from unifiedui.core.config import settings
+
         _verifier_instance = JWKSTokenVerifier(
             jwks_url=settings.identity_jwks_url,
             algorithms=settings.identity_token_algorithms,

@@ -1,18 +1,19 @@
 """Business logic handlers for global search operations."""
+
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
-from sqlalchemy import select, or_
+from sqlalchemy import or_, select
 
-from unifiedui.core.database.client import SQLAlchemyClient
+from unifiedui.core.database.enums import PrincipalTypeEnum, TenantRolesEnum
 from unifiedui.core.database.models import (
-    Application,
-    ApplicationMember,
-    ApplicationTag,
     AutonomousAgent,
     AutonomousAgentMember,
     AutonomousAgentTag,
+    ChatAgent,
+    ChatAgentMember,
+    ChatAgentTag,
     Conversation,
     ConversationMember,
     ReActAgent,
@@ -20,29 +21,29 @@ from unifiedui.core.database.models import (
     ReActAgentTag,
     Tag,
 )
-from unifiedui.core.database.enums import TenantRolesEnum, PrincipalTypeEnum
-from unifiedui.caching.client import CacheClient
 
 if TYPE_CHECKING:
+    from unifiedui.caching.client import CacheClient
+    from unifiedui.core.database.client import SQLAlchemyClient
     from unifiedui.core.identity.users import ContextIdentityUser
 
-from unifiedui.schema.responses.search import SearchResponse, SearchResultItem
 from unifiedui.logger import get_logger
+from unifiedui.schema.responses.search import SearchResponse, SearchResultItem
 
 logger = get_logger(__name__)
 
-VALID_SEARCH_TYPES = {"application", "autonomous_agent", "conversation", "re_act_agent"}
+VALID_SEARCH_TYPES = {"chat_agent", "autonomous_agent", "conversation", "re_act_agent"}
 
 SEARCH_TYPE_CONFIG = {
-    "application": {
-        "entity_model": Application,
-        "member_model": ApplicationMember,
-        "entity_id_field": "application_id",
-        "tag_model": ApplicationTag,
-        "tag_entity_id_field": "application_id",
+    "chat_agent": {
+        "entity_model": ChatAgent,
+        "member_model": ChatAgentMember,
+        "entity_id_field": "chat_agent_id",
+        "tag_model": ChatAgentTag,
+        "tag_entity_id_field": "chat_agent_id",
         "admin_roles": [
             TenantRolesEnum.GLOBAL_ADMIN,
-            TenantRolesEnum.APPLICATIONS_ADMIN,
+            TenantRolesEnum.CHAT_AGENTS_ADMIN,
         ],
     },
     "autonomous_agent": {
@@ -87,7 +88,7 @@ class SearchHandler:
     def __init__(
         self,
         db_client: SQLAlchemyClient,
-        cache_client: Optional[CacheClient] = None,
+        cache_client: CacheClient | None = None,
     ):
         """Initialize the search handler.
 
@@ -108,15 +109,9 @@ class SearchHandler:
             List of principal IDs (user + groups).
         """
         user_id = user.identity.get_id()
-        identity_group_ids = [
-            g.id for g in user.groups
-            if g.principal_type == PrincipalTypeEnum.IDENTITY_GROUP.value
-        ]
-        custom_group_ids = [
-            g.id for g in user.groups
-            if g.principal_type == PrincipalTypeEnum.CUSTOM_GROUP.value
-        ]
-        return [user_id] + identity_group_ids + custom_group_ids
+        identity_group_ids = [g.id for g in user.groups if g.principal_type == PrincipalTypeEnum.IDENTITY_GROUP.value]
+        custom_group_ids = [g.id for g in user.groups if g.principal_type == PrincipalTypeEnum.CUSTOM_GROUP.value]
+        return [user_id, *identity_group_ids, *custom_group_ids]
 
     def _check_admin_for_type(
         self,
@@ -233,9 +228,7 @@ class SearchHandler:
         base_filters.append(or_(name_match, desc_match))
 
         search_query = (
-            select(entity_model.id, entity_model.name, entity_model.description)
-            .where(*base_filters)
-            .limit(limit)
+            select(entity_model.id, entity_model.name, entity_model.description).where(*base_filters).limit(limit)
         )
 
         rows = session.execute(search_query).all()
@@ -249,19 +242,21 @@ class SearchHandler:
             entity_ids,
         )
 
-        entity_type = [k for k, v in SEARCH_TYPE_CONFIG.items() if v is config][0]
+        entity_type = next(k for k, v in SEARCH_TYPE_CONFIG.items() if v is config)
         results: list[SearchResultItem] = []
         for entity_id, name, description in rows:
             match_field = "name" if query.lower() in (name or "").lower() else "description"
-            results.append(SearchResultItem(
-                type=entity_type,
-                id=entity_id,
-                name=name,
-                description=description,
-                match_field=match_field,
-                is_active=None,
-                tags=tags_map.get(entity_id, []),
-            ))
+            results.append(
+                SearchResultItem(
+                    type=entity_type,
+                    id=entity_id,
+                    name=name,
+                    description=description,
+                    match_field=match_field,
+                    is_active=None,
+                    tags=tags_map.get(entity_id, []),
+                )
+            )
 
         return results
 
@@ -270,7 +265,7 @@ class SearchHandler:
         tenant_id: str,
         user: ContextIdentityUser,
         query: str,
-        types: Optional[list[str]] = None,
+        types: list[str] | None = None,
         limit: int = 10,
     ) -> SearchResponse:
         """Execute global search across entity types.
@@ -303,9 +298,7 @@ class SearchHandler:
         with self.db_client.get_session() as session:
             for search_type in search_types:
                 config = SEARCH_TYPE_CONFIG[search_type]
-                is_admin = self._check_admin_for_type(
-                    user, tenant_id, config["admin_roles"]
-                )
+                is_admin = self._check_admin_for_type(user, tenant_id, config["admin_roles"])
                 type_results = self._search_entity_type(
                     session=session,
                     tenant_id=tenant_id,

@@ -1,32 +1,33 @@
 """Validators for handlers."""
-from unifiedui.handlers.validators.application_config import (
-    ApplicationConfigValidatorFactory,
-    BaseApplicationConfigValidator,
-    N8NConfigValidator,
-    N8NApplicationConfig,
+
+from unifiedui.handlers.validators.chat_agent_config import (
+    BaseChatAgentConfigValidator,
+    ChatAgentConfigValidatorFactory,
     N8NApiVersionEnum,
+    N8NChatAgentConfig,
+    N8NConfigValidator,
     N8NWorkflowTypeEnum,
 )
 from unifiedui.handlers.validators.credential_validator import (
-    CredentialTypeEnum,
     BasicAuthCredential,
+    CredentialTypeEnum,
     CredentialValidationError,
     UnsupportedCredentialTypeError,
     validate_credential_secret,
 )
 
 __all__ = [
-    # Application config validators
-    "ApplicationConfigValidatorFactory",
-    "BaseApplicationConfigValidator",
-    "N8NConfigValidator",
-    "N8NApplicationConfig",
-    "N8NApiVersionEnum",
-    "N8NWorkflowTypeEnum",
+    "BaseChatAgentConfigValidator",
+    "BasicAuthCredential",
+    # Chat agent config validators
+    "ChatAgentConfigValidatorFactory",
     # Credential validators
     "CredentialTypeEnum",
-    "BasicAuthCredential",
     "CredentialValidationError",
+    "N8NApiVersionEnum",
+    "N8NChatAgentConfig",
+    "N8NConfigValidator",
+    "N8NWorkflowTypeEnum",
     "UnsupportedCredentialTypeError",
     "validate_credential_secret",
 ]

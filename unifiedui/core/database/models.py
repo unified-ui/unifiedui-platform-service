@@ -1,38 +1,45 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 
 from sqlalchemy import (
     Boolean,
-    Integer,
-    String,
     DateTime,
     ForeignKey,
     ForeignKeyConstraint,
     Index,
-    UniqueConstraint,
+    Integer,
     Sequence,
-    func,
+    String,
+    UniqueConstraint,
 )
-from sqlalchemy.dialects import postgresql, mssql
+from sqlalchemy import Enum as SAEnum
+from sqlalchemy.dialects import mssql, postgresql
 from sqlalchemy.dialects.postgresql import TIMESTAMP as PG_TIMESTAMP
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, validates
 from sqlalchemy.types import JSON, TypeDecorator
-from sqlalchemy import Enum as SAEnum
 
-from unifiedui.core.database.enums import PermissionActionEnum, TenantRolesEnum, PrincipalTypeEnum, ApplicationTypeEnum, AutonomousAgentTypeEnum, AIModelTypeEnum, AIModelProviderEnum
+from unifiedui.core.database.enums import (
+    AIModelProviderEnum,
+    AIModelTypeEnum,
+    AutonomousAgentTypeEnum,
+    ChatAgentTypeEnum,
+    PermissionActionEnum,
+    PrincipalTypeEnum,
+    TenantRolesEnum,
+)
 
 
 # ---------- Utility functions ----------
 def utc_now() -> datetime:
     """Return current UTC time with microsecond precision."""
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 # ---------- Custom DateTime with microsecond precision ----------
 class HighPrecisionDateTime(TypeDecorator):
     """DateTime type that ensures microsecond precision across databases."""
+
     impl = DateTime
     cache_ok = True
 
@@ -78,9 +85,9 @@ PrincipalTypeSAEnum = SAEnum(
     validate_strings=True,
 )
 
-ApplicationTypeSAEnum = SAEnum(
-    *ApplicationTypeEnum.all(),
-    name="application_type",
+ChatAgentTypeSAEnum = SAEnum(
+    *ChatAgentTypeEnum.all(),
+    name="chat_agent_type",
     native_enum=False,
     create_constraint=True,
     validate_strings=True,
@@ -110,28 +117,30 @@ AIModelProviderSAEnum = SAEnum(
     validate_strings=True,
 )
 
+
 # ---------- Mixins ----------
 class IdMixin:
     """Mixin for ID field."""
+
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
 
 
 class AuditMixin:
     """Mixin for audit fields (timestamps and user tracking)."""
-    created_at: Mapped[datetime] = mapped_column(
-        HighPrecisionDateTime(), nullable=False, default=utc_now
-    )
+
+    created_at: Mapped[datetime] = mapped_column(HighPrecisionDateTime(), nullable=False, default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(
         HighPrecisionDateTime(), nullable=False, default=utc_now, onupdate=utc_now
     )
-    created_by: Mapped[Optional[str]] = mapped_column(String(50))
-    updated_by: Mapped[Optional[str]] = mapped_column(String(50))
+    created_by: Mapped[str | None] = mapped_column(String(50))
+    updated_by: Mapped[str | None] = mapped_column(String(50))
 
 
 class IdNameDescriptionMixin(IdMixin, AuditMixin):
     """Mixin for entities with ID, name, description and audit fields."""
+
     name: Mapped[str] = mapped_column(String(255), nullable=False)
-    description: Mapped[Optional[str]] = mapped_column(String(2000))
+    description: Mapped[str | None] = mapped_column(String(2000))
 
 
 class TenantScopedMixin:
@@ -142,12 +151,8 @@ class TenantScopedMixin:
 class Tenant(Base, IdNameDescriptionMixin):
     __tablename__ = "tenants"
 
-    members: Mapped[list["TenantMember"]] = relationship(
-        back_populates="tenant", cascade="all, delete-orphan"
-    )
-    principals: Mapped[list["Principal"]] = relationship(
-        back_populates="tenant", cascade="all, delete-orphan"
-    )
+    members: Mapped[list[TenantMember]] = relationship(back_populates="tenant", cascade="all, delete-orphan")
+    principals: Mapped[list[Principal]] = relationship(back_populates="tenant", cascade="all, delete-orphan")
 
 
 class TenantMember(Base, IdMixin, AuditMixin):
@@ -155,19 +160,18 @@ class TenantMember(Base, IdMixin, AuditMixin):
     Tenant membership and roles.
     Links directly to Principals via (tenant_id, principal_id).
     """
+
     __tablename__ = "tenant_members"
 
-    tenant_id: Mapped[str] = mapped_column(
-        String(36), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False
-    )
+    tenant_id: Mapped[str] = mapped_column(String(36), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False)
     principal_id: Mapped[str] = mapped_column(String(50), nullable=False)
     role: Mapped[str] = mapped_column(TenantPermissionSAEnum, nullable=False)
 
-    tenant: Mapped["Tenant"] = relationship(back_populates="members")
-    principal: Mapped["Principal"] = relationship(
+    tenant: Mapped[Tenant] = relationship(back_populates="members")
+    principal: Mapped[Principal] = relationship(
         foreign_keys="[TenantMember.tenant_id, TenantMember.principal_id]",
         primaryjoin="and_(TenantMember.tenant_id == Principal.tenant_id, TenantMember.principal_id == Principal.principal_id)",
-        overlaps="members,tenant"
+        overlaps="members,tenant",
     )
 
     __table_args__ = (
@@ -175,7 +179,7 @@ class TenantMember(Base, IdMixin, AuditMixin):
             ["tenant_id", "principal_id"],
             ["principals.tenant_id", "principals.principal_id"],
             ondelete="CASCADE",
-            name="fk_tenant_members_principal"
+            name="fk_tenant_members_principal",
         ),
         UniqueConstraint("tenant_id", "principal_id", "role", name="uq_tenant_members"),
         Index("ix_tm_tenant", "tenant_id"),
@@ -189,6 +193,7 @@ class Principal(Base):
     Principal entity representing users, identity groups, and custom groups.
     All principals (IDENTITY_USER, IDENTITY_GROUP, CUSTOM_GROUP) are stored here.
     """
+
     __tablename__ = "principals"
 
     tenant_id: Mapped[str] = mapped_column(
@@ -196,25 +201,23 @@ class Principal(Base):
     )
     principal_id: Mapped[str] = mapped_column(String(50), nullable=False, primary_key=True)
     principal_type: Mapped[str] = mapped_column(PrincipalTypeSAEnum, nullable=False)
-    mail: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    mail: Mapped[str | None] = mapped_column(String(255), nullable=True)
     display_name: Mapped[str] = mapped_column(String(255), nullable=False)
     principal_name: Mapped[str] = mapped_column(String(255), nullable=False)
-    description: Mapped[Optional[str]] = mapped_column(String(2000), nullable=True)
+    description: Mapped[str | None] = mapped_column(String(2000), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
-    created_at: Mapped[datetime] = mapped_column(
-        HighPrecisionDateTime(), nullable=False, default=utc_now
-    )
+    created_at: Mapped[datetime] = mapped_column(HighPrecisionDateTime(), nullable=False, default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(
         HighPrecisionDateTime(), nullable=False, default=utc_now, onupdate=utc_now
     )
 
     # Relationships
-    tenant: Mapped["Tenant"] = relationship(back_populates="principals")
-    custom_group_members: Mapped[list["CustomGroupMember"]] = relationship(
+    tenant: Mapped[Tenant] = relationship(back_populates="principals")
+    custom_group_members: Mapped[list[CustomGroupMember]] = relationship(
         back_populates="custom_group",
         foreign_keys="[CustomGroupMember.tenant_id, CustomGroupMember.custom_group_id]",
         primaryjoin="and_(Principal.tenant_id == CustomGroupMember.tenant_id, Principal.principal_id == CustomGroupMember.custom_group_id)",
-        cascade="all, delete-orphan"
+        cascade="all, delete-orphan",
     )
 
     __table_args__ = (
@@ -231,25 +234,24 @@ class CustomGroupMember(Base, IdMixin, AuditMixin):
     Tracks which principals (users, identity groups) are members of custom groups.
     Custom groups themselves are stored in the principals table with type CUSTOM_GROUP.
     """
+
     __tablename__ = "custom_group_members"
 
-    tenant_id: Mapped[str] = mapped_column(
-        String(36), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False
-    )
+    tenant_id: Mapped[str] = mapped_column(String(36), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False)
     custom_group_id: Mapped[str] = mapped_column(String(50), nullable=False)
     principal_id: Mapped[str] = mapped_column(String(50), nullable=False)
     role: Mapped[str] = mapped_column(PermissionActionSAEnum, nullable=False)
 
     # Relationships
-    custom_group: Mapped["Principal"] = relationship(
+    custom_group: Mapped[Principal] = relationship(
         back_populates="custom_group_members",
         foreign_keys="[CustomGroupMember.tenant_id, CustomGroupMember.custom_group_id]",
-        primaryjoin="and_(CustomGroupMember.tenant_id == Principal.tenant_id, CustomGroupMember.custom_group_id == Principal.principal_id)"
+        primaryjoin="and_(CustomGroupMember.tenant_id == Principal.tenant_id, CustomGroupMember.custom_group_id == Principal.principal_id)",
     )
-    member_principal: Mapped["Principal"] = relationship(
+    member_principal: Mapped[Principal] = relationship(
         foreign_keys="[CustomGroupMember.tenant_id, CustomGroupMember.principal_id]",
         primaryjoin="and_(CustomGroupMember.tenant_id == Principal.tenant_id, CustomGroupMember.principal_id == Principal.principal_id)",
-        overlaps="custom_group,custom_group_members"
+        overlaps="custom_group,custom_group_members",
     )
 
     __table_args__ = (
@@ -257,13 +259,13 @@ class CustomGroupMember(Base, IdMixin, AuditMixin):
             ["tenant_id", "custom_group_id"],
             ["principals.tenant_id", "principals.principal_id"],
             ondelete="CASCADE",
-            name="fk_custom_group_members_custom_group"
+            name="fk_custom_group_members_custom_group",
         ),
         ForeignKeyConstraint(
             ["tenant_id", "principal_id"],
             ["principals.tenant_id", "principals.principal_id"],
             ondelete="CASCADE",
-            name="fk_custom_group_members_principal"
+            name="fk_custom_group_members_principal",
         ),
         UniqueConstraint("tenant_id", "custom_group_id", "principal_id", name="uq_custom_group_members"),
         Index("ix_cgm_tenant", "tenant_id"),
@@ -272,49 +274,45 @@ class CustomGroupMember(Base, IdMixin, AuditMixin):
     )
 
 
-class Application(Base, IdNameDescriptionMixin, TenantScopedMixin):
-    __tablename__ = "applications"
+class ChatAgent(Base, IdNameDescriptionMixin, TenantScopedMixin):
+    """Chat agent entity for AI-powered chat integrations."""
 
-    type: Mapped[str] = mapped_column(ApplicationTypeSAEnum, nullable=False)
+    __tablename__ = "chat_agents"
+
+    type: Mapped[str] = mapped_column(ChatAgentTypeSAEnum, nullable=False)
     config: Mapped[dict] = mapped_column(PortableJSON, nullable=False, default=dict)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-    embed_allowed_origins: Mapped[Optional[str]] = mapped_column(String(2000), nullable=True, default=None)
+    embed_allowed_origins: Mapped[str | None] = mapped_column(String(2000), nullable=True, default=None)
 
-    members: Mapped[list["ApplicationMember"]] = relationship(
-        back_populates="application", cascade="all, delete-orphan"
-    )
-    tags: Mapped[list["ApplicationTag"]] = relationship(
-        back_populates="application", cascade="all, delete-orphan"
-    )
-    user_favorites: Mapped[list["ApplicationUserFavorite"]] = relationship(
-        back_populates="application", cascade="all, delete-orphan"
+    members: Mapped[list[ChatAgentMember]] = relationship(back_populates="chat_agent", cascade="all, delete-orphan")
+    tags: Mapped[list[ChatAgentTag]] = relationship(back_populates="chat_agent", cascade="all, delete-orphan")
+    user_favorites: Mapped[list[ChatAgentUserFavorite]] = relationship(
+        back_populates="chat_agent", cascade="all, delete-orphan"
     )
 
-    __table_args__ = (Index("ix_applications_tenant", "tenant_id"),)
+    __table_args__ = (Index("ix_chat_agents_tenant", "tenant_id"),)
 
 
 class Conversation(Base, IdNameDescriptionMixin, TenantScopedMixin):
     __tablename__ = "conversations"
 
-    application_id: Mapped[str] = mapped_column(
-        String(36), ForeignKey("applications.id", ondelete="CASCADE"), nullable=False
+    chat_agent_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("chat_agents.id", ondelete="CASCADE"), nullable=False
     )
-    ext_conversation_id: Mapped[Optional[str]] = mapped_column(
-        String(100), nullable=True, default=None
-    )
+    ext_conversation_id: Mapped[str | None] = mapped_column(String(100), nullable=True, default=None)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
-    application: Mapped["Application"] = relationship()
-    members: Mapped[list["ConversationMember"]] = relationship(
+    chat_agent: Mapped[ChatAgent] = relationship()
+    members: Mapped[list[ConversationMember]] = relationship(
         back_populates="conversation", cascade="all, delete-orphan"
     )
-    user_favorites: Mapped[list["ConversationUserFavorite"]] = relationship(
+    user_favorites: Mapped[list[ConversationUserFavorite]] = relationship(
         back_populates="conversation", cascade="all, delete-orphan"
     )
 
     __table_args__ = (
         Index("ix_conversations_tenant", "tenant_id"),
-        Index("ix_conversations_application", "application_id"),
+        Index("ix_conversations_chat_agent", "chat_agent_id"),
     )
 
 
@@ -325,19 +323,17 @@ class AutonomousAgent(Base, IdNameDescriptionMixin, TenantScopedMixin):
     config: Mapped[dict] = mapped_column(PortableJSON, nullable=False, default=dict)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     allow_api_keys: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-    primary_key_vault_uri: Mapped[Optional[str]] = mapped_column(String(2000), nullable=True)
-    secondary_key_vault_uri: Mapped[Optional[str]] = mapped_column(String(2000), nullable=True)
-    last_full_import: Mapped[Optional[datetime]] = mapped_column(
-        HighPrecisionDateTime(), nullable=True, default=None
-    )
+    primary_key_vault_uri: Mapped[str | None] = mapped_column(String(2000), nullable=True)
+    secondary_key_vault_uri: Mapped[str | None] = mapped_column(String(2000), nullable=True)
+    last_full_import: Mapped[datetime | None] = mapped_column(HighPrecisionDateTime(), nullable=True, default=None)
 
-    members: Mapped[list["AutonomousAgentMember"]] = relationship(
+    members: Mapped[list[AutonomousAgentMember]] = relationship(
         back_populates="autonomous_agent", cascade="all, delete-orphan"
     )
-    tags: Mapped[list["AutonomousAgentTag"]] = relationship(
+    tags: Mapped[list[AutonomousAgentTag]] = relationship(
         back_populates="autonomous_agent", cascade="all, delete-orphan"
     )
-    user_favorites: Mapped[list["AutonomousAgentUserFavorite"]] = relationship(
+    user_favorites: Mapped[list[AutonomousAgentUserFavorite]] = relationship(
         back_populates="autonomous_agent", cascade="all, delete-orphan"
     )
 
@@ -352,33 +348,30 @@ class Credential(Base, IdNameDescriptionMixin, TenantScopedMixin):
     credential_uri: Mapped[str] = mapped_column(String(2000), nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
-    members: Mapped[list["CredentialMember"]] = relationship(
-        back_populates="credential", cascade="all, delete-orphan"
-    )
-    tags: Mapped[list["CredentialTag"]] = relationship(
-        back_populates="credential", cascade="all, delete-orphan"
-    )
+    members: Mapped[list[CredentialMember]] = relationship(back_populates="credential", cascade="all, delete-orphan")
+    tags: Mapped[list[CredentialTag]] = relationship(back_populates="credential", cascade="all, delete-orphan")
 
     __table_args__ = (Index("ix_credentials_tenant", "tenant_id"),)
 
 
 # ---------- Permission tables ----------
-class ApplicationMember(Base, IdMixin, AuditMixin):
-    """Application membership table."""
-    __tablename__ = "application_members"
+class ChatAgentMember(Base, IdMixin, AuditMixin):
+    """Chat agent membership table."""
+
+    __tablename__ = "chat_agent_members"
 
     tenant_id: Mapped[str] = mapped_column(String(36), nullable=False)
-    application_id: Mapped[str] = mapped_column(
-        String(36), ForeignKey("applications.id", ondelete="CASCADE"), nullable=False
+    chat_agent_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("chat_agents.id", ondelete="CASCADE"), nullable=False
     )
     principal_id: Mapped[str] = mapped_column(String(50), nullable=False)
 
     role: Mapped[str] = mapped_column(PermissionActionSAEnum, nullable=False)
 
-    application: Mapped["Application"] = relationship(back_populates="members")
-    principal: Mapped["Principal"] = relationship(
-        foreign_keys="[ApplicationMember.tenant_id, ApplicationMember.principal_id]",
-        primaryjoin="and_(ApplicationMember.tenant_id == Principal.tenant_id, ApplicationMember.principal_id == Principal.principal_id)"
+    chat_agent: Mapped[ChatAgent] = relationship(back_populates="members")
+    principal: Mapped[Principal] = relationship(
+        foreign_keys="[ChatAgentMember.tenant_id, ChatAgentMember.principal_id]",
+        primaryjoin="and_(ChatAgentMember.tenant_id == Principal.tenant_id, ChatAgentMember.principal_id == Principal.principal_id)",
     )
 
     __table_args__ = (
@@ -386,16 +379,17 @@ class ApplicationMember(Base, IdMixin, AuditMixin):
             ["tenant_id", "principal_id"],
             ["principals.tenant_id", "principals.principal_id"],
             ondelete="CASCADE",
-            name="fk_application_members_principal"
+            name="fk_chat_agent_members_principal",
         ),
-        UniqueConstraint("application_id", "principal_id", name="uq_application_members"),
-        Index("ix_am_application", "application_id"),
-        Index("ix_am_principal", "principal_id"),
+        UniqueConstraint("chat_agent_id", "principal_id", name="uq_chat_agent_members"),
+        Index("ix_cam_chat_agent", "chat_agent_id"),
+        Index("ix_cam_principal", "principal_id"),
     )
 
 
 class ConversationMember(Base, IdMixin, AuditMixin):
     """Conversation membership table."""
+
     __tablename__ = "conversation_members"
 
     tenant_id: Mapped[str] = mapped_column(String(36), nullable=False)
@@ -406,10 +400,10 @@ class ConversationMember(Base, IdMixin, AuditMixin):
 
     role: Mapped[str] = mapped_column(PermissionActionSAEnum, nullable=False)
 
-    conversation: Mapped["Conversation"] = relationship(back_populates="members")
-    principal: Mapped["Principal"] = relationship(
+    conversation: Mapped[Conversation] = relationship(back_populates="members")
+    principal: Mapped[Principal] = relationship(
         foreign_keys="[ConversationMember.tenant_id, ConversationMember.principal_id]",
-        primaryjoin="and_(ConversationMember.tenant_id == Principal.tenant_id, ConversationMember.principal_id == Principal.principal_id)"
+        primaryjoin="and_(ConversationMember.tenant_id == Principal.tenant_id, ConversationMember.principal_id == Principal.principal_id)",
     )
 
     __table_args__ = (
@@ -417,7 +411,7 @@ class ConversationMember(Base, IdMixin, AuditMixin):
             ["tenant_id", "principal_id"],
             ["principals.tenant_id", "principals.principal_id"],
             ondelete="CASCADE",
-            name="fk_conversation_members_principal"
+            name="fk_conversation_members_principal",
         ),
         UniqueConstraint("conversation_id", "principal_id", name="uq_conversation_members"),
         Index("ix_cm_conversation", "conversation_id"),
@@ -427,6 +421,7 @@ class ConversationMember(Base, IdMixin, AuditMixin):
 
 class AutonomousAgentMember(Base, IdMixin, AuditMixin):
     """Autonomous agent membership table."""
+
     __tablename__ = "autonomous_agent_members"
 
     tenant_id: Mapped[str] = mapped_column(String(36), nullable=False)
@@ -437,10 +432,10 @@ class AutonomousAgentMember(Base, IdMixin, AuditMixin):
 
     role: Mapped[str] = mapped_column(PermissionActionSAEnum, nullable=False)
 
-    autonomous_agent: Mapped["AutonomousAgent"] = relationship(back_populates="members")
-    principal: Mapped["Principal"] = relationship(
+    autonomous_agent: Mapped[AutonomousAgent] = relationship(back_populates="members")
+    principal: Mapped[Principal] = relationship(
         foreign_keys="[AutonomousAgentMember.tenant_id, AutonomousAgentMember.principal_id]",
-        primaryjoin="and_(AutonomousAgentMember.tenant_id == Principal.tenant_id, AutonomousAgentMember.principal_id == Principal.principal_id)"
+        primaryjoin="and_(AutonomousAgentMember.tenant_id == Principal.tenant_id, AutonomousAgentMember.principal_id == Principal.principal_id)",
     )
 
     __table_args__ = (
@@ -448,7 +443,7 @@ class AutonomousAgentMember(Base, IdMixin, AuditMixin):
             ["tenant_id", "principal_id"],
             ["principals.tenant_id", "principals.principal_id"],
             ondelete="CASCADE",
-            name="fk_autonomous_agent_members_principal"
+            name="fk_autonomous_agent_members_principal",
         ),
         UniqueConstraint("autonomous_agent_id", "principal_id", name="uq_autonomous_agent_members"),
         Index("ix_aam_autonomous_agent", "autonomous_agent_id"),
@@ -458,6 +453,7 @@ class AutonomousAgentMember(Base, IdMixin, AuditMixin):
 
 class CredentialMember(Base, IdMixin, AuditMixin):
     """Credential membership table."""
+
     __tablename__ = "credential_members"
 
     tenant_id: Mapped[str] = mapped_column(String(36), nullable=False)
@@ -468,10 +464,10 @@ class CredentialMember(Base, IdMixin, AuditMixin):
 
     role: Mapped[str] = mapped_column(PermissionActionSAEnum, nullable=False)
 
-    credential: Mapped["Credential"] = relationship(back_populates="members")
-    principal: Mapped["Principal"] = relationship(
+    credential: Mapped[Credential] = relationship(back_populates="members")
+    principal: Mapped[Principal] = relationship(
         foreign_keys="[CredentialMember.tenant_id, CredentialMember.principal_id]",
-        primaryjoin="and_(CredentialMember.tenant_id == Principal.tenant_id, CredentialMember.principal_id == Principal.principal_id)"
+        primaryjoin="and_(CredentialMember.tenant_id == Principal.tenant_id, CredentialMember.principal_id == Principal.principal_id)",
     )
 
     __table_args__ = (
@@ -479,7 +475,7 @@ class CredentialMember(Base, IdMixin, AuditMixin):
             ["tenant_id", "principal_id"],
             ["principals.tenant_id", "principals.principal_id"],
             ondelete="CASCADE",
-            name="fk_credential_members_principal"
+            name="fk_credential_members_principal",
         ),
         UniqueConstraint("credential_id", "principal_id", name="uq_credential_members"),
         Index("ix_crm_credential", "credential_id"),
@@ -490,19 +486,16 @@ class CredentialMember(Base, IdMixin, AuditMixin):
 # ---------- Chat Widgets ----------
 class ChatWidget(Base, IdNameDescriptionMixin, TenantScopedMixin):
     """Chat widget entity for embedding chat interfaces."""
+
     __tablename__ = "chat_widgets"
 
-    type: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    type: Mapped[str | None] = mapped_column(String(50), nullable=True)
     config: Mapped[dict] = mapped_column(PortableJSON, nullable=False, default=dict)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
-    members: Mapped[list["ChatWidgetMember"]] = relationship(
-        back_populates="chat_widget", cascade="all, delete-orphan"
-    )
-    tags: Mapped[list["ChatWidgetTag"]] = relationship(
-        back_populates="chat_widget", cascade="all, delete-orphan"
-    )
-    user_favorites: Mapped[list["ChatWidgetUserFavorite"]] = relationship(
+    members: Mapped[list[ChatWidgetMember]] = relationship(back_populates="chat_widget", cascade="all, delete-orphan")
+    tags: Mapped[list[ChatWidgetTag]] = relationship(back_populates="chat_widget", cascade="all, delete-orphan")
+    user_favorites: Mapped[list[ChatWidgetUserFavorite]] = relationship(
         back_populates="chat_widget", cascade="all, delete-orphan"
     )
 
@@ -511,6 +504,7 @@ class ChatWidget(Base, IdNameDescriptionMixin, TenantScopedMixin):
 
 class ChatWidgetMember(Base, IdMixin, AuditMixin):
     """Chat widget membership table."""
+
     __tablename__ = "chat_widget_members"
 
     tenant_id: Mapped[str] = mapped_column(String(36), nullable=False)
@@ -521,10 +515,10 @@ class ChatWidgetMember(Base, IdMixin, AuditMixin):
 
     role: Mapped[str] = mapped_column(PermissionActionSAEnum, nullable=False)
 
-    chat_widget: Mapped["ChatWidget"] = relationship(back_populates="members")
-    principal: Mapped["Principal"] = relationship(
+    chat_widget: Mapped[ChatWidget] = relationship(back_populates="members")
+    principal: Mapped[Principal] = relationship(
         foreign_keys="[ChatWidgetMember.tenant_id, ChatWidgetMember.principal_id]",
-        primaryjoin="and_(ChatWidgetMember.tenant_id == Principal.tenant_id, ChatWidgetMember.principal_id == Principal.principal_id)"
+        primaryjoin="and_(ChatWidgetMember.tenant_id == Principal.tenant_id, ChatWidgetMember.principal_id == Principal.principal_id)",
     )
 
     __table_args__ = (
@@ -532,7 +526,7 @@ class ChatWidgetMember(Base, IdMixin, AuditMixin):
             ["tenant_id", "principal_id"],
             ["principals.tenant_id", "principals.principal_id"],
             ondelete="CASCADE",
-            name="fk_chat_widget_members_principal"
+            name="fk_chat_widget_members_principal",
         ),
         UniqueConstraint("chat_widget_id", "principal_id", name="uq_chat_widget_members"),
         Index("ix_cwm_chat_widget", "chat_widget_id"),
@@ -543,44 +537,31 @@ class ChatWidgetMember(Base, IdMixin, AuditMixin):
 # ---------- Tags ----------
 # Sequence for auto-incrementing tag IDs starting at 10000 (PostgreSQL only)
 # SQLite will use AUTOINCREMENT instead
-tag_id_seq = Sequence('tag_id_seq', start=10000, optional=True)
+tag_id_seq = Sequence("tag_id_seq", start=10000, optional=True)
 
 
 class Tag(Base, AuditMixin):
     """Tag entity for categorizing resources."""
+
     __tablename__ = "tags"
 
     # Note: For PostgreSQL, the sequence starts at 10000
     # For SQLite (tests), it starts at 1 (standard autoincrement)
-    id: Mapped[int] = mapped_column(
-        Integer, tag_id_seq, primary_key=True, autoincrement=True
-    )
-    tenant_id: Mapped[str] = mapped_column(
-        String(36), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False
-    )
+    id: Mapped[int] = mapped_column(Integer, tag_id_seq, primary_key=True, autoincrement=True)
+    tenant_id: Mapped[str] = mapped_column(String(36), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
 
     # Relationships to junction tables
-    application_tags: Mapped[list["ApplicationTag"]] = relationship(
+    chat_agent_tags: Mapped[list[ChatAgentTag]] = relationship(back_populates="tag", cascade="all, delete-orphan")
+    autonomous_agent_tags: Mapped[list[AutonomousAgentTag]] = relationship(
         back_populates="tag", cascade="all, delete-orphan"
     )
-    autonomous_agent_tags: Mapped[list["AutonomousAgentTag"]] = relationship(
-        back_populates="tag", cascade="all, delete-orphan"
-    )
-    chat_widget_tags: Mapped[list["ChatWidgetTag"]] = relationship(
-        back_populates="tag", cascade="all, delete-orphan"
-    )
-    credential_tags: Mapped[list["CredentialTag"]] = relationship(
-        back_populates="tag", cascade="all, delete-orphan"
-    )
-    tool_tags: Mapped[list["ToolTag"]] = relationship(
-        back_populates="tag", cascade="all, delete-orphan"
-    )
-    re_act_agent_tags: Mapped[list["ReActAgentTag"]] = relationship(
-        back_populates="tag", cascade="all, delete-orphan"
-    )
+    chat_widget_tags: Mapped[list[ChatWidgetTag]] = relationship(back_populates="tag", cascade="all, delete-orphan")
+    credential_tags: Mapped[list[CredentialTag]] = relationship(back_populates="tag", cascade="all, delete-orphan")
+    tool_tags: Mapped[list[ToolTag]] = relationship(back_populates="tag", cascade="all, delete-orphan")
+    re_act_agent_tags: Mapped[list[ReActAgentTag]] = relationship(back_populates="tag", cascade="all, delete-orphan")
 
-    @validates('name')
+    @validates("name")
     def convert_upper(self, key, value):
         """Convert tag name to uppercase."""
         return value.upper() if value else value
@@ -592,29 +573,31 @@ class Tag(Base, AuditMixin):
     )
 
 
-class ApplicationTag(Base, AuditMixin):
-    """Junction table for application tags."""
-    __tablename__ = "application_tags"
+class ChatAgentTag(Base, AuditMixin):
+    """Junction table for chat agent tags."""
+
+    __tablename__ = "chat_agent_tags"
 
     tenant_id: Mapped[str] = mapped_column(String(36), nullable=False, primary_key=True)
     tag_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("tags.id", ondelete="CASCADE"), nullable=False, primary_key=True
     )
-    application_id: Mapped[str] = mapped_column(
-        String(36), ForeignKey("applications.id", ondelete="CASCADE"), nullable=False, primary_key=True
+    chat_agent_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("chat_agents.id", ondelete="CASCADE"), nullable=False, primary_key=True
     )
 
-    tag: Mapped["Tag"] = relationship(back_populates="application_tags")
-    application: Mapped["Application"] = relationship(back_populates="tags")
+    tag: Mapped[Tag] = relationship(back_populates="chat_agent_tags")
+    chat_agent: Mapped[ChatAgent] = relationship(back_populates="tags")
 
     __table_args__ = (
-        Index("ix_at_application", "application_id"),
-        Index("ix_at_tag", "tag_id"),
+        Index("ix_cat_chat_agent", "chat_agent_id"),
+        Index("ix_cat_tag", "tag_id"),
     )
 
 
 class AutonomousAgentTag(Base, AuditMixin):
     """Junction table for autonomous agent tags."""
+
     __tablename__ = "autonomous_agent_tags"
 
     tenant_id: Mapped[str] = mapped_column(String(36), nullable=False, primary_key=True)
@@ -625,8 +608,8 @@ class AutonomousAgentTag(Base, AuditMixin):
         String(36), ForeignKey("autonomous_agents.id", ondelete="CASCADE"), nullable=False, primary_key=True
     )
 
-    tag: Mapped["Tag"] = relationship(back_populates="autonomous_agent_tags")
-    autonomous_agent: Mapped["AutonomousAgent"] = relationship(back_populates="tags")
+    tag: Mapped[Tag] = relationship(back_populates="autonomous_agent_tags")
+    autonomous_agent: Mapped[AutonomousAgent] = relationship(back_populates="tags")
 
     __table_args__ = (
         Index("ix_aat_autonomous_agent", "autonomous_agent_id"),
@@ -636,6 +619,7 @@ class AutonomousAgentTag(Base, AuditMixin):
 
 class ChatWidgetTag(Base, AuditMixin):
     """Junction table for chat widget tags."""
+
     __tablename__ = "chat_widget_tags"
 
     tenant_id: Mapped[str] = mapped_column(String(36), nullable=False, primary_key=True)
@@ -646,8 +630,8 @@ class ChatWidgetTag(Base, AuditMixin):
         String(36), ForeignKey("chat_widgets.id", ondelete="CASCADE"), nullable=False, primary_key=True
     )
 
-    tag: Mapped["Tag"] = relationship(back_populates="chat_widget_tags")
-    chat_widget: Mapped["ChatWidget"] = relationship(back_populates="tags")
+    tag: Mapped[Tag] = relationship(back_populates="chat_widget_tags")
+    chat_widget: Mapped[ChatWidget] = relationship(back_populates="tags")
 
     __table_args__ = (
         Index("ix_cwt_chat_widget", "chat_widget_id"),
@@ -657,6 +641,7 @@ class ChatWidgetTag(Base, AuditMixin):
 
 class CredentialTag(Base, AuditMixin):
     """Junction table for credential tags."""
+
     __tablename__ = "credential_tags"
 
     tenant_id: Mapped[str] = mapped_column(String(36), nullable=False, primary_key=True)
@@ -667,8 +652,8 @@ class CredentialTag(Base, AuditMixin):
         String(36), ForeignKey("credentials.id", ondelete="CASCADE"), nullable=False, primary_key=True
     )
 
-    tag: Mapped["Tag"] = relationship(back_populates="credential_tags")
-    credential: Mapped["Credential"] = relationship(back_populates="tags")
+    tag: Mapped[Tag] = relationship(back_populates="credential_tags")
+    credential: Mapped[Credential] = relationship(back_populates="tags")
 
     __table_args__ = (
         Index("ix_crt_credential", "credential_id"),
@@ -677,22 +662,23 @@ class CredentialTag(Base, AuditMixin):
 
 
 # ---------- User Favorites ----------
-class ApplicationUserFavorite(Base, AuditMixin):
-    """User favorites for applications."""
-    __tablename__ = "application_user_favorites"
+class ChatAgentUserFavorite(Base, AuditMixin):
+    """User favorites for chat agents."""
+
+    __tablename__ = "chat_agent_user_favorites"
 
     tenant_id: Mapped[str] = mapped_column(
         String(36), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False, primary_key=True
     )
     user_id: Mapped[str] = mapped_column(String(50), nullable=False, primary_key=True)
-    application_id: Mapped[str] = mapped_column(
-        String(36), ForeignKey("applications.id", ondelete="CASCADE"), nullable=False, primary_key=True
+    chat_agent_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("chat_agents.id", ondelete="CASCADE"), nullable=False, primary_key=True
     )
 
-    application: Mapped["Application"] = relationship(back_populates="user_favorites")
-    principal: Mapped["Principal"] = relationship(
-        foreign_keys="[ApplicationUserFavorite.tenant_id, ApplicationUserFavorite.user_id]",
-        primaryjoin="and_(ApplicationUserFavorite.tenant_id == Principal.tenant_id, ApplicationUserFavorite.user_id == Principal.principal_id)"
+    chat_agent: Mapped[ChatAgent] = relationship(back_populates="user_favorites")
+    principal: Mapped[Principal] = relationship(
+        foreign_keys="[ChatAgentUserFavorite.tenant_id, ChatAgentUserFavorite.user_id]",
+        primaryjoin="and_(ChatAgentUserFavorite.tenant_id == Principal.tenant_id, ChatAgentUserFavorite.user_id == Principal.principal_id)",
     )
 
     __table_args__ = (
@@ -700,15 +686,16 @@ class ApplicationUserFavorite(Base, AuditMixin):
             ["tenant_id", "user_id"],
             ["principals.tenant_id", "principals.principal_id"],
             ondelete="CASCADE",
-            name="fk_application_user_favorites_principal"
+            name="fk_chat_agent_user_favorites_principal",
         ),
-        Index("ix_auf_user", "user_id"),
-        Index("ix_auf_application", "application_id"),
+        Index("ix_cauf_user", "user_id"),
+        Index("ix_cauf_chat_agent", "chat_agent_id"),
     )
 
 
 class AutonomousAgentUserFavorite(Base, AuditMixin):
     """User favorites for autonomous agents."""
+
     __tablename__ = "autonomous_agent_user_favorites"
 
     tenant_id: Mapped[str] = mapped_column(
@@ -719,10 +706,10 @@ class AutonomousAgentUserFavorite(Base, AuditMixin):
         String(36), ForeignKey("autonomous_agents.id", ondelete="CASCADE"), nullable=False, primary_key=True
     )
 
-    autonomous_agent: Mapped["AutonomousAgent"] = relationship(back_populates="user_favorites")
-    principal: Mapped["Principal"] = relationship(
+    autonomous_agent: Mapped[AutonomousAgent] = relationship(back_populates="user_favorites")
+    principal: Mapped[Principal] = relationship(
         foreign_keys="[AutonomousAgentUserFavorite.tenant_id, AutonomousAgentUserFavorite.user_id]",
-        primaryjoin="and_(AutonomousAgentUserFavorite.tenant_id == Principal.tenant_id, AutonomousAgentUserFavorite.user_id == Principal.principal_id)"
+        primaryjoin="and_(AutonomousAgentUserFavorite.tenant_id == Principal.tenant_id, AutonomousAgentUserFavorite.user_id == Principal.principal_id)",
     )
 
     __table_args__ = (
@@ -730,7 +717,7 @@ class AutonomousAgentUserFavorite(Base, AuditMixin):
             ["tenant_id", "user_id"],
             ["principals.tenant_id", "principals.principal_id"],
             ondelete="CASCADE",
-            name="fk_autonomous_agent_user_favorites_principal"
+            name="fk_autonomous_agent_user_favorites_principal",
         ),
         Index("ix_aauf_user", "user_id"),
         Index("ix_aauf_autonomous_agent", "autonomous_agent_id"),
@@ -739,6 +726,7 @@ class AutonomousAgentUserFavorite(Base, AuditMixin):
 
 class ConversationUserFavorite(Base, AuditMixin):
     """User favorites for conversations."""
+
     __tablename__ = "conversation_user_favorites"
 
     tenant_id: Mapped[str] = mapped_column(
@@ -749,10 +737,10 @@ class ConversationUserFavorite(Base, AuditMixin):
         String(36), ForeignKey("conversations.id", ondelete="CASCADE"), nullable=False, primary_key=True
     )
 
-    conversation: Mapped["Conversation"] = relationship(back_populates="user_favorites")
-    principal: Mapped["Principal"] = relationship(
+    conversation: Mapped[Conversation] = relationship(back_populates="user_favorites")
+    principal: Mapped[Principal] = relationship(
         foreign_keys="[ConversationUserFavorite.tenant_id, ConversationUserFavorite.user_id]",
-        primaryjoin="and_(ConversationUserFavorite.tenant_id == Principal.tenant_id, ConversationUserFavorite.user_id == Principal.principal_id)"
+        primaryjoin="and_(ConversationUserFavorite.tenant_id == Principal.tenant_id, ConversationUserFavorite.user_id == Principal.principal_id)",
     )
 
     __table_args__ = (
@@ -760,7 +748,7 @@ class ConversationUserFavorite(Base, AuditMixin):
             ["tenant_id", "user_id"],
             ["principals.tenant_id", "principals.principal_id"],
             ondelete="CASCADE",
-            name="fk_conversation_user_favorites_principal"
+            name="fk_conversation_user_favorites_principal",
         ),
         Index("ix_cuf_user", "user_id"),
         Index("ix_cuf_conversation", "conversation_id"),
@@ -769,6 +757,7 @@ class ConversationUserFavorite(Base, AuditMixin):
 
 class ChatWidgetUserFavorite(Base, AuditMixin):
     """User favorites for chat widgets."""
+
     __tablename__ = "chat_widget_user_favorites"
 
     tenant_id: Mapped[str] = mapped_column(
@@ -779,10 +768,10 @@ class ChatWidgetUserFavorite(Base, AuditMixin):
         String(36), ForeignKey("chat_widgets.id", ondelete="CASCADE"), nullable=False, primary_key=True
     )
 
-    chat_widget: Mapped["ChatWidget"] = relationship(back_populates="user_favorites")
-    principal: Mapped["Principal"] = relationship(
+    chat_widget: Mapped[ChatWidget] = relationship(back_populates="user_favorites")
+    principal: Mapped[Principal] = relationship(
         foreign_keys="[ChatWidgetUserFavorite.tenant_id, ChatWidgetUserFavorite.user_id]",
-        primaryjoin="and_(ChatWidgetUserFavorite.tenant_id == Principal.tenant_id, ChatWidgetUserFavorite.user_id == Principal.principal_id)"
+        primaryjoin="and_(ChatWidgetUserFavorite.tenant_id == Principal.tenant_id, ChatWidgetUserFavorite.user_id == Principal.principal_id)",
     )
 
     __table_args__ = (
@@ -790,7 +779,7 @@ class ChatWidgetUserFavorite(Base, AuditMixin):
             ["tenant_id", "user_id"],
             ["principals.tenant_id", "principals.principal_id"],
             ondelete="CASCADE",
-            name="fk_chat_widget_user_favorites_principal"
+            name="fk_chat_widget_user_favorites_principal",
         ),
         Index("ix_cwuf_user", "user_id"),
         Index("ix_cwuf_chat_widget", "chat_widget_id"),
@@ -799,6 +788,7 @@ class ChatWidgetUserFavorite(Base, AuditMixin):
 
 class ReActAgentUserFavorite(Base, AuditMixin):
     """User favorites for ReACT agents."""
+
     __tablename__ = "re_act_agent_user_favorites"
 
     tenant_id: Mapped[str] = mapped_column(
@@ -809,10 +799,10 @@ class ReActAgentUserFavorite(Base, AuditMixin):
         String(36), ForeignKey("re_act_agents.id", ondelete="CASCADE"), nullable=False, primary_key=True
     )
 
-    re_act_agent: Mapped["ReActAgent"] = relationship(back_populates="user_favorites")
-    principal: Mapped["Principal"] = relationship(
+    re_act_agent: Mapped[ReActAgent] = relationship(back_populates="user_favorites")
+    principal: Mapped[Principal] = relationship(
         foreign_keys="[ReActAgentUserFavorite.tenant_id, ReActAgentUserFavorite.user_id]",
-        primaryjoin="and_(ReActAgentUserFavorite.tenant_id == Principal.tenant_id, ReActAgentUserFavorite.user_id == Principal.principal_id)"
+        primaryjoin="and_(ReActAgentUserFavorite.tenant_id == Principal.tenant_id, ReActAgentUserFavorite.user_id == Principal.principal_id)",
     )
 
     __table_args__ = (
@@ -820,7 +810,7 @@ class ReActAgentUserFavorite(Base, AuditMixin):
             ["tenant_id", "user_id"],
             ["principals.tenant_id", "principals.principal_id"],
             ondelete="CASCADE",
-            name="fk_re_act_agent_user_favorites_principal"
+            name="fk_re_act_agent_user_favorites_principal",
         ),
         Index("ix_rauf_user", "user_id"),
         Index("ix_rauf_re_act_agent", "re_act_agent_id"),
@@ -830,61 +820,58 @@ class ReActAgentUserFavorite(Base, AuditMixin):
 # ---------- Tools (ReACT Agent Tools) ----------
 class Tool(Base, IdNameDescriptionMixin, TenantScopedMixin):
     """Tool entity for ReACT agent tools (MCP servers, OpenAPI definitions)."""
+
     __tablename__ = "tools"
 
     type: Mapped[str] = mapped_column(String(50), nullable=False)
     config: Mapped[dict] = mapped_column(PortableJSON, nullable=False, default=dict)
-    credential_id: Mapped[Optional[str]] = mapped_column(
+    credential_id: Mapped[str | None] = mapped_column(
         String(36), ForeignKey("credentials.id", ondelete="SET NULL"), nullable=True
     )
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
-    credential: Mapped[Optional["Credential"]] = relationship(foreign_keys=[credential_id])
-    members: Mapped[list["ToolMember"]] = relationship(
-        back_populates="tool", cascade="all, delete-orphan"
-    )
-    tags: Mapped[list["ToolTag"]] = relationship(
-        back_populates="tool", cascade="all, delete-orphan"
-    )
+    credential: Mapped[Credential | None] = relationship(foreign_keys=[credential_id])
+    members: Mapped[list[ToolMember]] = relationship(back_populates="tool", cascade="all, delete-orphan")
+    tags: Mapped[list[ToolTag]] = relationship(back_populates="tool", cascade="all, delete-orphan")
 
     __table_args__ = (Index("ix_tools_tenant", "tenant_id"),)
 
 
 class TenantAIModel(Base, IdNameDescriptionMixin, TenantScopedMixin):
     """Tenant AI model entity for LLM and embedding model configurations."""
+
     __tablename__ = "tenant_ai_models"
 
     type: Mapped[str] = mapped_column(AIModelTypeSAEnum, nullable=False)
     provider: Mapped[str] = mapped_column(AIModelProviderSAEnum, nullable=False)
     purpose_groups: Mapped[list] = mapped_column(PortableJSON, nullable=False, default=list)
     config: Mapped[dict] = mapped_column(PortableJSON, nullable=False, default=dict)
-    credential_id: Mapped[Optional[str]] = mapped_column(
+    credential_id: Mapped[str | None] = mapped_column(
         String(36), ForeignKey("credentials.id", ondelete="SET NULL"), nullable=True
     )
     priority: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
-    credential: Mapped[Optional["Credential"]] = relationship(foreign_keys=[credential_id])
+    credential: Mapped[Credential | None] = relationship(foreign_keys=[credential_id])
 
     __table_args__ = (Index("ix_tenant_ai_models_tenant", "tenant_id"),)
 
 
 class ToolMember(Base, IdMixin, AuditMixin):
     """Tool membership table."""
+
     __tablename__ = "tool_members"
 
     tenant_id: Mapped[str] = mapped_column(String(36), nullable=False)
-    tool_id: Mapped[str] = mapped_column(
-        String(36), ForeignKey("tools.id", ondelete="CASCADE"), nullable=False
-    )
+    tool_id: Mapped[str] = mapped_column(String(36), ForeignKey("tools.id", ondelete="CASCADE"), nullable=False)
     principal_id: Mapped[str] = mapped_column(String(50), nullable=False)
 
     role: Mapped[str] = mapped_column(PermissionActionSAEnum, nullable=False)
 
-    tool: Mapped["Tool"] = relationship(back_populates="members")
-    principal: Mapped["Principal"] = relationship(
+    tool: Mapped[Tool] = relationship(back_populates="members")
+    principal: Mapped[Principal] = relationship(
         foreign_keys="[ToolMember.tenant_id, ToolMember.principal_id]",
-        primaryjoin="and_(ToolMember.tenant_id == Principal.tenant_id, ToolMember.principal_id == Principal.principal_id)"
+        primaryjoin="and_(ToolMember.tenant_id == Principal.tenant_id, ToolMember.principal_id == Principal.principal_id)",
     )
 
     __table_args__ = (
@@ -892,7 +879,7 @@ class ToolMember(Base, IdMixin, AuditMixin):
             ["tenant_id", "principal_id"],
             ["principals.tenant_id", "principals.principal_id"],
             ondelete="CASCADE",
-            name="fk_tool_members_principal"
+            name="fk_tool_members_principal",
         ),
         UniqueConstraint("tool_id", "principal_id", name="uq_tool_members"),
         Index("ix_tool_members_tool", "tool_id"),
@@ -902,6 +889,7 @@ class ToolMember(Base, IdMixin, AuditMixin):
 
 class ToolTag(Base, AuditMixin):
     """Junction table for tool tags."""
+
     __tablename__ = "tool_tags"
 
     tenant_id: Mapped[str] = mapped_column(String(36), nullable=False, primary_key=True)
@@ -912,8 +900,8 @@ class ToolTag(Base, AuditMixin):
         String(36), ForeignKey("tools.id", ondelete="CASCADE"), nullable=False, primary_key=True
     )
 
-    tag: Mapped["Tag"] = relationship(back_populates="tool_tags")
-    tool: Mapped["Tool"] = relationship(back_populates="tags")
+    tag: Mapped[Tag] = relationship(back_populates="tool_tags")
+    tool: Mapped[Tool] = relationship(back_populates="tags")
 
     __table_args__ = (
         Index("ix_tt_tool", "tool_id"),
@@ -924,25 +912,22 @@ class ToolTag(Base, AuditMixin):
 # ---------- ReACT Agents ----------
 class ReActAgent(Base, IdNameDescriptionMixin, TenantScopedMixin):
     """ReACT Agent entity for LLM-based agent configurations."""
+
     __tablename__ = "re_act_agents"
 
     ai_model_ids: Mapped[list] = mapped_column(PortableJSON, nullable=False, default=list)
-    system_prompt: Mapped[Optional[str]] = mapped_column(String(8000), nullable=True)
+    system_prompt: Mapped[str | None] = mapped_column(String(8000), nullable=True)
     tool_ids: Mapped[list] = mapped_column(PortableJSON, nullable=False, default=list)
-    security_prompt: Mapped[Optional[str]] = mapped_column(String(8000), nullable=True)
-    tool_use_prompt: Mapped[Optional[str]] = mapped_column(String(8000), nullable=True)
-    response_prompt: Mapped[Optional[str]] = mapped_column(String(8000), nullable=True)
+    security_prompt: Mapped[str | None] = mapped_column(String(8000), nullable=True)
+    tool_use_prompt: Mapped[str | None] = mapped_column(String(8000), nullable=True)
+    response_prompt: Mapped[str | None] = mapped_column(String(8000), nullable=True)
     greeting_messages: Mapped[list] = mapped_column(PortableJSON, nullable=False, default=list)
     config: Mapped[dict] = mapped_column(PortableJSON, nullable=False, default=dict)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
-    members: Mapped[list["ReActAgentMember"]] = relationship(
-        back_populates="re_act_agent", cascade="all, delete-orphan"
-    )
-    tags: Mapped[list["ReActAgentTag"]] = relationship(
-        back_populates="re_act_agent", cascade="all, delete-orphan"
-    )
-    user_favorites: Mapped[list["ReActAgentUserFavorite"]] = relationship(
+    members: Mapped[list[ReActAgentMember]] = relationship(back_populates="re_act_agent", cascade="all, delete-orphan")
+    tags: Mapped[list[ReActAgentTag]] = relationship(back_populates="re_act_agent", cascade="all, delete-orphan")
+    user_favorites: Mapped[list[ReActAgentUserFavorite]] = relationship(
         back_populates="re_act_agent", cascade="all, delete-orphan"
     )
 
@@ -951,6 +936,7 @@ class ReActAgent(Base, IdNameDescriptionMixin, TenantScopedMixin):
 
 class ReActAgentMember(Base, IdMixin, AuditMixin):
     """ReACT Agent membership table."""
+
     __tablename__ = "re_act_agent_members"
 
     tenant_id: Mapped[str] = mapped_column(String(36), nullable=False)
@@ -960,10 +946,10 @@ class ReActAgentMember(Base, IdMixin, AuditMixin):
     principal_id: Mapped[str] = mapped_column(String(50), nullable=False)
     role: Mapped[str] = mapped_column(PermissionActionSAEnum, nullable=False)
 
-    re_act_agent: Mapped["ReActAgent"] = relationship(back_populates="members")
-    principal: Mapped["Principal"] = relationship(
+    re_act_agent: Mapped[ReActAgent] = relationship(back_populates="members")
+    principal: Mapped[Principal] = relationship(
         foreign_keys="[ReActAgentMember.tenant_id, ReActAgentMember.principal_id]",
-        primaryjoin="and_(ReActAgentMember.tenant_id == Principal.tenant_id, ReActAgentMember.principal_id == Principal.principal_id)"
+        primaryjoin="and_(ReActAgentMember.tenant_id == Principal.tenant_id, ReActAgentMember.principal_id == Principal.principal_id)",
     )
 
     __table_args__ = (
@@ -971,7 +957,7 @@ class ReActAgentMember(Base, IdMixin, AuditMixin):
             ["tenant_id", "principal_id"],
             ["principals.tenant_id", "principals.principal_id"],
             ondelete="CASCADE",
-            name="fk_re_act_agent_members_principal"
+            name="fk_re_act_agent_members_principal",
         ),
         UniqueConstraint("re_act_agent_id", "principal_id", name="uq_re_act_agent_members"),
         Index("ix_re_act_agent_members_agent", "re_act_agent_id"),
@@ -981,6 +967,7 @@ class ReActAgentMember(Base, IdMixin, AuditMixin):
 
 class ReActAgentTag(Base, AuditMixin):
     """Junction table for ReACT agent tags."""
+
     __tablename__ = "re_act_agent_tags"
 
     tenant_id: Mapped[str] = mapped_column(String(36), nullable=False, primary_key=True)
@@ -991,8 +978,8 @@ class ReActAgentTag(Base, AuditMixin):
         String(36), ForeignKey("re_act_agents.id", ondelete="CASCADE"), nullable=False, primary_key=True
     )
 
-    tag: Mapped["Tag"] = relationship(back_populates="re_act_agent_tags")
-    re_act_agent: Mapped["ReActAgent"] = relationship(back_populates="tags")
+    tag: Mapped[Tag] = relationship(back_populates="re_act_agent_tags")
+    re_act_agent: Mapped[ReActAgent] = relationship(back_populates="tags")
 
     __table_args__ = (
         Index("ix_rat_agent", "re_act_agent_id"),
@@ -1003,15 +990,14 @@ class ReActAgentTag(Base, AuditMixin):
 # ---------- Recent Visits ----------
 class RecentVisit(Base, IdMixin, TenantScopedMixin):
     """Recent visit tracking for users."""
+
     __tablename__ = "recent_visits"
 
     user_id: Mapped[str] = mapped_column(String(255), nullable=False)
     resource_type: Mapped[str] = mapped_column(String(50), nullable=False)
     resource_id: Mapped[str] = mapped_column(String(36), nullable=False)
     resource_name: Mapped[str] = mapped_column(String(255), nullable=False)
-    visited_at: Mapped[datetime] = mapped_column(
-        HighPrecisionDateTime(), nullable=False, default=utc_now
-    )
+    visited_at: Mapped[datetime] = mapped_column(HighPrecisionDateTime(), nullable=False, default=utc_now)
 
     __table_args__ = (
         UniqueConstraint("tenant_id", "user_id", "resource_type", "resource_id", name="uq_recent_visits"),

@@ -1,4 +1,5 @@
 """Request schemas for recent visits."""
+
 from __future__ import annotations
 
 from pydantic import BaseModel, Field

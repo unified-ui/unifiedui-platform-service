@@ -25,7 +25,7 @@ Permission check applied after `@authenticate()`.
 
 ```python
 @check_permissions(
-    entity="application",  # or "tenant", "credential", "autonomous_agent", etc.
+    entity="chat_agent",  # or "tenant", "credential", "autonomous_agent", etc.
     required_permissions=[PermissionActionEnum.WRITE, PermissionActionEnum.ADMIN]
 )
 ```
@@ -44,7 +44,7 @@ Permission check applied after `@authenticate()`.
 | Entity | Member Model | ID Path Param |
 |--------|-------------|---------------|
 | `tenant` | (uses TenantRolesEnum) | `tenant_id` |
-| `application` | ApplicationMember | `application_id` |
+| `chat_agent` | ChatAgentMember | `chat_agent_id` |
 | `credential` | CredentialMember | `credential_id` |
 | `autonomous_agent` | AutonomousAgentMember | `autonomous_agent_id` |
 | `custom_group` | CustomGroupMember | `custom_group_id` |
@@ -171,13 +171,13 @@ Returns the calling user's effective permission on each resource in API response
 
 ```python
 principal_ids = await get_principal_ids(user, db, tenant_id)
-is_admin = check_is_admin(user, tenant_id, "application")
+is_admin = check_is_admin(user, tenant_id, "chat_agent")
 
 # Single resource
-my_perm = resolve_my_permission(db, ApplicationMember, app.id, principal_ids, is_admin)
+my_perm = resolve_my_permission(db, ChatAgentMember, app.id, principal_ids, is_admin)
 
 # Bulk (list endpoints)
-perms = resolve_my_permissions_bulk(db, ApplicationMember, app_ids, principal_ids, is_admin)
+perms = resolve_my_permissions_bulk(db, ChatAgentMember, app_ids, principal_ids, is_admin)
 ```
 
 ### Response Schema
@@ -185,14 +185,14 @@ perms = resolve_my_permissions_bulk(db, ApplicationMember, app_ids, principal_id
 All 7 RBAC resource response schemas include:
 
 ```python
-class ApplicationResponse(BaseModel):
+class ChatAgentResponse(BaseModel):
     # ... other fields ...
     my_permission: Optional[str] = None
 ```
 
 ### Supported Resources
 
-Application, AutonomousAgent, ChatWidget, ReActAgent, Conversation, Credential, Tool.
+ChatAgent, AutonomousAgent, ChatWidget, ReActAgent, Conversation, Credential, Tool.
 
 ### Adding New Roles
 

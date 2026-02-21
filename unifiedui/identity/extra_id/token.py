@@ -1,9 +1,8 @@
-from unifiedui.core.identity.providers import BaseIdentityToken
 from unifiedui.core.identity.enums import IdenityProviderEnum
+from unifiedui.core.identity.providers import BaseIdentityToken
 
 
 class ExtraIDIdentityTokenSerializer(BaseIdentityToken):
-
     def __init__(self, token: str, deserialized_token: dict):
         self._identity_provider = IdenityProviderEnum.EXTRA_ID.value
         super().__init__(token, deserialized_token)
@@ -30,22 +29,22 @@ class ExtraIDIdentityTokenSerializer(BaseIdentityToken):
         given_name = self.deserialized_token.get("given_name", "")
         if given_name:
             return given_name
-        
+
         name = self.deserialized_token.get("name", "")
         if name and " " in name:
             return name.split(" ", 1)[0]
-        
+
         return ""
 
     def get_lastname(self) -> str:
         family_name = self.deserialized_token.get("family_name", "")
         if family_name:
             return family_name
-        
+
         name = self.deserialized_token.get("name", "")
         if name and " " in name:
             return name.split(" ", 1)[1]
-        
+
         return ""
 
     def get_mail(self):

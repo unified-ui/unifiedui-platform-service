@@ -1,27 +1,28 @@
 """Business logic handlers for dashboard operations."""
+
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
-from sqlalchemy import select, func
+from sqlalchemy import func, select
 
-from unifiedui.core.database.client import SQLAlchemyClient
+from unifiedui.core.database.enums import TenantRolesEnum
 from unifiedui.core.database.models import (
-    Application,
-    ApplicationMember,
     AutonomousAgent,
     AutonomousAgentMember,
+    ChatAgent,
+    ChatAgentMember,
     Conversation,
     ConversationMember,
 )
-from unifiedui.core.database.enums import TenantRolesEnum
-from unifiedui.caching.client import CacheClient
 
 if TYPE_CHECKING:
+    from unifiedui.caching.client import CacheClient
+    from unifiedui.core.database.client import SQLAlchemyClient
     from unifiedui.core.identity.users import ContextIdentityUser
 
-from unifiedui.schema.responses.dashboard import DashboardStatsResponse, EntityStatsResponse
 from unifiedui.logger import get_logger
+from unifiedui.schema.responses.dashboard import DashboardStatsResponse, EntityStatsResponse
 
 logger = get_logger(__name__)
 
@@ -32,7 +33,7 @@ class DashboardHandler:
     def __init__(
         self,
         db_client: SQLAlchemyClient,
-        cache_client: Optional[CacheClient] = None,
+        cache_client: CacheClient | None = None,
     ):
         """Initialize the dashboard handler.
 
@@ -99,7 +100,7 @@ class DashboardHandler:
                 user_id = user.identity.get_id()
                 identity_group_ids = [g.id for g in user.groups]
                 custom_group_ids = [g.id for g in user.custom_groups]
-                principal_ids = [user_id] + identity_group_ids + custom_group_ids
+                principal_ids = [user_id, *identity_group_ids, *custom_group_ids]
 
                 member_subquery = (
                     select(getattr(member_model, entity_id_field))
@@ -115,9 +116,7 @@ class DashboardHandler:
             total = session.execute(total_query).scalar() or 0
 
             if has_active_field:
-                active_query = select(func.count(entity_model.id)).where(
-                    *base_filter, entity_model.is_active.is_(True)
-                )
+                active_query = select(func.count(entity_model.id)).where(*base_filter, entity_model.is_active.is_(True))
                 active = session.execute(active_query).scalar() or 0
                 inactive = total - active
             else:
@@ -150,16 +149,20 @@ class DashboardHandler:
             if cached:
                 return DashboardStatsResponse(**cached)
 
-        is_admin = self._check_tenant_admin(user, tenant_id, [
-            TenantRolesEnum.GLOBAL_ADMIN,
-        ])
+        is_admin = self._check_tenant_admin(
+            user,
+            tenant_id,
+            [
+                TenantRolesEnum.GLOBAL_ADMIN,
+            ],
+        )
 
-        applications = self._count_entity_with_permissions(
+        chat_agents = self._count_entity_with_permissions(
             tenant_id=tenant_id,
             user=user,
-            entity_model=Application,
-            member_model=ApplicationMember,
-            entity_id_field="application_id",
+            entity_model=ChatAgent,
+            member_model=ChatAgentMember,
+            entity_id_field="chat_agent_id",
             is_admin=is_admin,
             has_active_field=True,
         )
@@ -185,7 +188,7 @@ class DashboardHandler:
         )
 
         result = DashboardStatsResponse(
-            applications=applications,
+            chat_agents=chat_agents,
             autonomous_agents=autonomous_agents,
             conversations=conversations,
         )

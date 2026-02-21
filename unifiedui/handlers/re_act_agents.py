@@ -1,34 +1,37 @@
 """Business logic handlers for ReACT agent operations."""
+
 from __future__ import annotations
 
 import uuid
-from typing import TYPE_CHECKING, Optional, List, Union
+from typing import TYPE_CHECKING
 
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
-from unifiedui.core.database.client import SQLAlchemyClient
-from unifiedui.core.database.models import ReActAgent, ReActAgentMember, ReActAgentTag
 from unifiedui.core.database.enums import PermissionActionEnum
-from unifiedui.caching.client import CacheClient
-from unifiedui.handlers.permission_resolver import resolve_my_permissions_bulk, resolve_my_permission, get_principal_ids, check_is_admin
+from unifiedui.core.database.models import ReActAgent, ReActAgentMember, ReActAgentTag
+from unifiedui.handlers.permission_resolver import (
+    check_is_admin,
+    get_principal_ids,
+    resolve_my_permission,
+    resolve_my_permissions_bulk,
+)
 
 if TYPE_CHECKING:
+    from unifiedui.caching.client import CacheClient
+    from unifiedui.core.database.client import SQLAlchemyClient
     from unifiedui.core.identity.users import ContextIdentityUser
     from unifiedui.handlers.resource_permissions import ResourcePermissionsHandler
     from unifiedui.handlers.resource_tags import ResourceTagsHandler
+    from unifiedui.schema.requests.re_act_agent_permissions import SetReActAgentPermissionRequest
+    from unifiedui.schema.requests.re_act_agents import CreateReActAgentRequest, UpdateReActAgentRequest
 
-from unifiedui.schema.requests.re_act_agents import CreateReActAgentRequest, UpdateReActAgentRequest
-from unifiedui.schema.requests.re_act_agent_permissions import SetReActAgentPermissionRequest
-from unifiedui.schema.responses.re_act_agents import ReActAgentResponse
-from unifiedui.schema.responses.common import QuickListItemResponse
-from unifiedui.schema.responses.tags import TagSummary
-from unifiedui.schema.responses.principals import (
-    PrincipalWithRolesResponse,
-    ResourcePrincipalsResponse
-)
 from unifiedui.exc.re_act_agents import ReActAgentNotFoundError
 from unifiedui.logger import get_logger
+from unifiedui.schema.responses.common import QuickListItemResponse
+from unifiedui.schema.responses.principals import PrincipalWithRolesResponse, ResourcePrincipalsResponse
+from unifiedui.schema.responses.re_act_agents import ReActAgentResponse
+from unifiedui.schema.responses.tags import TagSummary
 
 logger = get_logger(__name__)
 
@@ -39,9 +42,9 @@ class ReActAgentHandler:
     def __init__(
         self,
         db_client: SQLAlchemyClient,
-        cache_client: Optional[CacheClient] = None,
-        permissions_handler: Optional[ResourcePermissionsHandler] = None,
-        tags_handler: Optional[ResourceTagsHandler] = None
+        cache_client: CacheClient | None = None,
+        permissions_handler: ResourcePermissionsHandler | None = None,
+        tags_handler: ResourceTagsHandler | None = None,
     ):
         """Initialize ReActAgentHandler.
 
@@ -61,6 +64,7 @@ class ReActAgentHandler:
         """Lazily initialize permissions handler."""
         if self._permissions_handler is None:
             from unifiedui.handlers.resource_permissions import ResourcePermissionsHandler
+
             self._permissions_handler = ResourcePermissionsHandler(self.db_client, self.cache_client)
         return self._permissions_handler
 
@@ -69,6 +73,7 @@ class ReActAgentHandler:
         """Lazily initialize tags handler."""
         if self._tags_handler is None:
             from unifiedui.handlers.resource_tags import ResourceTagsHandler
+
             self._tags_handler = ResourceTagsHandler(self.db_client, self.cache_client)
         return self._tags_handler
 
@@ -78,14 +83,14 @@ class ReActAgentHandler:
         user: ContextIdentityUser,
         skip: int = 0,
         limit: int = 100,
-        name_filter: Optional[str] = None,
-        is_active: Optional[int] = None,
-        tag_ids: Optional[List[int]] = None,
-        order_by: Optional[str] = None,
-        order_direction: Optional[str] = None,
-        view: Optional[str] = None,
-        use_cache: bool = True
-    ) -> Union[List[ReActAgentResponse], List[QuickListItemResponse]]:
+        name_filter: str | None = None,
+        is_active: int | None = None,
+        tag_ids: list[int] | None = None,
+        order_by: str | None = None,
+        order_direction: str | None = None,
+        view: str | None = None,
+        use_cache: bool = True,
+    ) -> list[ReActAgentResponse] | list[QuickListItemResponse]:
         """List ReACT agents for a tenant filtered by user permissions.
 
         Args:
@@ -110,18 +115,12 @@ class ReActAgentHandler:
 
         user_id = user.identity.get_id()
         user_tenants = user.tenants
-        matching_tenant = next(
-            (t for t in user_tenants if t["tenant"]["id"] == tenant_id),
-            None
-        )
+        matching_tenant = next((t for t in user_tenants if t["tenant"]["id"] == tenant_id), None)
 
         is_admin = False
         if matching_tenant:
             user_roles = matching_tenant["roles"]
-            admin_permissions = [
-                TenantRolesEnum.GLOBAL_ADMIN.value,
-                TenantRolesEnum.REACT_AGENT_ADMIN.value
-            ]
+            admin_permissions = [TenantRolesEnum.GLOBAL_ADMIN.value, TenantRolesEnum.REACT_AGENT_ADMIN.value]
             is_admin = any(perm in user_roles for perm in admin_permissions)
 
         identity_group_ids = None
@@ -149,9 +148,11 @@ class ReActAgentHandler:
                 logger.warning(f"Failed to get cached ReACT agent list: {e}")
 
         with self.db_client.get_session() as session:
-            query = select(ReActAgent).options(
-                selectinload(ReActAgent.tags).selectinload(ReActAgentTag.tag)
-            ).where(ReActAgent.tenant_id == tenant_id)
+            query = (
+                select(ReActAgent)
+                .options(selectinload(ReActAgent.tags).selectinload(ReActAgentTag.tag))
+                .where(ReActAgent.tenant_id == tenant_id)
+            )
 
             if not is_admin:
                 principal_ids = [user_id]
@@ -162,10 +163,7 @@ class ReActAgentHandler:
 
                 member_subquery = (
                     select(ReActAgentMember.re_act_agent_id)
-                    .where(
-                        ReActAgentMember.tenant_id == tenant_id,
-                        ReActAgentMember.principal_id.in_(principal_ids)
-                    )
+                    .where(ReActAgentMember.tenant_id == tenant_id, ReActAgentMember.principal_id.in_(principal_ids))
                     .distinct()
                 )
 
@@ -180,20 +178,14 @@ class ReActAgentHandler:
             if tag_ids:
                 tag_subquery = (
                     select(ReActAgentTag.re_act_agent_id)
-                    .where(
-                        ReActAgentTag.tenant_id == tenant_id,
-                        ReActAgentTag.tag_id.in_(tag_ids)
-                    )
+                    .where(ReActAgentTag.tenant_id == tenant_id, ReActAgentTag.tag_id.in_(tag_ids))
                     .distinct()
                 )
                 query = query.where(ReActAgent.id.in_(tag_subquery))
 
             if order_by and hasattr(ReActAgent, order_by):
                 column = getattr(ReActAgent, order_by)
-                if order_direction == "desc":
-                    query = query.order_by(column.desc())
-                else:
-                    query = query.order_by(column.asc())
+                query = query.order_by(column.desc()) if order_direction == "desc" else query.order_by(column.asc())
 
             query = query.offset(skip).limit(limit)
             agents = session.execute(query).scalars().all()
@@ -212,8 +204,7 @@ class ReActAgentHandler:
                 resource_ids = [r.id for r in result]
                 if resource_ids:
                     permissions = resolve_my_permissions_bulk(
-                        session, ReActAgentMember, "re_act_agent_id",
-                        tenant_id, resource_ids, principal_ids
+                        session, ReActAgentMember, "re_act_agent_id", tenant_id, resource_ids, principal_ids
                     )
                     for r in result:
                         r.my_permission = permissions.get(r.id)
@@ -229,11 +220,7 @@ class ReActAgentHandler:
             return result
 
     def get_re_act_agent(
-        self,
-        tenant_id: str,
-        re_act_agent_id: str,
-        user: Optional[ContextIdentityUser] = None,
-        use_cache: bool = True
+        self, tenant_id: str, re_act_agent_id: str, user: ContextIdentityUser | None = None, use_cache: bool = True
     ) -> ReActAgentResponse:
         """Get a specific ReACT agent by ID.
 
@@ -266,11 +253,10 @@ class ReActAgentHandler:
                 logger.warning(f"Failed to get cached ReACT agent: {e}")
 
         with self.db_client.get_session() as session:
-            query = select(ReActAgent).options(
-                selectinload(ReActAgent.tags).selectinload(ReActAgentTag.tag)
-            ).where(
-                ReActAgent.id == re_act_agent_id,
-                ReActAgent.tenant_id == tenant_id
+            query = (
+                select(ReActAgent)
+                .options(selectinload(ReActAgent.tags).selectinload(ReActAgentTag.tag))
+                .where(ReActAgent.id == re_act_agent_id, ReActAgent.tenant_id == tenant_id)
             )
             agent = session.execute(query).scalar_one_or_none()
 
@@ -287,18 +273,12 @@ class ReActAgentHandler:
                     logger.warning(f"Failed to cache ReACT agent: {e}")
 
             if user:
-                result.my_permission = self._resolve_user_permission(
-                    session, tenant_id, re_act_agent_id, user
-                )
+                result.my_permission = self._resolve_user_permission(session, tenant_id, re_act_agent_id, user)
 
             return result
 
     def create_re_act_agent(
-        self,
-        tenant_id: str,
-        request: CreateReActAgentRequest,
-        user_id: str,
-        user: ContextIdentityUser
+        self, tenant_id: str, request: CreateReActAgentRequest, user_id: str, user: ContextIdentityUser
     ) -> ReActAgentResponse:
         """Create a new ReACT agent.
 
@@ -331,7 +311,7 @@ class ReActAgentHandler:
                 config=request.config or {},
                 is_active=request.is_active,
                 created_by=user_id,
-                updated_by=user_id
+                updated_by=user_id,
             )
             session.add(agent)
 
@@ -341,7 +321,7 @@ class ReActAgentHandler:
                 tenant_id=tenant_id,
                 resource_id=agent_id,
                 user_id=user_id,
-                user=user
+                user=user,
             )
 
             session.commit()
@@ -354,11 +334,7 @@ class ReActAgentHandler:
             return self._model_to_response(agent)
 
     def update_re_act_agent(
-        self,
-        tenant_id: str,
-        re_act_agent_id: str,
-        request: UpdateReActAgentRequest,
-        user_id: str
+        self, tenant_id: str, re_act_agent_id: str, request: UpdateReActAgentRequest, user_id: str
     ) -> ReActAgentResponse:
         """Update an existing ReACT agent.
 
@@ -374,11 +350,10 @@ class ReActAgentHandler:
         logger.info("Updating ReACT agent", extra={"tenant_id": tenant_id, "re_act_agent_id": re_act_agent_id})
 
         with self.db_client.get_session() as session:
-            query = select(ReActAgent).options(
-                selectinload(ReActAgent.tags).selectinload(ReActAgentTag.tag)
-            ).where(
-                ReActAgent.id == re_act_agent_id,
-                ReActAgent.tenant_id == tenant_id
+            query = (
+                select(ReActAgent)
+                .options(selectinload(ReActAgent.tags).selectinload(ReActAgentTag.tag))
+                .where(ReActAgent.id == re_act_agent_id, ReActAgent.tenant_id == tenant_id)
             )
             agent = session.execute(query).scalar_one_or_none()
 
@@ -413,9 +388,11 @@ class ReActAgentHandler:
             session.commit()
             session.refresh(agent)
 
-            query = select(ReActAgent).options(
-                selectinload(ReActAgent.tags).selectinload(ReActAgentTag.tag)
-            ).where(ReActAgent.id == re_act_agent_id)
+            query = (
+                select(ReActAgent)
+                .options(selectinload(ReActAgent.tags).selectinload(ReActAgentTag.tag))
+                .where(ReActAgent.id == re_act_agent_id)
+            )
             agent = session.execute(query).scalar_one()
 
             logger.info("ReACT agent updated", extra={"re_act_agent_id": re_act_agent_id})
@@ -425,11 +402,7 @@ class ReActAgentHandler:
 
             return self._model_to_response(agent)
 
-    def delete_re_act_agent(
-        self,
-        tenant_id: str,
-        re_act_agent_id: str
-    ) -> None:
+    def delete_re_act_agent(self, tenant_id: str, re_act_agent_id: str) -> None:
         """Delete a ReACT agent.
 
         Args:
@@ -439,10 +412,7 @@ class ReActAgentHandler:
         logger.info("Deleting ReACT agent", extra={"tenant_id": tenant_id, "re_act_agent_id": re_act_agent_id})
 
         with self.db_client.get_session() as session:
-            query = select(ReActAgent).where(
-                ReActAgent.id == re_act_agent_id,
-                ReActAgent.tenant_id == tenant_id
-            )
+            query = select(ReActAgent).where(ReActAgent.id == re_act_agent_id, ReActAgent.tenant_id == tenant_id)
             agent = session.execute(query).scalar_one_or_none()
 
             if not agent:
@@ -481,12 +451,12 @@ class ReActAgentHandler:
         re_act_agent_id: str,
         skip: int = 0,
         limit: int = 100,
-        search: Optional[str] = None,
-        roles: Optional[List[str]] = None,
-        is_active: Optional[bool] = None,
-        order_by: Optional[str] = None,
-        order_direction: Optional[str] = None,
-        use_cache: bool = True
+        search: str | None = None,
+        roles: list[str] | None = None,
+        is_active: bool | None = None,
+        order_by: str | None = None,
+        order_direction: str | None = None,
+        use_cache: bool = True,
     ) -> ResourcePrincipalsResponse:
         """List permissions for a ReACT agent.
 
@@ -505,7 +475,9 @@ class ReActAgentHandler:
         Returns:
             Resource principals response
         """
-        logger.info("Listing ReACT agent permissions", extra={"tenant_id": tenant_id, "re_act_agent_id": re_act_agent_id})
+        logger.info(
+            "Listing ReACT agent permissions", extra={"tenant_id": tenant_id, "re_act_agent_id": re_act_agent_id}
+        )
 
         try:
             result = self.permissions_handler.list_permissions(
@@ -519,7 +491,7 @@ class ReActAgentHandler:
                 is_active=is_active,
                 order_by=order_by,
                 order_direction=order_direction,
-                use_cache=use_cache
+                use_cache=use_cache,
             )
         except ValueError as e:
             raise ReActAgentNotFoundError(re_act_agent_id) from e
@@ -533,23 +505,17 @@ class ReActAgentHandler:
                 display_name=p.get("display_name"),
                 principal_name=p.get("principal_name"),
                 description=p.get("description"),
-                is_active=p.get("is_active", True)
+                is_active=p.get("is_active", True),
             )
             for p in result["principals"]
         ]
 
         return ResourcePrincipalsResponse(
-            resource_id=re_act_agent_id,
-            resource_type="re_act_agent",
-            tenant_id=tenant_id,
-            principals=principals
+            resource_id=re_act_agent_id, resource_type="re_act_agent", tenant_id=tenant_id, principals=principals
         )
 
     def get_re_act_agent_permission(
-        self,
-        tenant_id: str,
-        re_act_agent_id: str,
-        principal_id: str
+        self, tenant_id: str, re_act_agent_id: str, principal_id: str
     ) -> PrincipalWithRolesResponse:
         """Get permission for a specific principal on a ReACT agent.
 
@@ -563,7 +529,7 @@ class ReActAgentHandler:
         """
         logger.info(
             "Getting ReACT agent permission",
-            extra={"tenant_id": tenant_id, "re_act_agent_id": re_act_agent_id, "principal_id": principal_id}
+            extra={"tenant_id": tenant_id, "re_act_agent_id": re_act_agent_id, "principal_id": principal_id},
         )
 
         try:
@@ -571,7 +537,7 @@ class ReActAgentHandler:
                 resource_type="re_act_agent",
                 tenant_id=tenant_id,
                 resource_id=re_act_agent_id,
-                principal_id=principal_id
+                principal_id=principal_id,
             )
         except ValueError as e:
             raise ReActAgentNotFoundError(str(e)) from e
@@ -583,7 +549,7 @@ class ReActAgentHandler:
             mail=result.get("mail"),
             display_name=result.get("display_name"),
             principal_name=result.get("principal_name"),
-            description=result.get("description")
+            description=result.get("description"),
         )
 
     def set_re_act_agent_permission(
@@ -592,7 +558,7 @@ class ReActAgentHandler:
         re_act_agent_id: str,
         request: SetReActAgentPermissionRequest,
         user_id: str,
-        user: ContextIdentityUser
+        user: ContextIdentityUser,
     ) -> PrincipalWithRolesResponse:
         """Set or update a permission for a principal on a ReACT agent.
 
@@ -608,11 +574,7 @@ class ReActAgentHandler:
         """
         logger.info(
             "Setting ReACT agent permission",
-            extra={
-                "tenant_id": tenant_id,
-                "re_act_agent_id": re_act_agent_id,
-                "principal_id": request.principal_id
-            }
+            extra={"tenant_id": tenant_id, "re_act_agent_id": re_act_agent_id, "principal_id": request.principal_id},
         )
 
         try:
@@ -624,14 +586,14 @@ class ReActAgentHandler:
                 principal_type=request.principal_type.value,
                 role=request.role,
                 user_id=user_id,
-                user=user
+                user=user,
             )
 
             result = self.permissions_handler.get_permission(
                 resource_type="re_act_agent",
                 tenant_id=tenant_id,
                 resource_id=re_act_agent_id,
-                principal_id=request.principal_id
+                principal_id=request.principal_id,
             )
         except ValueError as e:
             raise ReActAgentNotFoundError(str(e)) from e
@@ -643,16 +605,11 @@ class ReActAgentHandler:
             mail=result.get("mail"),
             display_name=result.get("display_name"),
             principal_name=result.get("principal_name"),
-            description=result.get("description")
+            description=result.get("description"),
         )
 
     def delete_re_act_agent_permission(
-        self,
-        tenant_id: str,
-        re_act_agent_id: str,
-        principal_id: str,
-        principal_type: str,
-        permission: str
+        self, tenant_id: str, re_act_agent_id: str, principal_id: str, principal_type: str, permission: str
     ) -> None:
         """Delete a permission for a principal on a ReACT agent.
 
@@ -669,8 +626,8 @@ class ReActAgentHandler:
                 "tenant_id": tenant_id,
                 "re_act_agent_id": re_act_agent_id,
                 "principal_id": principal_id,
-                "permission": permission
-            }
+                "permission": permission,
+            },
         )
 
         try:
@@ -680,18 +637,14 @@ class ReActAgentHandler:
                 resource_id=re_act_agent_id,
                 principal_id=principal_id,
                 principal_type=principal_type,
-                role=permission
+                role=permission,
             )
         except ValueError as e:
             raise ReActAgentNotFoundError(str(e)) from e
 
     def _resolve_user_permission(
-        self,
-        session: object,
-        tenant_id: str,
-        re_act_agent_id: str,
-        user: ContextIdentityUser
-    ) -> Optional[str]:
+        self, session: object, tenant_id: str, re_act_agent_id: str, user: ContextIdentityUser
+    ) -> str | None:
         """Resolve the user's permission level on a specific ReACT agent.
 
         Args:
@@ -704,12 +657,12 @@ class ReActAgentHandler:
             Permission action string or None
         """
         from unifiedui.core.database.enums import TenantRolesEnum
+
         if check_is_admin(user, tenant_id, [TenantRolesEnum.GLOBAL_ADMIN, TenantRolesEnum.REACT_AGENT_ADMIN]):
             return PermissionActionEnum.ADMIN.value
         principal_ids = get_principal_ids(user)
         return resolve_my_permission(
-            session, ReActAgentMember, "re_act_agent_id",
-            tenant_id, re_act_agent_id, principal_ids
+            session, ReActAgentMember, "re_act_agent_id", tenant_id, re_act_agent_id, principal_ids
         )
 
     @staticmethod
@@ -723,13 +676,10 @@ class ReActAgentHandler:
             ReACT agent response
         """
         tags = []
-        if hasattr(agent, 'tags') and agent.tags:
+        if hasattr(agent, "tags") and agent.tags:
             for agent_tag in agent.tags:
                 if agent_tag.tag:
-                    tags.append(TagSummary(
-                        id=agent_tag.tag.id,
-                        name=agent_tag.tag.name
-                    ))
+                    tags.append(TagSummary(id=agent_tag.tag.id, name=agent_tag.tag.name))
 
         return ReActAgentResponse(
             id=agent.id,
@@ -749,5 +699,5 @@ class ReActAgentHandler:
             created_at=agent.created_at,
             updated_at=agent.updated_at,
             created_by=agent.created_by,
-            updated_by=agent.updated_by
+            updated_by=agent.updated_by,
         )

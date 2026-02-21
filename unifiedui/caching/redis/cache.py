@@ -1,7 +1,9 @@
 """Redis cache implementation."""
+
 import json
-from typing import Any, Optional
 from datetime import datetime
+from typing import Any
+
 import redis
 
 from unifiedui.core.caching.cache import BaseCache
@@ -12,6 +14,7 @@ logger = get_logger(__name__)
 
 class DateTimeEncoder(json.JSONEncoder):
     """Custom JSON encoder that handles datetime objects."""
+
     def default(self, obj):
         if isinstance(obj, datetime):
             return obj.isoformat()
@@ -26,12 +29,12 @@ class RedisCache(BaseCache):
         host: str = "localhost",
         port: int = 6379,
         db: int = 0,
-        password: Optional[str] = None,
-        default_ttl: int = 3600
+        password: str | None = None,
+        default_ttl: int = 3600,
     ):
         """
         Initialize Redis cache client.
-        
+
         Args:
             host: Redis host
             port: Redis port
@@ -40,22 +43,16 @@ class RedisCache(BaseCache):
             default_ttl: Default TTL in seconds (default: 1 hour)
         """
         self.default_ttl = default_ttl
-        self.client = redis.Redis(
-            host=host,
-            port=port,
-            db=db,
-            password=password,
-            decode_responses=True
-        )
+        self.client = redis.Redis(host=host, port=port, db=db, password=password, decode_responses=True)
         logger.info(f"Redis cache initialized: {host}:{port}/{db}")
 
-    def get(self, key: str) -> Optional[Any]:
+    def get(self, key: str) -> Any | None:
         """
         Retrieve a value from Redis cache.
-        
+
         Args:
             key: Cache key
-            
+
         Returns:
             Deserialized value or None
         """
@@ -70,10 +67,10 @@ class RedisCache(BaseCache):
             logger.error(f"Redis GET error for key {key}: {e}")
             return None
 
-    def set(self, key: str, value: Any, ttl: Optional[int] = None) -> None:
+    def set(self, key: str, value: Any, ttl: int | None = None) -> None:
         """
         Store a value in Redis cache.
-        
+
         Args:
             key: Cache key
             value: Value to cache (will be JSON serialized)
@@ -90,10 +87,10 @@ class RedisCache(BaseCache):
     def delete(self, key: str) -> bool:
         """
         Delete a key from Redis.
-        
+
         Args:
             key: Cache key
-            
+
         Returns:
             True if deleted, False otherwise
         """
@@ -108,10 +105,10 @@ class RedisCache(BaseCache):
     def delete_pattern(self, pattern: str) -> int:
         """
         Delete all keys matching a pattern.
-        
+
         Args:
             pattern: Key pattern (e.g., "tenant:*")
-            
+
         Returns:
             Number of keys deleted
         """
@@ -129,7 +126,7 @@ class RedisCache(BaseCache):
     def ping(self) -> bool:
         """
         Check if Redis connection is alive.
-        
+
         Returns:
             True if connected
         """

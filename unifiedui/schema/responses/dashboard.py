@@ -1,4 +1,5 @@
 """Response schemas for dashboard endpoints."""
+
 from pydantic import BaseModel
 
 
@@ -13,6 +14,6 @@ class EntityStatsResponse(BaseModel):
 class DashboardStatsResponse(BaseModel):
     """Dashboard quick stats response."""
 
-    applications: EntityStatsResponse
+    chat_agents: EntityStatsResponse
     autonomous_agents: EntityStatsResponse
     conversations: EntityStatsResponse

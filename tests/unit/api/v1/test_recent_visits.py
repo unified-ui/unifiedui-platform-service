@@ -1,13 +1,13 @@
 """Tests for recent visits API endpoints."""
+
 import uuid
 from typing import Any
 
 from fastapi import status
 from starlette.testclient import TestClient
-
-from unifiedui.core.database.models import RecentVisit
 from tests.conftest import create_auth_headers
 
+from unifiedui.core.database.models import RecentVisit
 
 ENDPOINT_RECENT_VISITS = "/api/v1/platform-service/tenants/{tenant_id}/users/{user_id}/recent-visits"
 ENDPOINT_SYNC = "/api/v1/platform-service/tenants/{tenant_id}/users/{user_id}/recent-visits/sync"
@@ -29,8 +29,8 @@ def create_visit_in_db(
     test_client: TestClient,
     tenant_id: str,
     user_id: str,
-    resource_type: str = "application",
-    resource_id: str = None,
+    resource_type: str = "chat_agent",
+    resource_id: str | None = None,
     resource_name: str = "Test Resource",
 ) -> str:
     """Create a recent visit directly in DB and return its ID."""
@@ -76,7 +76,7 @@ def test_list_recent_visits_with_data(test_client: TestClient):
     tenant_id = create_tenant_for_user(test_client, user)
     user_id = user.get_id()
 
-    create_visit_in_db(test_client, tenant_id, user_id, "application", resource_name="App 1")
+    create_visit_in_db(test_client, tenant_id, user_id, "chat_agent", resource_name="App 1")
     create_visit_in_db(test_client, tenant_id, user_id, "autonomous_agent", resource_name="Agent 1")
     create_visit_in_db(test_client, tenant_id, user_id, "conversation", resource_name="Conv 1")
 
@@ -138,7 +138,7 @@ def test_sync_recent_visits_new(test_client: TestClient):
         ENDPOINT_SYNC.format(tenant_id=tenant_id, user_id=user_id),
         json={
             "visits": [
-                {"resource_type": "application", "resource_id": str(uuid.uuid4()), "resource_name": "App A"},
+                {"resource_type": "chat_agent", "resource_id": str(uuid.uuid4()), "resource_name": "App A"},
                 {"resource_type": "autonomous_agent", "resource_id": str(uuid.uuid4()), "resource_name": "Agent B"},
             ],
         },
@@ -158,13 +158,13 @@ def test_sync_recent_visits_upsert(test_client: TestClient):
     user_id = user.get_id()
     resource_id = str(uuid.uuid4())
 
-    create_visit_in_db(test_client, tenant_id, user_id, "application", resource_id, "Old Name")
+    create_visit_in_db(test_client, tenant_id, user_id, "chat_agent", resource_id, "Old Name")
 
     response = test_client.post(
         ENDPOINT_SYNC.format(tenant_id=tenant_id, user_id=user_id),
         json={
             "visits": [
-                {"resource_type": "application", "resource_id": resource_id, "resource_name": "New Name"},
+                {"resource_type": "chat_agent", "resource_id": resource_id, "resource_name": "New Name"},
             ],
         },
         headers=headers,
@@ -190,7 +190,7 @@ def test_sync_recent_visits_cleanup(test_client: TestClient):
         ENDPOINT_SYNC.format(tenant_id=tenant_id, user_id=user_id),
         json={
             "visits": [
-                {"resource_type": "application", "resource_id": str(uuid.uuid4()), "resource_name": "New Resource"},
+                {"resource_type": "chat_agent", "resource_id": str(uuid.uuid4()), "resource_name": "New Resource"},
             ],
         },
         headers=headers,

@@ -1,7 +1,7 @@
-from enum import Enum
+from enum import StrEnum
 
 
-class IdenityProviderEnum(str, Enum):
+class IdenityProviderEnum(StrEnum):
     MOCK = "MOCK"
     EXTRA_ID = "EXTRA_ID"
     AWS_COGNITO = "AWS_COGNITO"

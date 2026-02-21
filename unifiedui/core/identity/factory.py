@@ -1,17 +1,17 @@
 """Factory classes for identity token deserialization and provider creation."""
 
-import jwt
 import time
 
-from jwt.exceptions import InvalidTokenError, ExpiredSignatureError
+import jwt
+from jwt.exceptions import InvalidTokenError
 
-from unifiedui.core.identity.providers import BaseIdentityProvider, BaseIdentityToken
 from unifiedui.core.identity.enums import IdenityProviderEnum
+from unifiedui.core.identity.providers import BaseIdentityProvider, BaseIdentityToken
 from unifiedui.core.identity.token_verifier import get_token_verifier
 from unifiedui.identity.extra_id.provider import ExtraIDIdentityProvider
 from unifiedui.identity.extra_id.token import ExtraIDIdentityTokenSerializer
-from unifiedui.identity.mock.token import MockIdentityToken
 from unifiedui.identity.mock.provider import MockIdentityProvider
+from unifiedui.identity.mock.token import MockIdentityToken
 from unifiedui.logger import get_logger
 
 logger = get_logger(__name__)
@@ -43,7 +43,7 @@ class IdentityTokenFactory:
                 options={"verify_signature": False},
             )
         except InvalidTokenError as e:
-            raise ValueError(f"Invalid JWT token: {str(e)}")
+            raise ValueError(f"Invalid JWT token: {e!s}")
 
         iss: str = unverified_claims.get("iss", "")
 
@@ -96,8 +96,7 @@ class IdentityTokenFactory:
             return ExtraIDIdentityTokenSerializer(token, verified_claims)
 
         logger.debug(
-            "Token signature verification is disabled — "
-            "expected when using delegated Microsoft Graph access tokens"
+            "Token signature verification is disabled — expected when using delegated Microsoft Graph access tokens"
         )
         unverified_claims: dict = jwt.decode(token, options={"verify_signature": False})
 

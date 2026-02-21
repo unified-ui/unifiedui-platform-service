@@ -70,7 +70,7 @@ class BaseDatabaseClient(ABC):
     def tenants(self):
         """
         Get the tenants collection.
-        
+
         Returns:
             TenantsCollection: The tenants collection interface
         """
@@ -80,7 +80,7 @@ class BaseDatabaseClient(ABC):
     def permissions(self):
         """
         Get the permissions collection.
-        
+
         Returns:
             PermissionsCollection: The permissions collection interface
         """

@@ -1,11 +1,12 @@
 """Tests for tenant AI models caching."""
+
 from typing import Any
+
 from fastapi import status
 from starlette.testclient import TestClient
-
-from unifiedui.core.database.enums import PrincipalTypeEnum
 from tests.conftest import create_auth_headers
 
+from unifiedui.core.database.enums import PrincipalTypeEnum
 
 ENDPOINT_TENANTS = "/api/v1/platform-service/tenants"
 ENDPOINT_AI_MODELS = "/api/v1/platform-service/tenants/{tenant_id}/ai-models"
@@ -252,7 +253,7 @@ class TestTenantAIModelCaching:
     ) -> None:
         """Test that lack of access is handled correctly with caching."""
         admin_token = test_client.create_test_user("cache-admin-2", "Cache Admin 2")
-        admin_headers = create_auth_headers(admin_token)
+        create_auth_headers(admin_token)
         tenant_id = create_tenant_for_user(test_client, admin_token)
 
         outsider_token = test_client.create_test_user("cache-outsider-1", "Cache Outsider")

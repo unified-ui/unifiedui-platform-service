@@ -10,10 +10,10 @@ pytest tests/ -n auto --no-header -q
 pytest tests/ -n auto --cov=unifiedui --cov-report=html --cov-report=term-missing
 
 # Single file
-pytest tests/unit/api/v1/test_applications.py -n auto --no-header -q
+pytest tests/unit/api/v1/test_chat_agents.py -n auto --no-header -q
 
 # Single test
-pytest tests/unit/api/v1/test_applications.py::TestApplicationRoutes::test_create_application_success -v
+pytest tests/unit/api/v1/test_chat_agents.py::TestChatAgentRoutes::test_create_chat_agent_success -v
 ```
 
 **pytest config (pyproject.toml)**:
@@ -37,7 +37,7 @@ Every resource in `tests/unit/api/v1/` has **exactly three test files**:
 | `test_{resource}_caching.py` | Cache hit/miss, invalidation, isolation | `use_cache=True` (default) |
 
 ### Resources with three-file pattern:
-applications, autonomous_agents, chat_widgets, conversations, credentials, custom_groups, identity, principals, tags, tenant_ai_models, tenants, tools, user_favorites
+chat_agents, autonomous_agents, chat_widgets, conversations, credentials, custom_groups, identity, principals, tags, tenant_ai_models, tenants, tools, user_favorites
 
 ---
 
@@ -79,8 +79,8 @@ def create_tenant_for_user(test_client: TestClient, user_token: Any, tenant_name
     return response.json()["id"]
 
 
-class TestApplicationRoutes:
-    """Test suite for application API routes."""
+class TestChatAgentRoutes:
+    """Test suite for chat agent API routes."""
     
     def test_create_{resource}_success(self, test_client: TestClient, test_user_token: Any) -> None:
         """Test successful {resource} creation."""
@@ -351,9 +351,9 @@ tests/
 │   └── vault.py                        # MockVault
 └── unit/
     ├── api/v1/                         # Route integration tests (3-file pattern)
-    │   ├── test_applications.py
-    │   ├── test_applications_rbac.py
-    │   ├── test_applications_caching.py
+    │   ├── test_chat_agents.py
+    │   ├── test_chat_agents_rbac.py
+    │   ├── test_chat_agents_caching.py
     │   ├── test_autonomous_agents.py
     │   ├── test_autonomous_agents_rbac.py
     │   ├── test_autonomous_agents_caching.py
@@ -378,8 +378,8 @@ def test_{action}_{scenario}(self, test_client, ...):
 ```
 
 Examples:
-- `test_create_application_success`
-- `test_create_application_missing_name`
+- `test_create_chat_agent_success`
+- `test_create_chat_agent_missing_name`
 - `test_read_user_can_view_but_not_modify`
 - `test_direct_user_permission_grant_invalidates_cache`
 - `test_cache_isolated_between_users`

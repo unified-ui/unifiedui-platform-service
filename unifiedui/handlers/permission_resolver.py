@@ -1,14 +1,16 @@
 """Utility for resolving user permissions on resources."""
+
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional, List, Dict, Type
+from typing import TYPE_CHECKING
 
-from sqlalchemy import select, case, func
-from sqlalchemy.orm import Session
+from sqlalchemy import select
 
 from unifiedui.core.database.enums import PermissionActionEnum, TenantRolesEnum
 
 if TYPE_CHECKING:
+    from sqlalchemy.orm import Session
+
     from unifiedui.core.database.models import Base
     from unifiedui.core.identity.users import ContextIdentityUser
 
@@ -19,7 +21,7 @@ PERMISSION_HIERARCHY = {
 }
 
 
-def get_principal_ids(user: ContextIdentityUser) -> List[str]:
+def get_principal_ids(user: ContextIdentityUser) -> list[str]:
     """Collect all principal IDs for a user (user ID + group IDs).
 
     Args:
@@ -37,7 +39,7 @@ def get_principal_ids(user: ContextIdentityUser) -> List[str]:
     return principal_ids
 
 
-def check_is_admin(user: ContextIdentityUser, tenant_id: str, admin_roles: List[TenantRolesEnum]) -> bool:
+def check_is_admin(user: ContextIdentityUser, tenant_id: str, admin_roles: list[TenantRolesEnum]) -> bool:
     """Check if the user has admin-level tenant roles.
 
     Args:
@@ -48,10 +50,7 @@ def check_is_admin(user: ContextIdentityUser, tenant_id: str, admin_roles: List[
     Returns:
         True if user has any of the admin roles
     """
-    matching_tenant = next(
-        (t for t in user.tenants if t["tenant"]["id"] == tenant_id),
-        None
-    )
+    matching_tenant = next((t for t in user.tenants if t["tenant"]["id"] == tenant_id), None)
     if not matching_tenant:
         return False
     user_roles = matching_tenant["roles"]
@@ -61,17 +60,17 @@ def check_is_admin(user: ContextIdentityUser, tenant_id: str, admin_roles: List[
 
 def resolve_my_permission(
     session: Session,
-    member_model: Type[Base],
+    member_model: type[Base],
     id_field: str,
     tenant_id: str,
     resource_id: str,
-    principal_ids: List[str]
-) -> Optional[str]:
+    principal_ids: list[str],
+) -> str | None:
     """Resolve the highest permission a user has on a single resource.
 
     Args:
         session: SQLAlchemy session
-        member_model: The member model class (e.g., ApplicationMember)
+        member_model: The member model class (e.g., ChatAgentMember)
         id_field: The resource ID field name on the member model
         tenant_id: Tenant ID
         resource_id: The resource ID
@@ -80,13 +79,10 @@ def resolve_my_permission(
     Returns:
         The highest permission action string or None
     """
-    query = (
-        select(member_model.role)
-        .where(
-            getattr(member_model, id_field) == resource_id,
-            member_model.tenant_id == tenant_id,
-            member_model.principal_id.in_(principal_ids)
-        )
+    query = select(member_model.role).where(
+        getattr(member_model, id_field) == resource_id,
+        member_model.tenant_id == tenant_id,
+        member_model.principal_id.in_(principal_ids),
     )
     roles = session.execute(query).scalars().all()
     if not roles:
@@ -96,12 +92,12 @@ def resolve_my_permission(
 
 def resolve_my_permissions_bulk(
     session: Session,
-    member_model: Type[Base],
+    member_model: type[Base],
     id_field: str,
     tenant_id: str,
-    resource_ids: List[str],
-    principal_ids: List[str]
-) -> Dict[str, str]:
+    resource_ids: list[str],
+    principal_ids: list[str],
+) -> dict[str, str]:
     """Resolve the highest permission a user has on multiple resources.
 
     Args:
@@ -119,17 +115,14 @@ def resolve_my_permissions_bulk(
         return {}
 
     resource_id_col = getattr(member_model, id_field)
-    query = (
-        select(resource_id_col, member_model.role)
-        .where(
-            resource_id_col.in_(resource_ids),
-            member_model.tenant_id == tenant_id,
-            member_model.principal_id.in_(principal_ids)
-        )
+    query = select(resource_id_col, member_model.role).where(
+        resource_id_col.in_(resource_ids),
+        member_model.tenant_id == tenant_id,
+        member_model.principal_id.in_(principal_ids),
     )
     rows = session.execute(query).all()
 
-    result: Dict[str, str] = {}
+    result: dict[str, str] = {}
     for rid, role in rows:
         current = result.get(rid)
         if current is None or PERMISSION_HIERARCHY.get(role, 0) > PERMISSION_HIERARCHY.get(current, 0):

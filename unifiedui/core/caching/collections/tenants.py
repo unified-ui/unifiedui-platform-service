@@ -1,10 +1,13 @@
 """Tenants cache collection implementation."""
-from typing import Optional, List
+
+from typing import TYPE_CHECKING
 from urllib.parse import quote
 
-from unifiedui.schema.responses.tenants import TenantResponse
 from unifiedui.logger import get_logger
-from unifiedui.core.caching.client import BaseCacheClient
+from unifiedui.schema.responses.tenants import TenantResponse
+
+if TYPE_CHECKING:
+    from unifiedui.core.caching.client import BaseCacheClient
 
 logger = get_logger(__name__)
 
@@ -18,49 +21,39 @@ class TenantsCacheCollection:
     def __init__(self, cache_client: "BaseCacheClient"):
         """
         Initialize Tenants cache collection.
-        
+
         Args:
             cache_client: Cache client instance providing get/set/delete operations
         """
         self.cache_client = cache_client
 
-    def build_key(
-        self,
-        tenant_id: Optional[str],
-        user_id: str,
-        route: str
-    ) -> str:
+    def build_key(self, tenant_id: str | None, user_id: str, route: str) -> str:
         """
         Build cache key: tenant:{tenantID}:user:{userID}:route:{route}
         """
         # URL-encode route to handle query params
-        encoded_route = quote(route, safe='')
-        
+        encoded_route = quote(route, safe="")
+
         if tenant_id:
             return f"tenant:{tenant_id}:user:{user_id}:route:{encoded_route}"
         else:
             return f"tenant:list:user:{user_id}:route:{encoded_route}"
 
-    def get_tenant(
-        self,
-        tenant_id: str,
-        user_id: str,
-        route: str
-    ) -> Optional[TenantResponse]:
+    def get_tenant(self, tenant_id: str, user_id: str, route: str) -> TenantResponse | None:
         """
         Get a single tenant from cache.
-        
+
         Args:
             tenant_id: Tenant ID
             user_id: User ID
             route: Request route including query params
-            
+
         Returns:
             Cached tenant or None
         """
         key = self.build_key(tenant_id, user_id, route)
         data = self.cache_client.get(key)
-        
+
         if data:
             try:
                 return TenantResponse(**data)
@@ -70,16 +63,11 @@ class TenantsCacheCollection:
         return None
 
     def set_tenant(
-        self,
-        tenant_id: str,
-        user_id: str,
-        route: str,
-        tenant: TenantResponse,
-        ttl: Optional[int] = None
+        self, tenant_id: str, user_id: str, route: str, tenant: TenantResponse, ttl: int | None = None
     ) -> None:
         """
         Cache a single tenant.
-        
+
         Args:
             tenant_id: Tenant ID
             user_id: User ID
@@ -91,24 +79,20 @@ class TenantsCacheCollection:
         data = tenant.model_dump()
         self.cache_client.set(key, data, ttl)
 
-    def get_tenant_list(
-        self,
-        user_id: str,
-        route: str
-    ) -> Optional[List[TenantResponse]]:
+    def get_tenant_list(self, user_id: str, route: str) -> list[TenantResponse] | None:
         """
         Get tenant list from cache.
-        
+
         Args:
             user_id: User ID
             route: Request route including query params
-            
+
         Returns:
             Cached tenant list or None
         """
         key = self.build_key(None, user_id, route)
         data = self.cache_client.get(key)
-        
+
         if data:
             try:
                 return [TenantResponse(**item) for item in data]
@@ -117,16 +101,10 @@ class TenantsCacheCollection:
                 return None
         return None
 
-    def set_tenant_list(
-        self,
-        user_id: str,
-        route: str,
-        tenants: List[TenantResponse],
-        ttl: Optional[int] = None
-    ) -> None:
+    def set_tenant_list(self, user_id: str, route: str, tenants: list[TenantResponse], ttl: int | None = None) -> None:
         """
         Cache a tenant list.
-        
+
         Args:
             user_id: User ID
             route: Request route including query params
@@ -137,19 +115,15 @@ class TenantsCacheCollection:
         data = [tenant.model_dump() for tenant in tenants]
         self.cache_client.set(key, data, ttl)
 
-    def invalidate_tenant(
-        self,
-        tenant_id: str,
-        user_id: Optional[str] = None
-    ) -> int:
+    def invalidate_tenant(self, tenant_id: str, user_id: str | None = None) -> int:
         """
         Invalidate all cache entries for a specific tenant.
         If user_id is provided, only invalidate for that user.
-        
+
         Args:
             tenant_id: Tenant ID
             user_id: Optional user ID to limit invalidation
-            
+
         Returns:
             Number of keys deleted
         """
@@ -159,21 +133,18 @@ class TenantsCacheCollection:
         else:
             # Invalidate all users' cache for this tenant
             pattern = f"tenant:{tenant_id}:*"
-        
+
         deleted = self.cache_client.delete_pattern(pattern)
         logger.info(f"Invalidated {deleted} cache entries for tenant {tenant_id}")
         return deleted
 
-    def invalidate_user(
-        self,
-        user_id: str
-    ) -> int:
+    def invalidate_user(self, user_id: str) -> int:
         """
         Invalidate all cache entries for a specific user.
-        
+
         Args:
             user_id: User ID
-            
+
         Returns:
             Number of keys deleted
         """
@@ -185,7 +156,7 @@ class TenantsCacheCollection:
     def invalidate_all(self) -> int:
         """
         Invalidate all tenant cache entries.
-        
+
         Returns:
             Number of keys deleted
         """

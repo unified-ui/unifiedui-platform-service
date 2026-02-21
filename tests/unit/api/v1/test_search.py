@@ -1,21 +1,21 @@
 """Tests for global search API endpoint."""
+
 import uuid
 from typing import Any
 
 from fastapi import status
 from starlette.testclient import TestClient
+from tests.conftest import create_auth_headers
 
 from unifiedui.core.database.enums import PermissionActionEnum, PrincipalTypeEnum
 from unifiedui.core.database.models import (
-    Application,
-    ApplicationMember,
     AutonomousAgent,
     AutonomousAgentMember,
+    ChatAgent,
+    ChatAgentMember,
     Conversation,
     ConversationMember,
 )
-from tests.conftest import create_auth_headers
-
 
 ENDPOINT_SEARCH = "/api/v1/platform-service/tenants/{tenant_id}/search"
 PRINCIPAL_TYPE_USER = PrincipalTypeEnum.IDENTITY_USER.value
@@ -33,7 +33,9 @@ def create_tenant_for_user(test_client: TestClient, user_token: Any, tenant_name
     return response.json()["id"]
 
 
-def add_user_to_tenant(test_client: TestClient, tenant_id: str, admin_headers: dict, user_id: str, role: str = "READER") -> None:
+def add_user_to_tenant(
+    test_client: TestClient, tenant_id: str, admin_headers: dict, user_id: str, role: str = "READER"
+) -> None:
     """Add a user to a tenant via API."""
     response = test_client.put(
         f"/api/v1/platform-service/tenants/{tenant_id}/principals",
@@ -47,18 +49,18 @@ def add_user_to_tenant(test_client: TestClient, tenant_id: str, admin_headers: d
     assert response.status_code == status.HTTP_200_OK
 
 
-def create_application_in_db(
+def create_chat_agent_in_db(
     test_client: TestClient,
     tenant_id: str,
     user_id: str,
     name: str = "Test App",
-    description: str = "Test application",
+    description: str = "Test chat agent",
     is_active: bool = True,
 ) -> str:
-    """Create an application directly in DB and return its ID."""
+    """Create a chat agent directly in DB and return its ID."""
     app_id = str(uuid.uuid4())
     with test_client.db_client.get_session() as session:
-        app = Application(
+        app = ChatAgent(
             id=app_id,
             tenant_id=tenant_id,
             name=name,
@@ -71,10 +73,10 @@ def create_application_in_db(
         )
         session.add(app)
         session.commit()
-        member = ApplicationMember(
+        member = ChatAgentMember(
             id=str(uuid.uuid4()),
             tenant_id=tenant_id,
-            application_id=app_id,
+            chat_agent_id=app_id,
             principal_id=user_id,
             role=PermissionActionEnum.ADMIN,
             created_by=user_id,
@@ -136,7 +138,7 @@ def create_conversation_in_db(
         conv = Conversation(
             id=conv_id,
             tenant_id=tenant_id,
-            application_id=app_id,
+            chat_agent_id=app_id,
             name=name,
             created_by=user_id,
             updated_by=user_id,
@@ -182,8 +184,8 @@ def test_search_by_name(test_client: TestClient):
     tenant_id = create_tenant_for_user(test_client, user)
     user_id = user.get_id()
 
-    create_application_in_db(test_client, tenant_id, user_id, "Support Bot", "Handles support")
-    create_application_in_db(test_client, tenant_id, user_id, "Invoice Agent", "Processes invoices")
+    create_chat_agent_in_db(test_client, tenant_id, user_id, "Support Bot", "Handles support")
+    create_chat_agent_in_db(test_client, tenant_id, user_id, "Invoice Agent", "Processes invoices")
     create_autonomous_agent_in_db(test_client, tenant_id, user_id, "Support Monitor", "Monitors support")
 
     response = test_client.get(
@@ -208,8 +210,8 @@ def test_search_by_description(test_client: TestClient):
     tenant_id = create_tenant_for_user(test_client, user)
     user_id = user.get_id()
 
-    create_application_in_db(test_client, tenant_id, user_id, "App Alpha", "Financial processing system")
-    create_application_in_db(test_client, tenant_id, user_id, "App Beta", "Customer management")
+    create_chat_agent_in_db(test_client, tenant_id, user_id, "App Alpha", "Financial processing system")
+    create_chat_agent_in_db(test_client, tenant_id, user_id, "App Beta", "Customer management")
 
     response = test_client.get(
         ENDPOINT_SEARCH.format(tenant_id=tenant_id),
@@ -231,19 +233,19 @@ def test_search_with_type_filter(test_client: TestClient):
     tenant_id = create_tenant_for_user(test_client, user)
     user_id = user.get_id()
 
-    create_application_in_db(test_client, tenant_id, user_id, "Support App")
+    create_chat_agent_in_db(test_client, tenant_id, user_id, "Support App")
     create_autonomous_agent_in_db(test_client, tenant_id, user_id, "Support Agent")
 
     response = test_client.get(
         ENDPOINT_SEARCH.format(tenant_id=tenant_id),
         headers=headers,
-        params={"q": "Support", "types": "application"},
+        params={"q": "Support", "types": "chat_agent"},
     )
 
     assert response.status_code == status.HTTP_200_OK
     data = response.json()
     assert data["total"] == 1
-    assert data["results"][0]["type"] == "application"
+    assert data["results"][0]["type"] == "chat_agent"
     assert data["results"][0]["name"] == "Support App"
 
 
@@ -259,15 +261,15 @@ def test_search_permission_filtering(test_client: TestClient):
     tenant_id = create_tenant_for_user(test_client, admin_user)
     add_user_to_tenant(test_client, tenant_id, admin_headers, regular_id, "READER")
 
-    create_application_in_db(test_client, tenant_id, admin_id, "Secret App")
+    create_chat_agent_in_db(test_client, tenant_id, admin_id, "Secret App")
 
     shared_app_id = str(uuid.uuid4())
     with test_client.db_client.get_session() as session:
-        app = Application(
+        app = ChatAgent(
             id=shared_app_id,
             tenant_id=tenant_id,
             name="Shared App",
-            description="Shared application",
+            description="Shared chat agent",
             type="N8N",
             config={},
             is_active=True,
@@ -277,10 +279,10 @@ def test_search_permission_filtering(test_client: TestClient):
         session.add(app)
         session.commit()
         for pid, role in [(admin_id, PermissionActionEnum.ADMIN), (regular_id, PermissionActionEnum.READ)]:
-            member = ApplicationMember(
+            member = ChatAgentMember(
                 id=str(uuid.uuid4()),
                 tenant_id=tenant_id,
-                application_id=shared_app_id,
+                chat_agent_id=shared_app_id,
                 principal_id=pid,
                 role=role,
                 created_by=admin_id,
@@ -315,7 +317,7 @@ def test_search_with_limit(test_client: TestClient):
     user_id = user.get_id()
 
     for i in range(5):
-        create_application_in_db(test_client, tenant_id, user_id, f"App {i}")
+        create_chat_agent_in_db(test_client, tenant_id, user_id, f"App {i}")
 
     response = test_client.get(
         ENDPOINT_SEARCH.format(tenant_id=tenant_id),
@@ -335,9 +337,9 @@ def test_search_across_multiple_types(test_client: TestClient):
     tenant_id = create_tenant_for_user(test_client, user)
     user_id = user.get_id()
 
-    create_application_in_db(test_client, tenant_id, user_id, "Invoice Bot")
+    create_chat_agent_in_db(test_client, tenant_id, user_id, "Invoice Bot")
     create_autonomous_agent_in_db(test_client, tenant_id, user_id, "Invoice Monitor")
-    app_id = create_application_in_db(test_client, tenant_id, user_id, "Helper App")
+    app_id = create_chat_agent_in_db(test_client, tenant_id, user_id, "Helper App")
     create_conversation_in_db(test_client, tenant_id, user_id, app_id, "Invoice Discussion")
 
     response = test_client.get(
@@ -350,7 +352,7 @@ def test_search_across_multiple_types(test_client: TestClient):
     data = response.json()
     assert data["total"] == 3
     result_types = {r["type"] for r in data["results"]}
-    assert "application" in result_types
+    assert "chat_agent" in result_types
     assert "autonomous_agent" in result_types
     assert "conversation" in result_types
 
@@ -362,7 +364,7 @@ def test_search_case_insensitive(test_client: TestClient):
     tenant_id = create_tenant_for_user(test_client, user)
     user_id = user.get_id()
 
-    create_application_in_db(test_client, tenant_id, user_id, "Support Bot")
+    create_chat_agent_in_db(test_client, tenant_id, user_id, "Support Bot")
 
     response = test_client.get(
         ENDPOINT_SEARCH.format(tenant_id=tenant_id),

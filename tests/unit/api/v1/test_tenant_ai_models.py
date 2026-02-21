@@ -1,10 +1,10 @@
 """Tests for tenant AI models API endpoints."""
+
 from typing import Any
+
 from fastapi import status
 from starlette.testclient import TestClient
-
 from tests.conftest import create_auth_headers
-
 
 ENDPOINT_AI_MODELS = "/api/v1/platform-service/tenants/{tenant_id}/ai-models"
 ENDPOINT_AI_MODEL_DETAIL = "/api/v1/platform-service/tenants/{tenant_id}/ai-models/{model_id}"
@@ -18,7 +18,7 @@ def create_tenant_for_user(test_client: TestClient, user_token: Any, tenant_name
     response = test_client.post(
         "/api/v1/platform-service/tenants",
         json={"name": tenant_name, "description": f"Tenant for {user_token.get_id()}"},
-        headers=headers
+        headers=headers,
     )
     assert response.status_code == status.HTTP_201_CREATED
     return response.json()["id"]
@@ -103,7 +103,7 @@ class TestTenantAIModelRoutes:
         assert data["description"] == model_data["description"]
         assert data["type"] == model_data["type"]
         assert data["provider"] == model_data["provider"]
-        assert data["is_active"] == False
+        assert not data["is_active"]
         assert data["priority"] == 0
         assert "id" in data
         assert data["tenant_id"] == tenant_id
@@ -141,7 +141,7 @@ class TestTenantAIModelRoutes:
         assert response.status_code == status.HTTP_201_CREATED
         data = response.json()
         assert data["provider"] == "OPENAI"
-        assert data["is_active"] == True
+        assert data["is_active"]
         assert data["priority"] == 1
 
     def test_create_ai_model_embedding_type(
@@ -409,8 +409,12 @@ class TestTenantAIModelRoutes:
 
         create_ai_model(test_client, tenant_id, headers, "LLM", model_type="LLM_MODEL")
         create_ai_model(
-            test_client, tenant_id, headers, "Embed",
-            model_type="EMBEDDING_MODEL", provider="OPENAI",
+            test_client,
+            tenant_id,
+            headers,
+            "Embed",
+            model_type="EMBEDDING_MODEL",
+            provider="OPENAI",
         )
 
         response = test_client.get(
@@ -466,7 +470,7 @@ class TestTenantAIModelRoutes:
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert data["name"] == "Updated Model Name"
-        assert data["is_active"] == True
+        assert data["is_active"]
 
     def test_update_ai_model_not_found(
         self,

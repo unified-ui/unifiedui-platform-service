@@ -1,41 +1,37 @@
 """Tool configuration validators using factory pattern."""
-from abc import ABC, abstractmethod
-from typing import Dict, Any
 
-from pydantic import BaseModel
+from abc import ABC, abstractmethod
+from typing import Any
 
 from unifiedui.core.database.enums import ToolTypeEnum
-from unifiedui.exc.tools import (
-    ToolConfigValidationError, 
-    UnsupportedToolTypeError
-)
+from unifiedui.exc.tools import UnsupportedToolTypeError
 from unifiedui.logger import get_logger
-
 
 logger = get_logger(__name__)
 
 
 # ========== Base Validator Interface ==========
 
+
 class BaseToolConfigValidator(ABC):
     """Abstract base class for tool config validators."""
-    
+
     @abstractmethod
-    def validate(self, config: Dict[str, Any]) -> Dict[str, Any]:
+    def validate(self, config: dict[str, Any]) -> dict[str, Any]:
         """
         Validate the configuration and return the validated config.
-        
+
         Args:
             config: Configuration dictionary to validate
-            
+
         Returns:
             Validated configuration dictionary
-            
+
         Raises:
             ToolConfigValidationError: If validation fails
         """
         pass
-    
+
     @abstractmethod
     def get_supported_type(self) -> ToolTypeEnum:
         """Get the tool type this validator supports."""
@@ -44,19 +40,20 @@ class BaseToolConfigValidator(ABC):
 
 # ========== MCP Server Validator ==========
 
+
 class MCPServerConfigValidator(BaseToolConfigValidator):
     """Validator for MCP Server tool configuration."""
-    
-    def validate(self, config: Dict[str, Any]) -> Dict[str, Any]:
+
+    def validate(self, config: dict[str, Any]) -> dict[str, Any]:
         """
         Validate MCP Server configuration.
-        
+
         Args:
             config: Configuration dictionary to validate
-            
+
         Returns:
             Validated configuration dictionary
-            
+
         Raises:
             ToolConfigValidationError: If validation fails
         """
@@ -64,26 +61,27 @@ class MCPServerConfigValidator(BaseToolConfigValidator):
         # For now, accept any config
         logger.debug("MCP Server config validation (passthrough)", extra={"config_keys": list(config.keys())})
         return config
-    
+
     def get_supported_type(self) -> ToolTypeEnum:
         return ToolTypeEnum.MCP_SERVER
 
 
 # ========== OpenAPI Definition Validator ==========
 
+
 class OpenAPIDefinitionConfigValidator(BaseToolConfigValidator):
     """Validator for OpenAPI Definition tool configuration."""
-    
-    def validate(self, config: Dict[str, Any]) -> Dict[str, Any]:
+
+    def validate(self, config: dict[str, Any]) -> dict[str, Any]:
         """
         Validate OpenAPI Definition configuration.
-        
+
         Args:
             config: Configuration dictionary to validate
-            
+
         Returns:
             Validated configuration dictionary
-            
+
         Raises:
             ToolConfigValidationError: If validation fails
         """
@@ -91,32 +89,33 @@ class OpenAPIDefinitionConfigValidator(BaseToolConfigValidator):
         # For now, accept any config
         logger.debug("OpenAPI Definition config validation (passthrough)", extra={"config_keys": list(config.keys())})
         return config
-    
+
     def get_supported_type(self) -> ToolTypeEnum:
         return ToolTypeEnum.OPENAPI_DEFINITION
 
 
 # ========== Factory ==========
 
+
 class ToolConfigValidatorFactory:
     """Factory for creating tool config validators based on tool type."""
-    
-    _validators: Dict[ToolTypeEnum, BaseToolConfigValidator] = {
+
+    _validators: dict[ToolTypeEnum, BaseToolConfigValidator] = {
         ToolTypeEnum.MCP_SERVER: MCPServerConfigValidator(),
         ToolTypeEnum.OPENAPI_DEFINITION: OpenAPIDefinitionConfigValidator(),
     }
-    
+
     @classmethod
     def get_validator(cls, tool_type: str) -> BaseToolConfigValidator:
         """
         Get the appropriate validator for the given tool type.
-        
+
         Args:
             tool_type: Tool type string (MCP_SERVER, OPENAPI_DEFINITION)
-            
+
         Returns:
             Appropriate validator instance
-            
+
         Raises:
             UnsupportedToolTypeError: If tool type is not supported
         """
@@ -124,25 +123,25 @@ class ToolConfigValidatorFactory:
             enum_type = ToolTypeEnum(tool_type)
         except ValueError:
             raise UnsupportedToolTypeError(tool_type)
-        
+
         validator = cls._validators.get(enum_type)
         if not validator:
             raise UnsupportedToolTypeError(tool_type)
-        
+
         return validator
-    
+
     @classmethod
-    def validate_config(cls, tool_type: str, config: Dict[str, Any]) -> Dict[str, Any]:
+    def validate_config(cls, tool_type: str, config: dict[str, Any]) -> dict[str, Any]:
         """
         Validate a tool configuration using the appropriate validator.
-        
+
         Args:
             tool_type: Tool type string
             config: Configuration dictionary to validate
-            
+
         Returns:
             Validated configuration dictionary
-            
+
         Raises:
             UnsupportedToolTypeError: If tool type is not supported
             ToolConfigValidationError: If validation fails

@@ -1,4 +1,5 @@
 """Request schemas for ReACT agent permissions."""
+
 from pydantic import BaseModel, Field
 
 from unifiedui.core.database.enums import PermissionActionEnum, PrincipalTypeEnum
