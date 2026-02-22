@@ -419,9 +419,9 @@ class TestChatAgentRoutes:
         second_created_at = resp2.json()["created_at"]
 
         # Verify that second was created after first
-        assert (
-            second_created_at > first_created_at
-        ), f"Second ({second_created_at}) should be after First ({first_created_at})"
+        assert second_created_at > first_created_at, (
+            f"Second ({second_created_at}) should be after First ({first_created_at})"
+        )
 
         # Order by created_at descending (newest first)
         response = test_client.get(
@@ -433,9 +433,9 @@ class TestChatAgentRoutes:
         data = response.json()
         assert len(data) == 2
         # Second app should be first (newest)
-        assert (
-            data[0]["name"] == "Second App"
-        ), f"Expected 'Second App' first but got {data[0]['name']}. Data: {[(d['name'], d['created_at']) for d in data]}"
+        assert data[0]["name"] == "Second App", (
+            f"Expected 'Second App' first but got {data[0]['name']}. Data: {[(d['name'], d['created_at']) for d in data]}"
+        )
         assert data[1]["name"] == "First App"
 
     def test_list_chat_agents_order_by_without_direction_defaults_to_asc(

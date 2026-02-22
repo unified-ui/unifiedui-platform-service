@@ -248,9 +248,9 @@ class TestIdentityRoutes:
 
         for endpoint in endpoints:
             response = test_client.get(endpoint)
-            assert (
-                response.status_code == status.HTTP_401_UNAUTHORIZED
-            ), f"Endpoint {endpoint} should require authentication"
+            assert response.status_code == status.HTTP_401_UNAUTHORIZED, (
+                f"Endpoint {endpoint} should require authentication"
+            )
 
     def test_get_users_with_all_parameters(self, test_client: TestClient, auth_headers: dict[str, str]) -> None:
         """Test users retrieval with all query parameters."""
