@@ -12,6 +12,7 @@ from unifiedui.core.database.enums import EnvironmentTypeEnum, OrganizationRoleE
 from unifiedui.core.database.models import (
     Organization,
     OrganizationMember,
+    Principal,
     Tenant,
     TenantMember,
 )
@@ -27,9 +28,9 @@ from unifiedui.handlers.principals_helper import ensure_principal_exists
 from unifiedui.logger import get_logger
 from unifiedui.schema.responses.organizations import (
     OrganizationContextResponse,
-    OrganizationMemberResponse,
-    OrganizationMemberRoleResponse,
-    OrganizationMembersResponse,
+    OrganizationPrincipalResponse,
+    OrganizationPrincipalRoleResponse,
+    OrganizationPrincipalsResponse,
     OrganizationResponse,
     TenantWithOrganizationResponse,
 )
@@ -43,8 +44,8 @@ if TYPE_CHECKING:
     from unifiedui.schema.requests.organizations import (
         CreateOrganizationRequest,
         CreateTenantInOrganizationRequest,
-        DeleteOrganizationMemberRequest,
-        SetOrganizationMemberRequest,
+        DeleteOrganizationPrincipalRequest,
+        SetOrganizationPrincipalRequest,
         UpdateOrganizationRequest,
     )
 
@@ -208,11 +209,31 @@ class OrganizationHandler:
             logger.info("Organization updated", extra={"organization_id": organization_id})
             return self._org_to_response(org)
 
-    # ---------- Organization Members ----------
+    # ---------- Organization Principals ----------
 
-    def list_members(self, organization_id: str) -> OrganizationMembersResponse:
-        """List all members of an organization."""
-        logger.info("Listing organization members", extra={"organization_id": organization_id})
+    def list_principals(
+        self,
+        organization_id: str,
+        skip: int = 0,
+        limit: int = 100,
+        search: str | None = None,
+        order_by: str | None = None,
+        order_direction: str | None = "asc",
+    ) -> OrganizationPrincipalsResponse:
+        """List all principals of an organization with optional search and pagination.
+
+        Args:
+            organization_id: The organization ID
+            skip: Number of principals to skip (for pagination)
+            limit: Maximum number of principals to return
+            search: Search term for display_name, principal_name, or mail
+            order_by: Column to order by (currently only 'display_name')
+            order_direction: Sort direction ('asc' or 'desc')
+
+        Returns:
+            OrganizationPrincipalsResponse with principals and their roles
+        """
+        logger.info("Listing organization principals", extra={"organization_id": organization_id})
 
         with self.db_client.get_session() as session:
             self._validate_organization_exists(session, organization_id)
@@ -227,25 +248,27 @@ class OrganizationHandler:
                 .all()
             )
 
-            # Group by principal_id
+            principal_info = self._resolve_principal_info(session, organization_id, members)
+
             members_dict: dict[str, list[OrganizationMember]] = {}
             for member in members:
                 if member.principal_id not in members_dict:
                     members_dict[member.principal_id] = []
                 members_dict[member.principal_id].append(member)
 
-            member_responses = []
+            principal_responses = []
             for principal_id, member_roles in members_dict.items():
                 first = member_roles[0]
-                member_responses.append(
-                    OrganizationMemberResponse(
+                info = principal_info.get(principal_id, {})
+                principal_responses.append(
+                    OrganizationPrincipalResponse(
                         principal_id=principal_id,
                         principal_type=first.principal_type,
-                        display_name=None,
-                        principal_name=None,
-                        mail=None,
+                        display_name=info.get("display_name"),
+                        principal_name=info.get("principal_name"),
+                        mail=info.get("mail"),
                         roles=[
-                            OrganizationMemberRoleResponse(
+                            OrganizationPrincipalRoleResponse(
                                 id=m.id,
                                 principal_id=m.principal_id,
                                 principal_type=m.principal_type,
@@ -257,20 +280,49 @@ class OrganizationHandler:
                     )
                 )
 
-            return OrganizationMembersResponse(
+            if search:
+                search_lower = search.lower()
+                principal_responses = [
+                    p
+                    for p in principal_responses
+                    if (p.display_name and search_lower in p.display_name.lower())
+                    or (p.principal_name and search_lower in p.principal_name.lower())
+                    or (p.mail and search_lower in p.mail.lower())
+                ]
+
+            reverse = order_direction == "desc"
+            if order_by == "display_name":
+                principal_responses.sort(key=lambda p: (p.display_name or "").lower(), reverse=reverse)
+            else:
+                principal_responses.sort(key=lambda p: (p.display_name or "").lower())
+
+            total_count = len(principal_responses)
+            paginated = principal_responses[skip : skip + limit]
+
+            return OrganizationPrincipalsResponse(
                 organization_id=organization_id,
-                members=member_responses,
+                principals=paginated,
+                total_count=total_count,
             )
 
-    def set_member(
+    def set_principal(
         self,
         organization_id: str,
-        request: SetOrganizationMemberRequest,
+        request: SetOrganizationPrincipalRequest,
         user_id: str,
-    ) -> OrganizationMemberRoleResponse:
-        """Add or set a member role in the organization."""
+    ) -> OrganizationPrincipalRoleResponse:
+        """Add or set a principal role in the organization.
+
+        Args:
+            organization_id: The organization ID
+            request: Request containing principal_id, principal_type, and role
+            user_id: The ID of the user making the change
+
+        Returns:
+            OrganizationPrincipalRoleResponse with the created role entry
+        """
         logger.info(
-            "Setting organization member",
+            "Setting organization principal",
             extra={
                 "organization_id": organization_id,
                 "principal_id": request.principal_id,
@@ -281,7 +333,6 @@ class OrganizationHandler:
         with self.db_client.get_session() as session:
             self._validate_organization_exists(session, organization_id)
 
-            # Check if member already has this role
             existing = session.execute(
                 select(OrganizationMember).where(
                     OrganizationMember.organization_id == organization_id,
@@ -306,11 +357,11 @@ class OrganizationHandler:
             session.flush()
 
             logger.info(
-                "Organization member role set",
+                "Organization principal role set",
                 extra={"member_id": member.id, "role": request.role},
             )
 
-            return OrganizationMemberRoleResponse(
+            return OrganizationPrincipalRoleResponse(
                 id=member.id,
                 principal_id=member.principal_id,
                 principal_type=member.principal_type,
@@ -318,14 +369,19 @@ class OrganizationHandler:
                 created_at=member.created_at,
             )
 
-    def delete_member(
+    def delete_principal(
         self,
         organization_id: str,
-        request: DeleteOrganizationMemberRequest,
+        request: DeleteOrganizationPrincipalRequest,
     ) -> None:
-        """Remove a member role from the organization."""
+        """Remove a principal role from the organization.
+
+        Args:
+            organization_id: The organization ID
+            request: Request containing principal_id, principal_type, and role
+        """
         logger.info(
-            "Deleting organization member role",
+            "Deleting organization principal role",
             extra={
                 "organization_id": organization_id,
                 "principal_id": request.principal_id,
@@ -348,7 +404,7 @@ class OrganizationHandler:
                 raise OrganizationMemberNotFoundError(request.principal_id)
 
             session.delete(member)
-            logger.info("Organization member role deleted")
+            logger.info("Organization principal role deleted")
 
     # ---------- Organization Tenants ----------
 
@@ -551,3 +607,50 @@ class OrganizationHandler:
                 self.cache_client.clear_cache_for_user(user_id)
         except Exception as e:
             logger.warning(f"Failed to invalidate cache: {e}")
+
+    @staticmethod
+    def _resolve_principal_info(
+        session: Session,
+        organization_id: str,
+        members: list[OrganizationMember],
+    ) -> dict[str, dict[str, str | None]]:
+        """Resolve display_name, principal_name, mail from the Principal table.
+
+        Looks up principals from any tenant belonging to the organization.
+
+        Args:
+            session: Database session
+            organization_id: The organization ID
+            members: List of OrganizationMember records
+
+        Returns:
+            Dict mapping principal_id to display info
+        """
+        principal_ids = list({m.principal_id for m in members})
+        if not principal_ids:
+            return {}
+
+        tenant_ids_subquery = select(Tenant.id).where(Tenant.organization_id == organization_id)
+
+        principals = session.execute(
+            select(
+                Principal.principal_id,
+                Principal.display_name,
+                Principal.principal_name,
+                Principal.mail,
+            )
+            .where(
+                Principal.tenant_id.in_(tenant_ids_subquery),
+                Principal.principal_id.in_(principal_ids),
+            )
+            .distinct(Principal.principal_id)
+        ).all()
+
+        return {
+            p.principal_id: {
+                "display_name": p.display_name,
+                "principal_name": p.principal_name,
+                "mail": p.mail,
+            }
+            for p in principals
+        }

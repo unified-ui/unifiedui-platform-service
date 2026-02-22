@@ -2,7 +2,7 @@
 
 from typing import TYPE_CHECKING
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 
 from unifiedui.core.database.enums import OrganizationRoleEnum
 from unifiedui.core.middleware.apis.v1.auth import authenticate, check_permissions
@@ -11,13 +11,13 @@ from unifiedui.handlers.organizations import OrganizationHandler
 from unifiedui.schema.requests.organizations import (
     CreateOrganizationRequest,
     CreateTenantInOrganizationRequest,
-    DeleteOrganizationMemberRequest,
-    SetOrganizationMemberRequest,
+    DeleteOrganizationPrincipalRequest,
+    SetOrganizationPrincipalRequest,
     UpdateOrganizationRequest,
 )
 from unifiedui.schema.responses.organizations import (
-    OrganizationMemberRoleResponse,
-    OrganizationMembersResponse,
+    OrganizationPrincipalRoleResponse,
+    OrganizationPrincipalsResponse,
     OrganizationResponse,
     TenantWithOrganizationResponse,
 )
@@ -110,64 +110,76 @@ async def update_organization(
     return handler.update_organization(organization_id, org_data, user_id)
 
 
-# ---------- Organization Members ----------
+# ---------- Organization Principals ----------
 
 
 @router.get(
-    "/{organization_id}/members",
-    response_model=OrganizationMembersResponse,
+    "/{organization_id}/principals",
+    response_model=OrganizationPrincipalsResponse,
     status_code=status.HTTP_200_OK,
-    summary="List Organization Members",
-    description="List all members of an organization",
+    summary="List Organization Principals",
+    description="List all principals of an organization with optional search and pagination",
 )
 @authenticate()
 @check_permissions(entity="organization", required_org_roles=ORG_GLOBAL_ADMIN_ROLES)
-async def list_organization_members(
+async def list_organization_principals(
     request: Request,
     organization_id: str,
+    skip: int = Query(0, ge=0, description="Number of principals to skip"),
+    limit: int = Query(100, ge=1, le=500, description="Maximum number of principals to return"),
+    search: str | None = Query(None, description="Search term for display_name, principal_name, or mail"),
+    order_by: str | None = Query(None, enum=["display_name"], description="Column to order by"),
+    order_direction: str | None = Query("asc", enum=["asc", "desc"], description="Sort direction"),
     handler: OrganizationHandler = Depends(get_organization_handler),
-) -> OrganizationMembersResponse:
-    """List all members of an organization."""
-    return handler.list_members(organization_id)
+) -> OrganizationPrincipalsResponse:
+    """List all principals of an organization."""
+    return handler.list_principals(
+        organization_id,
+        skip=skip,
+        limit=limit,
+        search=search,
+        order_by=order_by,
+        order_direction=order_direction,
+    )
 
 
 @router.post(
-    "/{organization_id}/members",
-    response_model=OrganizationMemberRoleResponse,
+    "/{organization_id}/principals",
+    response_model=OrganizationPrincipalRoleResponse,
     status_code=status.HTTP_201_CREATED,
-    summary="Set Organization Member",
-    description="Add or set a member role in the organization",
+    summary="Set Organization Principal",
+    description="Add or set a principal role in the organization",
 )
 @authenticate()
 @check_permissions(entity="organization", required_org_roles=ORG_GLOBAL_ADMIN_ROLES)
-async def set_organization_member(
+async def set_organization_principal(
     request: Request,
     organization_id: str,
-    member_data: SetOrganizationMemberRequest,
+    principal_data: SetOrganizationPrincipalRequest,
     handler: OrganizationHandler = Depends(get_organization_handler),
-) -> OrganizationMemberRoleResponse:
-    """Add or set a member role in the organization."""
+) -> OrganizationPrincipalRoleResponse:
+    """Add or set a principal role in the organization."""
     user: ContextIdentityUser = request.state.user
     user_id = user.identity.get_id()
-    return handler.set_member(organization_id, member_data, user_id)
+    return handler.set_principal(organization_id, principal_data, user_id)
 
 
 @router.delete(
-    "/{organization_id}/members",
+    "/{organization_id}/principals",
     status_code=status.HTTP_204_NO_CONTENT,
-    summary="Delete Organization Member",
-    description="Remove a member role from the organization",
+    summary="Delete Organization Principal",
+    description="Remove a principal role from the organization",
 )
 @authenticate()
 @check_permissions(entity="organization", required_org_roles=ORG_GLOBAL_ADMIN_ROLES)
-async def delete_organization_member(
+async def delete_organization_principal(
     request: Request,
     organization_id: str,
-    member_data: DeleteOrganizationMemberRequest,
+    principal_data: DeleteOrganizationPrincipalRequest,
     handler: OrganizationHandler = Depends(get_organization_handler),
 ) -> None:
-    """Remove a member role from the organization."""
-    handler.delete_member(organization_id, member_data)
+    """Remove a principal role from the organization."""
+    handler.delete_principal(organization_id, principal_data)
 
 
 # ---------- Organization Tenants ----------

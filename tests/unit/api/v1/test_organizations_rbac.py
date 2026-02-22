@@ -22,7 +22,7 @@ def _disable_system_admin_restriction():
 # API Endpoints
 ENDPOINT_ORGANIZATIONS = "/api/v1/platform-service/organizations"
 ENDPOINT_ORGANIZATION_DETAIL = "/api/v1/platform-service/organizations/{organization_id}"
-ENDPOINT_ORGANIZATION_MEMBERS = "/api/v1/platform-service/organizations/{organization_id}/members"
+ENDPOINT_ORGANIZATION_PRINCIPALS = "/api/v1/platform-service/organizations/{organization_id}/principals"
 ENDPOINT_ORGANIZATION_TENANTS = "/api/v1/platform-service/organizations/{organization_id}/tenants"
 ENDPOINT_ORGANIZATION_TENANT_DETAIL = "/api/v1/platform-service/organizations/{organization_id}/tenants/{tenant_id}"
 
@@ -89,15 +89,15 @@ class TestOrganizationRBAC:
         )
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
-    def test_unauthenticated_cannot_list_members(self, test_client: TestClient) -> None:
-        """Test that unauthenticated users cannot list org members."""
-        response = test_client.get(ENDPOINT_ORGANIZATION_MEMBERS.format(organization_id="some-org-id"))
+    def test_unauthenticated_cannot_list_principals(self, test_client: TestClient) -> None:
+        """Test that unauthenticated users cannot list org principals."""
+        response = test_client.get(ENDPOINT_ORGANIZATION_PRINCIPALS.format(organization_id="some-org-id"))
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
-    def test_unauthenticated_cannot_set_member(self, test_client: TestClient) -> None:
-        """Test that unauthenticated users cannot add org members."""
+    def test_unauthenticated_cannot_set_principal(self, test_client: TestClient) -> None:
+        """Test that unauthenticated users cannot add org principals."""
         response = test_client.post(
-            ENDPOINT_ORGANIZATION_MEMBERS.format(organization_id="some-org-id"),
+            ENDPOINT_ORGANIZATION_PRINCIPALS.format(organization_id="some-org-id"),
             json={
                 "principal_id": "hacker",
                 "principal_type": PRINCIPAL_TYPE_USER,
@@ -106,11 +106,11 @@ class TestOrganizationRBAC:
         )
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
-    def test_unauthenticated_cannot_delete_member(self, test_client: TestClient) -> None:
-        """Test that unauthenticated users cannot delete org members."""
+    def test_unauthenticated_cannot_delete_principal(self, test_client: TestClient) -> None:
+        """Test that unauthenticated users cannot delete org principals."""
         response = test_client.request(
             "DELETE",
-            ENDPOINT_ORGANIZATION_MEMBERS.format(organization_id="some-org-id"),
+            ENDPOINT_ORGANIZATION_PRINCIPALS.format(organization_id="some-org-id"),
             json={
                 "principal_id": "someone",
                 "principal_type": PRINCIPAL_TYPE_USER,
@@ -148,10 +148,12 @@ class TestOrganizationRBAC:
         org = _create_org(test_client, headers, identity_tenant_id="rbac-idp-creator")
 
         # Verify creator has TENANT_GLOBAL_ADMIN
-        members_resp = test_client.get(ENDPOINT_ORGANIZATION_MEMBERS.format(organization_id=org["id"]), headers=headers)
-        assert members_resp.status_code == status.HTTP_200_OK
+        principals_resp = test_client.get(
+            ENDPOINT_ORGANIZATION_PRINCIPALS.format(organization_id=org["id"]), headers=headers
+        )
+        assert principals_resp.status_code == status.HTTP_200_OK
 
-        members = members_resp.json()["members"]
+        members = principals_resp.json()["principals"]
         creator = next((m for m in members if m["principal_id"] == "rbac-creator-1"), None)
         assert creator is not None
         roles = [r["role"] for r in creator["roles"]]
@@ -186,7 +188,7 @@ class TestOrganizationRBAC:
         all_roles = [ROLE_ORG_TENANT_ADMIN, ROLE_ORG_TENANT_CREATOR]
         for i, role in enumerate(all_roles):
             resp = test_client.post(
-                ENDPOINT_ORGANIZATION_MEMBERS.format(organization_id=org_id),
+                ENDPOINT_ORGANIZATION_PRINCIPALS.format(organization_id=org_id),
                 json={
                     "principal_id": f"role-user-{i}",
                     "principal_type": PRINCIPAL_TYPE_USER,
@@ -258,22 +260,22 @@ class TestOrganizationRBAC:
         )
         assert resp_upd.status_code == status.HTTP_200_OK
 
-        # List members
-        resp_mem = test_client.get(ENDPOINT_ORGANIZATION_MEMBERS.format(organization_id=org_id), headers=headers)
+        # List principals
+        resp_mem = test_client.get(ENDPOINT_ORGANIZATION_PRINCIPALS.format(organization_id=org_id), headers=headers)
         assert resp_mem.status_code == status.HTTP_200_OK
 
-        # Set member
+        # Set principal
         resp_set = test_client.post(
-            ENDPOINT_ORGANIZATION_MEMBERS.format(organization_id=org_id),
+            ENDPOINT_ORGANIZATION_PRINCIPALS.format(organization_id=org_id),
             json={"principal_id": "new-user", "principal_type": PRINCIPAL_TYPE_USER, "role": ROLE_ORG_TENANT_CREATOR},
             headers=headers,
         )
         assert resp_set.status_code == status.HTTP_201_CREATED
 
-        # Delete member
+        # Delete principal
         resp_del = test_client.request(
             "DELETE",
-            ENDPOINT_ORGANIZATION_MEMBERS.format(organization_id=org_id),
+            ENDPOINT_ORGANIZATION_PRINCIPALS.format(organization_id=org_id),
             json={"principal_id": "new-user", "principal_type": PRINCIPAL_TYPE_USER, "role": ROLE_ORG_TENANT_CREATOR},
             headers=headers,
         )
@@ -300,8 +302,8 @@ class TestOrganizationRBAC:
         )
         assert resp_dt.status_code == status.HTTP_204_NO_CONTENT
 
-    def test_member_role_assignment_and_removal_flow(self, test_client: TestClient) -> None:
-        """Test the full flow of adding and removing org member roles."""
+    def test_principal_role_assignment_and_removal_flow(self, test_client: TestClient) -> None:
+        """Test the full flow of adding and removing org principal roles."""
         admin_token = test_client.create_test_user("rbac-admin-flow", "RBAC Admin Flow")
         admin_headers = create_auth_headers(admin_token, use_cache=False)
 
@@ -315,7 +317,7 @@ class TestOrganizationRBAC:
 
         # Assign TENANT_ADMIN role to new user
         set_resp = test_client.post(
-            ENDPOINT_ORGANIZATION_MEMBERS.format(organization_id=org_id),
+            ENDPOINT_ORGANIZATION_PRINCIPALS.format(organization_id=org_id),
             json={"principal_id": "flow-user", "principal_type": PRINCIPAL_TYPE_USER, "role": ROLE_ORG_TENANT_ADMIN},
             headers=admin_headers,
         )
@@ -323,7 +325,7 @@ class TestOrganizationRBAC:
 
         # Assign additional TENANT_CREATOR role
         set2_resp = test_client.post(
-            ENDPOINT_ORGANIZATION_MEMBERS.format(organization_id=org_id),
+            ENDPOINT_ORGANIZATION_PRINCIPALS.format(organization_id=org_id),
             json={
                 "principal_id": "flow-user",
                 "principal_type": PRINCIPAL_TYPE_USER,
@@ -334,31 +336,35 @@ class TestOrganizationRBAC:
         assert set2_resp.status_code == status.HTTP_201_CREATED
 
         # Verify both roles exist
-        members_resp = test_client.get(
-            ENDPOINT_ORGANIZATION_MEMBERS.format(organization_id=org_id), headers=admin_headers
+        principals_resp = test_client.get(
+            ENDPOINT_ORGANIZATION_PRINCIPALS.format(organization_id=org_id), headers=admin_headers
         )
-        flow_member = next((m for m in members_resp.json()["members"] if m["principal_id"] == "flow-user"), None)
-        assert flow_member is not None
-        roles = [r["role"] for r in flow_member["roles"]]
+        flow_principal = next(
+            (m for m in principals_resp.json()["principals"] if m["principal_id"] == "flow-user"), None
+        )
+        assert flow_principal is not None
+        roles = [r["role"] for r in flow_principal["roles"]]
         assert ROLE_ORG_TENANT_ADMIN in roles
         assert ROLE_ORG_TENANT_CREATOR in roles
 
         # Remove TENANT_ADMIN role
         del_resp = test_client.request(
             "DELETE",
-            ENDPOINT_ORGANIZATION_MEMBERS.format(organization_id=org_id),
+            ENDPOINT_ORGANIZATION_PRINCIPALS.format(organization_id=org_id),
             json={"principal_id": "flow-user", "principal_type": PRINCIPAL_TYPE_USER, "role": ROLE_ORG_TENANT_ADMIN},
             headers=admin_headers,
         )
         assert del_resp.status_code == status.HTTP_204_NO_CONTENT
 
         # Verify only TENANT_CREATOR remains
-        members_resp2 = test_client.get(
-            ENDPOINT_ORGANIZATION_MEMBERS.format(organization_id=org_id), headers=admin_headers
+        principals_resp2 = test_client.get(
+            ENDPOINT_ORGANIZATION_PRINCIPALS.format(organization_id=org_id), headers=admin_headers
         )
-        flow_member2 = next((m for m in members_resp2.json()["members"] if m["principal_id"] == "flow-user"), None)
-        assert flow_member2 is not None
-        roles2 = [r["role"] for r in flow_member2["roles"]]
+        flow_principal2 = next(
+            (m for m in principals_resp2.json()["principals"] if m["principal_id"] == "flow-user"), None
+        )
+        assert flow_principal2 is not None
+        roles2 = [r["role"] for r in flow_principal2["roles"]]
         assert ROLE_ORG_TENANT_ADMIN not in roles2
         assert ROLE_ORG_TENANT_CREATOR in roles2
 
@@ -412,8 +418,8 @@ class TestOrganizationRBAC:
         )
         assert response.status_code == status.HTTP_204_NO_CONTENT
 
-    def test_group_as_org_member(self, test_client: TestClient) -> None:
-        """Test that identity groups can be added as org members."""
+    def test_group_as_org_principal(self, test_client: TestClient) -> None:
+        """Test that identity groups can be added as org principals."""
         user_token = test_client.create_test_user("rbac-grp-1", "RBAC Grp")
         headers = create_auth_headers(user_token, use_cache=False)
 
@@ -427,7 +433,7 @@ class TestOrganizationRBAC:
 
         # Add group as MEMBER
         resp = test_client.post(
-            ENDPOINT_ORGANIZATION_MEMBERS.format(organization_id=org_id),
+            ENDPOINT_ORGANIZATION_PRINCIPALS.format(organization_id=org_id),
             json={
                 "principal_id": "group-rbac-001",
                 "principal_type": PRINCIPAL_TYPE_GROUP,
@@ -448,103 +454,113 @@ class TestOrganizationRBACEnforcement:
     """
 
     @staticmethod
-    def _setup_org_with_member(
+    def _setup_org_with_principal(
         test_client: TestClient,
         slug: str,
         idp: str,
-        member_role: str | None = None,
+        principal_role: str | None = None,
     ) -> tuple[dict[str, Any], dict[str, str], dict[str, str]]:
         """Create an org as admin and optionally add a second user with a specific role.
 
         Returns:
-            (org_data, admin_headers, member_headers)
+            (org_data, admin_headers, principal_headers)
         """
         admin_token = test_client.create_test_user(f"rbac-enf-admin-{slug}", f"Admin {slug}")
         admin_headers = create_auth_headers(admin_token, use_cache=False)
 
         org = _create_org(test_client, admin_headers, identity_tenant_id=f"rbac-enf-idp-{idp}", slug=slug)
 
-        member_token = test_client.create_test_user(f"rbac-enf-user-{slug}", f"User {slug}")
-        member_headers = create_auth_headers(member_token, use_cache=False)
+        principal_token = test_client.create_test_user(f"rbac-enf-user-{slug}", f"User {slug}")
+        principal_headers = create_auth_headers(principal_token, use_cache=False)
 
-        if member_role is not None:
+        if principal_role is not None:
             resp = test_client.post(
-                ENDPOINT_ORGANIZATION_MEMBERS.format(organization_id=org["id"]),
+                ENDPOINT_ORGANIZATION_PRINCIPALS.format(organization_id=org["id"]),
                 json={
                     "principal_id": f"rbac-enf-user-{slug}",
                     "principal_type": PRINCIPAL_TYPE_USER,
-                    "role": member_role,
+                    "role": principal_role,
                 },
                 headers=admin_headers,
             )
             assert resp.status_code == status.HTTP_201_CREATED
 
-        return org, admin_headers, member_headers
+        return org, admin_headers, principal_headers
 
     # ---------- No org role → 403 on protected routes ----------
 
     def test_no_role_cannot_update_org(self, test_client: TestClient) -> None:
         """User without any org role gets 403 on PATCH org."""
-        org, _, member_headers = self._setup_org_with_member(test_client, slug="norole-upd", idp="norole-upd")
+        org, _, principal_headers = self._setup_org_with_principal(test_client, slug="norole-upd", idp="norole-upd")
         resp = test_client.patch(
             ENDPOINT_ORGANIZATION_DETAIL.format(organization_id=org["id"]),
             json={"name": "Hacked Name"},
-            headers=member_headers,
+            headers=principal_headers,
         )
         assert resp.status_code == status.HTTP_403_FORBIDDEN
 
-    def test_no_role_cannot_list_members(self, test_client: TestClient) -> None:
-        """User without any org role gets 403 on GET members."""
-        org, _, member_headers = self._setup_org_with_member(test_client, slug="norole-listmem", idp="norole-listmem")
+    def test_no_role_cannot_list_principals(self, test_client: TestClient) -> None:
+        """User without any org role gets 403 on GET principals."""
+        org, _, principal_headers = self._setup_org_with_principal(
+            test_client, slug="norole-listprin", idp="norole-listprin"
+        )
         resp = test_client.get(
-            ENDPOINT_ORGANIZATION_MEMBERS.format(organization_id=org["id"]),
-            headers=member_headers,
+            ENDPOINT_ORGANIZATION_PRINCIPALS.format(organization_id=org["id"]),
+            headers=principal_headers,
         )
         assert resp.status_code == status.HTTP_403_FORBIDDEN
 
-    def test_no_role_cannot_set_member(self, test_client: TestClient) -> None:
-        """User without any org role gets 403 on POST members."""
-        org, _, member_headers = self._setup_org_with_member(test_client, slug="norole-setmem", idp="norole-setmem")
+    def test_no_role_cannot_set_principal(self, test_client: TestClient) -> None:
+        """User without any org role gets 403 on POST principals."""
+        org, _, principal_headers = self._setup_org_with_principal(
+            test_client, slug="norole-setprin", idp="norole-setprin"
+        )
         resp = test_client.post(
-            ENDPOINT_ORGANIZATION_MEMBERS.format(organization_id=org["id"]),
+            ENDPOINT_ORGANIZATION_PRINCIPALS.format(organization_id=org["id"]),
             json={"principal_id": "x", "principal_type": PRINCIPAL_TYPE_USER, "role": ROLE_ORG_TENANT_CREATOR},
-            headers=member_headers,
+            headers=principal_headers,
         )
         assert resp.status_code == status.HTTP_403_FORBIDDEN
 
-    def test_no_role_cannot_delete_member(self, test_client: TestClient) -> None:
-        """User without any org role gets 403 on DELETE members."""
-        org, _, member_headers = self._setup_org_with_member(test_client, slug="norole-delmem", idp="norole-delmem")
+    def test_no_role_cannot_delete_principal(self, test_client: TestClient) -> None:
+        """User without any org role gets 403 on DELETE principals."""
+        org, _, principal_headers = self._setup_org_with_principal(
+            test_client, slug="norole-delprin", idp="norole-delprin"
+        )
         resp = test_client.request(
             "DELETE",
-            ENDPOINT_ORGANIZATION_MEMBERS.format(organization_id=org["id"]),
+            ENDPOINT_ORGANIZATION_PRINCIPALS.format(organization_id=org["id"]),
             json={"principal_id": "x", "principal_type": PRINCIPAL_TYPE_USER, "role": ROLE_ORG_TENANT_CREATOR},
-            headers=member_headers,
+            headers=principal_headers,
         )
         assert resp.status_code == status.HTTP_403_FORBIDDEN
 
     def test_no_role_cannot_list_tenants(self, test_client: TestClient) -> None:
         """User without any org role gets 403 on GET tenants."""
-        org, _, member_headers = self._setup_org_with_member(test_client, slug="norole-listten", idp="norole-listten")
+        org, _, principal_headers = self._setup_org_with_principal(
+            test_client, slug="norole-listten", idp="norole-listten"
+        )
         resp = test_client.get(
             ENDPOINT_ORGANIZATION_TENANTS.format(organization_id=org["id"]),
-            headers=member_headers,
+            headers=principal_headers,
         )
         assert resp.status_code == status.HTTP_403_FORBIDDEN
 
     def test_no_role_cannot_create_tenant(self, test_client: TestClient) -> None:
         """User without any org role gets 403 on POST tenants."""
-        org, _, member_headers = self._setup_org_with_member(test_client, slug="norole-crtten", idp="norole-crtten")
+        org, _, principal_headers = self._setup_org_with_principal(
+            test_client, slug="norole-crtten", idp="norole-crtten"
+        )
         resp = test_client.post(
             ENDPOINT_ORGANIZATION_TENANTS.format(organization_id=org["id"]),
             json={"name": "Evil Tenant", "environment_type": "SANDBOX"},
-            headers=member_headers,
+            headers=principal_headers,
         )
         assert resp.status_code == status.HTTP_403_FORBIDDEN
 
     def test_no_role_cannot_delete_tenant(self, test_client: TestClient) -> None:
         """User without any org role gets 403 on DELETE tenant."""
-        org, admin_headers, member_headers = self._setup_org_with_member(
+        org, admin_headers, principal_headers = self._setup_org_with_principal(
             test_client, slug="norole-delten", idp="norole-delten"
         )
         # Create a tenant as admin
@@ -558,20 +574,20 @@ class TestOrganizationRBACEnforcement:
         resp = test_client.request(
             "DELETE",
             ENDPOINT_ORGANIZATION_TENANT_DETAIL.format(organization_id=org["id"], tenant_id=tenant_id),
-            headers=member_headers,
+            headers=principal_headers,
         )
         assert resp.status_code == status.HTTP_403_FORBIDDEN
 
     # ---------- GET org (auth-only, no RBAC) works for anyone ----------
 
     def test_any_org_member_can_get_org(self, test_client: TestClient) -> None:
-        """GET org works for any org member (ORG_ALL_ROLES), including TENANT_CREATOR."""
-        org, _, member_headers = self._setup_org_with_member(
-            test_client, slug="anyauth-get", idp="anyauth-get", member_role=ROLE_ORG_TENANT_CREATOR
+        """GET org works for any org principal (ORG_ALL_ROLES), including TENANT_CREATOR."""
+        org, _, principal_headers = self._setup_org_with_principal(
+            test_client, slug="anyauth-get", idp="anyauth-get", principal_role=ROLE_ORG_TENANT_CREATOR
         )
         resp = test_client.get(
             ENDPOINT_ORGANIZATION_DETAIL.format(organization_id=org["id"]),
-            headers=member_headers,
+            headers=principal_headers,
         )
         assert resp.status_code == status.HTTP_200_OK
 
@@ -579,88 +595,88 @@ class TestOrganizationRBACEnforcement:
 
     def test_tenant_creator_can_list_tenants(self, test_client: TestClient) -> None:
         """TENANT_CREATOR can list tenants (ORG_ALL_ROLES)."""
-        org, _, member_headers = self._setup_org_with_member(
+        org, _, principal_headers = self._setup_org_with_principal(
             test_client,
             slug="tc-listten",
             idp="tc-listten",
-            member_role=ROLE_ORG_TENANT_CREATOR,
+            principal_role=ROLE_ORG_TENANT_CREATOR,
         )
         resp = test_client.get(
             ENDPOINT_ORGANIZATION_TENANTS.format(organization_id=org["id"]),
-            headers=member_headers,
+            headers=principal_headers,
         )
         assert resp.status_code == status.HTTP_200_OK
 
     def test_tenant_creator_can_create_tenant(self, test_client: TestClient) -> None:
         """TENANT_CREATOR can create tenants."""
-        org, _, member_headers = self._setup_org_with_member(
+        org, _, principal_headers = self._setup_org_with_principal(
             test_client,
             slug="tc-crtten",
             idp="tc-crtten",
-            member_role=ROLE_ORG_TENANT_CREATOR,
+            principal_role=ROLE_ORG_TENANT_CREATOR,
         )
         resp = test_client.post(
             ENDPOINT_ORGANIZATION_TENANTS.format(organization_id=org["id"]),
             json={"name": "Creator Tenant", "environment_type": "SANDBOX"},
-            headers=member_headers,
+            headers=principal_headers,
         )
         assert resp.status_code == status.HTTP_201_CREATED
 
     def test_tenant_creator_cannot_update_org(self, test_client: TestClient) -> None:
         """TENANT_CREATOR cannot update org (needs ADMIN)."""
-        org, _, member_headers = self._setup_org_with_member(
+        org, _, principal_headers = self._setup_org_with_principal(
             test_client,
             slug="tc-updorg",
             idp="tc-updorg",
-            member_role=ROLE_ORG_TENANT_CREATOR,
+            principal_role=ROLE_ORG_TENANT_CREATOR,
         )
         resp = test_client.patch(
             ENDPOINT_ORGANIZATION_DETAIL.format(organization_id=org["id"]),
             json={"name": "No Access"},
-            headers=member_headers,
+            headers=principal_headers,
         )
         assert resp.status_code == status.HTTP_403_FORBIDDEN
 
-    def test_tenant_creator_cannot_manage_members(self, test_client: TestClient) -> None:
-        """TENANT_CREATOR cannot list/set/delete members (needs ADMIN)."""
-        org, _, member_headers = self._setup_org_with_member(
+    def test_tenant_creator_cannot_manage_principals(self, test_client: TestClient) -> None:
+        """TENANT_CREATOR cannot list/set/delete principals (needs ADMIN)."""
+        org, _, principal_headers = self._setup_org_with_principal(
             test_client,
-            slug="tc-mgmem",
-            idp="tc-mgmem",
-            member_role=ROLE_ORG_TENANT_CREATOR,
+            slug="tc-mgprin",
+            idp="tc-mgprin",
+            principal_role=ROLE_ORG_TENANT_CREATOR,
         )
         org_id = org["id"]
 
-        # List members → 403
+        # List principals → 403
         resp_list = test_client.get(
-            ENDPOINT_ORGANIZATION_MEMBERS.format(organization_id=org_id), headers=member_headers
+            ENDPOINT_ORGANIZATION_PRINCIPALS.format(organization_id=org_id), headers=principal_headers
         )
         assert resp_list.status_code == status.HTTP_403_FORBIDDEN
 
-        # Set member → 403
+        # Set principal → 403
         resp_set = test_client.post(
-            ENDPOINT_ORGANIZATION_MEMBERS.format(organization_id=org_id),
+            ENDPOINT_ORGANIZATION_PRINCIPALS.format(organization_id=org_id),
             json={"principal_id": "x", "principal_type": PRINCIPAL_TYPE_USER, "role": ROLE_ORG_TENANT_CREATOR},
-            headers=member_headers,
+            headers=principal_headers,
         )
         assert resp_set.status_code == status.HTTP_403_FORBIDDEN
 
-        # Delete member → 403
+        # Delete principal → 403
         resp_del = test_client.request(
             "DELETE",
-            ENDPOINT_ORGANIZATION_MEMBERS.format(organization_id=org_id),
+            ENDPOINT_ORGANIZATION_PRINCIPALS.format(organization_id=org_id),
             json={"principal_id": "x", "principal_type": PRINCIPAL_TYPE_USER, "role": ROLE_ORG_TENANT_CREATOR},
-            headers=member_headers,
+            headers=principal_headers,
         )
         assert resp_del.status_code == status.HTTP_403_FORBIDDEN
 
     def test_tenant_creator_cannot_delete_tenant(self, test_client: TestClient) -> None:
         """TENANT_CREATOR cannot delete tenants (needs ADMIN)."""
-        org, admin_headers, member_headers = self._setup_org_with_member(
+        org, admin_headers, principal_headers = self._setup_org_with_principal(
             test_client,
             slug="tc-delten",
             idp="tc-delten",
-            member_role=ROLE_ORG_TENANT_CREATOR,
+            principal_role=ROLE_ORG_TENANT_CREATOR,
         )
         # Create a tenant as admin
         create_resp = test_client.post(
@@ -673,7 +689,7 @@ class TestOrganizationRBACEnforcement:
         resp = test_client.request(
             "DELETE",
             ENDPOINT_ORGANIZATION_TENANT_DETAIL.format(organization_id=org["id"], tenant_id=tenant_id),
-            headers=member_headers,
+            headers=principal_headers,
         )
         assert resp.status_code == status.HTTP_403_FORBIDDEN
 
@@ -681,59 +697,59 @@ class TestOrganizationRBACEnforcement:
 
     def test_tenant_admin_can_list_tenants(self, test_client: TestClient) -> None:
         """TENANT_ADMIN can list tenants (ORG_ALL_ROLES)."""
-        org, _, member_headers = self._setup_org_with_member(
+        org, _, principal_headers = self._setup_org_with_principal(
             test_client,
             slug="ta-listten",
             idp="ta-listten",
-            member_role=ROLE_ORG_TENANT_ADMIN,
+            principal_role=ROLE_ORG_TENANT_ADMIN,
         )
         resp = test_client.get(
             ENDPOINT_ORGANIZATION_TENANTS.format(organization_id=org["id"]),
-            headers=member_headers,
+            headers=principal_headers,
         )
         assert resp.status_code == status.HTTP_200_OK
 
     def test_tenant_admin_cannot_update_org(self, test_client: TestClient) -> None:
         """TENANT_ADMIN cannot update org (needs ADMIN or TENANT_GLOBAL_ADMIN)."""
-        org, _, member_headers = self._setup_org_with_member(
+        org, _, principal_headers = self._setup_org_with_principal(
             test_client,
             slug="ta-updorg",
             idp="ta-updorg",
-            member_role=ROLE_ORG_TENANT_ADMIN,
+            principal_role=ROLE_ORG_TENANT_ADMIN,
         )
         resp = test_client.patch(
             ENDPOINT_ORGANIZATION_DETAIL.format(organization_id=org["id"]),
             json={"name": "Not Allowed"},
-            headers=member_headers,
+            headers=principal_headers,
         )
         assert resp.status_code == status.HTTP_403_FORBIDDEN
 
-    def test_tenant_admin_cannot_manage_members(self, test_client: TestClient) -> None:
-        """TENANT_ADMIN cannot manage org members (needs ADMIN)."""
-        org, _, member_headers = self._setup_org_with_member(
+    def test_tenant_admin_cannot_manage_principals(self, test_client: TestClient) -> None:
+        """TENANT_ADMIN cannot manage org principals (needs ADMIN)."""
+        org, _, principal_headers = self._setup_org_with_principal(
             test_client,
-            slug="ta-mgmem",
-            idp="ta-mgmem",
-            member_role=ROLE_ORG_TENANT_ADMIN,
+            slug="ta-mgprin",
+            idp="ta-mgprin",
+            principal_role=ROLE_ORG_TENANT_ADMIN,
         )
         resp = test_client.get(
-            ENDPOINT_ORGANIZATION_MEMBERS.format(organization_id=org["id"]),
-            headers=member_headers,
+            ENDPOINT_ORGANIZATION_PRINCIPALS.format(organization_id=org["id"]),
+            headers=principal_headers,
         )
         assert resp.status_code == status.HTTP_403_FORBIDDEN
 
     def test_tenant_admin_can_create_tenant(self, test_client: TestClient) -> None:
         """ORGANISATION_TENANT_ADMIN can create tenants (part of ORG_ALL_ROLES)."""
-        org, _, member_headers = self._setup_org_with_member(
+        org, _, principal_headers = self._setup_org_with_principal(
             test_client,
             slug="ta-crtten",
             idp="ta-crtten",
-            member_role=ROLE_ORG_TENANT_ADMIN,
+            principal_role=ROLE_ORG_TENANT_ADMIN,
         )
         resp = test_client.post(
             ENDPOINT_ORGANIZATION_TENANTS.format(organization_id=org["id"]),
             json={"name": "Allowed", "environment_type": "SANDBOX"},
-            headers=member_headers,
+            headers=principal_headers,
         )
         assert resp.status_code == status.HTTP_201_CREATED
 
@@ -761,7 +777,7 @@ class TestOrganizationRBACEnforcement:
 
         # User1 tries to list org2 members → 403
         resp_mem = test_client.get(
-            ENDPOINT_ORGANIZATION_MEMBERS.format(organization_id=org2["id"]),
+            ENDPOINT_ORGANIZATION_PRINCIPALS.format(organization_id=org2["id"]),
             headers=headers1,
         )
         assert resp_mem.status_code == status.HTTP_403_FORBIDDEN

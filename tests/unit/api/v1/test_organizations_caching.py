@@ -22,7 +22,7 @@ def _disable_system_admin_restriction():
 # API Endpoints
 ENDPOINT_ORGANIZATIONS = "/api/v1/platform-service/organizations"
 ENDPOINT_ORGANIZATION_DETAIL = "/api/v1/platform-service/organizations/{organization_id}"
-ENDPOINT_ORGANIZATION_MEMBERS = "/api/v1/platform-service/organizations/{organization_id}/members"
+ENDPOINT_ORGANIZATION_PRINCIPALS = "/api/v1/platform-service/organizations/{organization_id}/principals"
 ENDPOINT_ORGANIZATION_TENANTS = "/api/v1/platform-service/organizations/{organization_id}/tenants"
 ENDPOINT_ORGANIZATION_TENANT_DETAIL = "/api/v1/platform-service/organizations/{organization_id}/tenants/{tenant_id}"
 
@@ -107,22 +107,22 @@ class TestOrganizationCaching:
         assert resp2.status_code == status.HTTP_200_OK
         assert resp2.json()["name"] == "Updated Cache Org"
 
-    def test_member_list_cached_and_reflects_changes(self, test_client: TestClient, fake_redis_client: Any) -> None:
-        """Test that member list reflects additions even with caching."""
-        user_token = test_client.create_test_user("cache-mem-list-1", "Cache Mem List")
+    def test_principal_list_cached_and_reflects_changes(self, test_client: TestClient, fake_redis_client: Any) -> None:
+        """Test that principal list reflects additions even with caching."""
+        user_token = test_client.create_test_user("cache-prin-list-1", "Cache Prin List")
         headers = create_auth_headers(user_token)
 
-        org = _create_org(test_client, headers, identity_tenant_id="cache-idp-memlist", slug="cache-memlist")
+        org = _create_org(test_client, headers, identity_tenant_id="cache-idp-prinlist", slug="cache-memlist")
         org_id = org["id"]
 
-        # List members (initially just creator)
-        resp1 = test_client.get(ENDPOINT_ORGANIZATION_MEMBERS.format(organization_id=org_id), headers=headers)
+        # List principals (initially just creator)
+        resp1 = test_client.get(ENDPOINT_ORGANIZATION_PRINCIPALS.format(organization_id=org_id), headers=headers)
         assert resp1.status_code == status.HTTP_200_OK
-        initial_count = len(resp1.json()["members"])
+        initial_count = len(resp1.json()["principals"])
 
-        # Add a member
+        # Add a principal
         test_client.post(
-            ENDPOINT_ORGANIZATION_MEMBERS.format(organization_id=org_id),
+            ENDPOINT_ORGANIZATION_PRINCIPALS.format(organization_id=org_id),
             json={
                 "principal_id": "cache-new-user",
                 "principal_type": PRINCIPAL_TYPE_USER,
@@ -132,21 +132,21 @@ class TestOrganizationCaching:
         )
 
         # List again — should reflect the new member
-        resp2 = test_client.get(ENDPOINT_ORGANIZATION_MEMBERS.format(organization_id=org_id), headers=headers)
+        resp2 = test_client.get(ENDPOINT_ORGANIZATION_PRINCIPALS.format(organization_id=org_id), headers=headers)
         assert resp2.status_code == status.HTTP_200_OK
-        assert len(resp2.json()["members"]) == initial_count + 1
+        assert len(resp2.json()["principals"]) == initial_count + 1
 
-    def test_member_removal_reflects_in_cached_list(self, test_client: TestClient, fake_redis_client: Any) -> None:
-        """Test that member removal is reflected even with caching."""
-        user_token = test_client.create_test_user("cache-mem-rem-1", "Cache Mem Rem")
+    def test_principal_removal_reflects_in_cached_list(self, test_client: TestClient, fake_redis_client: Any) -> None:
+        """Test that principal removal is reflected even with caching."""
+        user_token = test_client.create_test_user("cache-prin-rem-1", "Cache Prin Rem")
         headers = create_auth_headers(user_token)
 
-        org = _create_org(test_client, headers, identity_tenant_id="cache-idp-memrem", slug="cache-memrem")
+        org = _create_org(test_client, headers, identity_tenant_id="cache-idp-prinrem", slug="cache-memrem")
         org_id = org["id"]
 
-        # Add a member
+        # Add a principal
         test_client.post(
-            ENDPOINT_ORGANIZATION_MEMBERS.format(organization_id=org_id),
+            ENDPOINT_ORGANIZATION_PRINCIPALS.format(organization_id=org_id),
             json={
                 "principal_id": "cache-rm-user",
                 "principal_type": PRINCIPAL_TYPE_USER,
@@ -155,15 +155,15 @@ class TestOrganizationCaching:
             headers=headers,
         )
 
-        # Read member list (caches)
-        resp1 = test_client.get(ENDPOINT_ORGANIZATION_MEMBERS.format(organization_id=org_id), headers=headers)
-        members_before = resp1.json()["members"]
-        assert any(m["principal_id"] == "cache-rm-user" for m in members_before)
+        # Read principal list (caches)
+        resp1 = test_client.get(ENDPOINT_ORGANIZATION_PRINCIPALS.format(organization_id=org_id), headers=headers)
+        principals_before = resp1.json()["principals"]
+        assert any(m["principal_id"] == "cache-rm-user" for m in principals_before)
 
-        # Remove the member
+        # Remove the principal
         test_client.request(
             "DELETE",
-            ENDPOINT_ORGANIZATION_MEMBERS.format(organization_id=org_id),
+            ENDPOINT_ORGANIZATION_PRINCIPALS.format(organization_id=org_id),
             json={
                 "principal_id": "cache-rm-user",
                 "principal_type": PRINCIPAL_TYPE_USER,
@@ -172,10 +172,10 @@ class TestOrganizationCaching:
             headers=headers,
         )
 
-        # Read again — removed member should be gone
-        resp2 = test_client.get(ENDPOINT_ORGANIZATION_MEMBERS.format(organization_id=org_id), headers=headers)
-        members_after = resp2.json()["members"]
-        assert not any(m["principal_id"] == "cache-rm-user" for m in members_after)
+        # Read again — removed principal should be gone
+        resp2 = test_client.get(ENDPOINT_ORGANIZATION_PRINCIPALS.format(organization_id=org_id), headers=headers)
+        principals_after = resp2.json()["principals"]
+        assert not any(m["principal_id"] == "cache-rm-user" for m in principals_after)
 
     def test_tenant_list_cached_and_reflects_creation(self, test_client: TestClient, fake_redis_client: Any) -> None:
         """Test that tenant list reflects new tenant even with caching."""
@@ -252,20 +252,20 @@ class TestOrganizationCaching:
             identity_tenant_id="cache-idp-iso-2",
         )
 
-        # Add member to org1 only
+        # Add principal to org1 only
         test_client.post(
-            ENDPOINT_ORGANIZATION_MEMBERS.format(organization_id=org1["id"]),
+            ENDPOINT_ORGANIZATION_PRINCIPALS.format(organization_id=org1["id"]),
             json={"principal_id": "iso-user", "principal_type": PRINCIPAL_TYPE_USER, "role": ROLE_ORG_TENANT_CREATOR},
             headers=headers,
         )
 
         # Org1 members should include iso-user
-        resp1 = test_client.get(ENDPOINT_ORGANIZATION_MEMBERS.format(organization_id=org1["id"]), headers=headers)
-        assert any(m["principal_id"] == "iso-user" for m in resp1.json()["members"])
+        resp1 = test_client.get(ENDPOINT_ORGANIZATION_PRINCIPALS.format(organization_id=org1["id"]), headers=headers)
+        assert any(m["principal_id"] == "iso-user" for m in resp1.json()["principals"])
 
         # Org2 members should NOT include iso-user
-        resp2 = test_client.get(ENDPOINT_ORGANIZATION_MEMBERS.format(organization_id=org2["id"]), headers=headers)
-        assert not any(m["principal_id"] == "iso-user" for m in resp2.json()["members"])
+        resp2 = test_client.get(ENDPOINT_ORGANIZATION_PRINCIPALS.format(organization_id=org2["id"]), headers=headers)
+        assert not any(m["principal_id"] == "iso-user" for m in resp2.json()["principals"])
 
     def test_multiple_operations_with_cache_consistency(self, test_client: TestClient, fake_redis_client: Any) -> None:
         """Test a sequence of operations maintains cache consistency."""
@@ -281,15 +281,15 @@ class TestOrganizationCaching:
         org_id = org["id"]
 
         # 1. Initial state: 1 member, 1 tenant
-        mem_resp = test_client.get(ENDPOINT_ORGANIZATION_MEMBERS.format(organization_id=org_id), headers=headers)
-        assert len(mem_resp.json()["members"]) == 1
+        mem_resp = test_client.get(ENDPOINT_ORGANIZATION_PRINCIPALS.format(organization_id=org_id), headers=headers)
+        assert len(mem_resp.json()["principals"]) == 1
 
         ten_resp = test_client.get(ENDPOINT_ORGANIZATION_TENANTS.format(organization_id=org_id), headers=headers)
         assert len(ten_resp.json()) == 1
 
         # 2. Add member
         test_client.post(
-            ENDPOINT_ORGANIZATION_MEMBERS.format(organization_id=org_id),
+            ENDPOINT_ORGANIZATION_PRINCIPALS.format(organization_id=org_id),
             json={
                 "principal_id": "multi-user-a",
                 "principal_type": PRINCIPAL_TYPE_USER,
@@ -297,8 +297,8 @@ class TestOrganizationCaching:
             },
             headers=headers,
         )
-        mem_resp2 = test_client.get(ENDPOINT_ORGANIZATION_MEMBERS.format(organization_id=org_id), headers=headers)
-        assert len(mem_resp2.json()["members"]) == 2
+        mem_resp2 = test_client.get(ENDPOINT_ORGANIZATION_PRINCIPALS.format(organization_id=org_id), headers=headers)
+        assert len(mem_resp2.json()["principals"]) == 2
 
         # 3. Create tenant
         ct_resp = test_client.post(
@@ -322,7 +322,7 @@ class TestOrganizationCaching:
         # 5. Remove member
         test_client.request(
             "DELETE",
-            ENDPOINT_ORGANIZATION_MEMBERS.format(organization_id=org_id),
+            ENDPOINT_ORGANIZATION_PRINCIPALS.format(organization_id=org_id),
             json={
                 "principal_id": "multi-user-a",
                 "principal_type": PRINCIPAL_TYPE_USER,
@@ -330,8 +330,8 @@ class TestOrganizationCaching:
             },
             headers=headers,
         )
-        mem_resp3 = test_client.get(ENDPOINT_ORGANIZATION_MEMBERS.format(organization_id=org_id), headers=headers)
-        assert len(mem_resp3.json()["members"]) == 1
+        mem_resp3 = test_client.get(ENDPOINT_ORGANIZATION_PRINCIPALS.format(organization_id=org_id), headers=headers)
+        assert len(mem_resp3.json()["principals"]) == 1
 
         # 6. Delete tenant
         test_client.request(
@@ -363,7 +363,7 @@ class TestOrganizationCaching:
 
         # Read members 3 times
         for _ in range(3):
-            resp = test_client.get(ENDPOINT_ORGANIZATION_MEMBERS.format(organization_id=org_id), headers=headers)
+            resp = test_client.get(ENDPOINT_ORGANIZATION_PRINCIPALS.format(organization_id=org_id), headers=headers)
             assert resp.status_code == status.HTTP_200_OK
 
         # Read tenants 3 times

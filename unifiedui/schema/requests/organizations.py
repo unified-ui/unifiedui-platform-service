@@ -57,8 +57,8 @@ class UpdateOrganizationRequest(BaseModel):
     }
 
 
-class SetOrganizationMemberRequest(BaseModel):
-    """Schema for adding/setting a member role in the organization."""
+class SetOrganizationPrincipalRequest(BaseModel):
+    """Schema for adding/setting a principal role in the organization."""
 
     principal_id: str = Field(..., description="ID of the principal (user or group)")
     principal_type: str = Field(..., description="Type of principal (IDENTITY_USER or IDENTITY_GROUP)")
@@ -95,8 +95,8 @@ class SetOrganizationMemberRequest(BaseModel):
     }
 
 
-class DeleteOrganizationMemberRequest(BaseModel):
-    """Schema for removing a member role from the organization."""
+class DeleteOrganizationPrincipalRequest(BaseModel):
+    """Schema for removing a principal role from the organization."""
 
     principal_id: str = Field(..., description="ID of the principal (user or group)")
     principal_type: str = Field(..., description="Type of principal (IDENTITY_USER or IDENTITY_GROUP)")

@@ -42,7 +42,7 @@ ENDPOINT_TAGS = "/api/v1/platform-service/tenants/{tenant_id}/tags"
 ENDPOINT_TENANT_AI_MODELS = "/api/v1/platform-service/tenants/{tenant_id}/ai-models"
 
 ENDPOINT_ORGANIZATIONS = "/api/v1/platform-service/organizations"
-ENDPOINT_ORGANIZATION_MEMBERS = "/api/v1/platform-service/organizations/{organization_id}/members"
+ENDPOINT_ORGANIZATION_PRINCIPALS = "/api/v1/platform-service/organizations/{organization_id}/principals"
 
 ROLE_ORG_GLOBAL_ADMIN = OrganizationRoleEnum.ORGANISATION_GLOBAL_ADMIN.value
 ROLE_ORG_TENANT_ADMIN = OrganizationRoleEnum.ORGANISATION_TENANT_ADMIN.value
@@ -74,7 +74,7 @@ def _create_user_with_org_role(
     headers = create_auth_headers(token, use_cache=False)
 
     resp = test_client.post(
-        ENDPOINT_ORGANIZATION_MEMBERS.format(organization_id=TEST_ORGANIZATION_ID),
+        ENDPOINT_ORGANIZATION_PRINCIPALS.format(organization_id=TEST_ORGANIZATION_ID),
         json={
             "principal_id": user_id,
             "principal_type": PRINCIPAL_TYPE_USER,
@@ -651,7 +651,7 @@ class TestOrgCreationRestriction:
 
 
 class TestGetOrgRequiresMembership:
-    """Verify that GET organization requires org membership (any role)."""
+    """Verify that GET organization requires org principalship (any role)."""
 
     def test_member_can_get_org(self, test_client: TestClient) -> None:
         """User with ORGANISATION_TENANT_CREATOR can GET their org."""
@@ -695,15 +695,15 @@ class TestOrgRolePermissionBoundaries:
     """Verify exact permission boundaries for each organization role on org routes."""
 
     @staticmethod
-    def _setup_org_with_member(
+    def _setup_org_with_principal(
         test_client: TestClient,
         slug: str,
-        member_role: str,
+        principal_role: str,
     ) -> tuple[dict[str, Any], dict[str, str], dict[str, str]]:
-        """Create an org and add a member with the given role.
+        """Create an org and add a principal with the given role.
 
         Returns:
-            (org_data, admin_headers, member_headers)
+            (org_data, admin_headers, principal_headers)
         """
         admin_token = test_client.create_test_user(f"perm-adm-{slug}", f"Admin {slug}")
         admin_headers = create_auth_headers(admin_token, use_cache=False)
@@ -724,142 +724,142 @@ class TestOrgRolePermissionBoundaries:
         org = resp.json()
 
         member_id = f"perm-mbr-{slug}"
-        member_token = test_client.create_test_user(member_id, f"Member {slug}")
-        member_headers = create_auth_headers(member_token, use_cache=False)
+        principal_token = test_client.create_test_user(member_id, f"Member {slug}")
+        principal_headers = create_auth_headers(principal_token, use_cache=False)
 
         add_resp = test_client.post(
-            ENDPOINT_ORGANIZATION_MEMBERS.format(organization_id=org["id"]),
+            ENDPOINT_ORGANIZATION_PRINCIPALS.format(organization_id=org["id"]),
             json={
                 "principal_id": member_id,
                 "principal_type": PRINCIPAL_TYPE_USER,
-                "role": member_role,
+                "role": principal_role,
             },
             headers=admin_headers,
         )
         assert add_resp.status_code == status.HTTP_201_CREATED
 
-        return org, admin_headers, member_headers
+        return org, admin_headers, principal_headers
 
     def test_global_admin_can_update_org(self, test_client: TestClient) -> None:
         """ORGANISATION_GLOBAL_ADMIN can PATCH org."""
-        org, _, member_headers = self._setup_org_with_member(
-            test_client, slug=f"ga-upd-{uuid.uuid4().hex[:4]}", member_role=ROLE_ORG_GLOBAL_ADMIN
+        org, _, principal_headers = self._setup_org_with_principal(
+            test_client, slug=f"ga-upd-{uuid.uuid4().hex[:4]}", principal_role=ROLE_ORG_GLOBAL_ADMIN
         )
         resp = test_client.patch(
             f"{ENDPOINT_ORGANIZATIONS}/{org['id']}",
             json={"name": "GA Updated"},
-            headers=member_headers,
+            headers=principal_headers,
         )
         assert resp.status_code == status.HTTP_200_OK
 
     def test_global_admin_can_manage_members(self, test_client: TestClient) -> None:
-        """ORGANISATION_GLOBAL_ADMIN can list/add/remove org members."""
-        org, _, member_headers = self._setup_org_with_member(
-            test_client, slug=f"ga-mem-{uuid.uuid4().hex[:4]}", member_role=ROLE_ORG_GLOBAL_ADMIN
+        """ORGANISATION_GLOBAL_ADMIN can list/add/remove org principals."""
+        org, _, principal_headers = self._setup_org_with_principal(
+            test_client, slug=f"ga-mem-{uuid.uuid4().hex[:4]}", principal_role=ROLE_ORG_GLOBAL_ADMIN
         )
         org_id = org["id"]
 
         resp_list = test_client.get(
-            ENDPOINT_ORGANIZATION_MEMBERS.format(organization_id=org_id),
-            headers=member_headers,
+            ENDPOINT_ORGANIZATION_PRINCIPALS.format(organization_id=org_id),
+            headers=principal_headers,
         )
         assert resp_list.status_code == status.HTTP_200_OK
 
         resp_add = test_client.post(
-            ENDPOINT_ORGANIZATION_MEMBERS.format(organization_id=org_id),
+            ENDPOINT_ORGANIZATION_PRINCIPALS.format(organization_id=org_id),
             json={
                 "principal_id": "new-user-ga",
                 "principal_type": PRINCIPAL_TYPE_USER,
                 "role": ROLE_ORG_TENANT_CREATOR,
             },
-            headers=member_headers,
+            headers=principal_headers,
         )
         assert resp_add.status_code == status.HTTP_201_CREATED
 
     def test_tenant_admin_cannot_update_org(self, test_client: TestClient) -> None:
         """ORGANISATION_TENANT_ADMIN cannot PATCH org (requires GLOBAL_ADMIN)."""
-        org, _, member_headers = self._setup_org_with_member(
-            test_client, slug=f"ta-noupd-{uuid.uuid4().hex[:4]}", member_role=ROLE_ORG_TENANT_ADMIN
+        org, _, principal_headers = self._setup_org_with_principal(
+            test_client, slug=f"ta-noupd-{uuid.uuid4().hex[:4]}", principal_role=ROLE_ORG_TENANT_ADMIN
         )
         resp = test_client.patch(
             f"{ENDPOINT_ORGANIZATIONS}/{org['id']}",
             json={"name": "TA Should Fail"},
-            headers=member_headers,
+            headers=principal_headers,
         )
         assert resp.status_code == status.HTTP_403_FORBIDDEN
 
-    def test_tenant_admin_cannot_manage_members(self, test_client: TestClient) -> None:
-        """ORGANISATION_TENANT_ADMIN cannot list/add/remove org members."""
-        org, _, member_headers = self._setup_org_with_member(
-            test_client, slug=f"ta-nomem-{uuid.uuid4().hex[:4]}", member_role=ROLE_ORG_TENANT_ADMIN
+    def test_tenant_admin_cannot_manage_principals(self, test_client: TestClient) -> None:
+        """ORGANISATION_TENANT_ADMIN cannot list/add/remove org principals."""
+        org, _, principal_headers = self._setup_org_with_principal(
+            test_client, slug=f"ta-nomem-{uuid.uuid4().hex[:4]}", principal_role=ROLE_ORG_TENANT_ADMIN
         )
         resp = test_client.get(
-            ENDPOINT_ORGANIZATION_MEMBERS.format(organization_id=org["id"]),
-            headers=member_headers,
+            ENDPOINT_ORGANIZATION_PRINCIPALS.format(organization_id=org["id"]),
+            headers=principal_headers,
         )
         assert resp.status_code == status.HTTP_403_FORBIDDEN
 
     def test_tenant_admin_can_view_org(self, test_client: TestClient) -> None:
         """ORGANISATION_TENANT_ADMIN can GET org (ORG_ALL_ROLES)."""
-        org, _, member_headers = self._setup_org_with_member(
-            test_client, slug=f"ta-view-{uuid.uuid4().hex[:4]}", member_role=ROLE_ORG_TENANT_ADMIN
+        org, _, principal_headers = self._setup_org_with_principal(
+            test_client, slug=f"ta-view-{uuid.uuid4().hex[:4]}", principal_role=ROLE_ORG_TENANT_ADMIN
         )
         resp = test_client.get(
             f"{ENDPOINT_ORGANIZATIONS}/{org['id']}",
-            headers=member_headers,
+            headers=principal_headers,
         )
         assert resp.status_code == status.HTTP_200_OK
 
     def test_tenant_creator_can_view_org(self, test_client: TestClient) -> None:
         """ORGANISATION_TENANT_CREATOR can GET org (ORG_ALL_ROLES)."""
-        org, _, member_headers = self._setup_org_with_member(
-            test_client, slug=f"tc-view-{uuid.uuid4().hex[:4]}", member_role=ROLE_ORG_TENANT_CREATOR
+        org, _, principal_headers = self._setup_org_with_principal(
+            test_client, slug=f"tc-view-{uuid.uuid4().hex[:4]}", principal_role=ROLE_ORG_TENANT_CREATOR
         )
         resp = test_client.get(
             f"{ENDPOINT_ORGANIZATIONS}/{org['id']}",
-            headers=member_headers,
+            headers=principal_headers,
         )
         assert resp.status_code == status.HTTP_200_OK
 
     def test_tenant_creator_cannot_update_org(self, test_client: TestClient) -> None:
         """ORGANISATION_TENANT_CREATOR cannot PATCH org."""
-        org, _, member_headers = self._setup_org_with_member(
-            test_client, slug=f"tc-noupd-{uuid.uuid4().hex[:4]}", member_role=ROLE_ORG_TENANT_CREATOR
+        org, _, principal_headers = self._setup_org_with_principal(
+            test_client, slug=f"tc-noupd-{uuid.uuid4().hex[:4]}", principal_role=ROLE_ORG_TENANT_CREATOR
         )
         resp = test_client.patch(
             f"{ENDPOINT_ORGANIZATIONS}/{org['id']}",
             json={"name": "TC Should Fail"},
-            headers=member_headers,
+            headers=principal_headers,
         )
         assert resp.status_code == status.HTTP_403_FORBIDDEN
 
-    def test_tenant_creator_cannot_manage_members(self, test_client: TestClient) -> None:
-        """ORGANISATION_TENANT_CREATOR cannot list org members."""
-        org, _, member_headers = self._setup_org_with_member(
-            test_client, slug=f"tc-nomem-{uuid.uuid4().hex[:4]}", member_role=ROLE_ORG_TENANT_CREATOR
+    def test_tenant_creator_cannot_manage_principals(self, test_client: TestClient) -> None:
+        """ORGANISATION_TENANT_CREATOR cannot list org principals."""
+        org, _, principal_headers = self._setup_org_with_principal(
+            test_client, slug=f"tc-nomem-{uuid.uuid4().hex[:4]}", principal_role=ROLE_ORG_TENANT_CREATOR
         )
         resp = test_client.get(
-            ENDPOINT_ORGANIZATION_MEMBERS.format(organization_id=org["id"]),
-            headers=member_headers,
+            ENDPOINT_ORGANIZATION_PRINCIPALS.format(organization_id=org["id"]),
+            headers=principal_headers,
         )
         assert resp.status_code == status.HTTP_403_FORBIDDEN
 
     def test_tenant_creator_can_create_tenant(self, test_client: TestClient) -> None:
         """ORGANISATION_TENANT_CREATOR can create a tenant in org (ORG_ALL_ROLES)."""
-        org, _, member_headers = self._setup_org_with_member(
-            test_client, slug=f"tc-crtten-{uuid.uuid4().hex[:4]}", member_role=ROLE_ORG_TENANT_CREATOR
+        org, _, principal_headers = self._setup_org_with_principal(
+            test_client, slug=f"tc-crtten-{uuid.uuid4().hex[:4]}", principal_role=ROLE_ORG_TENANT_CREATOR
         )
         resp = test_client.post(
             f"{ENDPOINT_ORGANIZATIONS}/{org['id']}/tenants",
             json={"name": "Creator Tenant", "environment_type": "SANDBOX"},
-            headers=member_headers,
+            headers=principal_headers,
         )
         assert resp.status_code == status.HTTP_201_CREATED
 
     def test_tenant_creator_cannot_delete_tenant(self, test_client: TestClient) -> None:
         """ORGANISATION_TENANT_CREATOR cannot delete a tenant (requires TENANT_MANAGE_ROLES)."""
-        org, admin_headers, member_headers = self._setup_org_with_member(
-            test_client, slug=f"tc-nodel-{uuid.uuid4().hex[:4]}", member_role=ROLE_ORG_TENANT_CREATOR
+        org, admin_headers, principal_headers = self._setup_org_with_principal(
+            test_client, slug=f"tc-nodel-{uuid.uuid4().hex[:4]}", principal_role=ROLE_ORG_TENANT_CREATOR
         )
         create_resp = test_client.post(
             f"{ENDPOINT_ORGANIZATIONS}/{org['id']}/tenants",
@@ -872,14 +872,14 @@ class TestOrgRolePermissionBoundaries:
         resp = test_client.request(
             "DELETE",
             f"{ENDPOINT_ORGANIZATIONS}/{org['id']}/tenants/{tenant_id}",
-            headers=member_headers,
+            headers=principal_headers,
         )
         assert resp.status_code == status.HTTP_403_FORBIDDEN
 
     def test_tenant_admin_can_delete_tenant(self, test_client: TestClient) -> None:
         """ORGANISATION_TENANT_ADMIN can delete a tenant (ORG_TENANT_MANAGE_ROLES)."""
-        org, admin_headers, member_headers = self._setup_org_with_member(
-            test_client, slug=f"ta-del-{uuid.uuid4().hex[:4]}", member_role=ROLE_ORG_TENANT_ADMIN
+        org, admin_headers, principal_headers = self._setup_org_with_principal(
+            test_client, slug=f"ta-del-{uuid.uuid4().hex[:4]}", principal_role=ROLE_ORG_TENANT_ADMIN
         )
         create_resp = test_client.post(
             f"{ENDPOINT_ORGANIZATIONS}/{org['id']}/tenants",
@@ -892,7 +892,7 @@ class TestOrgRolePermissionBoundaries:
         resp = test_client.request(
             "DELETE",
             f"{ENDPOINT_ORGANIZATIONS}/{org['id']}/tenants/{tenant_id}",
-            headers=member_headers,
+            headers=principal_headers,
         )
         assert resp.status_code == status.HTTP_204_NO_CONTENT
 

@@ -22,8 +22,8 @@ class OrganizationResponse(BaseModel):
     updated_by: str | None = Field(None, description="User ID who last updated this")
 
 
-class OrganizationMemberRoleResponse(BaseModel):
-    """Response for an organization member role entry."""
+class OrganizationPrincipalRoleResponse(BaseModel):
+    """Response for an organization principal role entry."""
 
     id: str = Field(..., description="Unique identifier for the membership entry")
     principal_id: str = Field(..., description="ID of the principal")
@@ -32,7 +32,7 @@ class OrganizationMemberRoleResponse(BaseModel):
     created_at: datetime = Field(..., description="Timestamp when assigned")
 
 
-class OrganizationMemberResponse(BaseModel):
+class OrganizationPrincipalResponse(BaseModel):
     """Response for a single principal with their organization roles."""
 
     principal_id: str = Field(..., description="The principal ID")
@@ -40,14 +40,15 @@ class OrganizationMemberResponse(BaseModel):
     display_name: str | None = Field(None, description="Display name of the principal")
     principal_name: str | None = Field(None, description="Principal name (email for users)")
     mail: str | None = Field(None, description="Email address if available")
-    roles: list[OrganizationMemberRoleResponse] = Field(..., description="List of organization roles")
+    roles: list[OrganizationPrincipalRoleResponse] = Field(..., description="List of organization roles")
 
 
-class OrganizationMembersResponse(BaseModel):
-    """Response containing all members of an organization."""
+class OrganizationPrincipalsResponse(BaseModel):
+    """Response containing all principals of an organization."""
 
     organization_id: str = Field(..., description="The organization ID")
-    members: list[OrganizationMemberResponse] = Field(..., description="List of members with their roles")
+    principals: list[OrganizationPrincipalResponse] = Field(..., description="List of principals with their roles")
+    total_count: int = Field(..., description="Total number of principals (before pagination)")
 
 
 class OrganizationContextResponse(BaseModel):
