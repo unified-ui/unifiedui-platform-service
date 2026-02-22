@@ -42,6 +42,7 @@ Read the relevant instruction file **before** working in that area.
 8. **Keep files under 400 lines** — Split large handlers into helper methods or separate sub-handlers.
 9. **Custom exceptions** — Use typed exceptions from `exc/` for every error case. Never raise generic `Exception`.
 10. **Run tests and lint after changes** — After significant changes or when asked to test, run: `pytest tests/ -n auto --no-header -q`. Always run tests in parallel (`-n auto`) since there are many tests. Run `ruff check . && ruff format --check .` to verify linting passes.
+11. **Run pre-commit after EVERY task** — After completing any task (including intermediate sub-tasks), ALWAYS run `pre-commit run --all-files` and fix any failures before reporting completion. This is mandatory — never skip this step, even for small changes. Pre-commit must pass before any task is considered done.
 
 ---
 
@@ -74,6 +75,7 @@ Read the relevant instruction file **before** working in that area.
 - **Lint**: `ruff check .`
 - **Format**: `ruff format .`
 - **Lint + Format check (CI)**: `ruff check . && ruff format --check .`
+- **Pre-commit**: `pre-commit run --all-files`
 - **Type check**: `mypy unifiedui/`
 - **Migrations**: `alembic upgrade head` / `alembic revision --autogenerate -m "description"`
 - **Entry point**: `unifiedui/app.py` → `create_app()`
