@@ -445,19 +445,19 @@ class TestChatAgentRBAC:
         assert update_response2.status_code == status.HTTP_403_FORBIDDEN
 
     def test_tenant_global_admin_bypasses_chat_agent_permissions(self, test_client: TestClient) -> None:
-        """Test that tenant GLOBAL_ADMIN can access all chat agents without explicit permissions."""
+        """Test that tenant TENANT_GLOBAL_ADMIN can access all chat agents without explicit permissions."""
         # Admin creates tenant and chat agent
         admin_token = test_client.create_test_user("tenant-admin", "Tenant Admin")
         admin_headers = create_auth_headers(admin_token, use_cache=False)
         tenant_id = create_tenant_for_user(test_client, admin_token)
         app_id = create_chat_agent(test_client, tenant_id, admin_headers, "Tenant Admin Test")
 
-        # Create another user with GLOBAL_ADMIN on tenant
+        # Create another user with TENANT_GLOBAL_ADMIN on tenant
         global_admin_token = test_client.create_test_user("global-admin", "Global Admin")
         global_admin_headers = create_auth_headers(global_admin_token, use_cache=False)
 
-        # Add global admin to tenant with GLOBAL_ADMIN role
-        add_user_to_tenant(test_client, tenant_id, admin_headers, "global-admin", "GLOBAL_ADMIN")
+        # Add global admin to tenant with TENANT_GLOBAL_ADMIN role
+        add_user_to_tenant(test_client, tenant_id, admin_headers, "global-admin", "TENANT_GLOBAL_ADMIN")
 
         # Global admin can view chat agent without explicit permission
         get_response = test_client.get(
@@ -622,7 +622,7 @@ class TestChatAgentConfigRBAC:
         assert response.status_code == status.HTTP_403_FORBIDDEN
 
     def test_config_global_admin_bypasses_permission_check(self, test_client: TestClient) -> None:
-        """Test that GLOBAL_ADMIN can access /config without explicit chat agent permission.
+        """Test that TENANT_GLOBAL_ADMIN can access /config without explicit chat agent permission.
 
         Note: The endpoint may return 400 if the chat agent config is incomplete (missing credentials),
         but this test verifies that auth and permissions pass (not 401/403).
@@ -633,9 +633,9 @@ class TestChatAgentConfigRBAC:
         tenant_id = create_tenant_for_user(test_client, owner_token)
         app_id = create_chat_agent(test_client, tenant_id, owner_headers, "Config Test App 5")
 
-        # Create GLOBAL_ADMIN user
+        # Create TENANT_GLOBAL_ADMIN user
         global_admin_token = test_client.create_test_user("config-global-admin", "Config Global Admin")
-        add_user_to_tenant(test_client, tenant_id, owner_headers, "config-global-admin", "GLOBAL_ADMIN")
+        add_user_to_tenant(test_client, tenant_id, owner_headers, "config-global-admin", "TENANT_GLOBAL_ADMIN")
 
         # Global admin with valid service key can access config
         global_admin_headers = create_auth_headers_with_service_key(

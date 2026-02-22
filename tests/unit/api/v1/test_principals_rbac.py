@@ -15,7 +15,7 @@ ENDPOINT_PRINCIPAL_REFRESH = "/api/v1/platform-service/tenants/{tenant_id}/princ
 ENDPOINT_PRINCIPAL_STATUS = "/api/v1/platform-service/tenants/{tenant_id}/principals/{principal_id}/status"
 
 # Constants
-ROLE_GLOBAL_ADMIN = "GLOBAL_ADMIN"
+ROLE_TENANT_GLOBAL_ADMIN = "TENANT_GLOBAL_ADMIN"
 ROLE_READER = "READER"
 PRINCIPAL_TYPE_USER = "IDENTITY_USER"
 PRINCIPAL_TYPE_GROUP = "IDENTITY_GROUP"
@@ -31,8 +31,8 @@ class TestPrincipalRBAC:
         sample_tenant_data: dict[str, Any],
         test_user_token: Any,
     ) -> None:
-        """Test that GLOBAL_ADMIN can update principal status."""
-        # Create a tenant (creator is GLOBAL_ADMIN)
+        """Test that TENANT_GLOBAL_ADMIN can update principal status."""
+        # Create a tenant (creator is TENANT_GLOBAL_ADMIN)
         create_response = test_client.post(ENDPOINT_TENANTS, json=sample_tenant_data, headers=auth_headers)
         assert create_response.status_code == status.HTTP_201_CREATED
         tenant_id = create_response.json()["id"]
@@ -118,7 +118,7 @@ class TestPrincipalRBAC:
         sample_tenant_data: dict[str, Any],
         test_user_token: Any,
     ) -> None:
-        """Test that GLOBAL_ADMIN can refresh principal from IDP."""
+        """Test that TENANT_GLOBAL_ADMIN can refresh principal from IDP."""
         # Create a tenant
         create_response = test_client.post(ENDPOINT_TENANTS, json=sample_tenant_data, headers=auth_headers)
         assert create_response.status_code == status.HTTP_201_CREATED

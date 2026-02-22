@@ -131,7 +131,7 @@ class AutonomousAgentHandler:
 
         logger.info("Listing autonomous agents", extra={"tenant_id": tenant_id, "skip": skip, "limit": limit})
 
-        # Check if user is admin (has GLOBAL_ADMIN or AUTONOMOUS_AGENTS_ADMIN)
+        # Check if user is admin (has TENANT_GLOBAL_ADMIN or AUTONOMOUS_AGENTS_ADMIN)
         user_id = user.identity.get_id()
         user_tenants = user.tenants
         matching_tenant = next((t for t in user_tenants if t["tenant"]["id"] == tenant_id), None)
@@ -141,7 +141,7 @@ class AutonomousAgentHandler:
             user_roles = matching_tenant["roles"]
             is_admin = any(
                 p in user_roles
-                for p in [TenantRolesEnum.GLOBAL_ADMIN.value, TenantRolesEnum.AUTONOMOUS_AGENTS_ADMIN.value]
+                for p in [TenantRolesEnum.TENANT_GLOBAL_ADMIN.value, TenantRolesEnum.AUTONOMOUS_AGENTS_ADMIN.value]
             )
 
         # Only get group IDs if not admin
@@ -1216,7 +1216,9 @@ class AutonomousAgentHandler:
         """Resolve the user's permission level on a specific autonomous agent."""
         from unifiedui.core.database.enums import TenantRolesEnum
 
-        if check_is_admin(user, tenant_id, [TenantRolesEnum.GLOBAL_ADMIN, TenantRolesEnum.AUTONOMOUS_AGENTS_ADMIN]):
+        if check_is_admin(
+            user, tenant_id, [TenantRolesEnum.TENANT_GLOBAL_ADMIN, TenantRolesEnum.AUTONOMOUS_AGENTS_ADMIN]
+        ):
             return PermissionActionEnum.ADMIN.value
         principal_ids = get_principal_ids(user)
         return resolve_my_permission(

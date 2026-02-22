@@ -91,14 +91,14 @@ async def get_tenant(
     response_model=TenantResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Create Tenant",
-    description="Create a new tenant and assign creator as GLOBAL_ADMIN",
+    description="Create a new tenant and assign creator as TENANT_GLOBAL_ADMIN",
 )
 @authenticate()
 async def create_tenant(
     request: Request, tenant_data: CreateTenantRequest, handler: TenantHandler = Depends(get_tenant_handler)
 ) -> TenantResponse:
     """
-    Create a new tenant and assign the creator as GLOBAL_ADMIN.
+    Create a new tenant and assign the creator as TENANT_GLOBAL_ADMIN.
 
     Args:
         request: FastAPI request object (contains user in request.state)
@@ -122,7 +122,7 @@ async def create_tenant(
     description="Update an existing tenant",
 )
 @authenticate()
-@check_permissions(entity="tenant", required_permissions=[TenantRolesEnum.GLOBAL_ADMIN])
+@check_permissions(entity="tenant", required_permissions=[TenantRolesEnum.TENANT_GLOBAL_ADMIN])
 async def update_tenant(
     request: Request,
     tenant_id: str,
@@ -154,7 +154,7 @@ async def update_tenant(
     "/{tenant_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Delete Tenant", description="Delete a tenant by ID"
 )
 @authenticate()
-@check_permissions(entity="tenant", required_permissions=[TenantRolesEnum.GLOBAL_ADMIN])
+@check_permissions(entity="tenant", required_permissions=[TenantRolesEnum.TENANT_GLOBAL_ADMIN])
 async def delete_tenant(request: Request, tenant_id: str, handler: TenantHandler = Depends(get_tenant_handler)) -> None:
     """
     Delete a tenant by ID.

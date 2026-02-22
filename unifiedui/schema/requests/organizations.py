@@ -88,7 +88,7 @@ class SetOrganizationMemberRequest(BaseModel):
                 {
                     "principal_id": "user-id",
                     "principal_type": "IDENTITY_USER",
-                    "role": "ORGANISATION_MEMBER",
+                    "role": "ORGANISATION_TENANT_ADMIN",
                 }
             ]
         }
@@ -126,7 +126,7 @@ class DeleteOrganizationMemberRequest(BaseModel):
                 {
                     "principal_id": "user-id",
                     "principal_type": "IDENTITY_USER",
-                    "role": "ORGANISATION_MEMBER",
+                    "role": "ORGANISATION_TENANT_ADMIN",
                 }
             ]
         }

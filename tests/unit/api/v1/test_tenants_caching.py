@@ -19,7 +19,7 @@ ENDPOINT_PRINCIPAL_DETAIL = "/api/v1/platform-service/tenants/{tenant_id}/princi
 NON_EXISTENT_ID = "non-existent-id"
 
 # Roles
-ROLE_GLOBAL_ADMIN = TenantRolesEnum.GLOBAL_ADMIN.value
+ROLE_TENANT_GLOBAL_ADMIN = TenantRolesEnum.TENANT_GLOBAL_ADMIN.value
 ROLE_READER = TenantRolesEnum.READER.value
 ROLE_CHAT_AGENTS_ADMIN = TenantRolesEnum.CHAT_AGENTS_ADMIN.value
 
@@ -32,7 +32,7 @@ class TestTenantCaching:
     """Test suite for tenant caching behavior with X-Use-Cache enabled."""
 
     def test_creator_permissions_cached(self, test_client: TestClient, fake_redis_client: Any) -> None:
-        """Test that creator's GLOBAL_ADMIN permission is cached correctly."""
+        """Test that creator's TENANT_GLOBAL_ADMIN permission is cached correctly."""
         # Create user and tenant
         user_token = test_client.create_test_user("cache-creator", "Cache Creator")
         headers = create_auth_headers(user_token)
@@ -51,7 +51,7 @@ class TestTenantCaching:
         response2 = test_client.get(ENDPOINT_TENANT_DETAIL.format(tenant_id=tenant_id), headers=headers)
         assert response2.status_code == status.HTTP_200_OK
 
-        # User should still be able to update (has GLOBAL_ADMIN)
+        # User should still be able to update (has TENANT_GLOBAL_ADMIN)
         update_response = test_client.patch(
             ENDPOINT_TENANT_DETAIL.format(tenant_id=tenant_id), json={"name": "Updated Cached Tenant"}, headers=headers
         )
@@ -135,13 +135,17 @@ class TestTenantCaching:
         )
         tenant_id = create_response.json()["id"]
 
-        # Regular user gets GLOBAL_ADMIN
+        # Regular user gets TENANT_GLOBAL_ADMIN
         user_token = test_client.create_test_user("cache-regular-2", "Cache Regular 2")
         user_headers = create_auth_headers(user_token)
 
         test_client.put(
             ENDPOINT_TENANT_PRINCIPALS.format(tenant_id=tenant_id),
-            json={"principal_id": "cache-regular-2", "principal_type": PRINCIPAL_TYPE_USER, "role": ROLE_GLOBAL_ADMIN},
+            json={
+                "principal_id": "cache-regular-2",
+                "principal_type": PRINCIPAL_TYPE_USER,
+                "role": ROLE_TENANT_GLOBAL_ADMIN,
+            },
             headers=admin_headers,
         )
 
@@ -151,11 +155,15 @@ class TestTenantCaching:
         )
         assert update_response1.status_code == status.HTTP_200_OK
 
-        # Admin revokes GLOBAL_ADMIN permission
+        # Admin revokes TENANT_GLOBAL_ADMIN permission
         revoke_response = test_client.request(
             "DELETE",
             ENDPOINT_TENANT_PRINCIPALS.format(tenant_id=tenant_id),
-            json={"principal_id": "cache-regular-2", "principal_type": PRINCIPAL_TYPE_USER, "role": ROLE_GLOBAL_ADMIN},
+            json={
+                "principal_id": "cache-regular-2",
+                "principal_type": PRINCIPAL_TYPE_USER,
+                "role": ROLE_TENANT_GLOBAL_ADMIN,
+            },
             headers=admin_headers,
         )
         assert revoke_response.status_code == status.HTTP_200_OK
@@ -321,10 +329,14 @@ class TestTenantCaching:
             == status.HTTP_403_FORBIDDEN
         )
 
-        # 3. Add GLOBAL_ADMIN
+        # 3. Add TENANT_GLOBAL_ADMIN
         test_client.put(
             ENDPOINT_TENANT_PRINCIPALS.format(tenant_id=tenant_id),
-            json={"principal_id": "cache-regular-3", "principal_type": PRINCIPAL_TYPE_USER, "role": ROLE_GLOBAL_ADMIN},
+            json={
+                "principal_id": "cache-regular-3",
+                "principal_type": PRINCIPAL_TYPE_USER,
+                "role": ROLE_TENANT_GLOBAL_ADMIN,
+            },
             headers=admin_headers,
         )
         # User can now update
@@ -335,11 +347,15 @@ class TestTenantCaching:
             == status.HTTP_200_OK
         )
 
-        # 4. Remove GLOBAL_ADMIN
+        # 4. Remove TENANT_GLOBAL_ADMIN
         test_client.request(
             "DELETE",
             ENDPOINT_TENANT_PRINCIPALS.format(tenant_id=tenant_id),
-            json={"principal_id": "cache-regular-3", "principal_type": PRINCIPAL_TYPE_USER, "role": ROLE_GLOBAL_ADMIN},
+            json={
+                "principal_id": "cache-regular-3",
+                "principal_type": PRINCIPAL_TYPE_USER,
+                "role": ROLE_TENANT_GLOBAL_ADMIN,
+            },
             headers=admin_headers,
         )
         # User can read (still has READER)

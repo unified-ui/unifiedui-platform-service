@@ -23,7 +23,7 @@ ENDPOINT_PRINCIPAL_DETAIL = "/api/v1/platform-service/tenants/{tenant_id}/princi
 NON_EXISTENT_ID = "non-existent-id"
 
 # Roles
-ROLE_GLOBAL_ADMIN = TenantRolesEnum.GLOBAL_ADMIN.value
+ROLE_TENANT_GLOBAL_ADMIN = TenantRolesEnum.TENANT_GLOBAL_ADMIN.value
 ROLE_READER = TenantRolesEnum.READER.value
 ROLE_CHAT_AGENTS_ADMIN = TenantRolesEnum.CHAT_AGENTS_ADMIN.value
 
@@ -246,7 +246,7 @@ class TestIdentityCaching:
             json={
                 "principal_id": "remove-group-cache",
                 "principal_type": PRINCIPAL_TYPE_GROUP,
-                "role": ROLE_GLOBAL_ADMIN,
+                "role": ROLE_TENANT_GLOBAL_ADMIN,
             },
             headers=admin_headers,
         )
@@ -262,7 +262,7 @@ class TestIdentityCaching:
             json={
                 "principal_id": "remove-group-cache",
                 "principal_type": PRINCIPAL_TYPE_GROUP,
-                "role": ROLE_GLOBAL_ADMIN,
+                "role": ROLE_TENANT_GLOBAL_ADMIN,
             },
             headers=admin_headers,
         )

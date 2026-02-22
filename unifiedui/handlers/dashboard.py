@@ -153,7 +153,7 @@ class DashboardHandler:
             user,
             tenant_id,
             [
-                TenantRolesEnum.GLOBAL_ADMIN,
+                TenantRolesEnum.TENANT_GLOBAL_ADMIN,
             ],
         )
 

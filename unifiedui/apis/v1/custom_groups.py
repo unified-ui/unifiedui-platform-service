@@ -103,7 +103,7 @@ async def get_custom_group(
     response_model=CustomGroupResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Create Custom Group",
-    description="Create a new custom group and assign creator as ADMIN (requires CUSTOM_GROUP_CREATOR, CUSTOM_GROUPS_ADMIN, or GLOBAL_ADMIN on tenant)",
+    description="Create a new custom group and assign creator as ADMIN (requires CUSTOM_GROUP_CREATOR, CUSTOM_GROUPS_ADMIN, or TENANT_GLOBAL_ADMIN on tenant)",
 )
 @authenticate()
 @check_permissions(
@@ -111,7 +111,7 @@ async def get_custom_group(
     required_permissions=[
         TenantRolesEnum.CUSTOM_GROUP_CREATOR,
         TenantRolesEnum.CUSTOM_GROUPS_ADMIN,
-        TenantRolesEnum.GLOBAL_ADMIN,
+        TenantRolesEnum.TENANT_GLOBAL_ADMIN,
     ],
 )
 async def create_custom_group(
@@ -122,7 +122,7 @@ async def create_custom_group(
 ) -> CustomGroupResponse:
     """
     Create a new custom group and assign the creator as ADMIN.
-    Requires CUSTOM_GROUP_CREATOR, CUSTOM_GROUPS_ADMIN, or GLOBAL_ADMIN permission on tenant.
+    Requires CUSTOM_GROUP_CREATOR, CUSTOM_GROUPS_ADMIN, or TENANT_GLOBAL_ADMIN permission on tenant.
 
     Args:
         request: FastAPI request object (contains user in request.state)
@@ -144,7 +144,7 @@ async def create_custom_group(
     response_model=CustomGroupResponse,
     status_code=status.HTTP_200_OK,
     summary="Update Custom Group",
-    description="Update an existing custom group (requires WRITE/ADMIN on group or GLOBAL_ADMIN/CUSTOM_GROUPS_ADMIN on tenant)",
+    description="Update an existing custom group (requires WRITE/ADMIN on group or TENANT_GLOBAL_ADMIN/CUSTOM_GROUPS_ADMIN on tenant)",
 )
 @authenticate()
 @check_permissions(entity="custom_group", required_permissions=[PermissionActionEnum.WRITE, PermissionActionEnum.ADMIN])
@@ -157,7 +157,7 @@ async def update_custom_group(
 ) -> CustomGroupResponse:
     """
     Update an existing custom group.
-    Requires WRITE or ADMIN permission on the group, or GLOBAL_ADMIN/CUSTOM_GROUPS_ADMIN on tenant.
+    Requires WRITE or ADMIN permission on the group, or TENANT_GLOBAL_ADMIN/CUSTOM_GROUPS_ADMIN on tenant.
 
     Args:
         request: FastAPI request object (contains user in request.state)
@@ -179,7 +179,7 @@ async def update_custom_group(
     "/{custom_group_id}",
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Delete Custom Group",
-    description="Delete a custom group (requires ADMIN on group or GLOBAL_ADMIN/CUSTOM_GROUPS_ADMIN on tenant)",
+    description="Delete a custom group (requires ADMIN on group or TENANT_GLOBAL_ADMIN/CUSTOM_GROUPS_ADMIN on tenant)",
 )
 @authenticate()
 @check_permissions(entity="custom_group", required_permissions=[PermissionActionEnum.ADMIN])
@@ -191,7 +191,7 @@ async def delete_custom_group(
 ) -> None:
     """
     Delete a custom group.
-    Requires ADMIN permission on the group, or GLOBAL_ADMIN/CUSTOM_GROUPS_ADMIN on tenant.
+    Requires ADMIN permission on the group, or TENANT_GLOBAL_ADMIN/CUSTOM_GROUPS_ADMIN on tenant.
 
     Args:
         request: FastAPI request object
@@ -232,7 +232,7 @@ async def list_custom_group_principals(
 ) -> ResourcePrincipalsResponse:
     """
     Get all principals and their permissions for a specific custom group.
-    Requires READ, WRITE, or ADMIN permission on the group, or GLOBAL_ADMIN/CUSTOM_GROUPS_ADMIN on tenant.
+    Requires READ, WRITE, or ADMIN permission on the group, or TENANT_GLOBAL_ADMIN/CUSTOM_GROUPS_ADMIN on tenant.
 
     Args:
         request: FastAPI request object
@@ -287,7 +287,7 @@ async def get_principal_permissions(
 ) -> PrincipalWithRolesResponse:
     """
     Get all permissions for a specific principal on a custom group.
-    Requires READ, WRITE, or ADMIN permission on the group, or GLOBAL_ADMIN/CUSTOM_GROUPS_ADMIN on tenant.
+    Requires READ, WRITE, or ADMIN permission on the group, or TENANT_GLOBAL_ADMIN/CUSTOM_GROUPS_ADMIN on tenant.
 
     Args:
         request: FastAPI request object
@@ -320,7 +320,7 @@ async def set_principal_permission(
 ) -> PrincipalWithRolesResponse:
     """
     Add or update a permission for a principal on a custom group.
-    Requires ADMIN permission on the group, or GLOBAL_ADMIN/CUSTOM_GROUPS_ADMIN on tenant.
+    Requires ADMIN permission on the group, or TENANT_GLOBAL_ADMIN/CUSTOM_GROUPS_ADMIN on tenant.
 
     Args:
         request: FastAPI request object
@@ -365,7 +365,7 @@ async def delete_principal_permission(
 ) -> PrincipalWithRolesResponse:
     """
     Remove a specific permission from a principal on a custom group.
-    Requires ADMIN permission on the group, or GLOBAL_ADMIN/CUSTOM_GROUPS_ADMIN on tenant.
+    Requires ADMIN permission on the group, or TENANT_GLOBAL_ADMIN/CUSTOM_GROUPS_ADMIN on tenant.
 
     Args:
         request: FastAPI request object

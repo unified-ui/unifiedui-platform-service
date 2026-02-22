@@ -24,7 +24,7 @@ class TenantResponse(BaseModel):
 class TenantRoleDetailResponse(BaseModel):
     """Detailed role response including display name and creation info."""
 
-    role: str = Field(..., description="Role type (e.g., GLOBAL_ADMIN, READER)")
+    role: str = Field(..., description="Role type (e.g., TENANT_GLOBAL_ADMIN, READER)")
     display_name: str | None = Field(None, description="Human-readable role name")
     created_at: datetime | None = Field(None, description="When this role was assigned")
 
@@ -32,7 +32,7 @@ class TenantRoleDetailResponse(BaseModel):
 class TenantRoleResponse(BaseModel):
     id: str = Field(..., description="Unique identifier for the role")
     principal_type: str = Field(..., description="Type of principal (IDENTITY_USER, IDENTITY_GROUP, CUSTOM_GROUP)")
-    role: str = Field(..., description="Role type (e.g., GLOBAL_ADMIN, READER)")
+    role: str = Field(..., description="Role type (e.g., TENANT_GLOBAL_ADMIN, READER)")
     name: str | None = Field(None, description="Name of the role (derived from role value)")
     description: str | None = Field(None, description="Optional description of the role")
     created_at: datetime = Field(..., description="Timestamp when the role was created")

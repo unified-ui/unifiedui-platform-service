@@ -36,7 +36,7 @@ class TestConversationHandlerFoundryIntegration:
         user.identity.get_display_name.return_value = "Test User"
         user.identity.get_principal_name.return_value = "test@example.com"
         user.identity.get_mail.return_value = "test@example.com"
-        user.tenants = [{"tenant": {"id": "tenant-123"}, "roles": ["GLOBAL_ADMIN"]}]
+        user.tenants = [{"tenant": {"id": "tenant-123"}, "roles": ["TENANT_GLOBAL_ADMIN"]}]
         user.groups = []
         return user
 

@@ -7,7 +7,13 @@ from sqlalchemy import select
 
 from unifiedui.caching.dependencies import get_cache_client
 from unifiedui.core.config import settings
-from unifiedui.core.database.enums import PermissionActionEnum, PrincipalTypeEnum, TenantRolesEnum, UserPermissionEnum
+from unifiedui.core.database.enums import (
+    OrganizationRoleEnum,
+    PermissionActionEnum,
+    PrincipalTypeEnum,
+    TenantRolesEnum,
+    UserPermissionEnum,
+)
 from unifiedui.core.database.models import (
     AutonomousAgentMember,
     ChatAgentMember,
@@ -437,14 +443,27 @@ def authenticate(required_service_auth_key: str | None = None) -> Callable:
                 request.state.organization_context = None
 
             # Check tenant access if tenant_id is in path parameters
+            # Skip when organization_id is also present (org routes handle their own auth)
             tenant_id = request.path_params.get("tenant_id")
-            if tenant_id:
+            organization_id = request.path_params.get("organization_id")
+            if tenant_id and not organization_id:
                 user_tenants = user.tenants
-                if not any(t["tenant"]["id"] == tenant_id for t in user_tenants):
-                    raise HTTPException(
-                        status_code=status.HTTP_403_FORBIDDEN,
-                        detail=f"Access denied: User does not have access to tenant {tenant_id}",
-                    )
+                has_tenant_access = any(t["tenant"]["id"] == tenant_id for t in user_tenants)
+
+                if not has_tenant_access:
+                    org_context = getattr(request.state, "organization_context", None)
+                    org_roles = org_context.get("roles", []) if org_context else []
+                    org_bypass_roles = {
+                        OrganizationRoleEnum.ORGANISATION_GLOBAL_ADMIN.value,
+                        OrganizationRoleEnum.ORGANISATION_TENANT_ADMIN.value,
+                    }
+                    has_org_bypass = bool(set(org_roles) & org_bypass_roles)
+
+                    if not has_org_bypass:
+                        raise HTTPException(
+                            status_code=status.HTTP_403_FORBIDDEN,
+                            detail=f"Access denied: User does not have access to tenant {tenant_id}",
+                        )
 
             return await func(*args, **kwargs)
 
@@ -466,7 +485,7 @@ def check_permissions(
                Options: "tenant", "organization", "chat_agent", "credential", "autonomous_agent",
                         "custom_group", "conversation", "tag"
         required_permissions: List of required permission enums
-                            - For tenant: [TenantPermissionEnum.GLOBAL_ADMIN, TenantPermissionEnum.READER, etc.]
+                            - For tenant: [TenantPermissionEnum.TENANT_GLOBAL_ADMIN, TenantPermissionEnum.READER, etc.]
                             - For resources: [PermissionActionEnum.READ, PermissionActionEnum.WRITE, PermissionActionEnum.ADMIN]
                             - Special: [UserPermissions.IS_CREATOR] - allows access if user is the creator
                             If None or empty, no permission check is performed
@@ -477,11 +496,11 @@ def check_permissions(
         HTTPException: 401 if user not authenticated, 403 if permissions not met
 
     Example:
-        @check_permissions(entity="tenant", required_permissions=[TenantPermissionEnum.GLOBAL_ADMIN])
+        @check_permissions(entity="tenant", required_permissions=[TenantPermissionEnum.TENANT_GLOBAL_ADMIN])
         async def update_tenant(...):
             ...
 
-        @check_permissions(entity="organization", required_org_roles=["ORGANISATION_GLOBAL_ADMIN", "ORGANISATION_ADMIN"])
+        @check_permissions(entity="organization", required_org_roles=["ORGANISATION_GLOBAL_ADMIN"])
         async def update_organization(...):
             ...
 
@@ -489,7 +508,7 @@ def check_permissions(
         async def update_chat_agent(...):
             ...
 
-        @check_permissions(entity="tag", required_permissions=[TenantRolesEnum.GLOBAL_ADMIN, UserPermissions.IS_CREATOR])
+        @check_permissions(entity="tag", required_permissions=[TenantRolesEnum.TENANT_GLOBAL_ADMIN, UserPermissions.IS_CREATOR])
         async def delete_tag(...):
             ...
     """
@@ -520,11 +539,41 @@ def check_permissions(
 
             # Check organization-level roles if required
             if required_org_roles:
+                organization_id = request.path_params.get("organization_id")
                 org_context = getattr(request.state, "organization_context", None)
-                if org_context:
+
+                # Fast path: use pre-computed org context if it matches the target org
+                if org_context and organization_id and org_context.get("id") == organization_id:
                     user_org_roles = org_context.get("roles", [])
                     if any(role in user_org_roles for role in required_org_roles):
                         return await func(*args, **kwargs)
+
+                # Fallback: direct DB lookup for the specific organization_id
+                if organization_id:
+                    from unifiedui.core.database.models import OrganizationMember
+
+                    user_id = user.identity.get_id()
+                    identity_group_ids = [
+                        g.id for g in user.groups if getattr(g, "principal_type", None) == "IDENTITY_GROUP"
+                    ]
+                    all_principal_ids = [user_id, *identity_group_ids]
+
+                    db = get_db_client()
+                    with db.get_session() as session:
+                        org_members = (
+                            session.execute(
+                                select(OrganizationMember).where(
+                                    OrganizationMember.organization_id == organization_id,
+                                    OrganizationMember.principal_id.in_(all_principal_ids),
+                                )
+                            )
+                            .scalars()
+                            .all()
+                        )
+
+                        org_roles = sorted({m.role for m in org_members})
+                        if any(role in org_roles for role in required_org_roles):
+                            return await func(*args, **kwargs)
 
                 # If org roles were required but not met, deny
                 raise HTTPException(
@@ -533,6 +582,19 @@ def check_permissions(
                 )
 
             # Check permissions based on entity type
+            # First: org role bypass for tenant-scoped entities
+            # ORGANISATION_GLOBAL_ADMIN and ORGANISATION_TENANT_ADMIN bypass all tenant checks
+            if entity != "organization" and required_org_roles is None:
+                org_context = getattr(request.state, "organization_context", None)
+                if org_context:
+                    org_roles = set(org_context.get("roles", []))
+                    org_bypass_roles = {
+                        OrganizationRoleEnum.ORGANISATION_GLOBAL_ADMIN.value,
+                        OrganizationRoleEnum.ORGANISATION_TENANT_ADMIN.value,
+                    }
+                    if org_roles & org_bypass_roles:
+                        return await func(*args, **kwargs)
+
             if entity == "tenant":
                 tenant_id = request.path_params.get("tenant_id")
                 if not tenant_id:
@@ -563,7 +625,7 @@ def check_permissions(
                     )
 
             elif entity == "tag":
-                # Special handling for tags - check GLOBAL_ADMIN first, then IS_CREATOR
+                # Special handling for tags - check TENANT_GLOBAL_ADMIN first, then IS_CREATOR
                 tenant_id = request.path_params.get("tenant_id")
                 tag_id = request.path_params.get("tag_id")
 
@@ -576,14 +638,14 @@ def check_permissions(
                         status_code=status.HTTP_400_BAD_REQUEST, detail="tag_id not found in path parameters"
                     )
 
-                # Check tenant-level permissions first (GLOBAL_ADMIN)
+                # Check tenant-level permissions first (TENANT_GLOBAL_ADMIN)
                 user_tenants = user.tenants
                 matching_tenant = next((t for t in user_tenants if t["tenant"]["id"] == tenant_id), None)
 
                 if matching_tenant:
                     user_tenant_permissions = matching_tenant["roles"]
 
-                    # Check for TenantRolesEnum permissions (like GLOBAL_ADMIN)
+                    # Check for TenantRolesEnum permissions (like TENANT_GLOBAL_ADMIN)
                     tenant_role_perms = [perm for perm in required_permissions if isinstance(perm, TenantRolesEnum)]
                     for perm in tenant_role_perms:
                         if perm.value in user_tenant_permissions:
@@ -680,8 +742,8 @@ def check_permissions(
                     # matching_tenant["roles"] is already a list of permission strings
                     user_tenant_permissions = matching_tenant["roles"]
 
-                    # GLOBAL_ADMIN grants access to all resources
-                    if TenantRolesEnum.GLOBAL_ADMIN.value in user_tenant_permissions:
+                    # TENANT_GLOBAL_ADMIN grants access to all resources
+                    if TenantRolesEnum.TENANT_GLOBAL_ADMIN.value in user_tenant_permissions:
                         return await func(*args, **kwargs)
 
                     # Entity-specific admin permissions

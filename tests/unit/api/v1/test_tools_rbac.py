@@ -315,7 +315,7 @@ class TestToolRBAC:
         assert response.status_code == status.HTTP_403_FORBIDDEN
 
     def test_tenant_global_admin_can_access_all_tools(self, test_client: TestClient) -> None:
-        """Test that tenant GLOBAL_ADMIN can access all tools."""
+        """Test that tenant TENANT_GLOBAL_ADMIN can access all tools."""
         # Create owner with tenant
         owner_token = test_client.create_test_user("rbac-owner-9", "Tool Owner")
         owner_headers = create_auth_headers(owner_token, use_cache=False)
@@ -324,7 +324,7 @@ class TestToolRBAC:
         # Create tool
         tool_id = create_tool(test_client, tenant_id, owner_headers, "RBAC Test Tool 9")
 
-        # Create admin user and add to tenant as GLOBAL_ADMIN
+        # Create admin user and add to tenant as TENANT_GLOBAL_ADMIN
         global_admin_token = test_client.create_test_user("rbac-globaladmin-9", "Global Admin")
         global_admin_headers = create_auth_headers(global_admin_token, use_cache=False)
         test_client.put(
@@ -332,7 +332,7 @@ class TestToolRBAC:
             json={
                 "principal_id": global_admin_token.get_id(),
                 "principal_type": PRINCIPAL_TYPE_USER,
-                "role": "GLOBAL_ADMIN",
+                "role": "TENANT_GLOBAL_ADMIN",
             },
             headers=owner_headers,
         )

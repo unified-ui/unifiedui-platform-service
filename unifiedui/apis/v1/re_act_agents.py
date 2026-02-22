@@ -94,7 +94,7 @@ async def list_re_act_agents(
 @check_permissions(
     entity="tenant",
     required_permissions=[
-        TenantRolesEnum.GLOBAL_ADMIN,
+        TenantRolesEnum.TENANT_GLOBAL_ADMIN,
         TenantRolesEnum.REACT_AGENT_ADMIN,
         TenantRolesEnum.REACT_AGENT_CREATOR,
     ],
@@ -132,7 +132,7 @@ async def create_re_act_agent(
 @check_permissions(
     entity="re_act_agent",
     required_permissions=[
-        TenantRolesEnum.GLOBAL_ADMIN,
+        TenantRolesEnum.TENANT_GLOBAL_ADMIN,
         TenantRolesEnum.REACT_AGENT_ADMIN,
         PermissionActionEnum.ADMIN,
         PermissionActionEnum.WRITE,
@@ -171,7 +171,7 @@ async def get_re_act_agent(
 @check_permissions(
     entity="re_act_agent",
     required_permissions=[
-        TenantRolesEnum.GLOBAL_ADMIN,
+        TenantRolesEnum.TENANT_GLOBAL_ADMIN,
         TenantRolesEnum.REACT_AGENT_ADMIN,
         PermissionActionEnum.ADMIN,
         PermissionActionEnum.WRITE,
@@ -213,7 +213,11 @@ async def update_re_act_agent(
 @authenticate()
 @check_permissions(
     entity="re_act_agent",
-    required_permissions=[TenantRolesEnum.GLOBAL_ADMIN, TenantRolesEnum.REACT_AGENT_ADMIN, PermissionActionEnum.ADMIN],
+    required_permissions=[
+        TenantRolesEnum.TENANT_GLOBAL_ADMIN,
+        TenantRolesEnum.REACT_AGENT_ADMIN,
+        PermissionActionEnum.ADMIN,
+    ],
 )
 async def delete_re_act_agent(
     request: Request,
@@ -247,7 +251,11 @@ async def delete_re_act_agent(
 @authenticate()
 @check_permissions(
     entity="re_act_agent",
-    required_permissions=[TenantRolesEnum.GLOBAL_ADMIN, TenantRolesEnum.REACT_AGENT_ADMIN, PermissionActionEnum.ADMIN],
+    required_permissions=[
+        TenantRolesEnum.TENANT_GLOBAL_ADMIN,
+        TenantRolesEnum.REACT_AGENT_ADMIN,
+        PermissionActionEnum.ADMIN,
+    ],
 )
 async def list_re_act_agent_permissions(
     request: Request,
@@ -304,7 +312,11 @@ async def list_re_act_agent_permissions(
 @authenticate()
 @check_permissions(
     entity="re_act_agent",
-    required_permissions=[TenantRolesEnum.GLOBAL_ADMIN, TenantRolesEnum.REACT_AGENT_ADMIN, PermissionActionEnum.ADMIN],
+    required_permissions=[
+        TenantRolesEnum.TENANT_GLOBAL_ADMIN,
+        TenantRolesEnum.REACT_AGENT_ADMIN,
+        PermissionActionEnum.ADMIN,
+    ],
 )
 async def get_re_act_agent_permission(
     request: Request,
@@ -347,7 +359,11 @@ async def get_re_act_agent_permission(
 @authenticate()
 @check_permissions(
     entity="re_act_agent",
-    required_permissions=[TenantRolesEnum.GLOBAL_ADMIN, TenantRolesEnum.REACT_AGENT_ADMIN, PermissionActionEnum.ADMIN],
+    required_permissions=[
+        TenantRolesEnum.TENANT_GLOBAL_ADMIN,
+        TenantRolesEnum.REACT_AGENT_ADMIN,
+        PermissionActionEnum.ADMIN,
+    ],
 )
 async def set_re_act_agent_permission(
     request: Request,
@@ -395,7 +411,11 @@ async def set_re_act_agent_permission(
 @authenticate()
 @check_permissions(
     entity="re_act_agent",
-    required_permissions=[TenantRolesEnum.GLOBAL_ADMIN, TenantRolesEnum.REACT_AGENT_ADMIN, PermissionActionEnum.ADMIN],
+    required_permissions=[
+        TenantRolesEnum.TENANT_GLOBAL_ADMIN,
+        TenantRolesEnum.REACT_AGENT_ADMIN,
+        PermissionActionEnum.ADMIN,
+    ],
 )
 async def delete_re_act_agent_permission(
     request: Request,

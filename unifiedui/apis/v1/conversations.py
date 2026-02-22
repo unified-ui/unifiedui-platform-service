@@ -50,7 +50,7 @@ async def list_conversations(
     List conversations for a tenant.
 
     Users see only conversations they have permissions for, unless they have
-    GLOBAL_ADMIN or CONVERSATIONS_ADMIN on tenant level.
+    TENANT_GLOBAL_ADMIN or CONVERSATIONS_ADMIN on tenant level.
 
     Args:
         request: FastAPI request with user in state
@@ -99,7 +99,7 @@ async def list_conversations(
 @check_permissions(
     entity="tenant",
     required_permissions=[
-        TenantRolesEnum.GLOBAL_ADMIN,
+        TenantRolesEnum.TENANT_GLOBAL_ADMIN,
         TenantRolesEnum.CONVERSATIONS_ADMIN,
         TenantRolesEnum.CONVERSATIONS_CREATOR,
     ],
@@ -160,7 +160,7 @@ async def create_conversation(
 @check_permissions(
     entity="conversation",
     required_permissions=[
-        TenantRolesEnum.GLOBAL_ADMIN,
+        TenantRolesEnum.TENANT_GLOBAL_ADMIN,
         TenantRolesEnum.CONVERSATIONS_ADMIN,
         PermissionActionEnum.ADMIN,
         PermissionActionEnum.WRITE,
@@ -213,7 +213,7 @@ async def get_conversation(
 @check_permissions(
     entity="conversation",
     required_permissions=[
-        TenantRolesEnum.GLOBAL_ADMIN,
+        TenantRolesEnum.TENANT_GLOBAL_ADMIN,
         TenantRolesEnum.CONVERSATIONS_ADMIN,
         PermissionActionEnum.ADMIN,
         PermissionActionEnum.WRITE,
@@ -271,7 +271,7 @@ async def update_conversation(
 @check_permissions(
     entity="conversation",
     required_permissions=[
-        TenantRolesEnum.GLOBAL_ADMIN,
+        TenantRolesEnum.TENANT_GLOBAL_ADMIN,
         TenantRolesEnum.CONVERSATIONS_ADMIN,
         PermissionActionEnum.ADMIN,
     ],
@@ -326,7 +326,7 @@ async def delete_conversation(
 @check_permissions(
     entity="conversation",
     required_permissions=[
-        TenantRolesEnum.GLOBAL_ADMIN,
+        TenantRolesEnum.TENANT_GLOBAL_ADMIN,
         TenantRolesEnum.CONVERSATIONS_ADMIN,
         PermissionActionEnum.ADMIN,
         PermissionActionEnum.WRITE,
@@ -408,7 +408,7 @@ async def list_conversation_permissions(
 @check_permissions(
     entity="conversation",
     required_permissions=[
-        TenantRolesEnum.GLOBAL_ADMIN,
+        TenantRolesEnum.TENANT_GLOBAL_ADMIN,
         TenantRolesEnum.CONVERSATIONS_ADMIN,
         PermissionActionEnum.ADMIN,
         PermissionActionEnum.WRITE,
@@ -471,7 +471,7 @@ async def get_conversation_permission(
 @check_permissions(
     entity="conversation",
     required_permissions=[
-        TenantRolesEnum.GLOBAL_ADMIN,
+        TenantRolesEnum.TENANT_GLOBAL_ADMIN,
         TenantRolesEnum.CONVERSATIONS_ADMIN,
         PermissionActionEnum.ADMIN,
     ],
@@ -536,7 +536,7 @@ async def set_conversation_permission(
 @check_permissions(
     entity="conversation",
     required_permissions=[
-        TenantRolesEnum.GLOBAL_ADMIN,
+        TenantRolesEnum.TENANT_GLOBAL_ADMIN,
         TenantRolesEnum.CONVERSATIONS_ADMIN,
         PermissionActionEnum.ADMIN,
     ],

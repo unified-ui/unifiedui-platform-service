@@ -451,7 +451,7 @@ class TestCredentialRBAC:
         assert update_response2.status_code == status.HTTP_403_FORBIDDEN
 
     def test_tenant_global_admin_bypasses_credential_permissions(self, test_client: TestClient) -> None:
-        """Test that tenant GLOBAL_ADMIN can access all credentials without explicit permissions."""
+        """Test that tenant TENANT_GLOBAL_ADMIN can access all credentials without explicit permissions."""
         # User A creates tenant
         user_a_token = test_client.create_test_user("tenant-admin", "Tenant Admin")
         headers_a = create_auth_headers(user_a_token, use_cache=False)
@@ -467,7 +467,7 @@ class TestCredentialRBAC:
         # User B creates credential
         credential_id = create_credential(test_client, tenant_id, headers_b, "Private Credential")
 
-        # User A (tenant creator = GLOBAL_ADMIN) can access credential
+        # User A (tenant creator = TENANT_GLOBAL_ADMIN) can access credential
         get_response = test_client.get(
             ENDPOINT_CREDENTIAL_DETAIL.format(tenant_id=tenant_id, credential_id=credential_id), headers=headers_a
         )
@@ -641,7 +641,7 @@ class TestCredentialSecretRBAC:
         assert response.status_code == status.HTTP_403_FORBIDDEN
 
     def test_global_admin_can_get_secret(self, test_client: TestClient) -> None:
-        """Test that GLOBAL_ADMIN on tenant can get any credential secret."""
+        """Test that TENANT_GLOBAL_ADMIN on tenant can get any credential secret."""
         # Create owner and tenant
         owner_token = test_client.create_test_user("tenant-owner", "Tenant Owner")
         owner_headers = create_auth_headers(owner_token, use_cache=False)
@@ -654,10 +654,10 @@ class TestCredentialSecretRBAC:
         admin_token = test_client.create_test_user("global-admin-user", "Global Admin User")
         admin_headers = create_auth_headers(admin_token, use_cache=False)
 
-        # Add as GLOBAL_ADMIN to tenant
-        add_user_to_tenant(test_client, tenant_id, owner_headers, "global-admin-user", "GLOBAL_ADMIN")
+        # Add as TENANT_GLOBAL_ADMIN to tenant
+        add_user_to_tenant(test_client, tenant_id, owner_headers, "global-admin-user", "TENANT_GLOBAL_ADMIN")
 
-        # GLOBAL_ADMIN can get secret without specific credential permission
+        # TENANT_GLOBAL_ADMIN can get secret without specific credential permission
         response = test_client.get(
             f"{ENDPOINT_CREDENTIAL_DETAIL.format(tenant_id=tenant_id, credential_id=credential_id)}/secret",
             headers=admin_headers,

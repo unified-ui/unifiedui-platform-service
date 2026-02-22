@@ -80,7 +80,7 @@ class TestTenantAIModelRBAC:
     """Test suite for tenant AI model role-based access control."""
 
     def test_global_admin_can_create(self, test_client: TestClient) -> None:
-        """Test that GLOBAL_ADMIN (tenant creator) can create AI models."""
+        """Test that TENANT_GLOBAL_ADMIN (tenant creator) can create AI models."""
         user_token = test_client.create_test_user("rbac-admin-1", "Admin User")
         headers = create_auth_headers(user_token, use_cache=False)
         tenant_id = create_tenant_for_user(test_client, user_token)

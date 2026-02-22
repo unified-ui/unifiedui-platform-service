@@ -615,7 +615,7 @@ class ResourcePermissionsHandler:
         Check if a user has the required permission on a resource.
 
         This method checks:
-        1. Tenant-level admin permissions (GLOBAL_ADMIN, resource-specific admin)
+        1. Tenant-level admin permissions (TENANT_GLOBAL_ADMIN, resource-specific admin)
         2. Direct user permissions
         3. Identity group permissions
         4. Custom group permissions
@@ -644,8 +644,8 @@ class ResourcePermissionsHandler:
         if matching_tenant:
             user_roles = matching_tenant["roles"]
 
-            # GLOBAL_ADMIN grants access to all resources
-            if TenantRolesEnum.GLOBAL_ADMIN.value in user_roles:
+            # TENANT_GLOBAL_ADMIN grants access to all resources
+            if TenantRolesEnum.TENANT_GLOBAL_ADMIN.value in user_roles:
                 return True
 
             # Resource-specific admin grants access
@@ -693,7 +693,7 @@ class ResourcePermissionsHandler:
             return False
 
         user_roles = matching_tenant["roles"]
-        admin_roles = [TenantRolesEnum.GLOBAL_ADMIN.value, tenant_admin_role.value]
+        admin_roles = [TenantRolesEnum.TENANT_GLOBAL_ADMIN.value, tenant_admin_role.value]
         return any(role in user_roles for role in admin_roles)
 
     def get_user_principal_ids(self, user: ContextIdentityUser) -> list[str]:

@@ -261,7 +261,7 @@ class TestTagRBAC:
         assert response.status_code == status.HTTP_403_FORBIDDEN
 
     def test_global_admin_can_delete_any_tag(self, test_client: TestClient) -> None:
-        """Test that GLOBAL_ADMIN can delete any tag."""
+        """Test that TENANT_GLOBAL_ADMIN can delete any tag."""
         # Admin creates tenant
         admin_token = test_client.create_test_user("tag-admin-5", "Tag Admin 5")
         admin_headers = create_auth_headers(admin_token, use_cache=False)
@@ -273,10 +273,10 @@ class TestTagRBAC:
         add_user_to_tenant(test_client, tenant_id, admin_headers, "tag-creator-2", "READER")
         tag_id = create_tag(test_client, tenant_id, user_headers, "user-tag")
 
-        # GLOBAL_ADMIN can delete it
+        # TENANT_GLOBAL_ADMIN can delete it
         response = test_client.delete(
             ENDPOINT_TAG_DETAIL.format(tenant_id=tenant_id, tag_id=tag_id),
-            headers=admin_headers,  # Tenant creator is GLOBAL_ADMIN
+            headers=admin_headers,  # Tenant creator is TENANT_GLOBAL_ADMIN
         )
         assert response.status_code == status.HTTP_204_NO_CONTENT
 
@@ -299,7 +299,7 @@ class TestTagRBAC:
         assert response.status_code == status.HTTP_204_NO_CONTENT
 
     def test_non_creator_non_admin_cannot_delete_tag(self, test_client: TestClient) -> None:
-        """Test that non-creator and non-GLOBAL_ADMIN cannot delete a tag."""
+        """Test that non-creator and non-TENANT_GLOBAL_ADMIN cannot delete a tag."""
         # Admin creates tenant
         admin_token = test_client.create_test_user("tag-admin-7", "Tag Admin 7")
         admin_headers = create_auth_headers(admin_token, use_cache=False)
@@ -497,17 +497,17 @@ class TestResourceTagRBAC:
         assert delete_response.status_code == status.HTTP_204_NO_CONTENT
 
     def test_global_admin_bypasses_resource_permissions(self, test_client: TestClient) -> None:
-        """Test that tenant GLOBAL_ADMIN can manage any resource's tags."""
+        """Test that tenant TENANT_GLOBAL_ADMIN can manage any resource's tags."""
         # Admin creates tenant and chat agent
         admin_token = test_client.create_test_user("res-tag-admin-7", "Resource Tag Admin 7")
         admin_headers = create_auth_headers(admin_token, use_cache=False)
         tenant_id = create_tenant_for_user(test_client, admin_token)
         app_id = create_chat_agent_in_db(test_client, tenant_id, "res-tag-admin-7", "Test App 7")
 
-        # Create another GLOBAL_ADMIN
+        # Create another TENANT_GLOBAL_ADMIN
         global_admin_token = test_client.create_test_user("res-tag-global-1", "Resource Tag Global 1")
         global_admin_headers = create_auth_headers(global_admin_token, use_cache=False)
-        add_user_to_tenant(test_client, tenant_id, admin_headers, "res-tag-global-1", "GLOBAL_ADMIN")
+        add_user_to_tenant(test_client, tenant_id, admin_headers, "res-tag-global-1", "TENANT_GLOBAL_ADMIN")
 
         # Global admin can set tags without explicit permission
         set_response = test_client.put(

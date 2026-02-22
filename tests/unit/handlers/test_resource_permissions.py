@@ -406,15 +406,17 @@ class TestResourcePermissionsHandlerPermissionChecks:
         assert has_access is False
 
     def test_check_user_permission_global_admin_bypass(self, handler, setup_with_member):
-        """Test that GLOBAL_ADMIN bypasses resource-level permissions."""
+        """Test that TENANT_GLOBAL_ADMIN bypasses resource-level permissions."""
         data = setup_with_member
 
         mock_user = Mock()
         mock_user.identity.get_id.return_value = "different-user-id"
-        mock_user.tenants = [{"tenant": {"id": data["tenant_id"]}, "roles": [TenantRolesEnum.GLOBAL_ADMIN.value]}]
+        mock_user.tenants = [
+            {"tenant": {"id": data["tenant_id"]}, "roles": [TenantRolesEnum.TENANT_GLOBAL_ADMIN.value]}
+        ]
         mock_user.groups = []
 
-        # GLOBAL_ADMIN should have access even without member record
+        # TENANT_GLOBAL_ADMIN should have access even without member record
         has_access = handler.check_user_permission(
             resource_type="chat_agent",
             tenant_id=data["tenant_id"],
@@ -450,7 +452,9 @@ class TestResourcePermissionsHandlerPermissionChecks:
         data = setup_with_member
 
         mock_user = Mock()
-        mock_user.tenants = [{"tenant": {"id": data["tenant_id"]}, "roles": [TenantRolesEnum.GLOBAL_ADMIN.value]}]
+        mock_user.tenants = [
+            {"tenant": {"id": data["tenant_id"]}, "roles": [TenantRolesEnum.TENANT_GLOBAL_ADMIN.value]}
+        ]
 
         is_admin = handler.is_user_admin(resource_type="chat_agent", tenant_id=data["tenant_id"], user=mock_user)
 

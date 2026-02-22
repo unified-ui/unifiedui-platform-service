@@ -19,11 +19,9 @@ ENDPOINT_ORGANIZATION_TENANT_DETAIL = "/api/v1/platform-service/organizations/{o
 NON_EXISTENT_ID = "non-existent-id"
 
 # Roles
-ROLE_ORG_GLOBAL_ADMIN = OrganizationRoleEnum.ORGANISATION_GLOBAL_ADMIN.value
-ROLE_ORG_ADMIN = OrganizationRoleEnum.ORGANISATION_ADMIN.value
+ROLE_ORG_TENANT_GLOBAL_ADMIN = OrganizationRoleEnum.ORGANISATION_GLOBAL_ADMIN.value
 ROLE_ORG_TENANT_ADMIN = OrganizationRoleEnum.ORGANISATION_TENANT_ADMIN.value
 ROLE_ORG_TENANT_CREATOR = OrganizationRoleEnum.ORGANISATION_TENANT_CREATOR.value
-ROLE_ORG_MEMBER = OrganizationRoleEnum.ORGANISATION_MEMBER.value
 
 # Principal Types
 PRINCIPAL_TYPE_USER = PrincipalTypeEnum.IDENTITY_USER.value
@@ -125,7 +123,7 @@ class TestOrganizationRoutes:
         creator_member = next((m for m in data["members"] if m["principal_id"] == "org-creator-3"), None)
         assert creator_member is not None
         role_values = [r["role"] for r in creator_member["roles"]]
-        assert ROLE_ORG_GLOBAL_ADMIN in role_values
+        assert ROLE_ORG_TENANT_GLOBAL_ADMIN in role_values
 
     def test_create_organization_missing_name(self, test_client: TestClient) -> None:
         """Test organization creation with missing name."""
@@ -220,14 +218,14 @@ class TestOrganizationRoutes:
         assert data["slug"] == "get-org-1"
 
     def test_get_organization_not_found(self, test_client: TestClient) -> None:
-        """Test organization retrieval with non-existent ID."""
+        """Test organization retrieval with non-existent ID returns 403 (user not a member)."""
         user_token = test_client.create_test_user("org-get-nf", "Org Get NF")
         headers = create_auth_headers(user_token, use_cache=False)
 
         response = test_client.get(
             ENDPOINT_ORGANIZATION_DETAIL.format(organization_id=NON_EXISTENT_ID), headers=headers
         )
-        assert response.status_code == status.HTTP_404_NOT_FOUND
+        assert response.status_code == status.HTTP_403_FORBIDDEN
 
     def test_update_organization_success(self, test_client: TestClient) -> None:
         """Test successful organization update."""
@@ -307,7 +305,7 @@ class TestOrganizationRoutes:
         assert response.json()["is_active"] is False
 
     def test_update_organization_not_found(self, test_client: TestClient) -> None:
-        """Test updating a non-existent organization."""
+        """Test updating a non-existent organization returns 403 (RBAC before handler)."""
         user_token = test_client.create_test_user("org-upd-nf", "Org Upd NF")
         headers = create_auth_headers(user_token, use_cache=False)
 
@@ -316,7 +314,7 @@ class TestOrganizationRoutes:
             json={"name": "Should Fail"},
             headers=headers,
         )
-        assert response.status_code == status.HTTP_404_NOT_FOUND
+        assert response.status_code == status.HTTP_403_FORBIDDEN
 
 
 class TestOrganizationMemberRoutes:
@@ -338,14 +336,14 @@ class TestOrganizationMemberRoutes:
         assert len(data["members"]) >= 1
 
     def test_list_members_not_found_org(self, test_client: TestClient) -> None:
-        """Test listing members of a non-existent organization."""
+        """Test listing members of a non-existent organization returns 403 (RBAC before handler)."""
         user_token = test_client.create_test_user("org-mem-nf", "Org Mem NF")
         headers = create_auth_headers(user_token, use_cache=False)
 
         response = test_client.get(
             ENDPOINT_ORGANIZATION_MEMBERS.format(organization_id=NON_EXISTENT_ID), headers=headers
         )
-        assert response.status_code == status.HTTP_404_NOT_FOUND
+        assert response.status_code == status.HTTP_403_FORBIDDEN
 
     def test_set_member_success(self, test_client: TestClient) -> None:
         """Test adding a member to the organization."""
@@ -358,7 +356,7 @@ class TestOrganizationMemberRoutes:
         member_data = {
             "principal_id": "new-member-1",
             "principal_type": PRINCIPAL_TYPE_USER,
-            "role": ROLE_ORG_MEMBER,
+            "role": ROLE_ORG_TENANT_CREATOR,
         }
         response = test_client.post(
             ENDPOINT_ORGANIZATION_MEMBERS.format(organization_id=org_id),
@@ -370,7 +368,7 @@ class TestOrganizationMemberRoutes:
         data = response.json()
         assert data["principal_id"] == "new-member-1"
         assert data["principal_type"] == PRINCIPAL_TYPE_USER
-        assert data["role"] == ROLE_ORG_MEMBER
+        assert data["role"] == ROLE_ORG_TENANT_CREATOR
         assert "id" in data
         assert "created_at" in data
 
@@ -382,10 +380,10 @@ class TestOrganizationMemberRoutes:
         org = _create_org(test_client, headers, identity_tenant_id="idp-mem-multi-1", slug="mem-multi-org")
         org_id = org["id"]
 
-        # Add MEMBER role
+        # Add TENANT_ADMIN role
         test_client.post(
             ENDPOINT_ORGANIZATION_MEMBERS.format(organization_id=org_id),
-            json={"principal_id": "multi-user", "principal_type": PRINCIPAL_TYPE_USER, "role": ROLE_ORG_MEMBER},
+            json={"principal_id": "multi-user", "principal_type": PRINCIPAL_TYPE_USER, "role": ROLE_ORG_TENANT_ADMIN},
             headers=headers,
         )
 
@@ -403,7 +401,7 @@ class TestOrganizationMemberRoutes:
         multi_member = next((m for m in members if m["principal_id"] == "multi-user"), None)
         assert multi_member is not None
         role_values = [r["role"] for r in multi_member["roles"]]
-        assert ROLE_ORG_MEMBER in role_values
+        assert ROLE_ORG_TENANT_ADMIN in role_values
         assert ROLE_ORG_TENANT_CREATOR in role_values
 
     def test_set_member_duplicate_role(self, test_client: TestClient) -> None:
@@ -417,7 +415,7 @@ class TestOrganizationMemberRoutes:
         member_data = {
             "principal_id": "dup-member",
             "principal_type": PRINCIPAL_TYPE_USER,
-            "role": ROLE_ORG_MEMBER,
+            "role": ROLE_ORG_TENANT_CREATOR,
         }
 
         # First add succeeds
@@ -467,7 +465,7 @@ class TestOrganizationMemberRoutes:
         member_data = {
             "principal_id": "inv-member",
             "principal_type": "INVALID_TYPE",
-            "role": ROLE_ORG_MEMBER,
+            "role": ROLE_ORG_TENANT_CREATOR,
         }
         response = test_client.post(
             ENDPOINT_ORGANIZATION_MEMBERS.format(organization_id=org_id),
@@ -487,7 +485,7 @@ class TestOrganizationMemberRoutes:
         # Missing principal_id
         resp1 = test_client.post(
             ENDPOINT_ORGANIZATION_MEMBERS.format(organization_id=org_id),
-            json={"principal_type": PRINCIPAL_TYPE_USER, "role": ROLE_ORG_MEMBER},
+            json={"principal_type": PRINCIPAL_TYPE_USER, "role": ROLE_ORG_TENANT_CREATOR},
             headers=headers,
         )
         assert resp1.status_code == 422
@@ -503,7 +501,7 @@ class TestOrganizationMemberRoutes:
         # Missing principal_type
         resp3 = test_client.post(
             ENDPOINT_ORGANIZATION_MEMBERS.format(organization_id=org_id),
-            json={"principal_id": "some-user", "role": ROLE_ORG_MEMBER},
+            json={"principal_id": "some-user", "role": ROLE_ORG_TENANT_CREATOR},
             headers=headers,
         )
         assert resp3.status_code == 422
@@ -524,14 +522,14 @@ class TestOrganizationMemberRoutes:
         member_data = {
             "principal_id": "some-user",
             "principal_type": PRINCIPAL_TYPE_USER,
-            "role": ROLE_ORG_MEMBER,
+            "role": ROLE_ORG_TENANT_CREATOR,
         }
         response = test_client.post(
             ENDPOINT_ORGANIZATION_MEMBERS.format(organization_id=NON_EXISTENT_ID),
             json=member_data,
             headers=headers,
         )
-        assert response.status_code == status.HTTP_404_NOT_FOUND
+        assert response.status_code == status.HTTP_403_FORBIDDEN
 
     def test_set_member_group_principal(self, test_client: TestClient) -> None:
         """Test adding a group principal as org member."""
@@ -544,7 +542,7 @@ class TestOrganizationMemberRoutes:
         member_data = {
             "principal_id": "group-001",
             "principal_type": PRINCIPAL_TYPE_GROUP,
-            "role": ROLE_ORG_MEMBER,
+            "role": ROLE_ORG_TENANT_CREATOR,
         }
         response = test_client.post(
             ENDPOINT_ORGANIZATION_MEMBERS.format(organization_id=org_id),
@@ -565,7 +563,7 @@ class TestOrganizationMemberRoutes:
         # Add a member
         test_client.post(
             ENDPOINT_ORGANIZATION_MEMBERS.format(organization_id=org_id),
-            json={"principal_id": "del-user", "principal_type": PRINCIPAL_TYPE_USER, "role": ROLE_ORG_MEMBER},
+            json={"principal_id": "del-user", "principal_type": PRINCIPAL_TYPE_USER, "role": ROLE_ORG_TENANT_CREATOR},
             headers=headers,
         )
 
@@ -573,7 +571,7 @@ class TestOrganizationMemberRoutes:
         delete_data = {
             "principal_id": "del-user",
             "principal_type": PRINCIPAL_TYPE_USER,
-            "role": ROLE_ORG_MEMBER,
+            "role": ROLE_ORG_TENANT_CREATOR,
         }
         response = test_client.request(
             "DELETE",
@@ -594,7 +592,7 @@ class TestOrganizationMemberRoutes:
         delete_data = {
             "principal_id": "non-existent-user",
             "principal_type": PRINCIPAL_TYPE_USER,
-            "role": ROLE_ORG_MEMBER,
+            "role": ROLE_ORG_TENANT_CREATOR,
         }
         response = test_client.request(
             "DELETE",
@@ -616,7 +614,7 @@ class TestOrganizationMemberRoutes:
         resp = test_client.request(
             "DELETE",
             ENDPOINT_ORGANIZATION_MEMBERS.format(organization_id=org_id),
-            json={"principal_type": PRINCIPAL_TYPE_USER, "role": ROLE_ORG_MEMBER},
+            json={"principal_type": PRINCIPAL_TYPE_USER, "role": ROLE_ORG_TENANT_CREATOR},
             headers=headers,
         )
         assert resp.status_code == 422
@@ -629,7 +627,7 @@ class TestOrganizationMemberRoutes:
         delete_data = {
             "principal_id": "some-user",
             "principal_type": PRINCIPAL_TYPE_USER,
-            "role": ROLE_ORG_MEMBER,
+            "role": ROLE_ORG_TENANT_CREATOR,
         }
         response = test_client.request(
             "DELETE",
@@ -637,7 +635,7 @@ class TestOrganizationMemberRoutes:
             json=delete_data,
             headers=headers,
         )
-        assert response.status_code == status.HTTP_404_NOT_FOUND
+        assert response.status_code == status.HTTP_403_FORBIDDEN
 
 
 class TestOrganizationTenantRoutes:
@@ -657,14 +655,14 @@ class TestOrganizationTenantRoutes:
         assert len(tenants) == 1  # default tenant
 
     def test_list_tenants_org_not_found(self, test_client: TestClient) -> None:
-        """Test listing tenants of a non-existent organization."""
+        """Test listing tenants of a non-existent organization returns 403 (RBAC before handler)."""
         user_token = test_client.create_test_user("org-ten-nf-1", "Org Ten NF")
         headers = create_auth_headers(user_token, use_cache=False)
 
         response = test_client.get(
             ENDPOINT_ORGANIZATION_TENANTS.format(organization_id=NON_EXISTENT_ID), headers=headers
         )
-        assert response.status_code == status.HTTP_404_NOT_FOUND
+        assert response.status_code == status.HTTP_403_FORBIDDEN
 
     def test_create_tenant_success(self, test_client: TestClient) -> None:
         """Test creating a new tenant in the organization."""
@@ -779,7 +777,7 @@ class TestOrganizationTenantRoutes:
         assert response.status_code == 422
 
     def test_create_tenant_org_not_found(self, test_client: TestClient) -> None:
-        """Test creating a tenant in a non-existent organization."""
+        """Test creating a tenant in a non-existent organization returns 403 (RBAC before handler)."""
         user_token = test_client.create_test_user("org-ten-cnf-1", "Org Ten CNF")
         headers = create_auth_headers(user_token, use_cache=False)
 
@@ -789,7 +787,7 @@ class TestOrganizationTenantRoutes:
             json=tenant_data,
             headers=headers,
         )
-        assert response.status_code == status.HTTP_404_NOT_FOUND
+        assert response.status_code == status.HTTP_403_FORBIDDEN
 
     def test_delete_tenant_success(self, test_client: TestClient) -> None:
         """Test deleting a non-default tenant from the organization."""

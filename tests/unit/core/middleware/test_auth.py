@@ -377,6 +377,7 @@ class TestCheckPermissionsDecorator:
         mock_request = Mock(spec=Request)
         mock_request.state = Mock()
         mock_request.state.user = Mock()
+        mock_request.state.organization_context = None
         mock_request.path_params = {}
 
         @check_permissions(entity="tenant", required_permissions=[TenantRolesEnum.READER])
@@ -398,6 +399,7 @@ class TestCheckPermissionsDecorator:
         mock_request = Mock(spec=Request)
         mock_request.state = Mock()
         mock_request.state.user = mock_user
+        mock_request.state.organization_context = None
         mock_request.path_params = {"tenant_id": "tenant-123"}
 
         @check_permissions(entity="tenant", required_permissions=[TenantRolesEnum.READER])
@@ -418,6 +420,7 @@ class TestCheckPermissionsDecorator:
         mock_request = Mock(spec=Request)
         mock_request.state = Mock()
         mock_request.state.user = mock_user
+        mock_request.state.organization_context = None
         mock_request.path_params = {"tenant_id": "tenant-123"}
 
         @check_permissions(entity="tenant", required_permissions=[TenantRolesEnum.READER])
@@ -429,16 +432,17 @@ class TestCheckPermissionsDecorator:
 
     @pytest.mark.asyncio
     async def test_check_permissions_global_admin_bypass(self):
-        """Test that GLOBAL_ADMIN bypasses resource-level checks."""
+        """Test that TENANT_GLOBAL_ADMIN bypasses resource-level checks."""
         mock_user = Mock()
         mock_user.identity.get_id.return_value = "user-123"
         mock_user.groups = []
         mock_user.custom_groups = []
-        mock_user.tenants = [{"tenant": {"id": "tenant-123"}, "roles": [TenantRolesEnum.GLOBAL_ADMIN.value]}]
+        mock_user.tenants = [{"tenant": {"id": "tenant-123"}, "roles": [TenantRolesEnum.TENANT_GLOBAL_ADMIN.value]}]
 
         mock_request = Mock(spec=Request)
         mock_request.state = Mock()
         mock_request.state.user = mock_user
+        mock_request.state.organization_context = None
         mock_request.path_params = {"tenant_id": "tenant-123", "chat_agent_id": "app-123"}
 
         @check_permissions(entity="chat_agent", required_permissions=[PermissionActionEnum.WRITE])
@@ -455,6 +459,7 @@ class TestCheckPermissionsDecorator:
         mock_request = Mock(spec=Request)
         mock_request.state = Mock()
         mock_request.state.user = mock_user
+        mock_request.state.organization_context = None
         mock_request.path_params = {"tenant_id": "tenant-123"}
 
         @check_permissions(entity="unsupported_entity", required_permissions=[PermissionActionEnum.READ])

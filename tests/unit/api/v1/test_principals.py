@@ -13,7 +13,7 @@ ENDPOINT_PRINCIPAL_REFRESH = "/api/v1/platform-service/tenants/{tenant_id}/princ
 ENDPOINT_PRINCIPAL_STATUS = "/api/v1/platform-service/tenants/{tenant_id}/principals/{principal_id}/status"
 
 # Constants
-ROLE_GLOBAL_ADMIN = "GLOBAL_ADMIN"
+ROLE_TENANT_GLOBAL_ADMIN = "TENANT_GLOBAL_ADMIN"
 ROLE_READER = "READER"
 PRINCIPAL_TYPE_USER = "IDENTITY_USER"
 PRINCIPAL_TYPE_GROUP = "IDENTITY_GROUP"

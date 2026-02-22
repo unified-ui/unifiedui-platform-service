@@ -34,7 +34,7 @@ class SetPrincipalRequest(BaseModel):
 
     principal_id: str = Field(..., description="ID of the principal (user or group)")
     principal_type: str = Field(..., description="Type of principal (IDENTITY_USER, IDENTITY_GROUP, CUSTOM_GROUP)")
-    role: str = Field(..., description="Role to assign (e.g., GLOBAL_ADMIN, READER, CHAT_AGENTS_ADMIN, etc.)")
+    role: str = Field(..., description="Role to assign (e.g., TENANT_GLOBAL_ADMIN, READER, CHAT_AGENTS_ADMIN, etc.)")
 
     @field_validator("principal_type")
     @classmethod
@@ -57,7 +57,7 @@ class SetPrincipalRequest(BaseModel):
     model_config = {
         "json_schema_extra": {
             "examples": [
-                {"principal_id": "id", "principal_type": "IDENTITY_USER", "role": "GLOBAL_ADMIN"},
+                {"principal_id": "id", "principal_type": "IDENTITY_USER", "role": "TENANT_GLOBAL_ADMIN"},
                 {"principal_id": "id", "principal_type": "IDENTITY_GROUP", "role": "READER"},
             ]
         }
@@ -69,7 +69,7 @@ class DeletePrincipalRequest(BaseModel):
 
     principal_id: str = Field(..., description="ID of the principal (user or group)")
     principal_type: str = Field(..., description="Type of principal (IDENTITY_USER, IDENTITY_GROUP, CUSTOM_GROUP)")
-    role: str = Field(..., description="Role to remove (e.g., GLOBAL_ADMIN, READER, CHAT_AGENTS_ADMIN, etc.)")
+    role: str = Field(..., description="Role to remove (e.g., TENANT_GLOBAL_ADMIN, READER, CHAT_AGENTS_ADMIN, etc.)")
 
     @field_validator("principal_type")
     @classmethod
@@ -91,6 +91,6 @@ class DeletePrincipalRequest(BaseModel):
 
     model_config = {
         "json_schema_extra": {
-            "examples": [{"principal_id": "id", "principal_type": "IDENTITY_USER", "role": "GLOBAL_ADMIN"}]
+            "examples": [{"principal_id": "id", "principal_type": "IDENTITY_USER", "role": "TENANT_GLOBAL_ADMIN"}]
         }
     }

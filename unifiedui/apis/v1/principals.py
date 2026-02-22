@@ -116,7 +116,7 @@ async def get_principal_permissions(
     description="Add or update a role for a principal on a tenant",
 )
 @authenticate()
-@check_permissions(entity="tenant", required_permissions=[TenantRolesEnum.GLOBAL_ADMIN])
+@check_permissions(entity="tenant", required_permissions=[TenantRolesEnum.TENANT_GLOBAL_ADMIN])
 async def set_principal_permission(
     request: Request,
     tenant_id: str,
@@ -160,7 +160,7 @@ async def set_principal_permission(
     description="Remove a specific role from a principal on a tenant",
 )
 @authenticate()
-@check_permissions(entity="tenant", required_permissions=[TenantRolesEnum.GLOBAL_ADMIN])
+@check_permissions(entity="tenant", required_permissions=[TenantRolesEnum.TENANT_GLOBAL_ADMIN])
 async def delete_principal_permission(
     request: Request,
     tenant_id: str,
@@ -202,7 +202,7 @@ async def delete_principal_permission(
     description="Refresh a principal's data from the identity provider",
 )
 @authenticate()
-@check_permissions(entity="tenant", required_permissions=[TenantRolesEnum.GLOBAL_ADMIN])
+@check_permissions(entity="tenant", required_permissions=[TenantRolesEnum.TENANT_GLOBAL_ADMIN])
 async def refresh_principal(
     request: Request,
     tenant_id: str,
@@ -227,7 +227,7 @@ async def refresh_principal(
         PrincipalResponse: The refreshed principal data
 
     Raises:
-        PermissionDeniedError: If user doesn't have GLOBAL_ADMIN role
+        PermissionDeniedError: If user doesn't have TENANT_GLOBAL_ADMIN role
         ValueError: If principal type is invalid
     """
     user: ContextIdentityUser = request.state.user
@@ -241,10 +241,10 @@ async def refresh_principal(
     response_model=PrincipalResponse,
     status_code=status.HTTP_200_OK,
     summary="Update Principal Status",
-    description="Update a principal's is_active status (GLOBAL_ADMIN only)",
+    description="Update a principal's is_active status (TENANT_GLOBAL_ADMIN only)",
 )
 @authenticate()
-@check_permissions(entity="tenant", required_permissions=[TenantRolesEnum.GLOBAL_ADMIN])
+@check_permissions(entity="tenant", required_permissions=[TenantRolesEnum.TENANT_GLOBAL_ADMIN])
 async def update_principal_status(
     request: Request,
     tenant_id: str,
@@ -255,7 +255,7 @@ async def update_principal_status(
     """
     Update a principal's is_active status.
 
-    Only GLOBAL_ADMIN users can activate/deactivate principals.
+    Only TENANT_GLOBAL_ADMIN users can activate/deactivate principals.
     Deactivated principals cannot access any resources in the tenant.
 
     Args:
@@ -269,7 +269,7 @@ async def update_principal_status(
         PrincipalResponse: The updated principal data
 
     Raises:
-        PermissionDeniedError: If user doesn't have GLOBAL_ADMIN role
+        PermissionDeniedError: If user doesn't have TENANT_GLOBAL_ADMIN role
         ValueError: If principal is not found
     """
     return handler.update_principal_status(tenant_id=tenant_id, principal_id=principal_id, is_active=body.is_active)

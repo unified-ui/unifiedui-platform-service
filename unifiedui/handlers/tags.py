@@ -338,7 +338,7 @@ class TagHandler:
         """
         Delete a tag.
 
-        Permission check (GLOBAL_ADMIN or creator) is handled by @check_permissions decorator.
+        Permission check (TENANT_GLOBAL_ADMIN or creator) is handled by @check_permissions decorator.
 
         Args:
             tenant_id: The ID of the tenant

@@ -2,9 +2,10 @@
 
 from typing import TYPE_CHECKING
 
-from fastapi import APIRouter, Depends, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 
-from unifiedui.core.middleware.apis.v1.auth import authenticate
+from unifiedui.core.database.enums import OrganizationRoleEnum
+from unifiedui.core.middleware.apis.v1.auth import authenticate, check_permissions
 from unifiedui.handlers.dependencies import get_organization_handler
 from unifiedui.handlers.organizations import OrganizationHandler
 from unifiedui.schema.requests.organizations import (
@@ -26,6 +27,17 @@ if TYPE_CHECKING:
 
 router = APIRouter()
 
+ORG_GLOBAL_ADMIN_ROLES = [
+    OrganizationRoleEnum.ORGANISATION_GLOBAL_ADMIN.value,
+]
+
+ORG_TENANT_MANAGE_ROLES = [
+    OrganizationRoleEnum.ORGANISATION_GLOBAL_ADMIN.value,
+    OrganizationRoleEnum.ORGANISATION_TENANT_ADMIN.value,
+]
+
+ORG_ALL_ROLES = [role.value for role in OrganizationRoleEnum]
+
 
 # ---------- Organization CRUD ----------
 
@@ -38,6 +50,7 @@ router = APIRouter()
     description="Get a specific organization by ID",
 )
 @authenticate()
+@check_permissions(entity="organization", required_org_roles=ORG_ALL_ROLES)
 async def get_organization(
     request: Request,
     organization_id: str,
@@ -52,7 +65,7 @@ async def get_organization(
     response_model=OrganizationResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Create Organization",
-    description="Create a new organization with a default tenant",
+    description="Create a new organization with a default tenant (restricted to system admin emails)",
 )
 @authenticate()
 async def create_organization(
@@ -63,7 +76,17 @@ async def create_organization(
     """Create a new organization with a default tenant."""
     user: ContextIdentityUser = request.state.user
     user_id = user.identity.get_id()
-    return handler.create_organization(org_data, user_id)
+    user_mail = user.identity.get_mail()
+
+    from unifiedui.core.config import settings
+
+    if settings.system_admin_emails and (not user_mail or user_mail not in settings.system_admin_emails):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied: Only system administrators can create organizations",
+        )
+
+    return handler.create_organization(org_data, user_id, user=user)
 
 
 @router.patch(
@@ -74,6 +97,7 @@ async def create_organization(
     description="Update an existing organization",
 )
 @authenticate()
+@check_permissions(entity="organization", required_org_roles=ORG_GLOBAL_ADMIN_ROLES)
 async def update_organization(
     request: Request,
     organization_id: str,
@@ -97,6 +121,7 @@ async def update_organization(
     description="List all members of an organization",
 )
 @authenticate()
+@check_permissions(entity="organization", required_org_roles=ORG_GLOBAL_ADMIN_ROLES)
 async def list_organization_members(
     request: Request,
     organization_id: str,
@@ -114,6 +139,7 @@ async def list_organization_members(
     description="Add or set a member role in the organization",
 )
 @authenticate()
+@check_permissions(entity="organization", required_org_roles=ORG_GLOBAL_ADMIN_ROLES)
 async def set_organization_member(
     request: Request,
     organization_id: str,
@@ -133,6 +159,7 @@ async def set_organization_member(
     description="Remove a member role from the organization",
 )
 @authenticate()
+@check_permissions(entity="organization", required_org_roles=ORG_GLOBAL_ADMIN_ROLES)
 async def delete_organization_member(
     request: Request,
     organization_id: str,
@@ -154,6 +181,7 @@ async def delete_organization_member(
     description="List all tenants in an organization",
 )
 @authenticate()
+@check_permissions(entity="organization", required_org_roles=ORG_ALL_ROLES)
 async def list_organization_tenants(
     request: Request,
     organization_id: str,
@@ -171,6 +199,7 @@ async def list_organization_tenants(
     description="Create a new tenant within an organization",
 )
 @authenticate()
+@check_permissions(entity="organization", required_org_roles=ORG_ALL_ROLES)
 async def create_tenant_in_organization(
     request: Request,
     organization_id: str,
@@ -190,6 +219,7 @@ async def create_tenant_in_organization(
     description="Delete a tenant within an organization",
 )
 @authenticate()
+@check_permissions(entity="organization", required_org_roles=ORG_TENANT_MANAGE_ROLES)
 async def delete_tenant_in_organization(
     request: Request,
     organization_id: str,

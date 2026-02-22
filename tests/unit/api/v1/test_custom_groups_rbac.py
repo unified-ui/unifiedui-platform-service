@@ -461,7 +461,7 @@ class TestCustomGroupRBAC:
         assert update_response2.status_code == status.HTTP_403_FORBIDDEN
 
     def test_tenant_global_admin_bypasses_custom_group_permissions(self, test_client: TestClient) -> None:
-        """Test that tenant GLOBAL_ADMIN can access all custom groups regardless of group membership."""
+        """Test that tenant TENANT_GLOBAL_ADMIN can access all custom groups regardless of group membership."""
         # User A creates tenant and custom group
         user_a_token = test_client.create_test_user("tenant-admin", "Tenant Admin")
         headers_a = create_auth_headers(user_a_token, use_cache=False)
@@ -485,13 +485,13 @@ class TestCustomGroupRBAC:
         # User B creates a private custom group
         group_id = create_custom_group(test_client, tenant_id, headers_b, "Private Group")
 
-        # User A (tenant GLOBAL_ADMIN) CAN access the group even though not explicitly a member
+        # User A (tenant TENANT_GLOBAL_ADMIN) CAN access the group even though not explicitly a member
         get_response = test_client.get(
             ENDPOINT_CUSTOM_GROUP_DETAIL.format(tenant_id=tenant_id, custom_group_id=group_id), headers=headers_a
         )
         assert get_response.status_code == status.HTTP_200_OK
 
-        # User A (tenant GLOBAL_ADMIN) CAN update the group
+        # User A (tenant TENANT_GLOBAL_ADMIN) CAN update the group
         update_response = test_client.patch(
             ENDPOINT_CUSTOM_GROUP_DETAIL.format(tenant_id=tenant_id, custom_group_id=group_id),
             json={"name": "Updated by Tenant Admin"},
@@ -499,7 +499,7 @@ class TestCustomGroupRBAC:
         )
         assert update_response.status_code == status.HTTP_200_OK
 
-        # User A (tenant GLOBAL_ADMIN) CAN manage principals
+        # User A (tenant TENANT_GLOBAL_ADMIN) CAN manage principals
         add_response = test_client.put(
             ENDPOINT_CUSTOM_GROUP_PRINCIPALS.format(tenant_id=tenant_id, custom_group_id=group_id),
             json={"principal_id": "new-user", "principal_type": PRINCIPAL_TYPE_USER, "role": ROLE_READ},
@@ -507,7 +507,7 @@ class TestCustomGroupRBAC:
         )
         assert add_response.status_code == status.HTTP_200_OK
 
-        # User A (tenant GLOBAL_ADMIN) CAN delete the group
+        # User A (tenant TENANT_GLOBAL_ADMIN) CAN delete the group
         delete_response = test_client.request(
             "DELETE",
             ENDPOINT_CUSTOM_GROUP_DETAIL.format(tenant_id=tenant_id, custom_group_id=group_id),

@@ -53,7 +53,7 @@ async def list_chat_widgets(
     List chat widgets for a tenant.
 
     Users see only chat widgets they have permissions for, unless they have
-    GLOBAL_ADMIN or CHAT_WIDGETS_ADMIN on tenant level.
+    TENANT_GLOBAL_ADMIN or CHAT_WIDGETS_ADMIN on tenant level.
 
     Args:
         request: FastAPI request with user in state
@@ -117,7 +117,7 @@ async def list_chat_widgets(
 @check_permissions(
     entity="tenant",
     required_permissions=[
-        TenantRolesEnum.GLOBAL_ADMIN,
+        TenantRolesEnum.TENANT_GLOBAL_ADMIN,
         TenantRolesEnum.CHAT_WIDGETS_ADMIN,
         TenantRolesEnum.CHAT_WIDGETS_CREATOR,
     ],
@@ -166,7 +166,7 @@ async def create_chat_widget(
 @check_permissions(
     entity="chat_widget",
     required_permissions=[
-        TenantRolesEnum.GLOBAL_ADMIN,
+        TenantRolesEnum.TENANT_GLOBAL_ADMIN,
         TenantRolesEnum.CHAT_WIDGETS_ADMIN,
         PermissionActionEnum.ADMIN,
         PermissionActionEnum.WRITE,
@@ -216,7 +216,7 @@ async def get_chat_widget(
 @check_permissions(
     entity="chat_widget",
     required_permissions=[
-        TenantRolesEnum.GLOBAL_ADMIN,
+        TenantRolesEnum.TENANT_GLOBAL_ADMIN,
         TenantRolesEnum.CHAT_WIDGETS_ADMIN,
         PermissionActionEnum.ADMIN,
         PermissionActionEnum.WRITE,
@@ -273,7 +273,11 @@ async def update_chat_widget(
 @authenticate()
 @check_permissions(
     entity="chat_widget",
-    required_permissions=[TenantRolesEnum.GLOBAL_ADMIN, TenantRolesEnum.CHAT_WIDGETS_ADMIN, PermissionActionEnum.ADMIN],
+    required_permissions=[
+        TenantRolesEnum.TENANT_GLOBAL_ADMIN,
+        TenantRolesEnum.CHAT_WIDGETS_ADMIN,
+        PermissionActionEnum.ADMIN,
+    ],
 )
 async def delete_chat_widget(
     request: Request, tenant_id: str, chat_widget_id: str, handler: ChatWidgetHandler = Depends(get_chat_widget_handler)
@@ -322,7 +326,7 @@ async def delete_chat_widget(
 @check_permissions(
     entity="chat_widget",
     required_permissions=[
-        TenantRolesEnum.GLOBAL_ADMIN,
+        TenantRolesEnum.TENANT_GLOBAL_ADMIN,
         TenantRolesEnum.CHAT_WIDGETS_ADMIN,
         PermissionActionEnum.ADMIN,
         PermissionActionEnum.WRITE,
@@ -404,7 +408,7 @@ async def list_chat_widget_permissions(
 @check_permissions(
     entity="chat_widget",
     required_permissions=[
-        TenantRolesEnum.GLOBAL_ADMIN,
+        TenantRolesEnum.TENANT_GLOBAL_ADMIN,
         TenantRolesEnum.CHAT_WIDGETS_ADMIN,
         PermissionActionEnum.ADMIN,
         PermissionActionEnum.WRITE,
@@ -466,7 +470,11 @@ async def get_chat_widget_permission(
 @authenticate()
 @check_permissions(
     entity="chat_widget",
-    required_permissions=[TenantRolesEnum.GLOBAL_ADMIN, TenantRolesEnum.CHAT_WIDGETS_ADMIN, PermissionActionEnum.ADMIN],
+    required_permissions=[
+        TenantRolesEnum.TENANT_GLOBAL_ADMIN,
+        TenantRolesEnum.CHAT_WIDGETS_ADMIN,
+        PermissionActionEnum.ADMIN,
+    ],
 )
 async def set_chat_widget_permission(
     request: Request,
@@ -527,7 +535,11 @@ async def set_chat_widget_permission(
 @authenticate()
 @check_permissions(
     entity="chat_widget",
-    required_permissions=[TenantRolesEnum.GLOBAL_ADMIN, TenantRolesEnum.CHAT_WIDGETS_ADMIN, PermissionActionEnum.ADMIN],
+    required_permissions=[
+        TenantRolesEnum.TENANT_GLOBAL_ADMIN,
+        TenantRolesEnum.CHAT_WIDGETS_ADMIN,
+        PermissionActionEnum.ADMIN,
+    ],
 )
 async def delete_chat_widget_permission(
     request: Request,

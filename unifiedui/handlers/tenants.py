@@ -139,7 +139,7 @@ class TenantHandler:
 
     def create_tenant(self, request: CreateTenantRequest, user_id: str, user: ContextIdentityUser) -> TenantResponse:
         """
-        Create a new tenant and assign the creator as GLOBAL_ADMIN.
+        Create a new tenant and assign the creator as TENANT_GLOBAL_ADMIN.
 
         Resolves the organization from the user's identity context.
         The tenant is created within the user's organization.
@@ -178,13 +178,13 @@ class TenantHandler:
                 session=session, tenant_id=tenant_id, principal_id=user_id, principal_type="IDENTITY_USER", user=user
             )
 
-            # Create GLOBAL_ADMIN role for the creator
+            # Create TENANT_GLOBAL_ADMIN role for the creator
             role_id = str(uuid.uuid4())
             tenant_role = TenantMember(
                 id=role_id,
                 tenant_id=tenant_id,
                 principal_id=user_id,
-                role="GLOBAL_ADMIN",
+                role="TENANT_GLOBAL_ADMIN",
                 created_by=user_id,
                 updated_by=user_id,
             )
@@ -193,7 +193,7 @@ class TenantHandler:
 
             # Commit happens automatically in context manager
             logger.info(
-                "Tenant created with GLOBAL_ADMIN role",
+                "Tenant created with TENANT_GLOBAL_ADMIN role",
                 extra={"tenant_id": tenant_id, "user_id": user_id, "role_id": role_id},
             )
 

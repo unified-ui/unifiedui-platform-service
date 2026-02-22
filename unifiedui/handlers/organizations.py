@@ -85,7 +85,9 @@ class OrganizationHandler:
                 return None
             return self._org_to_response(org)
 
-    def create_organization(self, request: CreateOrganizationRequest, user_id: str) -> OrganizationResponse:
+    def create_organization(
+        self, request: CreateOrganizationRequest, user_id: str, user: ContextIdentityUser | None = None
+    ) -> OrganizationResponse:
         """Create a new organization with a default tenant."""
         logger.info("Creating organization", extra={"org_name": request.name, "user_id": user_id})
 
@@ -133,12 +135,22 @@ class OrganizationHandler:
             session.add(default_tenant)
             session.flush()
 
-            # Assign creator as GLOBAL_ADMIN on the default tenant
+            # Ensure principal exists for the creator
+            if user is not None:
+                ensure_principal_exists(
+                    session=session,
+                    tenant_id=default_tenant_id,
+                    principal_id=user_id,
+                    principal_type="IDENTITY_USER",
+                    user=user,
+                )
+
+            # Assign creator as TENANT_GLOBAL_ADMIN on the default tenant
             tenant_role = TenantMember(
                 id=str(uuid.uuid4()),
                 tenant_id=default_tenant_id,
                 principal_id=user_id,
-                role="GLOBAL_ADMIN",
+                role="TENANT_GLOBAL_ADMIN",
                 created_by=user_id,
                 updated_by=user_id,
             )
@@ -382,7 +394,7 @@ class OrganizationHandler:
             session.add(tenant)
             session.flush()
 
-            # Ensure principal exists and assign GLOBAL_ADMIN on the new tenant
+            # Ensure principal exists and assign TENANT_GLOBAL_ADMIN on the new tenant
             ensure_principal_exists(
                 session=session,
                 tenant_id=tenant_id,
@@ -395,7 +407,7 @@ class OrganizationHandler:
                 id=str(uuid.uuid4()),
                 tenant_id=tenant_id,
                 principal_id=user_id,
-                role="GLOBAL_ADMIN",
+                role="TENANT_GLOBAL_ADMIN",
                 created_by=user_id,
                 updated_by=user_id,
             )

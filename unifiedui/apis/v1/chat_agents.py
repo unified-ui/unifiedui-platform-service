@@ -55,7 +55,7 @@ async def list_chat_agents(
     List chat agents for a tenant.
 
     Users see only chat agents they have permissions for, unless they have
-    GLOBAL_ADMIN or CHAT_AGENTS_ADMIN on tenant level.
+    TENANT_GLOBAL_ADMIN or CHAT_AGENTS_ADMIN on tenant level.
 
     Args:
         request: FastAPI request with user in state
@@ -125,7 +125,7 @@ async def list_chat_agents(
 @check_permissions(
     entity="tenant",
     required_permissions=[
-        TenantRolesEnum.GLOBAL_ADMIN,
+        TenantRolesEnum.TENANT_GLOBAL_ADMIN,
         TenantRolesEnum.CHAT_AGENTS_ADMIN,
         TenantRolesEnum.CHAT_AGENTS_CREATOR,
     ],
@@ -174,7 +174,7 @@ async def create_chat_agent(
 @check_permissions(
     entity="chat_agent",
     required_permissions=[
-        TenantRolesEnum.GLOBAL_ADMIN,
+        TenantRolesEnum.TENANT_GLOBAL_ADMIN,
         TenantRolesEnum.CHAT_AGENTS_ADMIN,
         PermissionActionEnum.ADMIN,
         PermissionActionEnum.WRITE,
@@ -224,7 +224,7 @@ async def get_chat_agent(
 @check_permissions(
     entity="chat_agent",
     required_permissions=[
-        TenantRolesEnum.GLOBAL_ADMIN,
+        TenantRolesEnum.TENANT_GLOBAL_ADMIN,
         TenantRolesEnum.CHAT_AGENTS_ADMIN,
         PermissionActionEnum.ADMIN,
         PermissionActionEnum.WRITE,
@@ -281,7 +281,11 @@ async def update_chat_agent(
 @authenticate()
 @check_permissions(
     entity="chat_agent",
-    required_permissions=[TenantRolesEnum.GLOBAL_ADMIN, TenantRolesEnum.CHAT_AGENTS_ADMIN, PermissionActionEnum.ADMIN],
+    required_permissions=[
+        TenantRolesEnum.TENANT_GLOBAL_ADMIN,
+        TenantRolesEnum.CHAT_AGENTS_ADMIN,
+        PermissionActionEnum.ADMIN,
+    ],
 )
 async def delete_chat_agent(
     request: Request, tenant_id: str, chat_agent_id: str, handler: ChatAgentHandler = Depends(get_chat_agent_handler)
@@ -330,7 +334,7 @@ async def delete_chat_agent(
 @check_permissions(
     entity="chat_agent",
     required_permissions=[
-        TenantRolesEnum.GLOBAL_ADMIN,
+        TenantRolesEnum.TENANT_GLOBAL_ADMIN,
         TenantRolesEnum.CHAT_AGENTS_ADMIN,
         PermissionActionEnum.ADMIN,
         PermissionActionEnum.WRITE,
@@ -398,7 +402,7 @@ async def get_chat_agent_config(
 @check_permissions(
     entity="chat_agent",
     required_permissions=[
-        TenantRolesEnum.GLOBAL_ADMIN,
+        TenantRolesEnum.TENANT_GLOBAL_ADMIN,
         TenantRolesEnum.CHAT_AGENTS_ADMIN,
         PermissionActionEnum.ADMIN,
         PermissionActionEnum.WRITE,
@@ -480,7 +484,7 @@ async def list_chat_agent_permissions(
 @check_permissions(
     entity="chat_agent",
     required_permissions=[
-        TenantRolesEnum.GLOBAL_ADMIN,
+        TenantRolesEnum.TENANT_GLOBAL_ADMIN,
         TenantRolesEnum.CHAT_AGENTS_ADMIN,
         PermissionActionEnum.ADMIN,
         PermissionActionEnum.WRITE,
@@ -542,7 +546,11 @@ async def get_chat_agent_permission(
 @authenticate()
 @check_permissions(
     entity="chat_agent",
-    required_permissions=[TenantRolesEnum.GLOBAL_ADMIN, TenantRolesEnum.CHAT_AGENTS_ADMIN, PermissionActionEnum.ADMIN],
+    required_permissions=[
+        TenantRolesEnum.TENANT_GLOBAL_ADMIN,
+        TenantRolesEnum.CHAT_AGENTS_ADMIN,
+        PermissionActionEnum.ADMIN,
+    ],
 )
 async def set_chat_agent_permission(
     request: Request,
@@ -603,7 +611,11 @@ async def set_chat_agent_permission(
 @authenticate()
 @check_permissions(
     entity="chat_agent",
-    required_permissions=[TenantRolesEnum.GLOBAL_ADMIN, TenantRolesEnum.CHAT_AGENTS_ADMIN, PermissionActionEnum.ADMIN],
+    required_permissions=[
+        TenantRolesEnum.TENANT_GLOBAL_ADMIN,
+        TenantRolesEnum.CHAT_AGENTS_ADMIN,
+        PermissionActionEnum.ADMIN,
+    ],
 )
 async def delete_chat_agent_permission(
     request: Request,

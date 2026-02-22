@@ -118,7 +118,7 @@ class ToolHandler:
 
         logger.info("Listing tools", extra={"tenant_id": tenant_id, "skip": skip, "limit": limit})
 
-        # Check if user is admin (has GLOBAL_ADMIN or REACT_AGENT_ADMIN)
+        # Check if user is admin (has TENANT_GLOBAL_ADMIN or REACT_AGENT_ADMIN)
         user_id = user.identity.get_id()
         user_tenants = user.tenants
         matching_tenant = next((t for t in user_tenants if t["tenant"]["id"] == tenant_id), None)
@@ -126,7 +126,7 @@ class ToolHandler:
         is_admin = False
         if matching_tenant:
             user_roles = matching_tenant["roles"]
-            admin_permissions = [TenantRolesEnum.GLOBAL_ADMIN.value, TenantRolesEnum.REACT_AGENT_ADMIN.value]
+            admin_permissions = [TenantRolesEnum.TENANT_GLOBAL_ADMIN.value, TenantRolesEnum.REACT_AGENT_ADMIN.value]
             is_admin = any(perm in user_roles for perm in admin_permissions)
 
         # Only get group IDs if not admin
@@ -669,7 +669,7 @@ class ToolHandler:
         """
         from unifiedui.core.database.enums import TenantRolesEnum
 
-        if check_is_admin(user, tenant_id, [TenantRolesEnum.GLOBAL_ADMIN, TenantRolesEnum.REACT_AGENT_ADMIN]):
+        if check_is_admin(user, tenant_id, [TenantRolesEnum.TENANT_GLOBAL_ADMIN, TenantRolesEnum.REACT_AGENT_ADMIN]):
             return PermissionActionEnum.ADMIN.value
         principal_ids = get_principal_ids(user)
         return resolve_my_permission(session, ToolMember, "tool_id", tenant_id, tool_id, principal_ids)

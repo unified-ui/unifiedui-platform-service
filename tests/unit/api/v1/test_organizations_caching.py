@@ -16,9 +16,9 @@ ENDPOINT_ORGANIZATION_TENANTS = "/api/v1/platform-service/organizations/{organiz
 ENDPOINT_ORGANIZATION_TENANT_DETAIL = "/api/v1/platform-service/organizations/{organization_id}/tenants/{tenant_id}"
 
 # Organization Roles
-ROLE_ORG_GLOBAL_ADMIN = OrganizationRoleEnum.ORGANISATION_GLOBAL_ADMIN.value
-ROLE_ORG_ADMIN = OrganizationRoleEnum.ORGANISATION_ADMIN.value
-ROLE_ORG_MEMBER = OrganizationRoleEnum.ORGANISATION_MEMBER.value
+ROLE_ORG_TENANT_GLOBAL_ADMIN = OrganizationRoleEnum.ORGANISATION_GLOBAL_ADMIN.value
+ROLE_ORG_TENANT_ADMIN = OrganizationRoleEnum.ORGANISATION_TENANT_ADMIN.value
+ROLE_ORG_TENANT_CREATOR = OrganizationRoleEnum.ORGANISATION_TENANT_CREATOR.value
 
 # Principal Types
 PRINCIPAL_TYPE_USER = PrincipalTypeEnum.IDENTITY_USER.value
@@ -112,7 +112,11 @@ class TestOrganizationCaching:
         # Add a member
         test_client.post(
             ENDPOINT_ORGANIZATION_MEMBERS.format(organization_id=org_id),
-            json={"principal_id": "cache-new-user", "principal_type": PRINCIPAL_TYPE_USER, "role": ROLE_ORG_MEMBER},
+            json={
+                "principal_id": "cache-new-user",
+                "principal_type": PRINCIPAL_TYPE_USER,
+                "role": ROLE_ORG_TENANT_CREATOR,
+            },
             headers=headers,
         )
 
@@ -132,7 +136,11 @@ class TestOrganizationCaching:
         # Add a member
         test_client.post(
             ENDPOINT_ORGANIZATION_MEMBERS.format(organization_id=org_id),
-            json={"principal_id": "cache-rm-user", "principal_type": PRINCIPAL_TYPE_USER, "role": ROLE_ORG_MEMBER},
+            json={
+                "principal_id": "cache-rm-user",
+                "principal_type": PRINCIPAL_TYPE_USER,
+                "role": ROLE_ORG_TENANT_CREATOR,
+            },
             headers=headers,
         )
 
@@ -145,7 +153,11 @@ class TestOrganizationCaching:
         test_client.request(
             "DELETE",
             ENDPOINT_ORGANIZATION_MEMBERS.format(organization_id=org_id),
-            json={"principal_id": "cache-rm-user", "principal_type": PRINCIPAL_TYPE_USER, "role": ROLE_ORG_MEMBER},
+            json={
+                "principal_id": "cache-rm-user",
+                "principal_type": PRINCIPAL_TYPE_USER,
+                "role": ROLE_ORG_TENANT_CREATOR,
+            },
             headers=headers,
         )
 
@@ -232,7 +244,7 @@ class TestOrganizationCaching:
         # Add member to org1 only
         test_client.post(
             ENDPOINT_ORGANIZATION_MEMBERS.format(organization_id=org1["id"]),
-            json={"principal_id": "iso-user", "principal_type": PRINCIPAL_TYPE_USER, "role": ROLE_ORG_MEMBER},
+            json={"principal_id": "iso-user", "principal_type": PRINCIPAL_TYPE_USER, "role": ROLE_ORG_TENANT_CREATOR},
             headers=headers,
         )
 
@@ -267,7 +279,11 @@ class TestOrganizationCaching:
         # 2. Add member
         test_client.post(
             ENDPOINT_ORGANIZATION_MEMBERS.format(organization_id=org_id),
-            json={"principal_id": "multi-user-a", "principal_type": PRINCIPAL_TYPE_USER, "role": ROLE_ORG_MEMBER},
+            json={
+                "principal_id": "multi-user-a",
+                "principal_type": PRINCIPAL_TYPE_USER,
+                "role": ROLE_ORG_TENANT_CREATOR,
+            },
             headers=headers,
         )
         mem_resp2 = test_client.get(ENDPOINT_ORGANIZATION_MEMBERS.format(organization_id=org_id), headers=headers)
@@ -296,7 +312,11 @@ class TestOrganizationCaching:
         test_client.request(
             "DELETE",
             ENDPOINT_ORGANIZATION_MEMBERS.format(organization_id=org_id),
-            json={"principal_id": "multi-user-a", "principal_type": PRINCIPAL_TYPE_USER, "role": ROLE_ORG_MEMBER},
+            json={
+                "principal_id": "multi-user-a",
+                "principal_type": PRINCIPAL_TYPE_USER,
+                "role": ROLE_ORG_TENANT_CREATOR,
+            },
             headers=headers,
         )
         mem_resp3 = test_client.get(ENDPOINT_ORGANIZATION_MEMBERS.format(organization_id=org_id), headers=headers)

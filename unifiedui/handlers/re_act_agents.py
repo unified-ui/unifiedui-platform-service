@@ -120,7 +120,7 @@ class ReActAgentHandler:
         is_admin = False
         if matching_tenant:
             user_roles = matching_tenant["roles"]
-            admin_permissions = [TenantRolesEnum.GLOBAL_ADMIN.value, TenantRolesEnum.REACT_AGENT_ADMIN.value]
+            admin_permissions = [TenantRolesEnum.TENANT_GLOBAL_ADMIN.value, TenantRolesEnum.REACT_AGENT_ADMIN.value]
             is_admin = any(perm in user_roles for perm in admin_permissions)
 
         identity_group_ids = None
@@ -658,7 +658,7 @@ class ReActAgentHandler:
         """
         from unifiedui.core.database.enums import TenantRolesEnum
 
-        if check_is_admin(user, tenant_id, [TenantRolesEnum.GLOBAL_ADMIN, TenantRolesEnum.REACT_AGENT_ADMIN]):
+        if check_is_admin(user, tenant_id, [TenantRolesEnum.TENANT_GLOBAL_ADMIN, TenantRolesEnum.REACT_AGENT_ADMIN]):
             return PermissionActionEnum.ADMIN.value
         principal_ids = get_principal_ids(user)
         return resolve_my_permission(

@@ -599,7 +599,7 @@ class PrincipalHandler:
     def _get_role_display_name(self, role: str) -> str:
         """Get a human-readable display name for a role."""
         role_display_names = {
-            "GLOBAL_ADMIN": "Global Administrator",
+            "TENANT_GLOBAL_ADMIN": "Global Administrator",
             "READER": "Reader",
             "CUSTOM_GROUPS_ADMIN": "Custom Groups Administrator",
             "CUSTOM_GROUP_CREATOR": "Custom Group Creator",

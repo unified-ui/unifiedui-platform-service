@@ -292,7 +292,7 @@ class TestChatWidgetCaching:
         global_admin_token = test_client.create_test_user("cw-bypass-global", "CW Bypass Global")
         global_admin_headers = create_auth_headers(global_admin_token)
 
-        add_user_to_tenant(test_client, tenant_id, admin_headers, "cw-bypass-global", "GLOBAL_ADMIN")
+        add_user_to_tenant(test_client, tenant_id, admin_headers, "cw-bypass-global", "TENANT_GLOBAL_ADMIN")
 
         # Global admin can access without explicit permission
         response1 = test_client.get(

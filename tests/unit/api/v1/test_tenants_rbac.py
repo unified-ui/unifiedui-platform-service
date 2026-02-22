@@ -19,7 +19,7 @@ ENDPOINT_PRINCIPAL_DETAIL = "/api/v1/platform-service/tenants/{tenant_id}/princi
 NON_EXISTENT_ID = "non-existent-id"
 
 # Roles
-ROLE_GLOBAL_ADMIN = TenantRolesEnum.GLOBAL_ADMIN.value
+ROLE_TENANT_GLOBAL_ADMIN = TenantRolesEnum.TENANT_GLOBAL_ADMIN.value
 ROLE_READER = TenantRolesEnum.READER.value
 ROLE_CHAT_AGENTS_ADMIN = TenantRolesEnum.CHAT_AGENTS_ADMIN.value
 
@@ -32,7 +32,7 @@ class TestTenantRBAC:
     """Test suite for tenant role-based access control."""
 
     def test_creator_becomes_global_admin(self, test_client: TestClient) -> None:
-        """Test that tenant creator automatically becomes GLOBAL_ADMIN."""
+        """Test that tenant creator automatically becomes TENANT_GLOBAL_ADMIN."""
         # Create user and tenant
         user_token = test_client.create_test_user("creator-user", "Creator User")
         headers = create_auth_headers(user_token, use_cache=False)
@@ -45,7 +45,7 @@ class TestTenantRBAC:
         assert response.status_code == status.HTTP_201_CREATED
         tenant_id = response.json()["id"]
 
-        # Verify creator has GLOBAL_ADMIN role
+        # Verify creator has TENANT_GLOBAL_ADMIN role
         principals_response = test_client.get(
             ENDPOINT_PRINCIPAL_DETAIL.format(tenant_id=tenant_id, principal_id="creator-user"), headers=headers
         )
@@ -53,10 +53,10 @@ class TestTenantRBAC:
         assert principals_response.status_code == status.HTTP_200_OK
         data = principals_response.json()
         assert data["principal_id"] == "creator-user"
-        assert ROLE_GLOBAL_ADMIN in data["roles"]
+        assert ROLE_TENANT_GLOBAL_ADMIN in data["roles"]
 
     def test_global_admin_can_update_tenant(self, test_client: TestClient) -> None:
-        """Test that GLOBAL_ADMIN can update tenant."""
+        """Test that TENANT_GLOBAL_ADMIN can update tenant."""
         # Create user and tenant
         user_token = test_client.create_test_user("admin-user", "Admin User")
         headers = create_auth_headers(user_token, use_cache=False)
@@ -75,7 +75,7 @@ class TestTenantRBAC:
         assert update_response.json()["name"] == "Updated Name"
 
     def test_global_admin_can_delete_tenant(self, test_client: TestClient) -> None:
-        """Test that GLOBAL_ADMIN can delete tenant."""
+        """Test that TENANT_GLOBAL_ADMIN can delete tenant."""
         # Create user and tenant
         user_token = test_client.create_test_user("delete-admin", "Delete Admin")
         headers = create_auth_headers(user_token, use_cache=False)
@@ -93,7 +93,7 @@ class TestTenantRBAC:
         assert delete_response.status_code == status.HTTP_204_NO_CONTENT
 
     def test_global_admin_can_manage_principals(self, test_client: TestClient) -> None:
-        """Test that GLOBAL_ADMIN can add/remove principals."""
+        """Test that TENANT_GLOBAL_ADMIN can add/remove principals."""
         # Create admin user and tenant
         admin_token = test_client.create_test_user("principal-admin", "Principal Admin")
         admin_headers = create_auth_headers(admin_token, use_cache=False)
@@ -195,7 +195,7 @@ class TestTenantRBAC:
         )
         assert principals_response.status_code == status.HTTP_200_OK
 
-        # Reader CANNOT update tenant (needs GLOBAL_ADMIN)
+        # Reader CANNOT update tenant (needs TENANT_GLOBAL_ADMIN)
         update_response = test_client.patch(
             ENDPOINT_TENANT_DETAIL.format(tenant_id=tenant_id),
             json={"name": "Hacked by Reader"},
@@ -203,13 +203,13 @@ class TestTenantRBAC:
         )
         assert update_response.status_code == status.HTTP_403_FORBIDDEN
 
-        # Reader CANNOT delete tenant (needs GLOBAL_ADMIN)
+        # Reader CANNOT delete tenant (needs TENANT_GLOBAL_ADMIN)
         delete_response = test_client.request(
             "DELETE", ENDPOINT_TENANT_DETAIL.format(tenant_id=tenant_id), headers=reader_headers
         )
         assert delete_response.status_code == status.HTTP_403_FORBIDDEN
 
-        # Reader CANNOT manage principals (needs GLOBAL_ADMIN)
+        # Reader CANNOT manage principals (needs TENANT_GLOBAL_ADMIN)
         add_principal_response = test_client.put(
             ENDPOINT_TENANT_PRINCIPALS.format(tenant_id=tenant_id),
             json={"principal_id": "another-user", "principal_type": PRINCIPAL_TYPE_USER, "role": ROLE_READER},
@@ -243,19 +243,19 @@ class TestTenantRBAC:
         get_response = test_client.get(ENDPOINT_TENANT_DETAIL.format(tenant_id=tenant_id), headers=app_user_headers)
         assert get_response.status_code == status.HTTP_200_OK
 
-        # App admin CANNOT update tenant (needs GLOBAL_ADMIN)
+        # App admin CANNOT update tenant (needs TENANT_GLOBAL_ADMIN)
         update_response = test_client.patch(
             ENDPOINT_TENANT_DETAIL.format(tenant_id=tenant_id), json={"name": "Hacked"}, headers=app_user_headers
         )
         assert update_response.status_code == status.HTTP_403_FORBIDDEN
 
-        # App admin CANNOT delete tenant (needs GLOBAL_ADMIN)
+        # App admin CANNOT delete tenant (needs TENANT_GLOBAL_ADMIN)
         delete_response = test_client.request(
             "DELETE", ENDPOINT_TENANT_DETAIL.format(tenant_id=tenant_id), headers=app_user_headers
         )
         assert delete_response.status_code == status.HTTP_403_FORBIDDEN
 
-        # App admin CANNOT manage principals (needs GLOBAL_ADMIN)
+        # App admin CANNOT manage principals (needs TENANT_GLOBAL_ADMIN)
         principal_response = test_client.put(
             ENDPOINT_TENANT_PRINCIPALS.format(tenant_id=tenant_id),
             json={"principal_id": "another-user", "principal_type": PRINCIPAL_TYPE_USER, "role": ROLE_READER},
@@ -264,7 +264,7 @@ class TestTenantRBAC:
         assert principal_response.status_code == status.HTTP_403_FORBIDDEN
 
     def test_multiple_global_admins(self, test_client: TestClient) -> None:
-        """Test that multiple users can be GLOBAL_ADMIN and all have full access."""
+        """Test that multiple users can be TENANT_GLOBAL_ADMIN and all have full access."""
         # First admin creates tenant
         admin1_token = test_client.create_test_user("admin-1", "Admin 1")
         admin1_headers = create_auth_headers(admin1_token, use_cache=False)
@@ -278,14 +278,14 @@ class TestTenantRBAC:
         admin2_token = test_client.create_test_user("admin-2", "Admin 2")
         admin2_headers = create_auth_headers(admin2_token, use_cache=False)
 
-        # First admin adds second admin with GLOBAL_ADMIN role
+        # First admin adds second admin with TENANT_GLOBAL_ADMIN role
         add_response = test_client.put(
             ENDPOINT_TENANT_PRINCIPALS.format(tenant_id=tenant_id),
-            json={"principal_id": "admin-2", "principal_type": PRINCIPAL_TYPE_USER, "role": ROLE_GLOBAL_ADMIN},
+            json={"principal_id": "admin-2", "principal_type": PRINCIPAL_TYPE_USER, "role": ROLE_TENANT_GLOBAL_ADMIN},
             headers=admin1_headers,
         )
         assert add_response.status_code == status.HTTP_200_OK
-        assert ROLE_GLOBAL_ADMIN in add_response.json()["roles"]
+        assert ROLE_TENANT_GLOBAL_ADMIN in add_response.json()["roles"]
 
         # Second admin CAN update tenant
         update_response = test_client.patch(
@@ -354,7 +354,7 @@ class TestTenantRBAC:
         assert len(roles) == 3
 
     def test_removing_global_admin_role(self, test_client: TestClient, fake_redis_client: Any) -> None:
-        """Test that GLOBAL_ADMIN role can be removed (user loses admin access)."""
+        """Test that TENANT_GLOBAL_ADMIN role can be removed (user loses admin access)."""
         # Admin creates tenant
         admin_token = test_client.create_test_user("demote-admin", "Demote Admin")
         admin_headers = create_auth_headers(admin_token, use_cache=False)
@@ -368,10 +368,14 @@ class TestTenantRBAC:
         admin2_token = test_client.create_test_user("admin-to-demote", "Admin To Demote")
         admin2_headers = create_auth_headers(admin2_token, use_cache=False)
 
-        # Give second user GLOBAL_ADMIN role
+        # Give second user TENANT_GLOBAL_ADMIN role
         test_client.put(
             ENDPOINT_TENANT_PRINCIPALS.format(tenant_id=tenant_id),
-            json={"principal_id": "admin-to-demote", "principal_type": PRINCIPAL_TYPE_USER, "role": ROLE_GLOBAL_ADMIN},
+            json={
+                "principal_id": "admin-to-demote",
+                "principal_type": PRINCIPAL_TYPE_USER,
+                "role": ROLE_TENANT_GLOBAL_ADMIN,
+            },
             headers=admin_headers,
         )
 
@@ -381,15 +385,19 @@ class TestTenantRBAC:
         )
         assert update_response.status_code == status.HTTP_200_OK
 
-        # First admin removes GLOBAL_ADMIN role from second admin
+        # First admin removes TENANT_GLOBAL_ADMIN role from second admin
         remove_response = test_client.request(
             "DELETE",
             ENDPOINT_TENANT_PRINCIPALS.format(tenant_id=tenant_id),
-            json={"principal_id": "admin-to-demote", "principal_type": PRINCIPAL_TYPE_USER, "role": ROLE_GLOBAL_ADMIN},
+            json={
+                "principal_id": "admin-to-demote",
+                "principal_type": PRINCIPAL_TYPE_USER,
+                "role": ROLE_TENANT_GLOBAL_ADMIN,
+            },
             headers=admin_headers,
         )
         assert remove_response.status_code == status.HTTP_200_OK
-        assert ROLE_GLOBAL_ADMIN not in remove_response.json()["roles"]
+        assert ROLE_TENANT_GLOBAL_ADMIN not in remove_response.json()["roles"]
 
         # Verify role was actually removed
         check_response = test_client.get(
@@ -397,7 +405,7 @@ class TestTenantRBAC:
         )
         assert check_response.status_code == status.HTTP_200_OK
         roles_after = check_response.json()["roles"]
-        assert ROLE_GLOBAL_ADMIN not in roles_after
+        assert ROLE_TENANT_GLOBAL_ADMIN not in roles_after
 
         # Second user now has NO roles, so should get 403 when trying to access tenant
         update_response2 = test_client.patch(
@@ -448,7 +456,7 @@ class TestTenantRBAC:
         assert access_before.status_code == status.HTTP_403_FORBIDDEN
 
         # Add user to custom group directly in DB (not via API)
-        # Grant GLOBAL_ADMIN role to the custom group directly in DB (not via API)
+        # Grant TENANT_GLOBAL_ADMIN role to the custom group directly in DB (not via API)
         from unifiedui.core.database.models import TenantMember
 
         # Use test_client.db_client to write to the SAME DB that the API reads from!
@@ -481,7 +489,7 @@ class TestTenantRBAC:
                 id=str(uuid.uuid4()),
                 tenant_id=tenant_id,
                 principal_id=custom_group_id,
-                role=ROLE_GLOBAL_ADMIN,
+                role=ROLE_TENANT_GLOBAL_ADMIN,
                 created_by=admin_token.get_id(),
                 updated_by=admin_token.get_id(),
             )
@@ -495,7 +503,7 @@ class TestTenantRBAC:
         access_after = test_client.get(ENDPOINT_TENANT_DETAIL.format(tenant_id=tenant_id), headers=regular_user_headers)
         assert access_after.status_code == status.HTTP_200_OK
 
-        # User CAN update tenant (has GLOBAL_ADMIN via custom group)
+        # User CAN update tenant (has TENANT_GLOBAL_ADMIN via custom group)
         update_response = test_client.patch(
             ENDPOINT_TENANT_DETAIL.format(tenant_id=tenant_id),
             json={"name": "Updated by Group Member"},
@@ -504,7 +512,7 @@ class TestTenantRBAC:
         assert update_response.status_code == status.HTTP_200_OK
         assert update_response.json()["name"] == "Updated by Group Member"
 
-        # User CAN manage principals (has GLOBAL_ADMIN via custom group)
+        # User CAN manage principals (has TENANT_GLOBAL_ADMIN via custom group)
         add_principal_response = test_client.put(
             ENDPOINT_TENANT_PRINCIPALS.format(tenant_id=tenant_id),
             json={"principal_id": "another-user", "principal_type": PRINCIPAL_TYPE_USER, "role": ROLE_READER},
@@ -512,7 +520,7 @@ class TestTenantRBAC:
         )
         assert add_principal_response.status_code == status.HTTP_200_OK
 
-        # User CAN delete tenant (has GLOBAL_ADMIN via custom group)
+        # User CAN delete tenant (has TENANT_GLOBAL_ADMIN via custom group)
         delete_response = test_client.request(
             "DELETE", ENDPOINT_TENANT_DETAIL.format(tenant_id=tenant_id), headers=regular_user_headers
         )
@@ -603,7 +611,7 @@ class TestTenantRBAC:
         get_response = test_client.get(ENDPOINT_TENANT_DETAIL.format(tenant_id=tenant_id), headers=reader_user_headers)
         assert get_response.status_code == status.HTTP_200_OK
 
-        # User CANNOT update tenant (only READER, needs GLOBAL_ADMIN)
+        # User CANNOT update tenant (only READER, needs TENANT_GLOBAL_ADMIN)
         update_response = test_client.patch(
             ENDPOINT_TENANT_DETAIL.format(tenant_id=tenant_id),
             json={"name": "Should Fail"},
@@ -611,13 +619,13 @@ class TestTenantRBAC:
         )
         assert update_response.status_code == status.HTTP_403_FORBIDDEN
 
-        # User CANNOT delete tenant (only READER, needs GLOBAL_ADMIN)
+        # User CANNOT delete tenant (only READER, needs TENANT_GLOBAL_ADMIN)
         delete_response = test_client.request(
             "DELETE", ENDPOINT_TENANT_DETAIL.format(tenant_id=tenant_id), headers=reader_user_headers
         )
         assert delete_response.status_code == status.HTTP_403_FORBIDDEN
 
-        # User CANNOT manage principals (only READER, needs GLOBAL_ADMIN)
+        # User CANNOT manage principals (only READER, needs TENANT_GLOBAL_ADMIN)
         add_principal_response = test_client.put(
             ENDPOINT_TENANT_PRINCIPALS.format(tenant_id=tenant_id),
             json={"principal_id": "another-user", "principal_type": PRINCIPAL_TYPE_USER, "role": ROLE_READER},
@@ -696,7 +704,7 @@ class TestTenantRBAC:
                 id=str(uuid.uuid4()),
                 tenant_id=tenant_id,
                 principal_id=custom_group_id,
-                role=ROLE_GLOBAL_ADMIN,
+                role=ROLE_TENANT_GLOBAL_ADMIN,
                 created_by="cg-isolation-admin",
                 updated_by="cg-isolation-admin",
             )
@@ -748,14 +756,18 @@ class TestTenantRBAC:
         )
         assert access_before.status_code == status.HTTP_403_FORBIDDEN
 
-        # Admin grants GLOBAL_ADMIN role to the identity group
+        # Admin grants TENANT_GLOBAL_ADMIN role to the identity group
         grant_response = test_client.put(
             ENDPOINT_TENANT_PRINCIPALS.format(tenant_id=tenant_id),
-            json={"principal_id": identity_group_id, "principal_type": PRINCIPAL_TYPE_GROUP, "role": ROLE_GLOBAL_ADMIN},
+            json={
+                "principal_id": identity_group_id,
+                "principal_type": PRINCIPAL_TYPE_GROUP,
+                "role": ROLE_TENANT_GLOBAL_ADMIN,
+            },
             headers=admin_headers,
         )
         assert grant_response.status_code == status.HTTP_200_OK
-        assert ROLE_GLOBAL_ADMIN in grant_response.json()["roles"]
+        assert ROLE_TENANT_GLOBAL_ADMIN in grant_response.json()["roles"]
 
         # Clear cache to ensure fresh data
         fake_redis_client.client.flushall()
@@ -764,7 +776,7 @@ class TestTenantRBAC:
         access_after = test_client.get(ENDPOINT_TENANT_DETAIL.format(tenant_id=tenant_id), headers=group_member_headers)
         assert access_after.status_code == status.HTTP_200_OK
 
-        # User CAN update tenant (has GLOBAL_ADMIN via identity group)
+        # User CAN update tenant (has TENANT_GLOBAL_ADMIN via identity group)
         update_response = test_client.patch(
             ENDPOINT_TENANT_DETAIL.format(tenant_id=tenant_id),
             json={"name": "Updated by Group Member"},
@@ -773,7 +785,7 @@ class TestTenantRBAC:
         assert update_response.status_code == status.HTTP_200_OK
         assert update_response.json()["name"] == "Updated by Group Member"
 
-        # User CAN manage principals (has GLOBAL_ADMIN via identity group)
+        # User CAN manage principals (has TENANT_GLOBAL_ADMIN via identity group)
         add_principal_response = test_client.put(
             ENDPOINT_TENANT_PRINCIPALS.format(tenant_id=tenant_id),
             json={"principal_id": "another-user", "principal_type": PRINCIPAL_TYPE_USER, "role": ROLE_READER},
@@ -781,7 +793,7 @@ class TestTenantRBAC:
         )
         assert add_principal_response.status_code == status.HTTP_200_OK
 
-        # User CAN delete tenant (has GLOBAL_ADMIN via identity group)
+        # User CAN delete tenant (has TENANT_GLOBAL_ADMIN via identity group)
         delete_response = test_client.request(
             "DELETE", ENDPOINT_TENANT_DETAIL.format(tenant_id=tenant_id), headers=group_member_headers
         )
@@ -823,19 +835,19 @@ class TestTenantRBAC:
         get_response = test_client.get(ENDPOINT_TENANT_DETAIL.format(tenant_id=tenant_id), headers=reader_headers)
         assert get_response.status_code == status.HTTP_200_OK
 
-        # User CANNOT update tenant (only READER, needs GLOBAL_ADMIN)
+        # User CANNOT update tenant (only READER, needs TENANT_GLOBAL_ADMIN)
         update_response = test_client.patch(
             ENDPOINT_TENANT_DETAIL.format(tenant_id=tenant_id), json={"name": "Should Fail"}, headers=reader_headers
         )
         assert update_response.status_code == status.HTTP_403_FORBIDDEN
 
-        # User CANNOT delete tenant (only READER, needs GLOBAL_ADMIN)
+        # User CANNOT delete tenant (only READER, needs TENANT_GLOBAL_ADMIN)
         delete_response = test_client.request(
             "DELETE", ENDPOINT_TENANT_DETAIL.format(tenant_id=tenant_id), headers=reader_headers
         )
         assert delete_response.status_code == status.HTTP_403_FORBIDDEN
 
-        # User CANNOT manage principals (only READER, needs GLOBAL_ADMIN)
+        # User CANNOT manage principals (only READER, needs TENANT_GLOBAL_ADMIN)
         add_principal_response = test_client.put(
             ENDPOINT_TENANT_PRINCIPALS.format(tenant_id=tenant_id),
             json={"principal_id": "another-user", "principal_type": PRINCIPAL_TYPE_USER, "role": ROLE_READER},
@@ -869,13 +881,13 @@ class TestTenantRBAC:
         )
         non_member_headers = create_auth_headers(non_member_token, use_cache=False)
 
-        # Admin grants GLOBAL_ADMIN role to the identity group
+        # Admin grants TENANT_GLOBAL_ADMIN role to the identity group
         grant_response = test_client.put(
             ENDPOINT_TENANT_PRINCIPALS.format(tenant_id=tenant_id),
             json={
                 "principal_id": privileged_group_id,
                 "principal_type": PRINCIPAL_TYPE_GROUP,
-                "role": ROLE_GLOBAL_ADMIN,
+                "role": ROLE_TENANT_GLOBAL_ADMIN,
             },
             headers=admin_headers,
         )
@@ -977,10 +989,14 @@ class TestTenantRBAC:
             headers=admin_headers,
         )
 
-        # Admin also grants GLOBAL_ADMIN directly to the user
+        # Admin also grants TENANT_GLOBAL_ADMIN directly to the user
         test_client.put(
             ENDPOINT_TENANT_PRINCIPALS.format(tenant_id=tenant_id),
-            json={"principal_id": combo_user_id, "principal_type": PRINCIPAL_TYPE_USER, "role": ROLE_GLOBAL_ADMIN},
+            json={
+                "principal_id": combo_user_id,
+                "principal_type": PRINCIPAL_TYPE_USER,
+                "role": ROLE_TENANT_GLOBAL_ADMIN,
+            },
             headers=admin_headers,
         )
 
@@ -991,7 +1007,7 @@ class TestTenantRBAC:
         get_response = test_client.get(ENDPOINT_TENANT_DETAIL.format(tenant_id=tenant_id), headers=combo_user_headers)
         assert get_response.status_code == status.HTTP_200_OK
 
-        # User CAN update tenant (has GLOBAL_ADMIN from direct assignment)
+        # User CAN update tenant (has TENANT_GLOBAL_ADMIN from direct assignment)
         update_response = test_client.patch(
             ENDPOINT_TENANT_DETAIL.format(tenant_id=tenant_id),
             json={"name": "Updated with Combined Permissions"},

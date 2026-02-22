@@ -414,8 +414,8 @@ class TestChatAgentCaching:
         global_admin_token = test_client.create_test_user("bypass-global", "Bypass Global")
         global_admin_headers = create_auth_headers(global_admin_token)
 
-        # Add to tenant with GLOBAL_ADMIN role
-        add_user_to_tenant(test_client, tenant_id, admin_headers, "bypass-global", "GLOBAL_ADMIN")
+        # Add to tenant with TENANT_GLOBAL_ADMIN role
+        add_user_to_tenant(test_client, tenant_id, admin_headers, "bypass-global", "TENANT_GLOBAL_ADMIN")
 
         # Global admin can access without explicit permission (cached)
         response1 = test_client.get(

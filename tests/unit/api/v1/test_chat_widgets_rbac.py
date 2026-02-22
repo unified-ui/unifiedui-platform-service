@@ -307,7 +307,7 @@ class TestChatWidgetRBAC:
         assert delete_response.status_code == status.HTTP_204_NO_CONTENT
 
     def test_tenant_global_admin_bypasses_chat_widget_permissions(self, test_client: TestClient) -> None:
-        """Test that tenant GLOBAL_ADMIN can access all chat widgets."""
+        """Test that tenant TENANT_GLOBAL_ADMIN can access all chat widgets."""
         admin_token = test_client.create_test_user("cw-tenant-admin", "CW Tenant Admin")
         admin_headers = create_auth_headers(admin_token, use_cache=False)
         tenant_id = create_tenant_for_user(test_client, admin_token)
@@ -316,7 +316,7 @@ class TestChatWidgetRBAC:
         global_admin_token = test_client.create_test_user("cw-global-admin", "CW Global Admin")
         global_admin_headers = create_auth_headers(global_admin_token, use_cache=False)
 
-        add_user_to_tenant(test_client, tenant_id, admin_headers, "cw-global-admin", "GLOBAL_ADMIN")
+        add_user_to_tenant(test_client, tenant_id, admin_headers, "cw-global-admin", "TENANT_GLOBAL_ADMIN")
 
         # Global admin can view
         get_response = test_client.get(

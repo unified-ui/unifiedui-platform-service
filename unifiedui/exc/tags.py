@@ -23,5 +23,5 @@ class TagDeleteNotAllowedError(Exception):
     def __init__(self, tag_id: int):
         self.tag_id = tag_id
         super().__init__(
-            f"Not authorized to delete tag with ID {tag_id}. Only GLOBAL_ADMIN or the tag creator can delete tags."
+            f"Not authorized to delete tag with ID {tag_id}. Only TENANT_GLOBAL_ADMIN or the tag creator can delete tags."
         )

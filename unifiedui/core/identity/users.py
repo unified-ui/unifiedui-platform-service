@@ -290,7 +290,7 @@ class ContextIdentityUser:
         """Auto-provision an organization with a default tenant on first login.
 
         Creates the organization, a default sandbox tenant (can_be_deleted=False),
-        assigns the user as ORGANISATION_GLOBAL_ADMIN and tenant GLOBAL_ADMIN,
+        assigns the user as ORGANISATION_GLOBAL_ADMIN and tenant TENANT_GLOBAL_ADMIN,
         and ensures the principal exists.
 
         Returns:
@@ -305,6 +305,10 @@ class ContextIdentityUser:
         identity_tenant_id = self.identity.get_identity_tenant_id()
 
         if not identity_provider or not identity_tenant_id:
+            return None
+
+        user_mail = self.identity.get_mail()
+        if settings.system_admin_emails and (not user_mail or user_mail not in settings.system_admin_emails):
             return None
 
         user_id = self.identity.get_id()
@@ -337,6 +341,7 @@ class ContextIdentityUser:
                     subscription_tier="free",
                 ),
                 user_id=user_id,
+                user=self,
             )
         except Exception:
             logger.warning(

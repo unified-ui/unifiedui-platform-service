@@ -426,7 +426,7 @@ class TestCredentialCaching:
 
     def test_tenant_admin_bypass_cached_correctly(self, test_client: TestClient, fake_redis_client: Any) -> None:
         """Test that tenant admin bypass is cached correctly."""
-        # User A creates tenant (becomes GLOBAL_ADMIN)
+        # User A creates tenant (becomes TENANT_GLOBAL_ADMIN)
         user_a_token = test_client.create_test_user("cache-tenant-admin", "Cache Tenant Admin")
         headers_a = create_auth_headers(user_a_token)
         tenant_id = create_tenant_for_user(test_client, user_a_token)
@@ -441,7 +441,7 @@ class TestCredentialCaching:
         # User B creates credential
         credential_id = create_credential(test_client, tenant_id, headers_b, "B's Credential")
 
-        # User A (GLOBAL_ADMIN) can access without explicit permission (cache this)
+        # User A (TENANT_GLOBAL_ADMIN) can access without explicit permission (cache this)
         response1 = test_client.get(
             ENDPOINT_CREDENTIAL_DETAIL.format(tenant_id=tenant_id, credential_id=credential_id), headers=headers_a
         )

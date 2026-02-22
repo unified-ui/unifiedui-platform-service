@@ -42,7 +42,7 @@ SEARCH_TYPE_CONFIG = {
         "tag_model": ChatAgentTag,
         "tag_entity_id_field": "chat_agent_id",
         "admin_roles": [
-            TenantRolesEnum.GLOBAL_ADMIN,
+            TenantRolesEnum.TENANT_GLOBAL_ADMIN,
             TenantRolesEnum.CHAT_AGENTS_ADMIN,
         ],
     },
@@ -53,7 +53,7 @@ SEARCH_TYPE_CONFIG = {
         "tag_model": AutonomousAgentTag,
         "tag_entity_id_field": "autonomous_agent_id",
         "admin_roles": [
-            TenantRolesEnum.GLOBAL_ADMIN,
+            TenantRolesEnum.TENANT_GLOBAL_ADMIN,
             TenantRolesEnum.AUTONOMOUS_AGENTS_ADMIN,
         ],
     },
@@ -64,7 +64,7 @@ SEARCH_TYPE_CONFIG = {
         "tag_model": None,
         "tag_entity_id_field": None,
         "admin_roles": [
-            TenantRolesEnum.GLOBAL_ADMIN,
+            TenantRolesEnum.TENANT_GLOBAL_ADMIN,
             TenantRolesEnum.CONVERSATIONS_ADMIN,
         ],
     },
@@ -75,7 +75,7 @@ SEARCH_TYPE_CONFIG = {
         "tag_model": ReActAgentTag,
         "tag_entity_id_field": "re_act_agent_id",
         "admin_roles": [
-            TenantRolesEnum.GLOBAL_ADMIN,
+            TenantRolesEnum.TENANT_GLOBAL_ADMIN,
             TenantRolesEnum.REACT_AGENT_ADMIN,
         ],
     },

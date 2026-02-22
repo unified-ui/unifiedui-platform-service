@@ -18,7 +18,7 @@ ENDPOINT_PRINCIPAL_DETAIL = "/api/v1/platform-service/tenants/{tenant_id}/princi
 NON_EXISTENT_ID = "non-existent-id"
 
 # Roles
-ROLE_GLOBAL_ADMIN = TenantRolesEnum.GLOBAL_ADMIN.value
+ROLE_TENANT_GLOBAL_ADMIN = TenantRolesEnum.TENANT_GLOBAL_ADMIN.value
 ROLE_READER = TenantRolesEnum.READER.value
 ROLE_CHAT_AGENTS_ADMIN = TenantRolesEnum.CHAT_AGENTS_ADMIN.value
 
@@ -149,7 +149,7 @@ class TestTenantRoutes:
         """Test tenant retrieval with non-existent ID."""
         response = test_client.get(ENDPOINT_TENANT_DETAIL.format(tenant_id=NON_EXISTENT_ID), headers=auth_headers)
 
-        assert response.status_code == status.HTTP_403_FORBIDDEN  # 403 instead of 404 for security
+        assert response.status_code == status.HTTP_404_NOT_FOUND
 
     def test_list_tenants_empty(self, test_client: TestClient, auth_headers: dict[str, str]) -> None:
         """Test listing tenants when none exist."""
@@ -331,7 +331,7 @@ class TestTenantRoutes:
             headers=auth_headers,
         )
 
-        assert response.status_code == status.HTTP_403_FORBIDDEN  # 403 instead of 404 for security
+        assert response.status_code == status.HTTP_404_NOT_FOUND
 
     def test_update_tenant_partial(
         self,
@@ -375,9 +375,9 @@ class TestTenantRoutes:
 
         assert response.status_code == status.HTTP_204_NO_CONTENT
 
-        # Verify tenant is deleted - returns 403 because user no longer has access
+        # Verify tenant is deleted - org admin bypasses auth, handler returns 404
         get_response = test_client.get(ENDPOINT_TENANT_DETAIL.format(tenant_id=tenant_id), headers=auth_headers)
-        assert get_response.status_code == status.HTTP_403_FORBIDDEN
+        assert get_response.status_code == status.HTTP_404_NOT_FOUND
 
     def test_delete_tenant_not_found(
         self, test_client: TestClient, auth_headers: dict[str, str], test_user_token: Any
@@ -387,7 +387,7 @@ class TestTenantRoutes:
             "DELETE", ENDPOINT_TENANT_DETAIL.format(tenant_id=NON_EXISTENT_ID), headers=auth_headers
         )
 
-        assert response.status_code == status.HTTP_403_FORBIDDEN  # 403 instead of 404 for security
+        assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
 class TestTenantPrincipalRoutes:
@@ -415,12 +415,12 @@ class TestTenantPrincipalRoutes:
         assert "principals" in data
         assert len(data["principals"]) >= 1  # At least the creator
 
-        # Check creator has GLOBAL_ADMIN role
+        # Check creator has TENANT_GLOBAL_ADMIN role
         creator_principal = next((p for p in data["principals"] if p["principal_id"] == test_user_token.get_id()), None)
         assert creator_principal is not None
         # roles is now a list of role detail objects
         creator_roles = [r["role"] for r in creator_principal["roles"]]
-        assert ROLE_GLOBAL_ADMIN in creator_roles
+        assert ROLE_TENANT_GLOBAL_ADMIN in creator_roles
         # Verify new response structure includes principal details
         assert "is_active" in creator_principal
         assert creator_principal["is_active"] is True
@@ -447,7 +447,7 @@ class TestTenantPrincipalRoutes:
 
         assert data["principal_id"] == test_user_token.get_id()
         assert data["principal_type"] == PRINCIPAL_TYPE_USER
-        assert ROLE_GLOBAL_ADMIN in data["roles"]
+        assert ROLE_TENANT_GLOBAL_ADMIN in data["roles"]
 
     def test_set_principal_permission_new_user(
         self, test_client: TestClient, auth_headers: dict[str, str], sample_tenant_data: dict[str, Any]
@@ -790,10 +790,10 @@ class TestTenantPrincipalRoutes:
             ENDPOINT_PRINCIPAL_DETAIL.format(tenant_id=tenant1_id, principal_id="isolated-user-1"), headers=headers1
         )
         assert principals1.status_code == status.HTTP_200_OK
-        assert ROLE_GLOBAL_ADMIN in principals1.json()["roles"]
+        assert ROLE_TENANT_GLOBAL_ADMIN in principals1.json()["roles"]
 
         principals2 = test_client.get(
             ENDPOINT_PRINCIPAL_DETAIL.format(tenant_id=tenant2_id, principal_id="isolated-user-2"), headers=headers2
         )
         assert principals2.status_code == status.HTTP_200_OK
-        assert ROLE_GLOBAL_ADMIN in principals2.json()["roles"]
+        assert ROLE_TENANT_GLOBAL_ADMIN in principals2.json()["roles"]

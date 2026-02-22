@@ -52,7 +52,7 @@ async def list_tools(
     List tools for a tenant.
 
     Users see only tools they have permissions for, unless they have
-    GLOBAL_ADMIN or REACT_AGENT_ADMIN on tenant level.
+    TENANT_GLOBAL_ADMIN or REACT_AGENT_ADMIN on tenant level.
     """
     try:
         user: ContextIdentityUser = request.state.user
@@ -116,7 +116,7 @@ async def list_tools(
 @check_permissions(
     entity="tenant",
     required_permissions=[
-        TenantRolesEnum.GLOBAL_ADMIN,
+        TenantRolesEnum.TENANT_GLOBAL_ADMIN,
         TenantRolesEnum.REACT_AGENT_ADMIN,
         TenantRolesEnum.REACT_AGENT_CREATOR,
     ],
@@ -152,7 +152,7 @@ async def create_tool(
 @check_permissions(
     entity="tool",
     required_permissions=[
-        TenantRolesEnum.GLOBAL_ADMIN,
+        TenantRolesEnum.TENANT_GLOBAL_ADMIN,
         TenantRolesEnum.REACT_AGENT_ADMIN,
         PermissionActionEnum.ADMIN,
         PermissionActionEnum.WRITE,
@@ -184,7 +184,7 @@ async def get_tool(
 @check_permissions(
     entity="tool",
     required_permissions=[
-        TenantRolesEnum.GLOBAL_ADMIN,
+        TenantRolesEnum.TENANT_GLOBAL_ADMIN,
         TenantRolesEnum.REACT_AGENT_ADMIN,
         PermissionActionEnum.ADMIN,
         PermissionActionEnum.WRITE,
@@ -223,7 +223,11 @@ async def update_tool(
 @authenticate()
 @check_permissions(
     entity="tool",
-    required_permissions=[TenantRolesEnum.GLOBAL_ADMIN, TenantRolesEnum.REACT_AGENT_ADMIN, PermissionActionEnum.ADMIN],
+    required_permissions=[
+        TenantRolesEnum.TENANT_GLOBAL_ADMIN,
+        TenantRolesEnum.REACT_AGENT_ADMIN,
+        PermissionActionEnum.ADMIN,
+    ],
 )
 async def delete_tool(
     request: Request, tenant_id: str, tool_id: str, handler: ToolHandler = Depends(get_tool_handler)
@@ -258,7 +262,11 @@ async def delete_tool(
 @authenticate()
 @check_permissions(
     entity="tool",
-    required_permissions=[TenantRolesEnum.GLOBAL_ADMIN, TenantRolesEnum.REACT_AGENT_ADMIN, PermissionActionEnum.ADMIN],
+    required_permissions=[
+        TenantRolesEnum.TENANT_GLOBAL_ADMIN,
+        TenantRolesEnum.REACT_AGENT_ADMIN,
+        PermissionActionEnum.ADMIN,
+    ],
 )
 async def list_tool_permissions(
     request: Request,
@@ -320,7 +328,11 @@ async def list_tool_permissions(
 @authenticate()
 @check_permissions(
     entity="tool",
-    required_permissions=[TenantRolesEnum.GLOBAL_ADMIN, TenantRolesEnum.REACT_AGENT_ADMIN, PermissionActionEnum.ADMIN],
+    required_permissions=[
+        TenantRolesEnum.TENANT_GLOBAL_ADMIN,
+        TenantRolesEnum.REACT_AGENT_ADMIN,
+        PermissionActionEnum.ADMIN,
+    ],
 )
 async def get_tool_permission(
     request: Request, tenant_id: str, tool_id: str, principal_id: str, handler: ToolHandler = Depends(get_tool_handler)
@@ -357,7 +369,11 @@ async def get_tool_permission(
 @authenticate()
 @check_permissions(
     entity="tool",
-    required_permissions=[TenantRolesEnum.GLOBAL_ADMIN, TenantRolesEnum.REACT_AGENT_ADMIN, PermissionActionEnum.ADMIN],
+    required_permissions=[
+        TenantRolesEnum.TENANT_GLOBAL_ADMIN,
+        TenantRolesEnum.REACT_AGENT_ADMIN,
+        PermissionActionEnum.ADMIN,
+    ],
 )
 async def set_tool_permission(
     request: Request,
@@ -401,7 +417,11 @@ async def set_tool_permission(
 @authenticate()
 @check_permissions(
     entity="tool",
-    required_permissions=[TenantRolesEnum.GLOBAL_ADMIN, TenantRolesEnum.REACT_AGENT_ADMIN, PermissionActionEnum.ADMIN],
+    required_permissions=[
+        TenantRolesEnum.TENANT_GLOBAL_ADMIN,
+        TenantRolesEnum.REACT_AGENT_ADMIN,
+        PermissionActionEnum.ADMIN,
+    ],
 )
 async def delete_tool_permission(
     request: Request,

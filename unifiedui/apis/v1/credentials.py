@@ -53,7 +53,7 @@ async def list_credentials(
     List credentials for a tenant.
 
     Users see only credentials they have permissions for, unless they have
-    GLOBAL_ADMIN or CREDENTIALS_ADMIN on tenant level.
+    TENANT_GLOBAL_ADMIN or CREDENTIALS_ADMIN on tenant level.
 
     Args:
         request: FastAPI request with user in state
@@ -117,7 +117,7 @@ async def list_credentials(
 @check_permissions(
     entity="tenant",
     required_permissions=[
-        TenantRolesEnum.GLOBAL_ADMIN,
+        TenantRolesEnum.TENANT_GLOBAL_ADMIN,
         TenantRolesEnum.CREDENTIALS_ADMIN,
         TenantRolesEnum.CREDENTIALS_CREATOR,
     ],
@@ -213,7 +213,7 @@ async def get_credential(
 @check_permissions(
     entity="credential",
     required_permissions=[
-        TenantRolesEnum.GLOBAL_ADMIN,
+        TenantRolesEnum.TENANT_GLOBAL_ADMIN,
         TenantRolesEnum.CREDENTIALS_ADMIN,
         PermissionActionEnum.WRITE,
         PermissionActionEnum.ADMIN,
@@ -227,7 +227,7 @@ async def get_credential_secret(
 
     This endpoint returns the actual secret value from the vault.
     Requires WRITE or ADMIN permission on the credential,
-    or GLOBAL_ADMIN/CREDENTIALS_ADMIN on the tenant.
+    or TENANT_GLOBAL_ADMIN/CREDENTIALS_ADMIN on the tenant.
 
     Args:
         request: FastAPI request with user in state

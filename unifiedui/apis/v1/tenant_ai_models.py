@@ -103,7 +103,7 @@ async def list_tenant_ai_models(
 @check_permissions(
     entity="tenant",
     required_permissions=[
-        TenantRolesEnum.GLOBAL_ADMIN,
+        TenantRolesEnum.TENANT_GLOBAL_ADMIN,
         TenantRolesEnum.TENANT_AI_MODELS_ADMIN,
     ],
 )
@@ -195,7 +195,7 @@ async def get_tenant_ai_model(
 @check_permissions(
     entity="tenant",
     required_permissions=[
-        TenantRolesEnum.GLOBAL_ADMIN,
+        TenantRolesEnum.TENANT_GLOBAL_ADMIN,
         TenantRolesEnum.TENANT_AI_MODELS_ADMIN,
     ],
 )
@@ -251,7 +251,7 @@ async def update_tenant_ai_model(
 @check_permissions(
     entity="tenant",
     required_permissions=[
-        TenantRolesEnum.GLOBAL_ADMIN,
+        TenantRolesEnum.TENANT_GLOBAL_ADMIN,
         TenantRolesEnum.TENANT_AI_MODELS_ADMIN,
     ],
 )

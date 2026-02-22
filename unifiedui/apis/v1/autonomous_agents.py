@@ -70,7 +70,7 @@ async def list_autonomous_agents(
     List autonomous agents for a tenant.
 
     Users see only autonomous agents they have permissions for, unless they have
-    GLOBAL_ADMIN or AUTONOMOUS_AGENTS_ADMIN on tenant level.
+    TENANT_GLOBAL_ADMIN or AUTONOMOUS_AGENTS_ADMIN on tenant level.
 
     Args:
         request: FastAPI request with user in state
@@ -130,7 +130,7 @@ async def list_autonomous_agents(
 @check_permissions(
     entity="tenant",
     required_permissions=[
-        TenantRolesEnum.GLOBAL_ADMIN,
+        TenantRolesEnum.TENANT_GLOBAL_ADMIN,
         TenantRolesEnum.AUTONOMOUS_AGENTS_ADMIN,
         TenantRolesEnum.AUTONOMOUS_AGENTS_CREATOR,
     ],
@@ -144,7 +144,7 @@ async def create_autonomous_agent(
     """
     Create a new autonomous agent.
 
-    Requires GLOBAL_ADMIN, AUTONOMOUS_AGENTS_ADMIN, or AUTONOMOUS_AGENTS_CREATOR permission on tenant level.
+    Requires TENANT_GLOBAL_ADMIN, AUTONOMOUS_AGENTS_ADMIN, or AUTONOMOUS_AGENTS_CREATOR permission on tenant level.
     Creator is automatically assigned ADMIN permission on the autonomous agent.
 
     Args:
@@ -182,7 +182,7 @@ async def create_autonomous_agent(
 @check_permissions(
     entity="autonomous_agent",
     required_permissions=[
-        TenantRolesEnum.GLOBAL_ADMIN,
+        TenantRolesEnum.TENANT_GLOBAL_ADMIN,
         TenantRolesEnum.AUTONOMOUS_AGENTS_ADMIN,
         PermissionActionEnum.ADMIN,
         PermissionActionEnum.WRITE,
@@ -198,7 +198,7 @@ async def get_autonomous_agent(
     """
     Get a specific autonomous agent by ID.
 
-    Requires READ permission or higher on the autonomous agent, or GLOBAL_ADMIN/AUTONOMOUS_AGENTS_ADMIN on tenant.
+    Requires READ permission or higher on the autonomous agent, or TENANT_GLOBAL_ADMIN/AUTONOMOUS_AGENTS_ADMIN on tenant.
 
     Args:
         request: FastAPI request with user in state
@@ -229,7 +229,7 @@ async def get_autonomous_agent(
 @check_permissions(
     entity="autonomous_agent",
     required_permissions=[
-        TenantRolesEnum.GLOBAL_ADMIN,
+        TenantRolesEnum.TENANT_GLOBAL_ADMIN,
         TenantRolesEnum.AUTONOMOUS_AGENTS_ADMIN,
         PermissionActionEnum.ADMIN,
         PermissionActionEnum.WRITE,
@@ -245,7 +245,7 @@ async def update_autonomous_agent(
     """
     Update an existing autonomous agent.
 
-    Requires WRITE permission or higher on the autonomous agent, or GLOBAL_ADMIN/AUTONOMOUS_AGENTS_ADMIN on tenant.
+    Requires WRITE permission or higher on the autonomous agent, or TENANT_GLOBAL_ADMIN/AUTONOMOUS_AGENTS_ADMIN on tenant.
 
     Args:
         request: FastAPI request with user in state
@@ -285,7 +285,7 @@ async def update_autonomous_agent(
 @check_permissions(
     entity="autonomous_agent",
     required_permissions=[
-        TenantRolesEnum.GLOBAL_ADMIN,
+        TenantRolesEnum.TENANT_GLOBAL_ADMIN,
         TenantRolesEnum.AUTONOMOUS_AGENTS_ADMIN,
         PermissionActionEnum.ADMIN,
     ],
@@ -299,7 +299,7 @@ async def delete_autonomous_agent(
     """
     Delete an autonomous agent.
 
-    Requires WRITE permission or higher on the autonomous agent, or GLOBAL_ADMIN/AUTONOMOUS_AGENTS_ADMIN on tenant.
+    Requires WRITE permission or higher on the autonomous agent, or TENANT_GLOBAL_ADMIN/AUTONOMOUS_AGENTS_ADMIN on tenant.
 
     Args:
         request: FastAPI request with user in state
@@ -335,7 +335,7 @@ async def delete_autonomous_agent(
 @check_permissions(
     entity="autonomous_agent",
     required_permissions=[
-        TenantRolesEnum.GLOBAL_ADMIN,
+        TenantRolesEnum.TENANT_GLOBAL_ADMIN,
         TenantRolesEnum.AUTONOMOUS_AGENTS_ADMIN,
         PermissionActionEnum.ADMIN,
         PermissionActionEnum.WRITE,
@@ -358,7 +358,7 @@ async def list_autonomous_agent_permissions(
     """
     Get all principals with permissions for an autonomous agent.
 
-    Requires READ permission or higher on the autonomous agent, or GLOBAL_ADMIN/AUTONOMOUS_AGENTS_ADMIN on tenant.
+    Requires READ permission or higher on the autonomous agent, or TENANT_GLOBAL_ADMIN/AUTONOMOUS_AGENTS_ADMIN on tenant.
 
     Args:
         request: FastAPI request with user in state
@@ -410,7 +410,7 @@ async def list_autonomous_agent_permissions(
 @check_permissions(
     entity="autonomous_agent",
     required_permissions=[
-        TenantRolesEnum.GLOBAL_ADMIN,
+        TenantRolesEnum.TENANT_GLOBAL_ADMIN,
         TenantRolesEnum.AUTONOMOUS_AGENTS_ADMIN,
         PermissionActionEnum.ADMIN,
         PermissionActionEnum.WRITE,
@@ -427,7 +427,7 @@ async def get_autonomous_agent_permission(
     """
     Get all permissions for a specific principal on an autonomous agent.
 
-    Requires READ permission or higher on the autonomous agent, or GLOBAL_ADMIN/AUTONOMOUS_AGENTS_ADMIN on tenant.
+    Requires READ permission or higher on the autonomous agent, or TENANT_GLOBAL_ADMIN/AUTONOMOUS_AGENTS_ADMIN on tenant.
 
     Args:
         request: FastAPI request with user in state
@@ -462,7 +462,7 @@ async def get_autonomous_agent_permission(
 @check_permissions(
     entity="autonomous_agent",
     required_permissions=[
-        TenantRolesEnum.GLOBAL_ADMIN,
+        TenantRolesEnum.TENANT_GLOBAL_ADMIN,
         TenantRolesEnum.AUTONOMOUS_AGENTS_ADMIN,
         PermissionActionEnum.ADMIN,
     ],
@@ -477,7 +477,7 @@ async def set_autonomous_agent_permission(
     """
     Set or update a principal's permission for an autonomous agent.
 
-    Requires ADMIN permission on the autonomous agent, or GLOBAL_ADMIN/AUTONOMOUS_AGENTS_ADMIN on tenant.
+    Requires ADMIN permission on the autonomous agent, or TENANT_GLOBAL_ADMIN/AUTONOMOUS_AGENTS_ADMIN on tenant.
 
     Args:
         request: FastAPI request with user in state
@@ -519,7 +519,7 @@ async def set_autonomous_agent_permission(
 @check_permissions(
     entity="autonomous_agent",
     required_permissions=[
-        TenantRolesEnum.GLOBAL_ADMIN,
+        TenantRolesEnum.TENANT_GLOBAL_ADMIN,
         TenantRolesEnum.AUTONOMOUS_AGENTS_ADMIN,
         PermissionActionEnum.ADMIN,
     ],
@@ -534,7 +534,7 @@ async def delete_autonomous_agent_permission(
     """
     Remove a principal's permission for an autonomous agent.
 
-    Requires ADMIN permission on the autonomous agent, or GLOBAL_ADMIN/AUTONOMOUS_AGENTS_ADMIN on tenant.
+    Requires ADMIN permission on the autonomous agent, or TENANT_GLOBAL_ADMIN/AUTONOMOUS_AGENTS_ADMIN on tenant.
 
     Args:
         request: FastAPI request with user in state
@@ -579,7 +579,7 @@ async def delete_autonomous_agent_permission(
 @check_permissions(
     entity="autonomous_agent",
     required_permissions=[
-        TenantRolesEnum.GLOBAL_ADMIN,
+        TenantRolesEnum.TENANT_GLOBAL_ADMIN,
         TenantRolesEnum.AUTONOMOUS_AGENTS_ADMIN,
         PermissionActionEnum.ADMIN,
         PermissionActionEnum.WRITE,
@@ -595,7 +595,7 @@ async def get_autonomous_agent_key(
     """
     Get an API key for an autonomous agent.
 
-    Requires WRITE or ADMIN permission on the autonomous agent, or GLOBAL_ADMIN/AUTONOMOUS_AGENTS_ADMIN on tenant.
+    Requires WRITE or ADMIN permission on the autonomous agent, or TENANT_GLOBAL_ADMIN/AUTONOMOUS_AGENTS_ADMIN on tenant.
 
     Args:
         request: FastAPI request with user in state
@@ -639,7 +639,7 @@ async def get_autonomous_agent_key(
 @check_permissions(
     entity="autonomous_agent",
     required_permissions=[
-        TenantRolesEnum.GLOBAL_ADMIN,
+        TenantRolesEnum.TENANT_GLOBAL_ADMIN,
         TenantRolesEnum.AUTONOMOUS_AGENTS_ADMIN,
         PermissionActionEnum.ADMIN,
         PermissionActionEnum.WRITE,
@@ -656,7 +656,7 @@ async def rotate_autonomous_agent_key(
     Rotate an API key for an autonomous agent.
 
     This generates a new random API key and replaces the existing one.
-    Requires WRITE or ADMIN permission on the autonomous agent, or GLOBAL_ADMIN/AUTONOMOUS_AGENTS_ADMIN on tenant.
+    Requires WRITE or ADMIN permission on the autonomous agent, or TENANT_GLOBAL_ADMIN/AUTONOMOUS_AGENTS_ADMIN on tenant.
 
     Args:
         request: FastAPI request with user in state
@@ -810,7 +810,7 @@ async def get_autonomous_agent_config(
 @check_permissions(
     entity="autonomous_agent",
     required_permissions=[
-        TenantRolesEnum.GLOBAL_ADMIN,
+        TenantRolesEnum.TENANT_GLOBAL_ADMIN,
         TenantRolesEnum.AUTONOMOUS_AGENTS_ADMIN,
         PermissionActionEnum.ADMIN,
         PermissionActionEnum.WRITE,

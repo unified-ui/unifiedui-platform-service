@@ -21,7 +21,7 @@ ENDPOINT_IDENTITY_PRINCIPAL_REFRESH = "/api/v1/platform-service/identity/princip
 NON_EXISTENT_ID = "non-existent-id"
 
 # Roles
-ROLE_GLOBAL_ADMIN = TenantRolesEnum.GLOBAL_ADMIN.value
+ROLE_TENANT_GLOBAL_ADMIN = TenantRolesEnum.TENANT_GLOBAL_ADMIN.value
 ROLE_READER = TenantRolesEnum.READER.value
 ROLE_CHAT_AGENTS_ADMIN = TenantRolesEnum.CHAT_AGENTS_ADMIN.value
 
