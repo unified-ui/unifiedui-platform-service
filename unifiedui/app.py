@@ -39,7 +39,6 @@ from unifiedui.exc.custom_groups import CustomGroupError, CustomGroupNotFoundErr
 from unifiedui.exc.organizations import (
     OrganizationAlreadyExistsError,
     OrganizationError,
-    OrganizationLimitExceededError,
     OrganizationMemberAlreadyExistsError,
     OrganizationMemberNotFoundError,
     OrganizationNotFoundError,
@@ -139,11 +138,6 @@ def create_app() -> FastAPI:
     async def organization_member_exists_handler(request: Request, exc: OrganizationMemberAlreadyExistsError):
         """Handle organization member already exists errors."""
         return JSONResponse(status_code=409, content={"detail": str(exc)})
-
-    @app.exception_handler(OrganizationLimitExceededError)
-    async def organization_limit_handler(request: Request, exc: OrganizationLimitExceededError):
-        """Handle organization limit exceeded errors."""
-        return JSONResponse(status_code=400, content={"detail": str(exc)})
 
     @app.exception_handler(TenantCannotBeDeletedError)
     async def tenant_cannot_be_deleted_handler(request: Request, exc: TenantCannotBeDeletedError):

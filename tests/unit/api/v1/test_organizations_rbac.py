@@ -44,8 +44,6 @@ def _create_org_data(
         "identity_provider": identity_provider,
         "identity_tenant_id": identity_tenant_id,
         "subscription_tier": kwargs.get("subscription_tier", "free"),
-        "max_tenants": kwargs.get("max_tenants", 10),
-        "max_users": kwargs.get("max_users", 100),
     }
     if "description" in kwargs:
         data["description"] = kwargs["description"]

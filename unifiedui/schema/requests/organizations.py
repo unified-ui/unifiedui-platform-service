@@ -18,8 +18,6 @@ class CreateOrganizationRequest(BaseModel):
     identity_provider: str = Field(..., max_length=50, description="Identity provider name (e.g., entra_id)")
     identity_tenant_id: str = Field(..., max_length=255, description="IDP tenant identifier")
     subscription_tier: str = Field("free", max_length=50, description="Subscription tier")
-    max_tenants: int = Field(10, ge=1, description="Maximum number of tenants")
-    max_users: int = Field(100, ge=1, description="Maximum number of users")
 
     @field_validator("slug")
     @classmethod
@@ -52,8 +50,6 @@ class UpdateOrganizationRequest(BaseModel):
     name: str | None = Field(None, min_length=1, max_length=255, description="Name of the organization")
     description: str | None = Field(None, max_length=2000, description="Optional description")
     subscription_tier: str | None = Field(None, max_length=50, description="Subscription tier")
-    max_tenants: int | None = Field(None, ge=1, description="Maximum number of tenants")
-    max_users: int | None = Field(None, ge=1, description="Maximum number of users")
     is_active: bool | None = Field(None, description="Whether the organization is active")
 
     model_config = {

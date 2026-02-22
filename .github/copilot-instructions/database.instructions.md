@@ -62,17 +62,17 @@ Who can receive permissions:
 class ChatAgent(Base, IdNameDescriptionMixin, TenantScopedMixin):
     """Chat agent entity model."""
     __tablename__ = "chat_agents"
-    
+
     type: Mapped[str] = mapped_column(...)
     config: Mapped[dict] = mapped_column(PortableJSON, default=dict)
     is_active: Mapped[bool] = mapped_column(default=False)
-    
+
     # Audit fields
     created_at: Mapped[datetime] = ...
     updated_at: Mapped[datetime] = ...
     created_by: Mapped[str] = ...
     updated_by: Mapped[str] = ...
-    
+
     # Relationships
     members: Mapped[list["ChatAgentMember"]] = relationship(...)
     tags: Mapped[list["ChatAgentTag"]] = relationship(...)
@@ -84,7 +84,7 @@ class ChatAgent(Base, IdNameDescriptionMixin, TenantScopedMixin):
 class ChatAgentMember(Base, IdMixin, AuditMixin):
     """Chat agent member/permission model."""
     __tablename__ = "chat_agent_members"
-    
+
     tenant_id: Mapped[str] = mapped_column(...)
     chat_agent_id: Mapped[str] = mapped_column(
         ForeignKey("chat_agents.id", ondelete="CASCADE")
@@ -92,7 +92,7 @@ class ChatAgentMember(Base, IdMixin, AuditMixin):
     principal_id: Mapped[str] = mapped_column(String(50))
     principal_type: Mapped[str] = mapped_column(PrincipalTypeSAEnum)
     role: Mapped[str] = mapped_column(PermissionActionSAEnum)  # READ | WRITE | ADMIN
-    
+
     # Unique constraint: one role per principal per resource
     __table_args__ = (
         UniqueConstraint("chat_agent_id", "principal_id", "principal_type", "role"),

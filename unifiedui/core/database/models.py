@@ -179,8 +179,6 @@ class Organization(Base, IdMixin, AuditMixin):
     identity_tenant_id: Mapped[str] = mapped_column(String(255), nullable=False)
 
     subscription_tier: Mapped[str] = mapped_column(String(50), nullable=False, default="free")
-    max_tenants: Mapped[int] = mapped_column(Integer, nullable=False, default=10)
-    max_users: Mapped[int] = mapped_column(Integer, nullable=False, default=100)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
     members: Mapped[list[OrganizationMember]] = relationship(

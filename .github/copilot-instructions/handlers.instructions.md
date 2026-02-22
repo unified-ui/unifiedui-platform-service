@@ -88,25 +88,25 @@ class {Resource}Handler:
 
 Every list handler:
 1. Checks if user is tenant admin → if yes, returns all (no member join)
-2. Otherwise collects all principal_ids (user + identity groups + custom groups) 
+2. Otherwise collects all principal_ids (user + identity groups + custom groups)
 3. Queries with subquery on `{Resource}Member` table
 4. Builds cache key with user-specific parameters
 
 ```python
 def list_{resources}(self, tenant_id: str, user: ContextIdentityUser, ...):
     user_id = user.identity.get_id()
-    
+
     # Check admin bypass
     is_admin = self._check_tenant_admin(user, tenant_id, [
         TenantRolesEnum.GLOBAL_ADMIN, TenantRolesEnum.{RESOURCE}_ADMIN
     ])
-    
+
     # Collect principal IDs for permission filtering
     if not is_admin:
         identity_group_ids = [g.id for g in user.groups]
         custom_group_ids = [g.id for g in user.custom_groups]
         principal_ids = [user_id] + identity_group_ids + custom_group_ids
-    
+
     # Build query
     query = select({Resource}).where({Resource}.tenant_id == tenant_id)
     if not is_admin:
@@ -118,7 +118,7 @@ def list_{resources}(self, tenant_id: str, user: ContextIdentityUser, ...):
             ).distinct()
         )
         query = query.where({Resource}.id.in_(member_subquery))
-    
+
     # ... apply filters, ordering, pagination
 ```
 

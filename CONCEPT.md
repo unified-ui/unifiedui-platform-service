@@ -15,22 +15,22 @@
 
 ### The Problem We Solve
 
-**Fragmented AI Experiences**  
+**Fragmented AI Experiences**
 When your organization leverages multiple agent platforms, users face:
 - **Inconsistent interfaces**: Each platform presents its own chat experience, creating friction and reducing productivity
 - **Missing UI layers**: Custom-built agents (e.g., LangGraph multi-agent systems) often lack any user interface, requiring developers to build and maintain separate front-ends
 - **Scattered monitoring**: Tracing and observability data lives in disparate systems, making it impossible to gain holistic insights into AI performance
 
-**Integration Complexity**  
+**Integration Complexity**
 Connecting agents from different platforms demands significant engineering effort:
 - Custom API integrations for each agent system
 - Bespoke authentication and authorization flows
 - Redundant implementations of common features like conversation history and user management
 
-**Platform Lock-In**  
+**Platform Lock-In**
 Organizations fear being tied to a single cloud provider or agent platform, limiting flexibility as technology evolves.
 
-**Rapid Technology Obsolescence**  
+**Rapid Technology Obsolescence**
 The AI and agent landscape evolves at unprecedented speed:
 - **Today's tools become tomorrow's legacy**: Agent frameworks, workflow platforms, and LLM orchestration tools that dominate today may be superseded by new innovations within months
 - **Framework churn**: Developers of agent systems must constantly adapt to emerging trends, migrating codebases and retraining teams on new platforms
@@ -45,20 +45,20 @@ This means your organization can adopt cutting-edge AI innovations without the o
 
 ### The unifiedui Solution
 
-**One Unified Interface, Every Agent**  
+**One Unified Interface, Every Agent**
 unifiedui provides a single, consistent chat experience for all your AI agents—whether they're built on enterprise platforms like Microsoft Foundry, workflow automation tools like n8n, or custom frameworks like LangGraph. Users interact with every agent through the same intuitive interface, complete with:
 - **Custom widget integration** for specialized interactions (forms, data visualization, interactive components)
 - **Consistent conversation history** across all agent types
 - **Unified access control** via your existing identity provider (Microsoft Entra ID, Google OAuth)
 
-**Centralized Tracing and Observability**  
+**Centralized Tracing and Observability**
 unifiedui's **unified tracing framework** ingests telemetry from all your agents—conversational and autonomous—into a single database:
 - **Monitor all agents** from one dashboard, regardless of their underlying platform
 - **Semantic search** across traces, conversations, and agent outputs
 - **Chat with your traces**: Ask natural language questions about agent behavior, performance patterns, and historical interactions
 - **No lock-in**: Even agents without native tracing stores (e.g., custom LangGraph deployments) can stream telemetry to unifiedui via our SDK
 
-**Cloud-Agnostic Architecture**  
+**Cloud-Agnostic Architecture**
 Deploy unifiedui wherever your business needs it:
 - **SaaS**: Fully managed, zero-ops deployment for rapid adoption
 - **Azure, AWS, or GCP**: Run unifiedui in your preferred cloud environment with full control over data residency
@@ -66,7 +66,7 @@ Deploy unifiedui wherever your business needs it:
 
 Agent systems themselves remain platform-agnostic—develop and deploy them anywhere, and unifiedui seamlessly integrates them through standardized APIs.
 
-**Native Support for Custom Agents**  
+**Native Support for Custom Agents**
 Building a specialized LangGraph multi-agent system or deploying Azure Functions-based autonomous agents? unifiedui's SDK makes integration effortless:
 - **Minimal code changes**: Add our SDK to send conversation data and tracing telemetry
 - **No UI development required**: Instantly expose your custom agents through unifiedui's chat interface
@@ -74,17 +74,17 @@ Building a specialized LangGraph multi-agent system or deploying Azure Functions
 
 ### Why unifiedui Matters
 
-**For Business Leaders**  
+**For Business Leaders**
 - **Accelerate AI adoption**: Users engage with AI through a single, familiar interface—no training on multiple platforms
 - **Reduce operational costs**: Consolidate monitoring, authentication, and UI development across all agents
 - **Future-proof your AI investments**: Add new agent platforms or migrate existing ones without disrupting user experiences
 
-**For Engineering Teams**  
+**For Engineering Teams**
 - **Developer velocity**: Integrate new agents in hours, not weeks, using standardized APIs and SDKs
 - **Comprehensive observability**: Gain visibility into every agent invocation, from interactive chats to background processing
 - **Flexible deployment**: Choose the infrastructure that aligns with your compliance, latency, and cost requirements
 
-**For End Users**  
+**For End Users**
 - **Consistent experience**: One chat interface for every AI capability—no context switching between platforms
 - **Contextual interactions**: Widgets adapt to business requirements, providing forms, visualizations, and custom UIs within conversations
 - **Trustworthy AI**: Transparent tracing and audit logs ensure accountability and explainability
@@ -688,7 +688,7 @@ Eine zentrale konzeptionelle Frage ist, ob Chat-Historie und Tracings direkt in 
 
 ### Gewichtete Gesamtbewertung
 
-**Integration in unifiedui**: **4.5/5** (gewichtet nach Priorität für Funktionalität und Flexibilität)  
+**Integration in unifiedui**: **4.5/5** (gewichtet nach Priorität für Funktionalität und Flexibilität)
 **On-the-fly Übersetzung**: **2.9/5** (gewichtet nach Priorität für Funktionalität und Flexibilität)
 
 ### Empfehlung

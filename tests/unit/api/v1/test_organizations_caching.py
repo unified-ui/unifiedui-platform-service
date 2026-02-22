@@ -38,8 +38,6 @@ def _create_org_data(
         "identity_provider": identity_provider,
         "identity_tenant_id": identity_tenant_id,
         "subscription_tier": kwargs.get("subscription_tier", "free"),
-        "max_tenants": kwargs.get("max_tenants", 10),
-        "max_users": kwargs.get("max_users", 100),
     }
 
 
@@ -256,7 +254,6 @@ class TestOrganizationCaching:
             headers,
             identity_tenant_id="cache-idp-multi",
             slug="cache-multi",
-            max_tenants=5,
         )
         org_id = org["id"]
 

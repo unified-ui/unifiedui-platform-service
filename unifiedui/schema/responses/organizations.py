@@ -15,8 +15,6 @@ class OrganizationResponse(BaseModel):
     identity_provider: str = Field(..., description="Identity provider name")
     identity_tenant_id: str = Field(..., description="IDP tenant identifier")
     subscription_tier: str = Field(..., description="Subscription tier")
-    max_tenants: int = Field(..., description="Maximum number of tenants")
-    max_users: int = Field(..., description="Maximum number of users")
     is_active: bool = Field(..., description="Whether the organization is active")
     created_at: datetime = Field(..., description="Timestamp when created")
     updated_at: datetime = Field(..., description="Timestamp when last updated")

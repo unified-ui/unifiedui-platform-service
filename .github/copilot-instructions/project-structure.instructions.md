@@ -42,7 +42,7 @@ unified-ui-platform-service/
 │   │   ├── database/           # DB models, enums, client interface
 │   │   │   ├── models.py       # SQLAlchemy models (~840 lines)
 │   │   │   ├── enums.py        # All enums (roles, permissions, types)
-│   │   │   ├── client.py       # SQLAlchemyClient 
+│   │   │   ├── client.py       # SQLAlchemyClient
 │   │   │   └── config.py       # DatabaseConfig
 │   │   ├── caching/            # Cache interface
 │   │   ├── vault/              # Vault interface (BaseVault, BaseVaultClient)

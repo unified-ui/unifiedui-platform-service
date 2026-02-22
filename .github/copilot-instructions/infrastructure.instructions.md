@@ -182,42 +182,42 @@ docdatabase/            → Implementations (MongoDB, CosmosDB)
 ```python
 class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
-    
+
     # Database
     database_url: str
-    
+
     # Cache
     redis_host: str = "localhost"
     redis_port: int = 6379
     redis_password: str = ""
     redis_db: int = 0
-    
+
     # Vault (dual vault support)
     vault_type: str = "dotenv"  # DOTENV | HASHICORP_VAULT | AZURE_KEYVAULT
     app_vault_type: Optional[str] = None     # Override for app vault (fallback: vault_type)
     secrets_vault_type: Optional[str] = None # Override for secrets vault (fallback: vault_type)
-    
+
     # App Vault Credentials
     app_hashicorp_vault_addr: Optional[str] = None
     app_hashicorp_vault_token: Optional[str] = None
     app_azure_keyvault_url: Optional[str] = None
-    
+
     # Secrets Vault Credentials
     secrets_hashicorp_vault_addr: Optional[str] = None
     secrets_hashicorp_vault_token: Optional[str] = None
     secrets_azure_keyvault_url: Optional[str] = None
-    
+
     # Identity
     azure_tenant_id: str
     azure_client_id: str
-    
+
     # CORS
     cors_origins: list[str] = ["*"]
-    
+
     # Agent Service Connection
     agent_service_url: str = "http://localhost:8085"
     agent_service_timeout: int = 30
-    
+
     model_config = SettingsConfigDict(env_file=".env")
 ```
 

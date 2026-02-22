@@ -17,7 +17,6 @@ from unifiedui.core.database.models import (
 )
 from unifiedui.exc.organizations import (
     OrganizationAlreadyExistsError,
-    OrganizationLimitExceededError,
     OrganizationMemberAlreadyExistsError,
     OrganizationMemberNotFoundError,
     OrganizationNotFoundError,
@@ -101,8 +100,6 @@ class OrganizationHandler:
                 identity_provider=request.identity_provider,
                 identity_tenant_id=request.identity_tenant_id,
                 subscription_tier=request.subscription_tier,
-                max_tenants=request.max_tenants,
-                max_users=request.max_users,
                 is_active=True,
                 created_by=user_id,
                 updated_by=user_id,
@@ -186,10 +183,6 @@ class OrganizationHandler:
                 org.description = request.description
             if request.subscription_tier is not None:
                 org.subscription_tier = request.subscription_tier
-            if request.max_tenants is not None:
-                org.max_tenants = request.max_tenants
-            if request.max_users is not None:
-                org.max_users = request.max_users
             if request.is_active is not None:
                 org.is_active = request.is_active
 
@@ -371,14 +364,7 @@ class OrganizationHandler:
         )
 
         with self.db_client.get_session() as session:
-            org = self._validate_organization_exists(session, organization_id)
-
-            # Check tenant limit
-            tenant_count = (
-                session.execute(select(Tenant).where(Tenant.organization_id == organization_id)).scalars().all()
-            )
-            if len(tenant_count) >= org.max_tenants:
-                raise OrganizationLimitExceededError("tenants", len(tenant_count), org.max_tenants)
+            self._validate_organization_exists(session, organization_id)
 
             tenant_id = str(uuid.uuid4())
             tenant = Tenant(
@@ -513,8 +499,6 @@ class OrganizationHandler:
             identity_provider=org.identity_provider,
             identity_tenant_id=org.identity_tenant_id,
             subscription_tier=org.subscription_tier,
-            max_tenants=org.max_tenants,
-            max_users=org.max_users,
             is_active=org.is_active,
             created_at=org.created_at,
             updated_at=org.updated_at,

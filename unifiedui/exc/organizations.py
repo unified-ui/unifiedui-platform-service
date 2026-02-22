@@ -57,16 +57,6 @@ class OrganizationMemberAlreadyExistsError(OrganizationError):
         super().__init__(f"Principal '{principal_id}' already has role '{role}' in organization")
 
 
-class OrganizationLimitExceededError(OrganizationError):
-    """Exception raised when organization limits are exceeded."""
-
-    def __init__(self, limit_type: str, current: int, maximum: int):
-        self.limit_type = limit_type
-        self.current = current
-        self.maximum = maximum
-        super().__init__(f"Organization {limit_type} limit exceeded: {current}/{maximum}")
-
-
 class TenantCannotBeDeletedError(OrganizationError):
     """Exception raised when trying to delete a non-deletable tenant."""
 

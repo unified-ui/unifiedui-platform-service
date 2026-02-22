@@ -99,13 +99,13 @@ class ChatAgentHandler:
         user: ContextIdentityUser
     ) -> ChatAgentResponse:
         """Create a new chat agent with the given configuration.
-        
+
         Args:
             tenant_id: Tenant ID for scoping
             request: Chat agent creation request data
             user_id: ID of the creating user
             user: Authenticated user context
-            
+
         Returns:
             Created chat agent response
         """

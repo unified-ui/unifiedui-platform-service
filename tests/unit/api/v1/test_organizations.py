@@ -37,8 +37,6 @@ def _create_org_data(
     identity_provider: str = "entra_id",
     identity_tenant_id: str = "idp-tenant-001",
     subscription_tier: str = "free",
-    max_tenants: int = 10,
-    max_users: int = 100,
 ) -> dict[str, Any]:
     """Helper to create organization request data."""
     data: dict[str, Any] = {
@@ -47,8 +45,6 @@ def _create_org_data(
         "identity_provider": identity_provider,
         "identity_tenant_id": identity_tenant_id,
         "subscription_tier": subscription_tier,
-        "max_tenants": max_tenants,
-        "max_users": max_users,
     }
     if description is not None:
         data["description"] = description
@@ -83,8 +79,6 @@ class TestOrganizationRoutes:
         assert data["identity_provider"] == org_data["identity_provider"]
         assert data["identity_tenant_id"] == org_data["identity_tenant_id"]
         assert data["subscription_tier"] == org_data["subscription_tier"]
-        assert data["max_tenants"] == org_data["max_tenants"]
-        assert data["max_users"] == org_data["max_users"]
         assert data["is_active"] is True
         assert "id" in data
         assert "created_at" in data
@@ -287,15 +281,13 @@ class TestOrganizationRoutes:
 
         response = test_client.patch(
             ENDPOINT_ORGANIZATION_DETAIL.format(organization_id=org_id),
-            json={"subscription_tier": "enterprise", "max_tenants": 50, "max_users": 500},
+            json={"subscription_tier": "enterprise"},
             headers=headers,
         )
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert data["subscription_tier"] == "enterprise"
-        assert data["max_tenants"] == 50
-        assert data["max_users"] == 500
 
     def test_update_organization_deactivate(self, test_client: TestClient) -> None:
         """Test deactivating an organization."""
@@ -735,7 +727,6 @@ class TestOrganizationTenantRoutes:
             headers,
             identity_tenant_id="idp-ten-stage-1",
             slug="ten-stage-org",
-            max_tenants=10,
         )
         org_id = org["id"]
 
@@ -786,37 +777,6 @@ class TestOrganizationTenantRoutes:
             headers=headers,
         )
         assert response.status_code == 422
-
-    def test_create_tenant_limit_exceeded(self, test_client: TestClient) -> None:
-        """Test that tenant creation fails when limit is reached."""
-        user_token = test_client.create_test_user("org-ten-lim-1", "Org Ten Lim")
-        headers = create_auth_headers(user_token, use_cache=False)
-
-        # Create org with max_tenants=2 (1 default + 1 allowed)
-        org = _create_org(
-            test_client,
-            headers,
-            identity_tenant_id="idp-ten-lim-1",
-            slug="ten-lim-org",
-            max_tenants=2,
-        )
-        org_id = org["id"]
-
-        # Create one more tenant (now at 2)
-        resp1 = test_client.post(
-            ENDPOINT_ORGANIZATION_TENANTS.format(organization_id=org_id),
-            json={"name": "Second Tenant", "environment_type": "SANDBOX"},
-            headers=headers,
-        )
-        assert resp1.status_code == status.HTTP_201_CREATED
-
-        # Third tenant should fail (limit is 2)
-        resp2 = test_client.post(
-            ENDPOINT_ORGANIZATION_TENANTS.format(organization_id=org_id),
-            json={"name": "Third Tenant", "environment_type": "SANDBOX"},
-            headers=headers,
-        )
-        assert resp2.status_code == status.HTTP_400_BAD_REQUEST
 
     def test_create_tenant_org_not_found(self, test_client: TestClient) -> None:
         """Test creating a tenant in a non-existent organization."""
@@ -920,7 +880,6 @@ class TestOrganizationTenantRoutes:
             headers,
             identity_tenant_id="idp-ten-multi-1",
             slug="ten-multi-org",
-            max_tenants=5,
         )
         org_id = org["id"]
 
