@@ -80,7 +80,7 @@ async def create_organization(
 
     from unifiedui.core.config import settings
 
-    if settings.system_admin_emails and (not user_mail or user_mail not in settings.system_admin_emails):
+    if settings.system_admin_email and (not user_mail or user_mail != settings.system_admin_email):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Access denied: Only system administrators can create organizations",

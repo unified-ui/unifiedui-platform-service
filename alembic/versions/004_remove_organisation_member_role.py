@@ -43,7 +43,7 @@ def upgrade() -> None:
     # Recreate the check constraint without ORGANISATION_MEMBER
     # For non-native enums, SQLAlchemy uses a CHECK constraint
     op.drop_constraint(
-        "ck_organization_members_organization_role",
+        "organization_role",
         "organization_members",
         type_="check",
     )
@@ -52,7 +52,7 @@ def upgrade() -> None:
         ", ".join(f"'{r}'" for r in NEW_ROLES)
     )
     op.create_check_constraint(
-        "ck_organization_members_organization_role",
+        "organization_role",
         "organization_members",
         sa.text(new_constraint),
     )
@@ -61,7 +61,7 @@ def upgrade() -> None:
 def downgrade() -> None:
     """Re-add ORGANISATION_MEMBER role to the check constraint."""
     op.drop_constraint(
-        "ck_organization_members_organization_role",
+        "organization_role",
         "organization_members",
         type_="check",
     )
@@ -70,7 +70,7 @@ def downgrade() -> None:
         ", ".join(f"'{r}'" for r in OLD_ROLES)
     )
     op.create_check_constraint(
-        "ck_organization_members_organization_role",
+        "organization_role",
         "organization_members",
         sa.text(old_constraint),
     )

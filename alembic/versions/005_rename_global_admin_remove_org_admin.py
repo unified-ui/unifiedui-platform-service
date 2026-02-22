@@ -81,7 +81,7 @@ def upgrade() -> None:
     )
 
     op.drop_constraint(
-        "ck_tenant_members_tenant_role",
+        "tenant_role",
         "tenant_members",
         type_="check",
     )
@@ -89,7 +89,7 @@ def upgrade() -> None:
         ", ".join(f"'{r}'" for r in NEW_TENANT_ROLES)
     )
     op.create_check_constraint(
-        "ck_tenant_members_tenant_role",
+        "tenant_role",
         "tenant_members",
         sa.text(new_tenant_constraint),
     )
@@ -99,7 +99,7 @@ def upgrade() -> None:
     )
 
     op.drop_constraint(
-        "ck_organization_members_organization_role",
+        "organization_role",
         "organization_members",
         type_="check",
     )
@@ -107,7 +107,7 @@ def upgrade() -> None:
         ", ".join(f"'{r}'" for r in NEW_ORG_ROLES)
     )
     op.create_check_constraint(
-        "ck_organization_members_organization_role",
+        "organization_role",
         "organization_members",
         sa.text(new_org_constraint),
     )
@@ -120,7 +120,7 @@ def downgrade() -> None:
     )
 
     op.drop_constraint(
-        "ck_tenant_members_tenant_role",
+        "tenant_role",
         "tenant_members",
         type_="check",
     )
@@ -128,13 +128,13 @@ def downgrade() -> None:
         ", ".join(f"'{r}'" for r in OLD_TENANT_ROLES)
     )
     op.create_check_constraint(
-        "ck_tenant_members_tenant_role",
+        "tenant_role",
         "tenant_members",
         sa.text(old_tenant_constraint),
     )
 
     op.drop_constraint(
-        "ck_organization_members_organization_role",
+        "organization_role",
         "organization_members",
         type_="check",
     )
@@ -142,7 +142,7 @@ def downgrade() -> None:
         ", ".join(f"'{r}'" for r in OLD_ORG_ROLES)
     )
     op.create_check_constraint(
-        "ck_organization_members_organization_role",
+        "organization_role",
         "organization_members",
         sa.text(old_org_constraint),
     )

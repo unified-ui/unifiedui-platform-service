@@ -568,16 +568,16 @@ class TestOrgTenantCreatorDoesNotGetBypass:
 
 
 class TestOrgCreationRestriction:
-    """Verify that organization creation is restricted to system_admin_emails."""
+    """Verify that organization creation is restricted to system_admin_email."""
 
     def test_create_org_allowed_for_system_admin(self, test_client: TestClient) -> None:
-        """User whose email is in system_admin_emails can create an org."""
+        """User whose email matches system_admin_email can create an org."""
         slug = f"sysadm-org-{uuid.uuid4().hex[:6]}"
         token = test_client.create_test_user("sysadm-creator", "Sys Admin", mail="admin@example.com")
         headers = create_auth_headers(token, use_cache=False)
 
         with patch("unifiedui.core.config.settings") as mock_settings:
-            mock_settings.system_admin_emails = ["admin@example.com"]
+            mock_settings.system_admin_email = "admin@example.com"
             resp = test_client.post(
                 ENDPOINT_ORGANIZATIONS,
                 json={
@@ -592,12 +592,12 @@ class TestOrgCreationRestriction:
         assert resp.json()["name"] == "SysAdmin Org"
 
     def test_create_org_denied_for_non_system_admin(self, test_client: TestClient) -> None:
-        """User whose email is NOT in system_admin_emails gets 403."""
+        """User whose email does NOT match system_admin_email gets 403."""
         token = test_client.create_test_user("nonsysadm", "Normal User", mail="user@example.com")
         headers = create_auth_headers(token, use_cache=False)
 
         with patch("unifiedui.core.config.settings") as mock_settings:
-            mock_settings.system_admin_emails = ["admin@example.com"]
+            mock_settings.system_admin_email = "admin@example.com"
             resp = test_client.post(
                 ENDPOINT_ORGANIZATIONS,
                 json={
@@ -611,12 +611,12 @@ class TestOrgCreationRestriction:
         assert resp.status_code == status.HTTP_403_FORBIDDEN
 
     def test_create_org_denied_when_no_email(self, test_client: TestClient) -> None:
-        """User with no email set gets 403 when system_admin_emails is configured."""
+        """User with no email set gets 403 when system_admin_email is configured."""
         token = test_client.create_test_user("nomail", "No Mail User")
         headers = create_auth_headers(token, use_cache=False)
 
         with patch("unifiedui.core.config.settings") as mock_settings:
-            mock_settings.system_admin_emails = ["admin@example.com"]
+            mock_settings.system_admin_email = "admin@example.com"
             resp = test_client.post(
                 ENDPOINT_ORGANIZATIONS,
                 json={
@@ -630,13 +630,13 @@ class TestOrgCreationRestriction:
         assert resp.status_code == status.HTTP_403_FORBIDDEN
 
     def test_create_org_allowed_when_no_restriction(self, test_client: TestClient) -> None:
-        """When system_admin_emails is empty, any authenticated user can create an org."""
+        """When system_admin_email is None, any authenticated user can create an org."""
         slug = f"norestrict-{uuid.uuid4().hex[:6]}"
         token = test_client.create_test_user("anyuser", "Any User", mail="any@example.com")
         headers = create_auth_headers(token, use_cache=False)
 
         with patch("unifiedui.core.config.settings") as mock_settings:
-            mock_settings.system_admin_emails = []
+            mock_settings.system_admin_email = None
             resp = test_client.post(
                 ENDPOINT_ORGANIZATIONS,
                 json={

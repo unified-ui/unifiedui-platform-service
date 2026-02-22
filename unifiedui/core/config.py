@@ -148,9 +148,7 @@ class Settings(BaseSettings):
 
     # Deployment Mode
     deployment_mode: str = "self-hosted"
-    system_admin_emails: list[str] = []
-    auto_create_organization: bool = True
-    default_organization_name: str = "Default Organization"
+    system_admin_email: str | None = None
 
     # Logging Configuration
     log_level: str = "INFO"
