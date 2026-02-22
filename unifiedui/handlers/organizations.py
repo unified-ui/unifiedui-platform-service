@@ -86,9 +86,13 @@ class OrganizationHandler:
             return self._org_to_response(org)
 
     def create_organization(
-        self, request: CreateOrganizationRequest, user_id: str, user: ContextIdentityUser | None = None
+        self,
+        request: CreateOrganizationRequest,
+        user_id: str,
+        user: ContextIdentityUser | None = None,
+        create_default_tenant: bool = True,
     ) -> OrganizationResponse:
-        """Create a new organization with a default tenant."""
+        """Create a new organization, optionally with a default tenant."""
         logger.info("Creating organization", extra={"org_name": request.name, "user_id": user_id})
 
         organization_id = str(uuid.uuid4())
@@ -119,42 +123,43 @@ class OrganizationHandler:
                     raise OrganizationSlugAlreadyExistsError(request.slug) from e
                 raise
 
-            # Create default tenant
-            default_tenant_id = str(uuid.uuid4())
-            default_tenant = Tenant(
-                id=default_tenant_id,
-                name="Default",
-                description="Default tenant",
-                organization_id=organization_id,
-                environment_type=EnvironmentTypeEnum.SANDBOX.value,
-                is_default=True,
-                can_be_deleted=False,
-                created_by=user_id,
-                updated_by=user_id,
-            )
-            session.add(default_tenant)
-            session.flush()
+            if create_default_tenant:
+                # Create default tenant
+                default_tenant_id = str(uuid.uuid4())
+                default_tenant = Tenant(
+                    id=default_tenant_id,
+                    name="Default",
+                    description="Default tenant",
+                    organization_id=organization_id,
+                    environment_type=EnvironmentTypeEnum.SANDBOX.value,
+                    is_default=True,
+                    can_be_deleted=False,
+                    created_by=user_id,
+                    updated_by=user_id,
+                )
+                session.add(default_tenant)
+                session.flush()
 
-            # Ensure principal exists for the creator
-            if user is not None:
-                ensure_principal_exists(
-                    session=session,
+                # Ensure principal exists for the creator
+                if user is not None:
+                    ensure_principal_exists(
+                        session=session,
+                        tenant_id=default_tenant_id,
+                        principal_id=user_id,
+                        principal_type="IDENTITY_USER",
+                        user=user,
+                    )
+
+                # Assign creator as TENANT_GLOBAL_ADMIN on the default tenant
+                tenant_role = TenantMember(
+                    id=str(uuid.uuid4()),
                     tenant_id=default_tenant_id,
                     principal_id=user_id,
-                    principal_type="IDENTITY_USER",
-                    user=user,
+                    role="TENANT_GLOBAL_ADMIN",
+                    created_by=user_id,
+                    updated_by=user_id,
                 )
-
-            # Assign creator as TENANT_GLOBAL_ADMIN on the default tenant
-            tenant_role = TenantMember(
-                id=str(uuid.uuid4()),
-                tenant_id=default_tenant_id,
-                principal_id=user_id,
-                role="TENANT_GLOBAL_ADMIN",
-                created_by=user_id,
-                updated_by=user_id,
-            )
-            session.add(tenant_role)
+                session.add(tenant_role)
 
             # Assign creator as ORGANISATION_GLOBAL_ADMIN
             org_member = OrganizationMember(
@@ -170,10 +175,10 @@ class OrganizationHandler:
             session.flush()
 
             logger.info(
-                "Organization created with default tenant",
+                "Organization created",
                 extra={
                     "organization_id": organization_id,
-                    "default_tenant_id": default_tenant_id,
+                    "with_default_tenant": create_default_tenant,
                     "user_id": user_id,
                 },
             )

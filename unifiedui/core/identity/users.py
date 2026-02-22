@@ -260,8 +260,17 @@ class ContextIdentityUser:
 
     def get_me(self) -> IdentityUserResponse:
         """Get the current user's identity information."""
+        from unifiedui.core.config import settings
+
         org_context = self.organization_context
         tenants_with_permissions = self.tenants
+
+        user_mail = self.identity.get_mail()
+        is_system_admin = bool(
+            settings.system_admin_email
+            and user_mail
+            and user_mail.lower().strip() == settings.system_admin_email.lower().strip()
+        )
 
         return IdentityUserResponse(
             id=self.identity.get_id(),
@@ -269,9 +278,10 @@ class ContextIdentityUser:
             identity_tenant_id=self.identity.get_identity_tenant_id(),
             display_name=self.identity.get_display_name(),
             principal_name=self.identity.get_principal_name(),
-            mail=self.identity.get_mail(),
+            mail=user_mail,
             firstname=self.identity.get_firstname(),
             lastname=self.identity.get_lastname(),
+            is_system_admin=is_system_admin,
             organization=org_context,
             tenants=tenants_with_permissions,
             groups=self.groups,

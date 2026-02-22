@@ -25,6 +25,7 @@ class IdentityUserResponse(BaseModel):
     firstname: str | None = None
     lastname: str | None = None
     mail: str | None = None
+    is_system_admin: bool = False
     organization: OrganizationContextResponse | None = None
     tenants: list[dict] | None = None
     groups: list[IdentityGroupResponse] | None = None

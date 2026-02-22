@@ -1,12 +1,23 @@
 """Tests for organization RBAC (Role-Based Access Control)."""
 
 from typing import Any
+from unittest.mock import patch
 
+import pytest
 from fastapi import status
 from starlette.testclient import TestClient
 
 from tests.conftest import create_auth_headers
 from unifiedui.core.database.enums import OrganizationRoleEnum, PrincipalTypeEnum
+
+
+@pytest.fixture(autouse=True)
+def _disable_system_admin_restriction():
+    """Disable system_admin_email restriction for all org tests in this module."""
+    with patch("unifiedui.core.config.settings") as mock_settings:
+        mock_settings.system_admin_email = None
+        yield
+
 
 # API Endpoints
 ENDPOINT_ORGANIZATIONS = "/api/v1/platform-service/organizations"

@@ -669,16 +669,18 @@ class TestGetOrgRequiresMembership:
 
         admin_headers = _get_admin_headers(test_client)
         slug = f"other-org-{uuid.uuid4().hex[:6]}"
-        resp_create = test_client.post(
-            ENDPOINT_ORGANIZATIONS,
-            json={
-                "name": "Other Org",
-                "slug": slug,
-                "identity_provider": "other_idp",
-                "identity_tenant_id": f"other-idp-{slug}",
-            },
-            headers=admin_headers,
-        )
+        with patch("unifiedui.core.config.settings") as mock_settings:
+            mock_settings.system_admin_email = None
+            resp_create = test_client.post(
+                ENDPOINT_ORGANIZATIONS,
+                json={
+                    "name": "Other Org",
+                    "slug": slug,
+                    "identity_provider": "other_idp",
+                    "identity_tenant_id": f"other-idp-{slug}",
+                },
+                headers=admin_headers,
+            )
         assert resp_create.status_code == status.HTTP_201_CREATED
         other_org_id = resp_create.json()["id"]
 
@@ -706,16 +708,18 @@ class TestOrgRolePermissionBoundaries:
         admin_token = test_client.create_test_user(f"perm-adm-{slug}", f"Admin {slug}")
         admin_headers = create_auth_headers(admin_token, use_cache=False)
 
-        resp = test_client.post(
-            ENDPOINT_ORGANIZATIONS,
-            json={
-                "name": f"Perm Org {slug}",
-                "slug": slug,
-                "identity_provider": "entra_id",
-                "identity_tenant_id": f"perm-idp-{slug}",
-            },
-            headers=admin_headers,
-        )
+        with patch("unifiedui.core.config.settings") as mock_settings:
+            mock_settings.system_admin_email = None
+            resp = test_client.post(
+                ENDPOINT_ORGANIZATIONS,
+                json={
+                    "name": f"Perm Org {slug}",
+                    "slug": slug,
+                    "identity_provider": "entra_id",
+                    "identity_tenant_id": f"perm-idp-{slug}",
+                },
+                headers=admin_headers,
+            )
         assert resp.status_code == status.HTTP_201_CREATED
         org = resp.json()
 
