@@ -141,6 +141,9 @@ class TenantHandler:
         """
         Create a new tenant and assign the creator as GLOBAL_ADMIN.
 
+        Resolves the organization from the user's identity context.
+        The tenant is created within the user's organization.
+
         Args:
             request: Tenant creation data
             user_id: ID of the user creating the tenant (principal_id)
@@ -148,18 +151,27 @@ class TenantHandler:
 
         Returns:
             Created tenant response
+
+        Raises:
+            TenantNotFoundError: If no organization found for the user's IDP tenant.
         """
         logger.info("Creating tenant", extra={"tenant_name": request.name, "user_id": user_id})
+
+        organization_id = self._resolve_user_organization_id(user)
 
         tenant_id = str(uuid.uuid4())
 
         with self.db_client.get_session() as session:
-            # Create tenant
             tenant = Tenant(
-                id=tenant_id, name=request.name, description=request.description, created_by=user_id, updated_by=user_id
+                id=tenant_id,
+                name=request.name,
+                description=request.description,
+                organization_id=organization_id,
+                created_by=user_id,
+                updated_by=user_id,
             )
             session.add(tenant)
-            session.flush()  # Flush to get the tenant ID for the member
+            session.flush()
 
             # Ensure principal exists (fetches from IDP if needed)
             ensure_principal_exists(
@@ -383,11 +395,32 @@ class TenantHandler:
             id=tenant.id,
             name=tenant.name,
             description=tenant.description,
+            organization_id=tenant.organization_id,
+            environment_type=tenant.environment_type,
+            is_default=tenant.is_default,
+            can_be_deleted=tenant.can_be_deleted,
             created_at=tenant.created_at,
             updated_at=tenant.updated_at,
             created_by=tenant.created_by,
             updated_by=tenant.updated_by,
         )
+
+    def _resolve_user_organization_id(self, user: ContextIdentityUser) -> str:
+        """Resolve the organization ID for the authenticated user.
+
+        Args:
+            user: The authenticated user context.
+
+        Returns:
+            The organization ID.
+
+        Raises:
+            TenantNotFoundError: If no organization exists for the user's IDP tenant.
+        """
+        org_context = user.organization_context
+        if org_context is None:
+            raise TenantNotFoundError("No organization found for user")
+        return org_context.id
 
     def _get_from_cache(self, cache_key: str, use_cache: bool = True):
         """

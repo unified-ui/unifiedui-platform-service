@@ -16,6 +16,8 @@ from unifiedui.core.database.models import (
 )
 from unifiedui.handlers.resource_permissions import RESOURCE_PERMISSION_CONFIG, ResourcePermissionsHandler
 
+TEST_HANDLER_ORG_ID = "handler-test-org-00000000"
+
 
 class TestResourcePermissionsHandlerConfig:
     """Tests for ResourcePermissionsHandler configuration."""
@@ -51,7 +53,12 @@ class TestResourcePermissionsHandlerOperations:
 
         # Create tenant
         tenant = Tenant(
-            id=tenant_id, name="Test Tenant", description="Test Description", created_by=user_id, updated_by=user_id
+            id=tenant_id,
+            name="Test Tenant",
+            description="Test Description",
+            organization_id=TEST_HANDLER_ORG_ID,
+            created_by=user_id,
+            updated_by=user_id,
         )
         test_db_session.add(tenant)
 
@@ -288,7 +295,12 @@ class TestResourcePermissionsHandlerPermissionChecks:
 
         # Create tenant
         tenant = Tenant(
-            id=tenant_id, name="Test Tenant", description="Test Description", created_by=user_id, updated_by=user_id
+            id=tenant_id,
+            name="Test Tenant",
+            description="Test Description",
+            organization_id=TEST_HANDLER_ORG_ID,
+            created_by=user_id,
+            updated_by=user_id,
         )
         test_db_session.add(tenant)
 
@@ -500,7 +512,12 @@ class TestResourcePermissionsHandlerMultipleResourceTypes:
 
         # Create tenant
         tenant = Tenant(
-            id=tenant_id, name="Test Tenant", description="Test Description", created_by=user_id, updated_by=user_id
+            id=tenant_id,
+            name="Test Tenant",
+            description="Test Description",
+            organization_id=TEST_HANDLER_ORG_ID,
+            created_by=user_id,
+            updated_by=user_id,
         )
         test_db_session.add(tenant)
 
@@ -613,6 +630,7 @@ class TestResourcePermissionsHandlerFilters:
             id=tenant_id,
             name="Test Tenant",
             description="Test Description",
+            organization_id=TEST_HANDLER_ORG_ID,
             created_by=creator_id,
             updated_by=creator_id,
         )

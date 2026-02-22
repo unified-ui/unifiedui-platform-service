@@ -1,18 +1,25 @@
 """FastAPI test client fixtures."""
 
 import logging
+import uuid
 from collections.abc import Generator
 
 import pytest
 from fastapi.testclient import TestClient
-from tests.fixtures.auth import create_auth_headers, create_test_user
 
+from tests.fixtures.auth import create_auth_headers, create_test_user
 from unifiedui.app import create_app
 from unifiedui.caching.client import CacheClient
 from unifiedui.caching.redis.cache import RedisCache
 from unifiedui.core.database.client import SQLAlchemyClient
+from unifiedui.core.database.models import Organization, OrganizationMember
 
 logger = logging.getLogger(__name__)
+
+TEST_ORGANIZATION_ID = "test-org-00000000"
+TEST_IDENTITY_PROVIDER = "MOCK"
+TEST_IDENTITY_TENANT_ID = "test-tenant-123"
+TEST_DEFAULT_USER_ID = "test-user-123"
 
 
 @pytest.fixture(scope="function")
@@ -51,6 +58,8 @@ def test_client(
 
     logger.info("Set test clients as global singletons")
 
+    _seed_test_organization(test_db_client)
+
     app = create_app()
     logger.info("App created")
 
@@ -81,3 +90,39 @@ def test_client(
     vault_dep._vault_client = None
     vault_dep._secrets_vault = None
     logger.info("Singletons reset")
+
+
+def _seed_test_organization(db_client: SQLAlchemyClient) -> None:
+    """Seed a test organization matching the mock identity provider.
+
+    Creates an Organization with identity_provider=MOCK and
+    identity_tenant_id=test-tenant-123 so that all mock users
+    can resolve their organization_context.
+    Also creates an OrganizationMember for the default test user.
+    """
+    with db_client.get_session() as session:
+        org = Organization(
+            id=TEST_ORGANIZATION_ID,
+            name="Test Organization",
+            slug="test-organization",
+            identity_provider=TEST_IDENTITY_PROVIDER,
+            identity_tenant_id=TEST_IDENTITY_TENANT_ID,
+            subscription_tier="free",
+            is_active=True,
+            created_by="system",
+            updated_by="system",
+        )
+        session.add(org)
+        session.flush()
+
+        member = OrganizationMember(
+            id=str(uuid.uuid4()),
+            organization_id=TEST_ORGANIZATION_ID,
+            principal_id=TEST_DEFAULT_USER_ID,
+            principal_type="IDENTITY_USER",
+            role="ORGANISATION_GLOBAL_ADMIN",
+            created_by="system",
+            updated_by="system",
+        )
+        session.add(member)
+    logger.info("Seeded test organization: %s", TEST_ORGANIZATION_ID)

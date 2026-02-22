@@ -4,6 +4,7 @@ from typing import Any
 
 from fastapi import status
 from starlette.testclient import TestClient
+
 from tests.fixtures.auth import create_auth_headers, create_test_user
 
 # Endpoints

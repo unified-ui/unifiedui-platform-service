@@ -5,6 +5,76 @@ All auth middleware: `unifiedui/core/middleware/apis/v1/auth.py`
 
 ---
 
+## Multi-IDP Identity Architecture
+
+The platform supports 9 identity provider types via factory pattern:
+
+### Token Factory (`IdentityTokenFactory`)
+Routes incoming JWTs by `iss` claim to the correct token serializer:
+
+| Issuer Pattern | Provider | Token Class | Verification |
+|---|---|---|---|
+| `mock.identity.provider/` | Mock | `MockIdentityToken` | Expiry only |
+| `sts.windows.net/` or `login.microsoftonline.com/.../v2.0` | Entra ID | `ExtraIDIdentityTokenSerializer` | JWKS + audience |
+| `accounts.google.com` | Google | `GoogleIdentityTokenSerializer` | JWKS + audience |
+| `cognito-idp.*.amazonaws.com/` | AWS Cognito | `AWSCognitoIdentityTokenSerializer` | JWKS + audience |
+| `*.okta.com` or `*.oktapreview.com` | Okta | `OktaIdentityTokenSerializer` | JWKS + audience |
+| Matches `OIDC_ISSUER_URL` | Generic OIDC | `OIDCIdentityTokenSerializer` | JWKS + audience |
+| Matches `SAML_ENTITY_ID` | SAML | `SAMLIdentityTokenSerializer` | Expiry only (gateway-trusted) |
+| `ldap://` or `ldaps://` prefix | LDAP | `LDAPIdentityTokenSerializer` | Expiry only (gateway-trusted) |
+| `krb://` prefix | Kerberos | `KerberosIdentityTokenSerializer` | Expiry only (gateway-trusted) |
+
+### Provider Factory (`IdentityProviderFactory`)
+Routes by `IdenityProviderEnum` value to create a provider for user/group lookups:
+
+| Provider | Backend | Key Config |
+|---|---|---|
+| Entra ID | Microsoft Graph API (OBO) | `IDENTITY_CLIENT_ID`, `IDENTITY_CLIENT_SECRET` |
+| Google | Admin Directory API (service account) | `GOOGLE_SERVICE_ACCOUNT_TOKEN` |
+| AWS Cognito | `cognito-idp` (boto3) | `AWS_COGNITO_REGION`, `AWS_COGNITO_USER_POOL_ID` |
+| LDAP | ldap3 SUBTREE search | `LDAP_SERVER_URL`, `LDAP_BIND_DN`, `LDAP_BASE_DN` |
+| Kerberos | LDAP/AD with SASL/Kerberos | `KERBEROS_LDAP_URL`, `KERBEROS_LDAP_BASE_DN` |
+| SAML | Assertion claims only (no directory) | `SAML_ENTITY_ID` |
+| Okta | Okta Management API v1 (SSWS) | `OKTA_DOMAIN`, `OKTA_API_TOKEN` |
+| Generic OIDC | UserInfo endpoint + token fallback | `OIDC_ISSUER_URL`, `OIDC_USERINFO_URL` |
+
+### Key files:
+- Token factory + singleton verifiers: `unifiedui/core/identity/factory.py`
+- Token verifier (JWKS): `unifiedui/core/identity/token_verifier.py`
+- Provider base classes: `unifiedui/core/identity/providers.py`
+- Enum: `unifiedui/core/identity/enums.py` (`IdenityProviderEnum`, 9 values)
+- Implementations: `unifiedui/identity/{provider}/token.py` + `provider.py`
+
+### Performance:
+- JWKS keys cached via `PyJWKClient(cache_keys=True)` — HTTP fetch only on first request / key rotation
+- Verifier instances are singletons (module-level globals)
+- LDAP/Kerberos/SAML skip JWKS entirely — only expiry check
+
+**Configuration:** See `SETUP.md` for per-provider setup instructions.
+
+---
+
+## OBO Flow (Token Authentication)
+
+The platform service uses the OAuth 2.0 **On-Behalf-Of (OBO) flow** for Microsoft Entra ID authentication:
+
+1. **Frontend** requests an API-scoped token via MSAL: `api://{client_id}/access_as_user`
+2. **Backend** verifies the token signature via JWKS (`identity_verify_signature=true`)
+3. **Backend** exchanges the user token for a Microsoft Graph token via OBO
+4. **Graph token** is used for all Graph API calls (user info, groups, tenants)
+
+**Key files:**
+- Token verification: `unifiedui/core/identity/token_verifier.py`
+- OBO exchange: `unifiedui/core/identity/obo_token_exchange.py`
+- Factory (orchestrates both): `unifiedui/core/identity/factory.py`
+- Identity provider (uses Graph token): `unifiedui/identity/extra_id/provider.py`
+
+**Fallback mode:** When `IDENTITY_CLIENT_SECRET` or `IDENTITY_TENANT_ID` is not configured, OBO is skipped and the user token is used directly for Graph calls (development/legacy mode).
+
+**Configuration:** See `SETUP.md` → "Azure App Registration (OBO Flow)" for full setup instructions.
+
+---
+
 ## Four Auth Decorators
 
 ### 1. `@authenticate()`

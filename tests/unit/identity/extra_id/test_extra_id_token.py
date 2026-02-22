@@ -127,9 +127,16 @@ class TestExtraIDIdentityTokenSerializer:
 
         assert token.get_lastname() == ""
 
-    def test_get_mail(self):
-        """Test getting email from mail claim."""
-        deserialized = {"mail": "user@example.com"}
+    def test_get_mail_from_email_claim(self):
+        """Test getting email from email claim (v2.0 tokens)."""
+        deserialized = {"email": "user@example.com"}
+        token = ExtraIDIdentityTokenSerializer("token", deserialized)
+
+        assert token.get_mail() == "user@example.com"
+
+    def test_get_mail_fallback_to_preferred_username(self):
+        """Test getting email falls back to preferred_username."""
+        deserialized = {"preferred_username": "user@example.com"}
         token = ExtraIDIdentityTokenSerializer("token", deserialized)
 
         assert token.get_mail() == "user@example.com"
@@ -147,15 +154,36 @@ class TestExtraIDIdentityTokenSerializer:
         assert token.get_identity_provider() == IdenityProviderEnum.EXTRA_ID.value
         assert token.get_identity_provider() == "EXTRA_ID"
 
-    def test_complete_token_with_all_fields(self):
-        """Test token with all possible fields."""
+    def test_get_principal_name_from_preferred_username(self):
+        """Test getting principal name from preferred_username (v2.0 tokens)."""
+        deserialized = {"preferred_username": "user@example.com"}
+        token = ExtraIDIdentityTokenSerializer("token", deserialized)
+
+        assert token.get_principal_name() == "user@example.com"
+
+    def test_get_principal_name_from_upn(self):
+        """Test getting principal name from upn claim (v1.0 tokens)."""
+        deserialized = {"upn": "user@example.com"}
+        token = ExtraIDIdentityTokenSerializer("token", deserialized)
+
+        assert token.get_principal_name() == "user@example.com"
+
+    def test_get_principal_name_default(self):
+        """Test principal name returns empty when missing."""
+        token = ExtraIDIdentityTokenSerializer("token", {})
+
+        assert token.get_principal_name() == ""
+
+    def test_complete_token_v2_claims(self):
+        """Test token with v2.0 claim format."""
         deserialized = {
             "oid": "user-123",
             "tid": "tenant-456",
             "name": "John Doe",
             "given_name": "John",
             "family_name": "Doe",
-            "mail": "john.doe@example.com",
+            "preferred_username": "john.doe@example.com",
+            "email": "john.doe@example.com",
         }
         token = ExtraIDIdentityTokenSerializer("full-token", deserialized)
 
@@ -164,5 +192,6 @@ class TestExtraIDIdentityTokenSerializer:
         assert token.get_display_name() == "John Doe"
         assert token.get_firstname() == "John"
         assert token.get_lastname() == "Doe"
+        assert token.get_principal_name() == "john.doe@example.com"
         assert token.get_mail() == "john.doe@example.com"
         assert token.get_identity_provider() == "EXTRA_ID"

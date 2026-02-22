@@ -220,8 +220,8 @@ class Tenant(Base, IdNameDescriptionMixin):
 
     __tablename__ = "tenants"
 
-    organization_id: Mapped[str | None] = mapped_column(
-        String(36), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=True
+    organization_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False
     )
     environment_type: Mapped[str] = mapped_column(
         EnvironmentTypeSAEnum, nullable=False, default=EnvironmentTypeEnum.SANDBOX.value
@@ -232,7 +232,7 @@ class Tenant(Base, IdNameDescriptionMixin):
     is_default: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     can_be_deleted: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
-    organization: Mapped[Organization | None] = relationship(back_populates="tenants")
+    organization: Mapped[Organization] = relationship(back_populates="tenants")
     members: Mapped[list[TenantMember]] = relationship(back_populates="tenant", cascade="all, delete-orphan")
     principals: Mapped[list[Principal]] = relationship(back_populates="tenant", cascade="all, delete-orphan")
 

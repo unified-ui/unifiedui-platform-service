@@ -4,8 +4,8 @@ import uuid
 
 from fastapi import status
 from starlette.testclient import TestClient
-from tests.conftest import create_auth_headers
 
+from tests.conftest import create_auth_headers
 from unifiedui.core.database.enums import PermissionActionEnum, PrincipalTypeEnum
 from unifiedui.core.database.models import ChatAgent, ChatAgentMember
 

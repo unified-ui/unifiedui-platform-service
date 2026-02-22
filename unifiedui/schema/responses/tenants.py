@@ -6,9 +6,15 @@ from pydantic import BaseModel, Field
 
 
 class TenantResponse(BaseModel):
+    """Response schema for a tenant."""
+
     id: str = Field(..., description="Unique identifier for the tenant")
     name: str = Field(..., description="Name of the tenant")
     description: str | None = Field(None, description="Optional description of the tenant")
+    organization_id: str = Field(..., description="ID of the parent organization")
+    environment_type: str = Field("SANDBOX", description="Environment type (SANDBOX or PRODUCTION)")
+    is_default: bool = Field(False, description="Whether this is the default tenant")
+    can_be_deleted: bool = Field(True, description="Whether this tenant can be deleted")
     created_at: datetime = Field(..., description="Timestamp when the tenant was created")
     updated_at: datetime = Field(..., description="Timestamp when the tenant was last updated")
     created_by: str | None = Field(None, description="User ID who created this tenant")

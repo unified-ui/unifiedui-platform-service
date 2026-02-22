@@ -12,13 +12,14 @@ logger = get_logger(__name__)
 class JWKSTokenVerifier:
     """Verifies JWT tokens using JWKS endpoint for signature validation and audience check."""
 
-    def __init__(self, jwks_url: str, algorithms: list[str], audience: str | None = None):
+    def __init__(self, jwks_url: str, algorithms: list[str], audience: str | list[str] | None = None):
         """Initialize the JWKS token verifier.
 
         Args:
             jwks_url: URL of the JWKS endpoint for public key retrieval.
             algorithms: List of accepted signing algorithms (e.g. ["RS256"]).
-            audience: Expected audience claim (client_id). If None, audience is not validated.
+            audience: Expected audience claim(s). Can be a single string or list
+                      of accepted audiences. If None, audience is not validated.
         """
         self._jwks_client = PyJWKClient(jwks_url, cache_keys=True)
         self._algorithms = algorithms
@@ -79,10 +80,13 @@ def get_token_verifier() -> JWKSTokenVerifier:
     if _verifier_instance is None:
         from unifiedui.core.config import settings
 
+        client_id = settings.identity_client_id
+        accepted_audiences = [client_id, f"api://{client_id}"] if client_id else None
+
         _verifier_instance = JWKSTokenVerifier(
             jwks_url=settings.identity_jwks_url,
             algorithms=settings.identity_token_algorithms,
-            audience=settings.identity_client_id,
+            audience=accepted_audiences,
         )
     return _verifier_instance
 

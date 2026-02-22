@@ -38,6 +38,31 @@ class TestIdenityProviderEnum:
         assert hasattr(IdenityProviderEnum, "GOOGLE_IDENTITY")
         assert IdenityProviderEnum.GOOGLE_IDENTITY == "GOOGLE_IDENTITY"
 
+    def test_has_ldap_value(self):
+        """Test LDAP value exists."""
+        assert hasattr(IdenityProviderEnum, "LDAP")
+        assert IdenityProviderEnum.LDAP == "LDAP"
+
+    def test_has_kerberos_value(self):
+        """Test KERBEROS value exists."""
+        assert hasattr(IdenityProviderEnum, "KERBEROS")
+        assert IdenityProviderEnum.KERBEROS == "KERBEROS"
+
+    def test_has_saml_value(self):
+        """Test SAML value exists."""
+        assert hasattr(IdenityProviderEnum, "SAML")
+        assert IdenityProviderEnum.SAML == "SAML"
+
+    def test_has_okta_value(self):
+        """Test OKTA value exists."""
+        assert hasattr(IdenityProviderEnum, "OKTA")
+        assert IdenityProviderEnum.OKTA == "OKTA"
+
+    def test_has_oidc_value(self):
+        """Test OIDC value exists."""
+        assert hasattr(IdenityProviderEnum, "OIDC")
+        assert IdenityProviderEnum.OIDC == "OIDC"
+
     def test_all_values_are_strings(self):
         """Test all enum values are strings."""
         for member in IdenityProviderEnum:
@@ -45,7 +70,7 @@ class TestIdenityProviderEnum:
 
     def test_enum_members_count(self):
         """Test the number of enum members."""
-        assert len(IdenityProviderEnum) == 4
+        assert len(IdenityProviderEnum) == 9
 
     def test_can_create_from_string(self):
         """Test enum can be created from string."""

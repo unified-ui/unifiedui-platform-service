@@ -3,9 +3,9 @@ from typing import TYPE_CHECKING
 from pymongo import MongoClient
 
 from unifiedui.core.docdatabase.base import BaseDatabaseClient
-from unifiedui.docdatabase.mongo.collections.custom_groups import MongoDBCustomGroupsCollection
-from unifiedui.docdatabase.mongo.collections.permissions import MongoDBPermissionsCollection
-from unifiedui.docdatabase.mongo.collections.tenants import MongoDBTenantsCollection
+from unifiedui.docdatabase.mongo.repos.custom_groups import MongoDBCustomGroupsCollection
+from unifiedui.docdatabase.mongo.repos.permissions import MongoDBPermissionsCollection
+from unifiedui.docdatabase.mongo.repos.tenants import MongoDBTenantsCollection
 
 if TYPE_CHECKING:
     from pymongo.database import Database

@@ -59,7 +59,14 @@ unified-ui-platform-service/
 │   │   ├── hashicorp_vault/    # HashiCorp Vault
 │   │   └── dotenv/             # DotEnv vault (development)
 │   ├── identity/               # Identity provider implementations
-│   │   ├── extra_id/           # Azure AD via MSAL
+│   │   ├── extra_id/           # Azure AD / Entra ID via MSAL (OBO flow)
+│   │   ├── google/             # Google Identity Platform (OAuth2)
+│   │   ├── aws_cognito/        # AWS Cognito (User Pools)
+│   │   ├── ldap/               # LDAP / Active Directory
+│   │   ├── kerberos/           # Kerberos / SPNEGO
+│   │   ├── saml/               # SAML 2.0
+│   │   ├── okta/               # Okta (OIDC + Management API)
+│   │   ├── oidc/               # Generic OIDC (Keycloak, Auth0, etc.)
 │   │   └── mock/               # Mock identity for testing
 │   ├── docdatabase/            # Document DB implementations
 │   ├── exc/                    # Custom exception classes
@@ -83,7 +90,14 @@ unified-ui-platform-service/
 | `core/vault/vault.py` → `BaseVault` | `vault/azure_keyvault/` | Azure Key Vault |
 | `core/vault/vault.py` → `BaseVault` | `vault/dotenv/` | DotEnv (dev) |
 | `core/caching/` | `caching/redis/` | Redis cache |
-| `core/identity/` | `identity/extra_id/` | Azure AD |
+| `core/identity/` | `identity/extra_id/` | Azure AD / Entra ID |
+| `core/identity/` | `identity/google/` | Google Identity |
+| `core/identity/` | `identity/aws_cognito/` | AWS Cognito |
+| `core/identity/` | `identity/ldap/` | LDAP / AD |
+| `core/identity/` | `identity/kerberos/` | Kerberos / SPNEGO |
+| `core/identity/` | `identity/saml/` | SAML 2.0 |
+| `core/identity/` | `identity/okta/` | Okta |
+| `core/identity/` | `identity/oidc/` | Generic OIDC |
 | `core/identity/` | `identity/mock/` | Mock (testing) |
 | `core/database/client.py` | `core/database/client.py` | SQLAlchemy (single impl) |
 

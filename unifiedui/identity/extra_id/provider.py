@@ -12,9 +12,17 @@ from unifiedui.utils.api_query import APIFilterQuery
 class ExtraIDIdentityProvider(BaseIdentityProvider, APIJSONBearerClient):
     """Microsoft Entra ID (formerly Azure AD) identity provider implementation."""
 
-    def __init__(self, identity_token: BaseIdentityToken):
+    def __init__(self, identity_token: BaseIdentityToken, graph_token: str | None = None):
+        """Initialize the Entra ID identity provider.
+
+        Args:
+            identity_token: The user's verified identity token.
+            graph_token: Microsoft Graph access token obtained via OBO flow.
+                         If None, falls back to using the identity token directly.
+        """
         BaseIdentityProvider.__init__(self, identity_token)
         APIJSONBearerClient.__init__(self, base_url="https://graph.microsoft.com/v1.0")
+        self._graph_token = graph_token or identity_token.token
 
     def _decode_token_payload(self, token: str) -> dict:
         """Decode JWT token payload without signature validation."""
@@ -58,7 +66,7 @@ class ExtraIDIdentityProvider(BaseIdentityProvider, APIJSONBearerClient):
             List of identity groups the user/service principal belongs to
         """
         query = query or APIFilterQuery()
-        headers = self._get_headers(self.identity_token.token)
+        headers = self._get_headers(self._graph_token)
 
         if query.next_link:
             url = query.next_link
@@ -93,7 +101,7 @@ class ExtraIDIdentityProvider(BaseIdentityProvider, APIJSONBearerClient):
             Tuple of (list of security groups, next_link)
         """
         query = query or APIFilterQuery()
-        headers = self._get_headers(self.identity_token.token)
+        headers = self._get_headers(self._graph_token)
 
         if query.search:
             headers["ConsistencyLevel"] = "eventual"
@@ -128,7 +136,7 @@ class ExtraIDIdentityProvider(BaseIdentityProvider, APIJSONBearerClient):
             Tuple of (list of users, next_link)
         """
         query = query or APIFilterQuery()
-        headers = self._get_headers(self.identity_token.token)
+        headers = self._get_headers(self._graph_token)
 
         if query.search:
             headers["ConsistencyLevel"] = "eventual"
@@ -168,7 +176,7 @@ class ExtraIDIdentityProvider(BaseIdentityProvider, APIJSONBearerClient):
         Returns:
             IdentityUserResponse with user details
         """
-        headers = self._get_headers(self.identity_token.token)
+        headers = self._get_headers(self._graph_token)
         url = self._url(f"/users/{user_id}")
         params = {"$select": "displayName,id,userPrincipalName,givenName,surname,mail"}
 
@@ -197,7 +205,7 @@ class ExtraIDIdentityProvider(BaseIdentityProvider, APIJSONBearerClient):
         Returns:
             IdentityGroupResponse with group details
         """
-        headers = self._get_headers(self.identity_token.token)
+        headers = self._get_headers(self._graph_token)
         url = self._url(f"/groups/{group_id}")
         params = {"$select": "displayName,id"}
 

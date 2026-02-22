@@ -5,8 +5,8 @@ from typing import Any
 
 from fastapi import status
 from starlette.testclient import TestClient
-from tests.conftest import create_auth_headers
 
+from tests.conftest import create_auth_headers
 from unifiedui.core.database.models import RecentVisit
 
 ENDPOINT_RECENT_VISITS = "/api/v1/platform-service/tenants/{tenant_id}/users/{user_id}/recent-visits"

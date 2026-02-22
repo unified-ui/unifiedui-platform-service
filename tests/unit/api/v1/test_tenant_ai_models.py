@@ -4,6 +4,7 @@ from typing import Any
 
 from fastapi import status
 from starlette.testclient import TestClient
+
 from tests.conftest import create_auth_headers
 
 ENDPOINT_AI_MODELS = "/api/v1/platform-service/tenants/{tenant_id}/ai-models"

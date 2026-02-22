@@ -16,6 +16,8 @@ from unifiedui.core.database.models import (
 )
 from unifiedui.handlers.resource_tags import RESOURCE_TAG_CONFIG, ResourceTagsHandler
 
+TEST_HANDLER_ORG_ID = "handler-test-org-00000000"
+
 
 class TestResourceTagsHandlerConfig:
     """Tests for ResourceTagsHandler configuration."""
@@ -59,7 +61,12 @@ class TestResourceTagsHandlerOperations:
 
         # Create tenant
         tenant = Tenant(
-            id=tenant_id, name="Test Tenant", description="Test Description", created_by=user_id, updated_by=user_id
+            id=tenant_id,
+            name="Test Tenant",
+            description="Test Description",
+            organization_id=TEST_HANDLER_ORG_ID,
+            created_by=user_id,
+            updated_by=user_id,
         )
         test_db_session.add(tenant)
 
@@ -347,7 +354,12 @@ class TestResourceTagsHandlerMultipleResourceTypes:
 
         # Create tenant
         tenant = Tenant(
-            id=tenant_id, name="Test Tenant", description="Test Description", created_by=user_id, updated_by=user_id
+            id=tenant_id,
+            name="Test Tenant",
+            description="Test Description",
+            organization_id=TEST_HANDLER_ORG_ID,
+            created_by=user_id,
+            updated_by=user_id,
         )
         test_db_session.add(tenant)
 
@@ -492,7 +504,14 @@ class TestResourceTagsHandlerCaching:
         user_id = f"test-user-{str(uuid.uuid4())[:8]}"
         chat_agent_id = str(uuid.uuid4())
 
-        tenant = Tenant(id=tenant_id, name="Test Tenant", description="Test", created_by=user_id, updated_by=user_id)
+        tenant = Tenant(
+            id=tenant_id,
+            name="Test Tenant",
+            description="Test",
+            organization_id=TEST_HANDLER_ORG_ID,
+            created_by=user_id,
+            updated_by=user_id,
+        )
         test_db_session.add(tenant)
 
         principal = Principal(

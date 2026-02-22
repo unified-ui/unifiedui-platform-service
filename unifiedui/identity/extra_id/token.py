@@ -23,7 +23,7 @@ class ExtraIDIdentityTokenSerializer(BaseIdentityToken):
         return self.deserialized_token.get("name", "")
 
     def get_principal_name(self) -> str:
-        return self.deserialized_token.get("userPrincipalName", "")
+        return self.deserialized_token.get("preferred_username") or self.deserialized_token.get("upn", "")
 
     def get_firstname(self) -> str:
         given_name = self.deserialized_token.get("given_name", "")
@@ -47,8 +47,8 @@ class ExtraIDIdentityTokenSerializer(BaseIdentityToken):
 
         return ""
 
-    def get_mail(self):
-        return self.deserialized_token.get("mail", "")
+    def get_mail(self) -> str:
+        return self.deserialized_token.get("email") or self.deserialized_token.get("preferred_username", "")
 
     def get_identity_provider(self) -> str:
         return self._identity_provider

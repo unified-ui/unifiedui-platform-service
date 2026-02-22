@@ -65,7 +65,7 @@ class TenantWithOrganizationResponse(BaseModel):
     id: str = Field(..., description="Unique identifier for the tenant")
     name: str = Field(..., description="Name of the tenant")
     description: str | None = Field(None, description="Optional description")
-    organization_id: str | None = Field(None, description="ID of the parent organization")
+    organization_id: str = Field(..., description="ID of the parent organization")
     environment_type: str = Field(..., description="Environment type (SANDBOX or PRODUCTION)")
     previous_stage_id: str | None = Field(None, description="ID of previous stage tenant")
     is_default: bool = Field(..., description="Whether this is the default tenant")

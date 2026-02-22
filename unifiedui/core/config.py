@@ -87,9 +87,64 @@ class Settings(BaseSettings):
 
     # Identity / Token Validation
     identity_client_id: str | None = None
+    identity_client_secret: str | None = None
+    identity_tenant_id: str | None = None
     identity_jwks_url: str = "https://login.microsoftonline.com/common/discovery/v2.0/keys"
     identity_token_algorithms: list[str] = ["RS256"]
     identity_verify_signature: bool = True
+
+    # Google Identity Configuration
+    google_client_id: str | None = None
+    google_service_account_token: str | None = None
+
+    # AWS Cognito Identity Configuration
+    aws_cognito_region: str | None = None
+    aws_cognito_user_pool_id: str | None = None
+    aws_cognito_client_id: str | None = None
+    aws_cognito_access_key_id: str | None = None
+    aws_cognito_secret_access_key: str | None = None
+
+    # LDAP Identity Configuration
+    ldap_server_url: str | None = None
+    ldap_bind_dn: str | None = None
+    ldap_bind_password: str | None = None
+    ldap_base_dn: str | None = None
+    ldap_user_search_filter: str = "(objectClass=person)"
+    ldap_group_search_filter: str = "(objectClass=groupOfNames)"
+    ldap_use_ssl: bool = True
+
+    # Kerberos Identity Configuration
+    kerberos_realm: str | None = None
+    kerberos_kdc_host: str | None = None
+    kerberos_service_principal: str | None = None
+    kerberos_keytab_path: str | None = None
+    kerberos_ldap_url: str | None = None
+    kerberos_ldap_base_dn: str | None = None
+
+    # SAML Identity Configuration
+    saml_entity_id: str | None = None
+    saml_sso_url: str | None = None
+    saml_certificate: str | None = None
+    saml_metadata_url: str | None = None
+    saml_attribute_map_id: str = "uid"
+    saml_attribute_map_email: str = "email"
+    saml_attribute_map_display_name: str = "displayName"
+    saml_attribute_map_first_name: str = "firstName"
+    saml_attribute_map_last_name: str = "lastName"
+
+    # Okta Identity Configuration
+    okta_domain: str | None = None
+    okta_client_id: str | None = None
+    okta_api_token: str | None = None
+    okta_authorization_server_id: str = "default"
+
+    # Generic OIDC Identity Configuration
+    oidc_issuer_url: str | None = None
+    oidc_client_id: str | None = None
+    oidc_client_secret: str | None = None
+    oidc_jwks_url: str | None = None
+    oidc_userinfo_url: str | None = None
+    oidc_scopes: str = "openid profile email"
 
     # Deployment Mode
     deployment_mode: str = "self-hosted"

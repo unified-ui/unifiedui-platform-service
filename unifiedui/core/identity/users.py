@@ -259,7 +259,17 @@ class ContextIdentityUser:
         return self._organization_context
 
     def get_me(self) -> IdentityUserResponse:
-        """Get the current user's identity information."""
+        """Get the current user's identity information.
+
+        If no organization exists for this user's IDP tenant and
+        auto_create_organization is enabled, automatically provisions
+        an organization with a default non-deletable sandbox tenant.
+        """
+        org_context = self.organization_context
+
+        if org_context is None and self._database_client:
+            org_context = self._auto_provision_organization()
+
         tenants_with_permissions = self.tenants
 
         return IdentityUserResponse(
@@ -271,7 +281,78 @@ class ContextIdentityUser:
             mail=self.identity.get_mail(),
             firstname=self.identity.get_firstname(),
             lastname=self.identity.get_lastname(),
-            organization=self.organization_context,
+            organization=org_context,
             tenants=tenants_with_permissions,
             groups=self.groups,
         )
+
+    def _auto_provision_organization(self) -> OrganizationContextResponse | None:
+        """Auto-provision an organization with a default tenant on first login.
+
+        Creates the organization, a default sandbox tenant (can_be_deleted=False),
+        assigns the user as ORGANISATION_GLOBAL_ADMIN and tenant GLOBAL_ADMIN,
+        and ensures the principal exists.
+
+        Returns:
+            Organization context if auto-provisioning succeeded, None otherwise.
+        """
+        from unifiedui.core.config import settings
+
+        if not settings.auto_create_organization:
+            return None
+
+        identity_provider = self.identity.get_identity_provider()
+        identity_tenant_id = self.identity.get_identity_tenant_id()
+
+        if not identity_provider or not identity_tenant_id:
+            return None
+
+        user_id = self.identity.get_id()
+        display_name = self.identity.get_display_name() or "User"
+
+        logger.info(
+            "Auto-provisioning organization for first-time user",
+            extra={
+                "user_id": user_id,
+                "identity_provider": identity_provider,
+                "identity_tenant_id": identity_tenant_id,
+            },
+        )
+
+        from unifiedui.handlers.organizations import OrganizationHandler
+        from unifiedui.schema.requests.organizations import CreateOrganizationRequest
+
+        handler = OrganizationHandler(self._database_client, self._cache)
+
+        slug = identity_tenant_id.replace(" ", "-").lower()[:100]
+
+        try:
+            handler.create_organization(
+                request=CreateOrganizationRequest(
+                    name=settings.default_organization_name,
+                    slug=slug,
+                    description=f"Auto-provisioned organization for {display_name}",
+                    identity_provider=identity_provider,
+                    identity_tenant_id=identity_tenant_id,
+                    subscription_tier="free",
+                ),
+                user_id=user_id,
+            )
+        except Exception:
+            logger.warning(
+                "Auto-provisioning failed (org may already exist)",
+                extra={"identity_provider": identity_provider, "identity_tenant_id": identity_tenant_id},
+            )
+
+        self._organization_context = None
+        self._tenants = None
+
+        idp_group_ids = self._get_idp_group_ids()
+        self._organization_context = handler.get_user_organization_context(
+            identity_provider=identity_provider,
+            identity_tenant_id=identity_tenant_id,
+            user_id=user_id,
+            identity_group_ids=idp_group_ids,
+        )
+
+        return self._organization_context
