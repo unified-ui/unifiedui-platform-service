@@ -4,7 +4,7 @@
 # ============================================
 # Stage 1: Build stage
 # ============================================
-FROM python:3.13-slim AS builder
+FROM python:3.14-slim AS builder
 
 WORKDIR /app
 
@@ -31,7 +31,7 @@ COPY alembic.ini ./
 # ============================================
 # Stage 2: Production stage
 # ============================================
-FROM python:3.13-slim
+FROM python:3.14-slim
 
 WORKDIR /app
 
