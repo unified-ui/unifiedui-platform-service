@@ -11,8 +11,8 @@ from unifiedui.exc.conversations import ConversationNotFoundError, FoundryConver
 from unifiedui.handlers.conversations import ConversationHandler
 from unifiedui.handlers.dependencies import get_conversation_handler
 from unifiedui.logger import get_logger
-from unifiedui.schema.requests.conversation_permissions import SetConversationPermissionRequest
 from unifiedui.schema.requests.conversations import CreateConversationRequest, UpdateConversationRequest
+from unifiedui.schema.requests.permissions import SetResourcePermissionRequest
 from unifiedui.schema.responses.conversations import ConversationResponse
 from unifiedui.schema.responses.principals import PrincipalWithRolesResponse, ResourcePrincipalsResponse
 
@@ -84,7 +84,7 @@ async def list_conversations(
             user=user,
         )
     except Exception as e:
-        logger.error(f"Failed to list conversations: {e}")
+        logger.error("Failed to list conversations: %s", e)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to list conversations")
 
 
@@ -141,10 +141,10 @@ async def create_conversation(
             foundry_api_key=x_microsoft_foundry_api_key,
         )
     except FoundryConversationCreationError as e:
-        logger.error(f"Failed to create Foundry conversation: {e}")
+        logger.error("Failed to create Foundry conversation: %s", e)
         raise HTTPException(status_code=e.status_code or status.HTTP_502_BAD_GATEWAY, detail=e.message)
     except Exception as e:
-        logger.error(f"Failed to create conversation: {e}")
+        logger.error("Failed to create conversation: %s", e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to create conversation: {e!s}"
         )
@@ -196,10 +196,10 @@ async def get_conversation(
         )
         return handler.get_conversation(tenant_id=tenant_id, conversation_id=conversation_id, user=user)
     except ConversationNotFoundError as e:
-        logger.warning(f"Conversation not found: {e}")
+        logger.warning("Conversation not found: %s", e)
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
-        logger.error(f"Failed to get conversation: {e}")
+        logger.error("Failed to get conversation: %s", e)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to get conversation")
 
 
@@ -252,10 +252,10 @@ async def update_conversation(
             tenant_id=tenant_id, conversation_id=conversation_id, request=update_request, user_id=user.identity.get_id()
         )
     except ConversationNotFoundError as e:
-        logger.warning(f"Conversation not found: {e}")
+        logger.warning("Conversation not found: %s", e)
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
-        logger.error(f"Failed to update conversation: {e}")
+        logger.error("Failed to update conversation: %s", e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to update conversation: {e!s}"
         )
@@ -306,10 +306,10 @@ async def delete_conversation(
         handler.delete_conversation(tenant_id=tenant_id, conversation_id=conversation_id)
         return Response(status_code=status.HTTP_204_NO_CONTENT)
     except ConversationNotFoundError as e:
-        logger.warning(f"Conversation not found: {e}")
+        logger.warning("Conversation not found: %s", e)
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
-        logger.error(f"Failed to delete conversation: {e}")
+        logger.error("Failed to delete conversation: %s", e)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to delete conversation")
 
 
@@ -389,10 +389,10 @@ async def list_conversation_permissions(
             order_direction=order_direction,
         )
     except ConversationNotFoundError as e:
-        logger.warning(f"Conversation not found: {e}")
+        logger.warning("Conversation not found: %s", e)
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
-        logger.error(f"Failed to list conversation permissions: {e}")
+        logger.error("Failed to list conversation permissions: %s", e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to list conversation permissions"
         )
@@ -452,10 +452,10 @@ async def get_conversation_permission(
             tenant_id=tenant_id, conversation_id=conversation_id, principal_id=principal_id
         )
     except ConversationNotFoundError as e:
-        logger.warning(f"Permission not found: {e}")
+        logger.warning("Permission not found: %s", e)
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
-        logger.error(f"Failed to get conversation permission: {e}")
+        logger.error("Failed to get conversation permission: %s", e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to get conversation permission"
         )
@@ -480,7 +480,7 @@ async def set_conversation_permission(
     request: Request,
     tenant_id: str,
     conversation_id: str,
-    permission_request: SetConversationPermissionRequest,
+    permission_request: SetResourcePermissionRequest,
     handler: ConversationHandler = Depends(get_conversation_handler),
 ) -> PrincipalWithRolesResponse:
     """
@@ -517,10 +517,10 @@ async def set_conversation_permission(
             user=user,
         )
     except ConversationNotFoundError as e:
-        logger.warning(f"Conversation not found: {e}")
+        logger.warning("Conversation not found: %s", e)
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
-        logger.error(f"Failed to set conversation permission: {e}")
+        logger.error("Failed to set conversation permission: %s", e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to set conversation permission: {e!s}"
         )
@@ -545,7 +545,7 @@ async def delete_conversation_permission(
     request: Request,
     tenant_id: str,
     conversation_id: str,
-    delete_request: SetConversationPermissionRequest,
+    delete_request: SetResourcePermissionRequest,
     handler: ConversationHandler = Depends(get_conversation_handler),
 ) -> Response:
     """
@@ -583,10 +583,10 @@ async def delete_conversation_permission(
         )
         return Response(status_code=status.HTTP_204_NO_CONTENT)
     except ConversationNotFoundError as e:
-        logger.warning(f"Permission not found: {e}")
+        logger.warning("Permission not found: %s", e)
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
-        logger.error(f"Failed to delete conversation permission: {e}")
+        logger.error("Failed to delete conversation permission: %s", e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to delete conversation permission"
         )

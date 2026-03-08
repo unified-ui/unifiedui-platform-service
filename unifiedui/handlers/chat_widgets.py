@@ -10,6 +10,7 @@ from sqlalchemy.orm import selectinload
 
 from unifiedui.core.database.enums import PermissionActionEnum, PrincipalTypeEnum
 from unifiedui.core.database.models import ChatWidget, ChatWidgetMember, ChatWidgetTag
+from unifiedui.handlers.cache_utils import ResourceCacheInvalidator
 from unifiedui.handlers.permission_resolver import (
     check_is_admin,
     get_principal_ids,
@@ -18,13 +19,15 @@ from unifiedui.handlers.permission_resolver import (
 )
 
 if TYPE_CHECKING:
+    from sqlalchemy.orm import Session
+
     from unifiedui.caching.client import CacheClient
     from unifiedui.core.database.client import SQLAlchemyClient
     from unifiedui.core.identity.users import ContextIdentityUser
     from unifiedui.handlers.resource_permissions import ResourcePermissionsHandler
     from unifiedui.handlers.resource_tags import ResourceTagsHandler
-    from unifiedui.schema.requests.chat_widget_permissions import SetChatWidgetPermissionRequest
     from unifiedui.schema.requests.chat_widgets import CreateChatWidgetRequest, UpdateChatWidgetRequest
+    from unifiedui.schema.requests.permissions import SetResourcePermissionRequest
 
 from unifiedui.exc.chat_widgets import ChatWidgetNotFoundError
 from unifiedui.logger import get_logger
@@ -59,6 +62,7 @@ class ChatWidgetHandler:
         self.cache_client = cache_client
         self._permissions_handler = permissions_handler
         self._tags_handler = tags_handler
+        self._cache = ResourceCacheInvalidator(cache_client, "chat_widgets", "cw")
 
     @property
     def permissions_handler(self) -> ResourcePermissionsHandler:
@@ -154,7 +158,7 @@ class ChatWidgetHandler:
                         return [QuickListItemResponse(**item) for item in cached_data]
                     return [ChatWidgetResponse(**item) for item in cached_data]
             except Exception as e:
-                logger.warning(f"Failed to get cached chat widget list: {e}")
+                logger.warning("Failed to get cached chat widget list: %s", e)
 
         with self.db_client.get_session() as session:
             query = (
@@ -231,7 +235,7 @@ class ChatWidgetHandler:
                     self.cache_client.client.set(cache_key, data, ttl=300)
                     logger.debug("Cached chat widget list")
                 except Exception as e:
-                    logger.warning(f"Failed to cache chat widget list: {e}")
+                    logger.warning("Failed to cache chat widget list: %s", e)
 
             return result
 
@@ -272,7 +276,7 @@ class ChatWidgetHandler:
                             )
                     return result
             except Exception as e:
-                logger.warning(f"Failed to get cached chat widget: {e}")
+                logger.warning("Failed to get cached chat widget: %s", e)
 
         with self.db_client.get_session() as session:
             query = (
@@ -293,7 +297,7 @@ class ChatWidgetHandler:
                     self.cache_client.client.set(cache_key, result.model_dump(), ttl=300)
                     logger.debug("Cached chat widget detail")
                 except Exception as e:
-                    logger.warning(f"Failed to cache chat widget: {e}")
+                    logger.warning("Failed to cache chat widget: %s", e)
 
             if user:
                 result.my_permission = self._resolve_user_permission(session, tenant_id, chat_widget_id, user)
@@ -407,6 +411,7 @@ class ChatWidgetHandler:
                 .where(ChatWidget.id == chat_widget_id, ChatWidget.tenant_id == tenant_id)
             )
             chat_widget = session.execute(query).scalar_one_or_none()
+            assert chat_widget is not None
 
             logger.info("Chat widget updated", extra={"chat_widget_id": chat_widget_id})
 
@@ -448,21 +453,15 @@ class ChatWidgetHandler:
 
     def _invalidate_list_cache(self, tenant_id: str) -> None:
         """Invalidate list cache for a tenant."""
-        if self.cache_client:
-            pattern = f"chat_widgets:list:tenant:{tenant_id}:*"
-            self.cache_client.client.delete_pattern(pattern)
+        self._cache.invalidate_list(tenant_id)
 
     def _invalidate_detail_cache(self, tenant_id: str, chat_widget_id: str) -> None:
         """Invalidate detail cache for a chat widget."""
-        if self.cache_client:
-            cache_key = f"chat_widgets:detail:tenant:{tenant_id}:cw:{chat_widget_id}"
-            self.cache_client.client.delete(cache_key)
+        self._cache.invalidate_detail(tenant_id, chat_widget_id)
 
     def _invalidate_permissions_cache(self, tenant_id: str, chat_widget_id: str) -> None:
         """Invalidate permissions cache for a chat widget."""
-        if self.cache_client:
-            pattern = f"chat_widgets:permissions:tenant:{tenant_id}:cw:{chat_widget_id}:*"
-            self.cache_client.client.delete_pattern(pattern)
+        self._cache.invalidate_permissions(tenant_id, chat_widget_id)
 
     # ========== Permission Management Methods ==========
 
@@ -581,7 +580,7 @@ class ChatWidgetHandler:
         self,
         tenant_id: str,
         chat_widget_id: str,
-        request: SetChatWidgetPermissionRequest,
+        request: SetResourcePermissionRequest,
         user_id: str,
         user: ContextIdentityUser,
     ) -> PrincipalWithRolesResponse:
@@ -663,7 +662,7 @@ class ChatWidgetHandler:
             raise ChatWidgetNotFoundError(str(e)) from e
 
     def _resolve_user_permission(
-        self, session: object, tenant_id: str, chat_widget_id: str, user: ContextIdentityUser
+        self, session: Session, tenant_id: str, chat_widget_id: str, user: ContextIdentityUser
     ) -> str | None:
         """Resolve the user's permission level on a specific chat widget.
 

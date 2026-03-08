@@ -68,7 +68,7 @@ async def list_tags(
 
         return handler.list_tags(tenant_id=tenant_id, name_filter=name, skip=skip, limit=limit, use_cache=use_cache)
     except Exception as e:
-        logger.error(f"Failed to list tags: {e}", exc_info=True)
+        logger.error("Failed to list tags: %s", e, exc_info=True)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to list tags")
 
 
@@ -107,7 +107,7 @@ async def create_tag(
 
         return handler.create_tag(tenant_id=tenant_id, name=create_request.name, user=user)
     except Exception as e:
-        logger.error(f"Failed to create tag: {e}", exc_info=True)
+        logger.error("Failed to create tag: %s", e, exc_info=True)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to create tag")
 
 
@@ -162,7 +162,7 @@ async def list_chat_agent_tags(
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except Exception as e:
-        logger.error(f"Failed to list chat agent tags: {e}", exc_info=True)
+        logger.error("Failed to list chat agent tags: %s", e, exc_info=True)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to list chat agent tags")
 
 
@@ -214,7 +214,7 @@ async def list_autonomous_agent_tags(
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except Exception as e:
-        logger.error(f"Failed to list autonomous agent tags: {e}", exc_info=True)
+        logger.error("Failed to list autonomous agent tags: %s", e, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to list autonomous agent tags"
         )
@@ -268,7 +268,7 @@ async def list_chat_widget_tags(
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except Exception as e:
-        logger.error(f"Failed to list chat widget tags: {e}", exc_info=True)
+        logger.error("Failed to list chat widget tags: %s", e, exc_info=True)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to list chat widget tags")
 
 
@@ -320,7 +320,7 @@ async def list_credential_tags(
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except Exception as e:
-        logger.error(f"Failed to list credential tags: {e}", exc_info=True)
+        logger.error("Failed to list credential tags: %s", e, exc_info=True)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to list credential tags")
 
 
@@ -363,7 +363,7 @@ async def delete_tag(
     except TagNotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
-        logger.error(f"Failed to delete tag: {e}", exc_info=True)
+        logger.error("Failed to delete tag: %s", e, exc_info=True)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to delete tag")
 
 
@@ -403,7 +403,7 @@ async def get_chat_agent_tags(
             tenant_id=tenant_id, resource_type="chat_agent", resource_id=chat_agent_id, use_cache=use_cache
         )
     except Exception as e:
-        logger.error(f"Failed to get chat agent tags: {e}", exc_info=True)
+        logger.error("Failed to get chat agent tags: %s", e, exc_info=True)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to get chat agent tags")
 
 
@@ -452,7 +452,7 @@ async def set_chat_agent_tags(
             user=user,
         )
     except Exception as e:
-        logger.error(f"Failed to set chat agent tags: {e}", exc_info=True)
+        logger.error("Failed to set chat agent tags: %s", e, exc_info=True)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to set chat agent tags")
 
 
@@ -487,7 +487,7 @@ async def delete_chat_agent_tags(
         handler.delete_resource_tags(tenant_id=tenant_id, resource_type="chat_agent", resource_id=chat_agent_id)
         return Response(status_code=status.HTTP_204_NO_CONTENT)
     except Exception as e:
-        logger.error(f"Failed to delete chat agent tags: {e}", exc_info=True)
+        logger.error("Failed to delete chat agent tags: %s", e, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to delete chat agent tags"
         )
@@ -536,7 +536,7 @@ async def get_autonomous_agent_tags(
             tenant_id=tenant_id, resource_type="autonomous_agent", resource_id=autonomous_agent_id, use_cache=use_cache
         )
     except Exception as e:
-        logger.error(f"Failed to get autonomous agent tags: {e}", exc_info=True)
+        logger.error("Failed to get autonomous agent tags: %s", e, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to get autonomous agent tags"
         )
@@ -587,7 +587,7 @@ async def set_autonomous_agent_tags(
             user=user,
         )
     except Exception as e:
-        logger.error(f"Failed to set autonomous agent tags: {e}", exc_info=True)
+        logger.error("Failed to set autonomous agent tags: %s", e, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to set autonomous agent tags"
         )
@@ -630,7 +630,7 @@ async def delete_autonomous_agent_tags(
         )
         return Response(status_code=status.HTTP_204_NO_CONTENT)
     except Exception as e:
-        logger.error(f"Failed to delete autonomous agent tags: {e}", exc_info=True)
+        logger.error("Failed to delete autonomous agent tags: %s", e, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to delete autonomous agent tags"
         )
@@ -672,7 +672,7 @@ async def get_chat_widget_tags(
             tenant_id=tenant_id, resource_type="chat_widget", resource_id=chat_widget_id, use_cache=use_cache
         )
     except Exception as e:
-        logger.error(f"Failed to get chat widget tags: {e}", exc_info=True)
+        logger.error("Failed to get chat widget tags: %s", e, exc_info=True)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to get chat widget tags")
 
 
@@ -721,7 +721,7 @@ async def set_chat_widget_tags(
             user=user,
         )
     except Exception as e:
-        logger.error(f"Failed to set chat widget tags: {e}", exc_info=True)
+        logger.error("Failed to set chat widget tags: %s", e, exc_info=True)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to set chat widget tags")
 
 
@@ -756,7 +756,7 @@ async def delete_chat_widget_tags(
         handler.delete_resource_tags(tenant_id=tenant_id, resource_type="chat_widget", resource_id=chat_widget_id)
         return Response(status_code=status.HTTP_204_NO_CONTENT)
     except Exception as e:
-        logger.error(f"Failed to delete chat widget tags: {e}", exc_info=True)
+        logger.error("Failed to delete chat widget tags: %s", e, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to delete chat widget tags"
         )
@@ -798,7 +798,7 @@ async def get_credential_tags(
             tenant_id=tenant_id, resource_type="credential", resource_id=credential_id, use_cache=use_cache
         )
     except Exception as e:
-        logger.error(f"Failed to get credential tags: {e}", exc_info=True)
+        logger.error("Failed to get credential tags: %s", e, exc_info=True)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to get credential tags")
 
 
@@ -847,7 +847,7 @@ async def set_credential_tags(
             user=user,
         )
     except Exception as e:
-        logger.error(f"Failed to set credential tags: {e}", exc_info=True)
+        logger.error("Failed to set credential tags: %s", e, exc_info=True)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to set credential tags")
 
 
@@ -882,7 +882,7 @@ async def delete_credential_tags(
         handler.delete_resource_tags(tenant_id=tenant_id, resource_type="credential", resource_id=credential_id)
         return Response(status_code=status.HTTP_204_NO_CONTENT)
     except Exception as e:
-        logger.error(f"Failed to delete credential tags: {e}", exc_info=True)
+        logger.error("Failed to delete credential tags: %s", e, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to delete credential tags"
         )
@@ -932,7 +932,7 @@ async def list_tool_tags(
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except Exception as e:
-        logger.error(f"Failed to list tool tags: {e}", exc_info=True)
+        logger.error("Failed to list tool tags: %s", e, exc_info=True)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to list tool tags")
 
 
@@ -969,7 +969,7 @@ async def get_tool_tags(
             tenant_id=tenant_id, resource_type="tool", resource_id=tool_id, use_cache=use_cache
         )
     except Exception as e:
-        logger.error(f"Failed to get tool tags: {e}", exc_info=True)
+        logger.error("Failed to get tool tags: %s", e, exc_info=True)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to get tool tags")
 
 
@@ -1014,7 +1014,7 @@ async def set_tool_tags(
             tenant_id=tenant_id, resource_type="tool", resource_id=tool_id, tag_names=tags_request.tags, user=user
         )
     except Exception as e:
-        logger.error(f"Failed to set tool tags: {e}", exc_info=True)
+        logger.error("Failed to set tool tags: %s", e, exc_info=True)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to set tool tags")
 
 
@@ -1046,5 +1046,5 @@ async def delete_tool_tags(
         handler.delete_resource_tags(tenant_id=tenant_id, resource_type="tool", resource_id=tool_id)
         return Response(status_code=status.HTTP_204_NO_CONTENT)
     except Exception as e:
-        logger.error(f"Failed to delete tool tags: {e}", exc_info=True)
+        logger.error("Failed to delete tool tags: %s", e, exc_info=True)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to delete tool tags")

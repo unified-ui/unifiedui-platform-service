@@ -45,7 +45,7 @@ class OIDCIdentityProvider(BaseIdentityProvider):
         Returns:
             List of group responses from token groups/roles claims.
         """
-        claims = self.identity_token.get_deserialized_token()
+        claims = self.identity_token.deserialized_token
         groups_claim = claims.get("groups", claims.get("roles", []))
         if not isinstance(groups_claim, list):
             return []

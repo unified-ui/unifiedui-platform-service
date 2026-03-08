@@ -75,8 +75,8 @@ async def get_users(
     """
     user: ContextIdentityUser = request.state.user
     query = APIFilterQuery(search=search, top=top, next_link=next_link)
-    users, next_link = user.idp.get_users(query=query)
-    return IdentityUsersResponse(value=users, next_link=next_link)
+    users, new_next_link = user.idp.get_users(query=query)
+    return IdentityUsersResponse(value=users, next_link=new_next_link)
 
 
 @router.get(
@@ -107,8 +107,8 @@ async def get_groups(
     """
     user: ContextIdentityUser = request.state.user
     query = APIFilterQuery(search=search, top=top, next_link=next_link)
-    groups, next_link = user.idp.get_security_groups(query=query)
-    return IdentityGroupsResponse(value=groups, next_link=next_link)
+    groups, new_next_link = user.idp.get_security_groups(query=query)
+    return IdentityGroupsResponse(value=groups, next_link=new_next_link)
 
 
 @router.get(

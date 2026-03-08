@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 import uuid
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
 
 from unifiedui.core.database.enums import ChatAgentTypeEnum, PermissionActionEnum
 from unifiedui.core.database.models import ChatAgent, ChatAgentMember, ChatAgentTag, ReActAgentVersion
+from unifiedui.handlers.cache_utils import ResourceCacheInvalidator
 from unifiedui.handlers.permission_resolver import (
     check_is_admin,
     get_principal_ids,
@@ -18,18 +19,25 @@ from unifiedui.handlers.permission_resolver import (
 )
 
 if TYPE_CHECKING:
+    from sqlalchemy.orm import Session
+
     from unifiedui.caching.client import CacheClient
     from unifiedui.core.database.client import SQLAlchemyClient
     from unifiedui.core.identity.users import ContextIdentityUser
     from unifiedui.core.vault.client import BaseVaultClient
     from unifiedui.handlers.resource_permissions import ResourcePermissionsHandler
     from unifiedui.handlers.resource_tags import ResourceTagsHandler
-    from unifiedui.schema.requests.chat_agent_permissions import SetChatAgentPermissionRequest
     from unifiedui.schema.requests.chat_agents import (
         CreateChatAgentRequest,
         UpdateChatAgentRequest,
         UpdateReActAgentVersionRequest,
     )
+    from unifiedui.schema.requests.permissions import SetResourcePermissionRequest
+    from unifiedui.schema.responses.chat_agents import (
+        MicrosoftFoundryConfigSettingsResponse,
+        N8NConfigSettingsResponse,
+    )
+    from unifiedui.schema.responses.re_act_agents import ReActAgentConfigSettingsResponse
 
 from unifiedui.exc.chat_agent_config import (
     InvalidCredentialError,
@@ -73,6 +81,7 @@ class ChatAgentHandler:
         self.vault_client = vault_client
         self._permissions_handler = permissions_handler
         self._tags_handler = tags_handler
+        self._cache = ResourceCacheInvalidator(cache_client, "chat_agents", "chat_agent")
 
     @property
     def permissions_handler(self) -> ResourcePermissionsHandler:
@@ -167,7 +176,7 @@ class ChatAgentHandler:
                         return [QuickListItemResponse(**item) for item in cached_data]
                     return [ChatAgentResponse(**item) for item in cached_data]
             except Exception as e:
-                logger.warning(f"Failed to get cached chat agent list: {e}")
+                logger.warning("Failed to get cached chat agent list: %s", e)
 
         with self.db_client.get_session() as session:
             query = (
@@ -251,7 +260,7 @@ class ChatAgentHandler:
                     self.cache_client.client.set(cache_key, data, ttl=300)
                     logger.debug("Cached chat agent list")
                 except Exception as e:
-                    logger.warning(f"Failed to cache chat agent list: {e}")
+                    logger.warning("Failed to cache chat agent list: %s", e)
 
             return result
 
@@ -291,7 +300,7 @@ class ChatAgentHandler:
                             )
                     return result
             except Exception as e:
-                logger.warning(f"Failed to get cached chat agent: {e}")
+                logger.warning("Failed to get cached chat agent: %s", e)
 
         with self.db_client.get_session() as session:
             query = (
@@ -315,7 +324,7 @@ class ChatAgentHandler:
                     self.cache_client.client.set(cache_key, result.model_dump(), ttl=300)
                     logger.debug("Cached chat agent detail")
                 except Exception as e:
-                    logger.warning(f"Failed to cache chat agent: {e}")
+                    logger.warning("Failed to cache chat agent: %s", e)
 
             if user:
                 result.my_permission = self._resolve_user_permission(session, tenant_id, chat_agent_id, user)
@@ -581,7 +590,7 @@ class ChatAgentHandler:
                     api_credential = credential_handler.get_credential(tenant_id, api_credential_id)
                     api_secret = credential_handler.get_credential_secret(tenant_id, api_credential_id)
                 except Exception as e:
-                    logger.error(f"Failed to fetch API credential: {e}")
+                    logger.error("Failed to fetch API credential: %s", e)
                     raise InvalidCredentialError(
                         credential_id=api_credential_id,
                         message=f"Invalid or inaccessible API credential with ID '{api_credential_id}'",
@@ -591,7 +600,7 @@ class ChatAgentHandler:
                     chat_credential = credential_handler.get_credential(tenant_id, chat_credential_id)
                     chat_secret = credential_handler.get_credential_secret(tenant_id, chat_credential_id)
                 except Exception as e:
-                    logger.error(f"Failed to fetch chat credential: {e}")
+                    logger.error("Failed to fetch chat credential: %s", e)
                     raise InvalidCredentialError(
                         credential_id=chat_credential_id,
                         message=f"Invalid or inaccessible chat credential with ID '{chat_credential_id}'",
@@ -628,7 +637,12 @@ class ChatAgentHandler:
                     secret=chat_secret_value,
                 )
 
-                settings = N8NConfigSettingsResponse(
+                settings: (
+                    N8NConfigSettingsResponse
+                    | MicrosoftFoundryConfigSettingsResponse
+                    | ReActAgentConfigSettingsResponse
+                    | dict[Any, Any]
+                ) = N8NConfigSettingsResponse(
                     api_version=config.get("api_version", "v1"),
                     workflow_type=config.get("workflow_type", "N8N_CHAT_AGENT_WORKFLOW"),
                     use_unified_chat_history=config.get("use_unified_chat_history", True),
@@ -696,7 +710,7 @@ class ChatAgentHandler:
                                     "secret": secret,
                                 }
                             except Exception as e:
-                                logger.warning(f"Failed to resolve credential for tool {tool.id}: {e}")
+                                logger.warning("Failed to resolve credential for tool %s: %s", tool.id, e)
                         resolved_tools.append(tool_data)
 
                 resolved_ai_models: list[ReActAgentAIModelResponse] = []
@@ -719,7 +733,7 @@ class ChatAgentHandler:
                                 secret = credential_handler.get_credential_secret(tenant_id, ai_model.credential_id)
                                 credential_secret = secret if isinstance(secret, dict) else {"api_key": secret}
                             except Exception as e:
-                                logger.warning(f"Failed to resolve credential for AI model {ai_model.id}: {e}")
+                                logger.warning("Failed to resolve credential for AI model %s: %s", ai_model.id, e)
                         resolved_ai_models.append(
                             ReActAgentAIModelResponse(
                                 id=ai_model.id,
@@ -759,21 +773,15 @@ class ChatAgentHandler:
 
     def _invalidate_list_cache(self, tenant_id: str) -> None:
         """Invalidate list cache for a tenant."""
-        if self.cache_client:
-            pattern = f"chat_agents:list:tenant:{tenant_id}:*"
-            self.cache_client.client.delete_pattern(pattern)
+        self._cache.invalidate_list(tenant_id)
 
     def _invalidate_detail_cache(self, tenant_id: str, chat_agent_id: str) -> None:
         """Invalidate detail cache for a chat agent."""
-        if self.cache_client:
-            cache_key = f"chat_agents:detail:tenant:{tenant_id}:chat_agent:{chat_agent_id}"
-            self.cache_client.client.delete(cache_key)
+        self._cache.invalidate_detail(tenant_id, chat_agent_id)
 
     def _invalidate_permissions_cache(self, tenant_id: str, chat_agent_id: str) -> None:
         """Invalidate permissions cache for a chat agent."""
-        if self.cache_client:
-            pattern = f"chat_agents:permissions:tenant:{tenant_id}:chat_agent:{chat_agent_id}:*"
-            self.cache_client.client.delete_pattern(pattern)
+        self._cache.invalidate_permissions(tenant_id, chat_agent_id)
 
     # ========== Version Management Methods (REACT_AGENT) ==========
 
@@ -1198,7 +1206,7 @@ class ChatAgentHandler:
         self,
         tenant_id: str,
         chat_agent_id: str,
-        request: SetChatAgentPermissionRequest,
+        request: SetResourcePermissionRequest,
         user_id: str,
         user: ContextIdentityUser,
     ) -> PrincipalWithRolesResponse:
@@ -1412,7 +1420,7 @@ class ChatAgentHandler:
         )
 
     def _resolve_user_permission(
-        self, session: object, tenant_id: str, chat_agent_id: str, user: ContextIdentityUser
+        self, session: Session, tenant_id: str, chat_agent_id: str, user: ContextIdentityUser
     ) -> str | None:
         """Resolve the user's permission level on a specific chat agent.
 

@@ -1,0 +1,266 @@
+name: CD — Release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      version_bump:
+        description: "Version bump type"
+        required: false
+        default: "patch"
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+      dry_run:
+        description: "Dry run (don't publish)"
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' || !contains(github.event.head_commit.message, '[skip ci]')
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Calculate next version
+        id: version
+        run: |
+          # Get floor version from pyproject.toml
+          FLOOR=$(python -c "import tomllib; print(tomllib.load(open('pyproject.toml', 'rb'))['project']['version'])")
+          echo "floor=$FLOOR" >> $GITHUB_OUTPUT
+
+          # Get latest tag
+          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          if [ -n "$LATEST_TAG" ]; then
+            CURRENT="${LATEST_TAG#v}"
+          else
+            CURRENT=""
+          fi
+          echo "current=$CURRENT" >> $GITHUB_OUTPUT
+
+          # Calculate next version
+          NEXT=$(python << EOF
+          import re
+
+          floor = "$FLOOR"
+          current = "$CURRENT"
+          bump = "${{ github.event.inputs.version_bump || 'patch' }}"
+
+          def parse(v):
+              m = re.match(r'(\d+)\.(\d+)\.(\d+)', v)
+              return [int(m.group(1)), int(m.group(2)), int(m.group(3))] if m else [0, 0, 0]
+
+          if not current:
+              next_ver = floor
+          else:
+              f = parse(floor)
+              c = parse(current)
+
+              # If floor is higher in major.minor, use floor
+              if (f[0], f[1]) > (c[0], c[1]):
+                  next_ver = floor
+              else:
+                  # Apply bump
+                  if bump == "major":
+                      next_ver = f"{c[0] + 1}.0.0"
+                  elif bump == "minor":
+                      next_ver = f"{c[0]}.{c[1] + 1}.0"
+                  else:  # patch
+                      next_ver = f"{c[0]}.{c[1]}.{c[2] + 1}"
+
+          print(next_ver)
+          EOF
+          )
+          echo "version=$NEXT" >> $GITHUB_OUTPUT
+
+          echo "📊 Version Calculation:"
+          echo "   Floor (pyproject.toml): $FLOOR"
+          echo "   Current (latest tag): ${CURRENT:-'none'}"
+          echo "   Next: $NEXT"
+
+      - name: Check if version exists
+        id: check
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          if git tag -l "v$VERSION" | grep -q .; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "⚠️ Tag v$VERSION already exists — skipping release"
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "✅ Tag v$VERSION will be created"
+          fi
+
+      - name: Generate changelog
+        id: changelog
+        if: steps.check.outputs.exists == 'false'
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          PREVIOUS="${{ steps.version.outputs.current }}"
+
+          # Get the previous tag or use first commit
+          if [ -n "$PREVIOUS" ] && git tag -l "v$PREVIOUS" | grep -q .; then
+            PREV_REF="v$PREVIOUS"
+          else
+            PREV_REF=$(git rev-list --max-parents=0 HEAD)
+          fi
+
+          echo "Generating changelog from $PREV_REF to HEAD..."
+
+          {
+            echo "## What's Changed"
+            echo ""
+
+            # Features
+            FEATURES=$(git log "$PREV_REF"..HEAD --pretty=format:"%s|%h" 2>/dev/null | grep -E "^feat(\(.+\))?:" | head -20 || true)
+            if [ -n "$FEATURES" ]; then
+              echo "### ✨ Features"
+              echo ""
+              echo "$FEATURES" | while IFS='|' read -r msg hash; do
+                clean_msg=$(echo "$msg" | sed -E 's/^feat(\([^)]+\))?:\s*//')
+                echo "- $clean_msg (\`$hash\`)"
+              done
+              echo ""
+            fi
+
+            # Bug fixes
+            FIXES=$(git log "$PREV_REF"..HEAD --pretty=format:"%s|%h" 2>/dev/null | grep -E "^fix(\(.+\))?:" | head -20 || true)
+            if [ -n "$FIXES" ]; then
+              echo "### 🐛 Bug Fixes"
+              echo ""
+              echo "$FIXES" | while IFS='|' read -r msg hash; do
+                clean_msg=$(echo "$msg" | sed -E 's/^fix(\([^)]+\))?:\s*//')
+                echo "- $clean_msg (\`$hash\`)"
+              done
+              echo ""
+            fi
+
+            # Documentation
+            DOCS=$(git log "$PREV_REF"..HEAD --pretty=format:"%s|%h" 2>/dev/null | grep -E "^docs(\(.+\))?:" | head -10 || true)
+            if [ -n "$DOCS" ]; then
+              echo "### 📚 Documentation"
+              echo ""
+              echo "$DOCS" | while IFS='|' read -r msg hash; do
+                clean_msg=$(echo "$msg" | sed -E 's/^docs(\([^)]+\))?:\s*//')
+                echo "- $clean_msg (\`$hash\`)"
+              done
+              echo ""
+            fi
+
+            # Refactoring
+            REFACTOR=$(git log "$PREV_REF"..HEAD --pretty=format:"%s|%h" 2>/dev/null | grep -E "^refactor(\(.+\))?:" | head -10 || true)
+            if [ -n "$REFACTOR" ]; then
+              echo "### ♻️ Refactoring"
+              echo ""
+              echo "$REFACTOR" | while IFS='|' read -r msg hash; do
+                clean_msg=$(echo "$msg" | sed -E 's/^refactor(\([^)]+\))?:\s*//')
+                echo "- $clean_msg (\`$hash\`)"
+              done
+              echo ""
+            fi
+
+            # Tests
+            TESTS=$(git log "$PREV_REF"..HEAD --pretty=format:"%s|%h" 2>/dev/null | grep -E "^test(\(.+\))?:" | head -10 || true)
+            if [ -n "$TESTS" ]; then
+              echo "### 🧪 Tests"
+              echo ""
+              echo "$TESTS" | while IFS='|' read -r msg hash; do
+                clean_msg=$(echo "$msg" | sed -E 's/^test(\([^)]+\))?:\s*//')
+                echo "- $clean_msg (\`$hash\`)"
+              done
+              echo ""
+            fi
+
+            # Other changes
+            OTHERS=$(git log "$PREV_REF"..HEAD --pretty=format:"%s|%h" 2>/dev/null | grep -E "^(perf|chore|ci|build)(\(.+\))?:" | head -10 || true)
+            if [ -n "$OTHERS" ]; then
+              echo "### 🔧 Other Changes"
+              echo ""
+              echo "$OTHERS" | while IFS='|' read -r msg hash; do
+                clean_msg=$(echo "$msg" | sed -E 's/^(perf|chore|ci|build)(\([^)]+\))?:\s*//')
+                echo "- $clean_msg (\`$hash\`)"
+              done
+              echo ""
+            fi
+
+            echo "---"
+            echo ""
+            if [ -n "$PREVIOUS" ]; then
+              echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/v$PREVIOUS...v$VERSION"
+            else
+              echo "**Full Changelog**: https://github.com/${{ github.repository }}/commits/v$VERSION"
+            fi
+
+          } > changelog.md
+
+          echo "📋 Generated changelog:"
+          cat changelog.md
+
+          {
+            echo 'body<<EOF'
+            cat changelog.md
+            echo 'EOF'
+          } >> $GITHUB_OUTPUT
+
+      - name: Create Git tag
+        if: steps.check.outputs.exists == 'false' && github.event.inputs.dry_run != 'true'
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "v$VERSION" -m "Release v$VERSION"
+          git push origin "v$VERSION"
+          echo "🏷️ Created and pushed tag v$VERSION"
+
+      - name: Create GitHub Release
+        if: steps.check.outputs.exists == 'false' && github.event.inputs.dry_run != 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          name: v${{ steps.version.outputs.version }}
+          body: ${{ steps.changelog.outputs.body }}
+          draft: false
+          prerelease: ${{ contains(steps.version.outputs.version, 'alpha') || contains(steps.version.outputs.version, 'beta') || contains(steps.version.outputs.version, 'rc') }}
+
+      - name: Summary
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          DRY_RUN="${{ github.event.inputs.dry_run || 'false' }}"
+          EXISTS="${{ steps.check.outputs.exists }}"
+
+          echo "## 🚀 Release Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Property | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Floor Version | \`${{ steps.version.outputs.floor }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Previous Version | \`${{ steps.version.outputs.current || 'N/A' }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| New Version | \`$VERSION\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Tag Exists | $EXISTS |" >> $GITHUB_STEP_SUMMARY
+          echo "| Dry Run | $DRY_RUN |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [[ "$EXISTS" == "true" ]]; then
+            echo "⚠️ **Skipped**: Tag already exists" >> $GITHUB_STEP_SUMMARY
+          elif [[ "$DRY_RUN" == "true" ]]; then
+            echo "🧪 **Dry Run**: No changes made" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "✅ **Released**:" >> $GITHUB_STEP_SUMMARY
+            echo "- 🏷️ [GitHub Release v$VERSION](https://github.com/${{ github.repository }}/releases/tag/v$VERSION)" >> $GITHUB_STEP_SUMMARY
+          fi

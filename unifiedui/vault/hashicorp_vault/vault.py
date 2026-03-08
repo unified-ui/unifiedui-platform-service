@@ -23,7 +23,7 @@ class HashiCorpVault(BaseVault):
             token: Vault authentication token
             mount_point: KV secrets engine mount point (default: secret)
         """
-        self.url = url or os.getenv("VAULT_ADDR", "http://localhost:8200")
+        self.url: str = url if url is not None else os.getenv("VAULT_ADDR", "http://localhost:8200")
         self.token = token or os.getenv("VAULT_TOKEN")
         self.mount_point = mount_point
 
@@ -36,16 +36,16 @@ class HashiCorpVault(BaseVault):
             if not self.client.is_authenticated():
                 raise ValueError("Failed to authenticate with HashiCorp Vault")
 
-            logger.info(f"HashiCorp Vault initialized: {self.url}")
+            logger.info("HashiCorp Vault initialized: %s", self.url)
         except Exception as e:
-            logger.error(f"Failed to initialize HashiCorp Vault: {e}")
+            logger.error("Failed to initialize HashiCorp Vault: %s", e)
             raise
 
     def store_secret(self, key: str, value: str, metadata: dict[str, Any] | None = None) -> str:
         """Store a secret in HashiCorp Vault."""
         try:
             # Prepare secret data
-            secret_data = {"value": value}
+            secret_data: dict[str, Any] = {"value": value}
             if metadata:
                 secret_data["metadata"] = metadata
 
@@ -56,10 +56,10 @@ class HashiCorpVault(BaseVault):
 
             # Return URI as reference
             uri = f"vault://{self.url.split('//')[1]}/{self.mount_point}/{key}"
-            logger.info(f"Stored secret in HashiCorp Vault: {key}")
+            logger.info("Stored secret in HashiCorp Vault: %s", key)
             return uri
         except Exception as e:
-            logger.error(f"Failed to store secret in HashiCorp Vault: {e}")
+            logger.error("Failed to store secret in HashiCorp Vault: %s", e)
             raise
 
     def build_secret_uri(self, key_name: str) -> str:
@@ -72,7 +72,7 @@ class HashiCorpVault(BaseVault):
             # Parse URI: vault://host/mount_point/path
             parts = uri.replace("vault://", "").split("/", 2)
             if len(parts) < 3:
-                logger.error(f"Invalid HashiCorp Vault URI: {uri}")
+                logger.error("Invalid HashiCorp Vault URI: %s", uri)
                 return None
 
             mount = parts[1]
@@ -81,10 +81,10 @@ class HashiCorpVault(BaseVault):
             response = self.client.secrets.kv.v2.read_secret_version(path=path, mount_point=mount)
 
             secret_value = response["data"]["data"].get("value")
-            logger.debug(f"Retrieved secret from HashiCorp Vault: {path}")
+            logger.debug("Retrieved secret from HashiCorp Vault: %s", path)
             return secret_value
         except Exception as e:
-            logger.error(f"Failed to get secret from HashiCorp Vault: {e}")
+            logger.error("Failed to get secret from HashiCorp Vault: %s", e)
             return None
 
     def update_secret(self, uri: str, value: str, metadata: dict[str, Any] | None = None) -> bool:
@@ -92,22 +92,22 @@ class HashiCorpVault(BaseVault):
         try:
             parts = uri.replace("vault://", "").split("/", 2)
             if len(parts) < 3:
-                logger.error(f"Invalid HashiCorp Vault URI: {uri}")
+                logger.error("Invalid HashiCorp Vault URI: %s", uri)
                 return False
 
             mount = parts[1]
             path = parts[2]
 
-            secret_data = {"value": value}
+            secret_data: dict[str, Any] = {"value": value}
             if metadata:
                 secret_data["metadata"] = metadata
 
             self.client.secrets.kv.v2.create_or_update_secret(path=path, secret=secret_data, mount_point=mount)
 
-            logger.info(f"Updated secret in HashiCorp Vault: {path}")
+            logger.info("Updated secret in HashiCorp Vault: %s", path)
             return True
         except Exception as e:
-            logger.error(f"Failed to update secret in HashiCorp Vault: {e}")
+            logger.error("Failed to update secret in HashiCorp Vault: %s", e)
             return False
 
     def delete_secret(self, uri: str) -> bool:
@@ -115,7 +115,7 @@ class HashiCorpVault(BaseVault):
         try:
             parts = uri.replace("vault://", "").split("/", 2)
             if len(parts) < 3:
-                logger.error(f"Invalid HashiCorp Vault URI: {uri}")
+                logger.error("Invalid HashiCorp Vault URI: %s", uri)
                 return False
 
             mount = parts[1]
@@ -124,10 +124,10 @@ class HashiCorpVault(BaseVault):
             # Delete latest version
             self.client.secrets.kv.v2.delete_latest_version_of_secret(path=path, mount_point=mount)
 
-            logger.info(f"Deleted secret from HashiCorp Vault: {path}")
+            logger.info("Deleted secret from HashiCorp Vault: %s", path)
             return True
         except Exception as e:
-            logger.error(f"Failed to delete secret from HashiCorp Vault: {e}")
+            logger.error("Failed to delete secret from HashiCorp Vault: %s", e)
             return False
 
     def ping(self) -> bool:
@@ -135,7 +135,7 @@ class HashiCorpVault(BaseVault):
         try:
             return self.client.is_authenticated()
         except Exception as e:
-            logger.error(f"HashiCorp Vault ping failed: {e}")
+            logger.error("HashiCorp Vault ping failed: %s", e)
             return False
 
     def close(self) -> None:

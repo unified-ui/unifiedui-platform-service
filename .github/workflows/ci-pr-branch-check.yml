@@ -1,20 +1,111 @@
-name: ci-pr-branch-check
+name: CI — PR Branch Check
 
 on:
   pull_request:
-    branches: [main]
+    types: [opened, synchronize, reopened, edited]
+
+permissions:
+  contents: read
 
 jobs:
-  check-branch:
-    name: Validate Source Branch
+  branch-naming:
+    name: Validate Branch Name
     runs-on: ubuntu-latest
     steps:
-      - name: Check source branch
+      - name: Check branch naming convention
         run: |
-          SOURCE_BRANCH="${{ github.head_ref }}"
-          echo "Source branch: $SOURCE_BRANCH"
-          if [[ ! "$SOURCE_BRANCH" =~ ^release/ ]]; then
-            echo "::error::PRs to main must come from a release/* branch. Got: $SOURCE_BRANCH"
+          BRANCH="${{ github.head_ref }}"
+          PATTERN="^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert|hotfix|dependabot)/"
+
+          # Allow special branches without prefix
+          if [[ "$BRANCH" == "develop" || "$BRANCH" == "main" ]]; then
+            echo "✅ Branch '$BRANCH' is a protected branch — allowed."
+            exit 0
+          fi
+
+          if [[ ! "$BRANCH" =~ $PATTERN ]]; then
+            echo "❌ Branch name '$BRANCH' does not follow convention."
+            echo ""
+            echo "   Expected: <type>/<description>"
+            echo ""
+            echo "   Types:"
+            echo "     feat/     - New feature"
+            echo "     fix/      - Bug fix"
+            echo "     hotfix/   - Urgent production fix (direct to main)"
+            echo "     docs/     - Documentation only"
+            echo "     refactor/ - Code refactoring"
+            echo "     test/     - Adding tests"
+            echo "     ci/       - CI/CD changes"
+            echo "     chore/    - Maintenance tasks"
             exit 1
           fi
-          echo "Branch check passed: $SOURCE_BRANCH"
+          echo "✅ Branch name '$BRANCH' is valid."
+
+  branch-target:
+    name: Validate PR Target
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check PR target branch rules
+        run: |
+          SOURCE="${{ github.head_ref }}"
+          TARGET="${{ github.base_ref }}"
+
+          echo "📋 PR: $SOURCE → $TARGET"
+          echo ""
+
+          # Rules for PRs to main
+          if [[ "$TARGET" == "main" ]]; then
+            if [[ "$SOURCE" == "develop" || "$SOURCE" =~ ^hotfix/ ]]; then
+              echo "✅ PR to 'main' from '$SOURCE' is allowed."
+              exit 0
+            else
+              echo "❌ PRs to 'main' are only allowed from:"
+              echo "   • develop (regular releases)"
+              echo "   • hotfix/* (emergency fixes)"
+              echo ""
+              echo "   Your branch: $SOURCE"
+              echo ""
+              echo "   📖 Simplified Flow:"
+              echo "   ┌────────────────────────────────────────────────────────────┐"
+              echo "   │                                                            │"
+              echo "   │  feat/* ──┐                                                │"
+              echo "   │  fix/*  ──┼──▶ develop ──────────────▶ main               │"
+              echo "   │  docs/* ──┤        ▲                    │                  │"
+              echo "   │  ci/*   ──┘        │                    ▼                  │"
+              echo "   │                    └──── hotfix/* ─────▶│                  │"
+              echo "   │                                                            │"
+              echo "   └────────────────────────────────────────────────────────────┘"
+              exit 1
+            fi
+          fi
+
+          # Rules for PRs to develop
+          if [[ "$TARGET" == "develop" ]]; then
+            if [[ "$SOURCE" =~ ^(feat|fix|docs|refactor|test|ci|chore|style|perf|build|revert)/ ]]; then
+              echo "✅ PR to 'develop' from '$SOURCE' is allowed."
+              exit 0
+            elif [[ "$SOURCE" =~ ^hotfix/ ]]; then
+              echo "✅ PR to 'develop' from '$SOURCE' (backport) is allowed."
+              exit 0
+            elif [[ "$SOURCE" =~ ^dependabot/ ]]; then
+              echo "✅ PR to 'develop' from '$SOURCE' (dependency update) is allowed."
+              exit 0
+            else
+              echo "❌ PRs to 'develop' are only allowed from:"
+              echo "   • feat/*"
+              echo "   • fix/*"
+              echo "   • docs/*"
+              echo "   • refactor/*"
+              echo "   • test/*"
+              echo "   • ci/*"
+              echo "   • chore/*"
+              echo "   • hotfix/* (backport)"
+              echo "   • dependabot/* (dependency updates)"
+              echo ""
+              echo "   Your branch: $SOURCE"
+              exit 1
+            fi
+          fi
+
+          # Other targets — allow all
+          echo "✅ PR to '$TARGET' from '$SOURCE' is allowed (no restrictions)."

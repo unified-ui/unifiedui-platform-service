@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import func, select
 
@@ -73,8 +73,8 @@ class DashboardHandler:
         self,
         tenant_id: str,
         user: ContextIdentityUser,
-        entity_model: type,
-        member_model: type,
+        entity_model: Any,
+        member_model: Any,
         entity_id_field: str,
         is_admin: bool,
         has_active_field: bool = True,

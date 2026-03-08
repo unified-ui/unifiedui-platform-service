@@ -6,6 +6,7 @@ from fastapi import status
 from starlette.testclient import TestClient
 
 from tests.conftest import create_auth_headers
+from tests.helpers.tenant import create_tenant_for_user
 from unifiedui.core.database.enums import PermissionActionEnum, PrincipalTypeEnum
 
 # API Endpoints
@@ -28,18 +29,6 @@ ROLE_ADMIN = PermissionActionEnum.ADMIN.value
 PRINCIPAL_TYPE_USER = PrincipalTypeEnum.IDENTITY_USER.value
 PRINCIPAL_TYPE_GROUP = PrincipalTypeEnum.IDENTITY_GROUP.value
 PRINCIPAL_TYPE_CUSTOM_GROUP = PrincipalTypeEnum.CUSTOM_GROUP.value
-
-
-def create_tenant_for_user(test_client: TestClient, user_token: Any, tenant_name: str = "Test Tenant") -> str:
-    """Helper function to create a tenant and return its ID."""
-    headers = create_auth_headers(user_token, use_cache=False)
-    response = test_client.post(
-        "/api/v1/platform-service/tenants",
-        json={"name": tenant_name, "description": f"Tenant for {user_token.get_id()}"},
-        headers=headers,
-    )
-    assert response.status_code == status.HTTP_201_CREATED
-    return response.json()["id"]
 
 
 class TestCredentialRoutes:

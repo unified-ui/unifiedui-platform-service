@@ -40,7 +40,7 @@ class JWKSTokenVerifier:
         try:
             signing_key = self._jwks_client.get_signing_key_from_jwt(token)
         except Exception as e:
-            logger.warning(f"Failed to retrieve signing key from JWKS: {e}")
+            logger.warning("Failed to retrieve signing key from JWKS: %s", e)
             raise ValueError(f"Failed to retrieve signing key: {e}")
 
         decode_options = {

@@ -204,9 +204,9 @@ class TenantHandler:
                     self.cache_client.invalidate_tenant_list_cache()
                     # Clear user cache since permissions changed
                     self.cache_client.clear_cache_for_user(user_id)
-                    logger.debug(f"Invalidated tenant list cache and user cache for {user_id}")
+                    logger.debug("Invalidated tenant list cache and user cache for %s", user_id)
                 except Exception as e:
-                    logger.warning(f"Failed to invalidate cache: {e}")
+                    logger.warning("Failed to invalidate cache: %s", e)
 
             return self._model_to_response(tenant)
 
@@ -253,9 +253,9 @@ class TenantHandler:
                     self.cache_client.invalidate_tenant_list_cache()
                     # Invalidate specific tenant cache
                     self.cache_client.invalidate_tenant_cache(tenant_id)
-                    logger.debug(f"Invalidated caches for tenant {tenant_id}")
+                    logger.debug("Invalidated caches for tenant %s", tenant_id)
                 except Exception as e:
-                    logger.warning(f"Failed to invalidate cache: {e}")
+                    logger.warning("Failed to invalidate cache: %s", e)
 
             return self._model_to_response(tenant)
 
@@ -296,9 +296,9 @@ class TenantHandler:
                     # Clear all user caches (all users who had access to this tenant)
                     pattern = "tenants:user:*:with_permissions"
                     self.cache_client.client.delete_pattern(pattern)
-                    logger.debug(f"Invalidated caches for deleted tenant {tenant_id}")
+                    logger.debug("Invalidated caches for deleted tenant %s", tenant_id)
                 except Exception as e:
-                    logger.warning(f"Failed to invalidate cache: {e}")
+                    logger.warning("Failed to invalidate cache: %s", e)
 
             logger.info("Tenant deleted", extra={"tenant_id": tenant_id})
 
@@ -437,10 +437,10 @@ class TenantHandler:
             try:
                 cached_data = self.cache_client.client.get(cache_key)
                 if cached_data is not None:
-                    logger.debug(f"Cache hit: {cache_key}")
+                    logger.debug("Cache hit: %s", cache_key)
                     return cached_data
             except Exception as e:
-                logger.warning(f"Failed to get from cache {cache_key}: {e}")
+                logger.warning("Failed to get from cache %s: %s", cache_key, e)
         return None
 
     def _set_to_cache(self, cache_key: str, data, ttl: int = 300):
@@ -455,9 +455,9 @@ class TenantHandler:
         if self.cache_client:
             try:
                 self.cache_client.client.set(cache_key, data, ttl=ttl)
-                logger.debug(f"Cached: {cache_key} (TTL: {ttl}s)")
+                logger.debug("Cached: %s (TTL: %ss)", cache_key, ttl)
             except Exception as e:
-                logger.warning(f"Failed to cache {cache_key}: {e}")
+                logger.warning("Failed to cache %s: %s", cache_key, e)
 
     def _validate_tenant_exists(self, session: Session, tenant_id: str) -> Tenant:
         """

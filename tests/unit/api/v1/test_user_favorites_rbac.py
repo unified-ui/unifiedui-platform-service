@@ -6,6 +6,7 @@ from fastapi import status
 from starlette.testclient import TestClient
 
 from tests.conftest import create_auth_headers
+from tests.helpers.tenant import add_user_to_tenant, create_tenant_for_user
 from unifiedui.core.database.enums import PermissionActionEnum, PrincipalTypeEnum
 from unifiedui.core.database.models import ChatAgent, ChatAgentMember
 
@@ -17,30 +18,6 @@ ENDPOINT_USER_FAVORITE_DETAIL = (
 
 # Principal Types
 PRINCIPAL_TYPE_USER = PrincipalTypeEnum.IDENTITY_USER.value
-
-
-def create_tenant_for_user(test_client: TestClient, user_token, tenant_name: str = "Test Tenant") -> str:
-    """Helper function to create a tenant and return its ID."""
-    headers = create_auth_headers(user_token, use_cache=False)
-    response = test_client.post(
-        "/api/v1/platform-service/tenants",
-        json={"name": tenant_name, "description": f"Tenant for {user_token.get_id()}"},
-        headers=headers,
-    )
-    assert response.status_code == status.HTTP_201_CREATED
-    return response.json()["id"]
-
-
-def add_user_to_tenant(
-    test_client: TestClient, tenant_id: str, admin_headers: dict, user_id: str, role: str = "READER"
-) -> None:
-    """Helper function to add a user to a tenant."""
-    response = test_client.put(
-        f"/api/v1/platform-service/tenants/{tenant_id}/principals",
-        json={"principal_id": user_id, "principal_type": PRINCIPAL_TYPE_USER, "role": role},
-        headers=admin_headers,
-    )
-    assert response.status_code == status.HTTP_200_OK
 
 
 def create_chat_agent_in_db(test_client: TestClient, tenant_id: str, user_id: str, name: str = "Test App") -> str:

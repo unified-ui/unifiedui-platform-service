@@ -42,7 +42,7 @@ async def list_recent_visits(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to list recent visits: {e}")
+        logger.error("Failed to list recent visits: %s", e)
         raise HTTPException(status_code=500, detail="Failed to list recent visits")
 
 
@@ -69,5 +69,5 @@ async def sync_recent_visits(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to sync recent visits: {e}")
+        logger.error("Failed to sync recent visits: %s", e)
         raise HTTPException(status_code=500, detail="Failed to sync recent visits")

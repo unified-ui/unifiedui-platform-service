@@ -22,16 +22,17 @@ class AzureKeyVault(BaseVault):
         Args:
             vault_url: Azure Key Vault URL (e.g., https://myvault.vault.azure.net/)
         """
-        self.vault_url = vault_url or os.getenv("AZURE_KEYVAULT_URL")
-        if not self.vault_url:
+        resolved_url = vault_url or os.getenv("AZURE_KEYVAULT_URL")
+        if not resolved_url:
             raise ValueError("AZURE_KEYVAULT_URL must be provided or set in environment")
+        self.vault_url = resolved_url
 
         try:
             credential = DefaultAzureCredential()
             self.client = SecretClient(vault_url=self.vault_url, credential=credential)
-            logger.info(f"Azure Key Vault initialized: {self.vault_url}")
+            logger.info("Azure Key Vault initialized: %s", self.vault_url)
         except Exception as e:
-            logger.error(f"Failed to initialize Azure Key Vault: {e}")
+            logger.error("Failed to initialize Azure Key Vault: %s", e)
             raise
 
     def store_secret(self, key: str, value: str, metadata: dict[str, Any] | None = None) -> str:
@@ -46,10 +47,10 @@ class AzureKeyVault(BaseVault):
 
             # Return URI as reference
             uri = f"azurekv://{self.vault_url.split('//')[1].split('.')[0]}/{secret.name}/{secret.properties.version}"
-            logger.info(f"Stored secret in Azure Key Vault: {secret_name}")
+            logger.info("Stored secret in Azure Key Vault: %s", secret_name)
             return uri
         except Exception as e:
-            logger.error(f"Failed to store secret in Azure Key Vault: {e}")
+            logger.error("Failed to store secret in Azure Key Vault: %s", e)
             raise
 
     def build_secret_uri(self, key_name: str) -> str:
@@ -63,17 +64,17 @@ class AzureKeyVault(BaseVault):
             # Parse URI: azurekv://vaultname/secretname/version
             parts = uri.replace("azurekv://", "").split("/")
             if len(parts) < 2:
-                logger.error(f"Invalid Azure Key Vault URI: {uri}")
+                logger.error("Invalid Azure Key Vault URI: %s", uri)
                 return None
 
             secret_name = parts[1]
             version = parts[2] if len(parts) > 2 else None
 
             secret = self.client.get_secret(secret_name, version=version)
-            logger.debug(f"Retrieved secret from Azure Key Vault: {secret_name}")
+            logger.debug("Retrieved secret from Azure Key Vault: %s", secret_name)
             return secret.value
         except Exception as e:
-            logger.error(f"Failed to get secret from Azure Key Vault: {e}")
+            logger.error("Failed to get secret from Azure Key Vault: %s", e)
             return None
 
     def update_secret(self, uri: str, value: str, metadata: dict[str, Any] | None = None) -> bool:
@@ -81,17 +82,17 @@ class AzureKeyVault(BaseVault):
         try:
             parts = uri.replace("azurekv://", "").split("/")
             if len(parts) < 2:
-                logger.error(f"Invalid Azure Key Vault URI: {uri}")
+                logger.error("Invalid Azure Key Vault URI: %s", uri)
                 return False
 
             secret_name = parts[1]
             tags = metadata if metadata else {}
 
             self.client.set_secret(secret_name, value, tags=tags)
-            logger.info(f"Updated secret in Azure Key Vault: {secret_name}")
+            logger.info("Updated secret in Azure Key Vault: %s", secret_name)
             return True
         except Exception as e:
-            logger.error(f"Failed to update secret in Azure Key Vault: {e}")
+            logger.error("Failed to update secret in Azure Key Vault: %s", e)
             return False
 
     def delete_secret(self, uri: str) -> bool:
@@ -99,7 +100,7 @@ class AzureKeyVault(BaseVault):
         try:
             parts = uri.replace("azurekv://", "").split("/")
             if len(parts) < 2:
-                logger.error(f"Invalid Azure Key Vault URI: {uri}")
+                logger.error("Invalid Azure Key Vault URI: %s", uri)
                 return False
 
             secret_name = parts[1]
@@ -108,10 +109,10 @@ class AzureKeyVault(BaseVault):
             poller = self.client.begin_delete_secret(secret_name)
             poller.wait()
 
-            logger.info(f"Deleted secret from Azure Key Vault: {secret_name}")
+            logger.info("Deleted secret from Azure Key Vault: %s", secret_name)
             return True
         except Exception as e:
-            logger.error(f"Failed to delete secret from Azure Key Vault: {e}")
+            logger.error("Failed to delete secret from Azure Key Vault: %s", e)
             return False
 
     def ping(self) -> bool:
@@ -122,7 +123,7 @@ class AzureKeyVault(BaseVault):
             list(secrets)  # Force evaluation
             return True
         except Exception as e:
-            logger.error(f"Azure Key Vault ping failed: {e}")
+            logger.error("Azure Key Vault ping failed: %s", e)
             return False
 
     def close(self) -> None:
@@ -131,4 +132,4 @@ class AzureKeyVault(BaseVault):
             self.client.close()
             logger.info("Azure Key Vault connection closed")
         except Exception as e:
-            logger.error(f"Failed to close Azure Key Vault: {e}")
+            logger.error("Failed to close Azure Key Vault: %s", e)

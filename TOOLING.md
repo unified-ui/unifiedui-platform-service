@@ -10,35 +10,38 @@ This document describes the development tooling, workflows, and quality gates fo
 | uv | latest | `curl -LsSf https://astral.sh/uv/install.sh \| sh` |
 | pre-commit | latest | `pip install pre-commit` |
 | commitlint | latest | `npm install -g @commitlint/cli @commitlint/config-conventional` |
+| Docker | latest | [docker.com](https://www.docker.com/) |
 
 ## Quick Commands
 
 ```bash
 # Development
-uv run uvicorn unifiedui.app:app --reload    # Start with hot reload
-uv run uvicorn unifiedui.app:app             # Start without hot reload
+uv sync                                       # Install/update dependencies
+uv sync --frozen                              # Install from lockfile (CI)
+uv run uvicorn unifiedui.app:app --reload     # Start with hot reload
 
 # Testing
-pytest tests/ -n auto --no-header -q         # Run all tests (parallel)
-pytest tests/ -n auto --cov=unifiedui --cov-report=html   # With coverage
+pytest tests/ -n auto --no-header -q                              # Run all tests (parallel)
+pytest tests/ -n auto --cov=unifiedui --cov-report=html           # With coverage
+pytest tests/ -n auto --cov=unifiedui --cov-fail-under=80         # CI coverage gate
 
 # Code Quality
 ruff check .                                  # Lint
 ruff format .                                 # Format
-ruff check . && ruff format --check .        # CI check (lint + format verify)
-mypy unifiedui/                              # Type check
+ruff check . && ruff format --check .         # CI check (lint + format verify)
+mypy unifiedui/                               # Type check
 
 # Database
 alembic upgrade head                          # Apply migrations
-alembic revision --autogenerate -m "desc"    # Create migration
-
-# Dependencies
-uv sync                                       # Install/update dependencies
-uv sync --frozen                             # Install from lockfile
+alembic revision --autogenerate -m "desc"     # Create migration
 
 # Docker
-docker compose -f docker/local/backend/docker-compose.yml up    # Local dev
-docker build -f docker/Dockerfile -t platform-service .         # Production build
+docker compose -f docker/local/infra/docker-compose.yml up -d    # Start infrastructure
+docker compose -f docker/local/backend/docker-compose.yml up      # Local dev (Docker)
+docker build -f docker/Dockerfile -t platform-service .           # Production build
+
+# Pre-commit
+pre-commit run --all-files                    # Run all hooks manually
 ```
 
 ## Pre-commit Hooks
@@ -55,6 +58,21 @@ Hooks run automatically on `git commit`. Manual run:
 ```bash
 pre-commit run --all-files
 ```
+
+### Configured Hooks
+
+| Hook | Source | Purpose |
+|------|--------|---------|
+| trailing-whitespace | pre-commit-hooks | Remove trailing whitespace |
+| end-of-file-fixer | pre-commit-hooks | Ensure files end with newline |
+| check-yaml | pre-commit-hooks | Validate YAML syntax |
+| check-json | pre-commit-hooks | Validate JSON syntax |
+| check-added-large-files | pre-commit-hooks | Prevent large files (>1MB) |
+| check-merge-conflict | pre-commit-hooks | Detect merge conflict markers |
+| detect-private-key | pre-commit-hooks | Prevent accidental key commits |
+| ruff (lint) | ruff-pre-commit | Lint with auto-fix |
+| ruff-format | ruff-pre-commit | Code formatting |
+| commitizen | commitizen | Enforce Conventional Commits |
 
 ## Commit Convention
 
@@ -97,7 +115,7 @@ Enabled rules:
 
 ### Type Checking (mypy)
 
-Not fully integrated yet; recommended settings:
+Recommended strict configuration:
 
 ```ini
 [mypy]
@@ -115,17 +133,22 @@ ignore_missing_imports = true
 
 ## CI/CD Workflows
 
-| Workflow | Trigger | Job |
-|----------|---------|-----|
-| `ci-tests-and-lint.yml` | push/PR | Tests, ruff, coverage |
-| `ci-pr-branch-check.yml` | PR | Branch naming check |
+| Workflow | Trigger | Description |
+|----------|---------|-------------|
+| `ci-tests-and-lint.yml` | push/PR | Lint, format, tests with coverage ≥ 80% |
+| `ci-pr-branch-check.yml` | PR | Branch naming + target validation |
 | `codeql.yml` | push/PR/weekly | Security scanning |
+| `auto-labeler.yml` | PR | Label PRs based on changed files |
+| `pr-size-labeler.yml` | PR | Label PRs by size (XS/S/M/L/XL) |
+| `release-drafter.yml` | push to main | Auto-draft GitHub releases |
+| `stale.yml` | daily | Mark/close stale issues and PRs |
 
 ## Security
 
 - **Dependabot** updates dependencies weekly (Mondays 09:00 CET)
 - **CodeQL** scans for vulnerabilities on every push and weekly
-- **Ruff** includes some security rules via flake8-bugbear
+- **Ruff** includes security rules via flake8-bugbear
+- **pre-commit** hooks detect private keys and merge conflicts
 
 ## IDE Configuration
 

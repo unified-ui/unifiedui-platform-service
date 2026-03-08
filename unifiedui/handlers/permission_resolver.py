@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import select
 
@@ -11,7 +11,6 @@ from unifiedui.core.database.enums import PermissionActionEnum, TenantRolesEnum
 if TYPE_CHECKING:
     from sqlalchemy.orm import Session
 
-    from unifiedui.core.database.models import Base
     from unifiedui.core.identity.users import ContextIdentityUser
 
 PERMISSION_HIERARCHY = {
@@ -60,7 +59,7 @@ def check_is_admin(user: ContextIdentityUser, tenant_id: str, admin_roles: list[
 
 def resolve_my_permission(
     session: Session,
-    member_model: type[Base],
+    member_model: type[Any],
     id_field: str,
     tenant_id: str,
     resource_id: str,
@@ -92,7 +91,7 @@ def resolve_my_permission(
 
 def resolve_my_permissions_bulk(
     session: Session,
-    member_model: type[Base],
+    member_model: type[Any],
     id_field: str,
     tenant_id: str,
     resource_ids: list[str],

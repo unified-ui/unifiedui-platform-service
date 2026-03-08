@@ -60,7 +60,7 @@ class MongoDBCustomGroupsCollection(CustomGroupsCollection):
         doc = group.model_dump()
         self._collection.insert_one(doc)
 
-        logger.info(f"Created custom group {group.id} for tenant {tenant_id}")
+        logger.info("Created custom group %s for tenant %s", group.id, tenant_id)
         return group
 
     def update(
@@ -80,7 +80,7 @@ class MongoDBCustomGroupsCollection(CustomGroupsCollection):
             return None
 
         result.pop("_id", None)
-        logger.info(f"Updated custom group {group_id}")
+        logger.info("Updated custom group %s", group_id)
         return CustomGroupModel(**result)
 
     def add_members(self, group_id: str, user_ids: list[str], updated_by: str) -> CustomGroupModel | None:
@@ -98,7 +98,7 @@ class MongoDBCustomGroupsCollection(CustomGroupsCollection):
             return None
 
         result.pop("_id", None)
-        logger.info(f"Added {len(user_ids)} members to custom group {group_id}")
+        logger.info("Added %s members to custom group %s", len(user_ids), group_id)
         return CustomGroupModel(**result)
 
     def remove_members(self, group_id: str, user_ids: list[str], updated_by: str) -> CustomGroupModel | None:
@@ -113,7 +113,7 @@ class MongoDBCustomGroupsCollection(CustomGroupsCollection):
             return None
 
         result.pop("_id", None)
-        logger.info(f"Removed {len(user_ids)} members from custom group {group_id}")
+        logger.info("Removed %s members from custom group %s", len(user_ids), group_id)
         return CustomGroupModel(**result)
 
     def delete(self, group_id: str) -> bool:
@@ -121,7 +121,7 @@ class MongoDBCustomGroupsCollection(CustomGroupsCollection):
         result = self._collection.delete_one({"id": group_id})
 
         if result.deleted_count > 0:
-            logger.info(f"Deleted custom group {group_id}")
+            logger.info("Deleted custom group %s", group_id)
             return True
 
         return False

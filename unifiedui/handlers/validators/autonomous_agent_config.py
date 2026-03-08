@@ -97,7 +97,7 @@ class N8NAutonomousAgentConfigValidator(BaseAutonomousAgentConfigValidator):
             validated = N8NAutonomousAgentConfig(**config)
             return validated.model_dump()
         except Exception as e:
-            logger.error(f"N8N autonomous agent config validation failed: {e}")
+            logger.error("N8N autonomous agent config validation failed: %s", e)
             raise AutonomousAgentConfigValidationError(
                 message=f"N8N configuration validation failed: {e!s}", errors=[str(e)]
             )

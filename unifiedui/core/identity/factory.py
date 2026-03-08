@@ -389,7 +389,7 @@ class IdentityProviderFactory:
             obo_client = get_obo_client()
             return obo_client.exchange_for_graph_token(identity_token.token)
         except ValueError as e:
-            logger.error(f"OBO token exchange failed: {e}")
+            logger.error("OBO token exchange failed: %s", e)
             raise
 
     @staticmethod

@@ -66,7 +66,7 @@ async def list_{resource_name_plural}(
 @check_permissions(
     entity="tenant",
     required_permissions=[
-        TenantRolesEnum.GLOBAL_ADMIN,
+        TenantRolesEnum.TENANT_GLOBAL_ADMIN,
         TenantRolesEnum.{RESOURCE}_ADMIN,
         TenantRolesEnum.{RESOURCE}_CREATOR
     ]
@@ -212,10 +212,11 @@ async def get_models_by_purpose(request: Request, tenant_id: str, purpose_group:
 - CRUD by tenant admin users via `@authenticate()`, lookup by purpose via `@authenticate_service_key()`
 - Routes registered at: `/api/v1/platform-service/tenants/{tenant_id}/ai-models`
 
-### ReACT Agent (Standard RBAC Resource)
-- Full CRUD + permission management + tags support
-- Same decorator pattern as ChatAgent/AutonomousAgent (authenticate + check_permissions)
-- Routes registered at: `/api/v1/platform-service/tenants/{tenant_id}/re-act-agents`
+### ReACT Agent (ChatAgent Sub-Type)
+- ReACT Agent is a sub-type of ChatAgent (`ChatAgentTypeEnum.REACT_AGENT`), **not** a standalone resource
+- Uses `ChatAgentMember` for RBAC — no standalone `ReActAgentMember`
+- Has a `ReActAgentVersion` model linked via FK to `chat_agents.id` (stores versioned config: system_prompt, tool_ids, ai_model_ids, etc.)
+- Routes for version management registered at: `/api/v1/platform-service/tenants/{tenant_id}/re-act-agents`
 
 ### Dashboard (Aggregation endpoint)
 - `GET /dashboard/stats` — returns aggregated counts (total + active) for chat_agents, autonomous_agents, conversations

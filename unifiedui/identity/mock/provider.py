@@ -8,9 +8,8 @@ class MockIdentityProvider(BaseIdentityProvider):
 
     def __init__(self, identity_token: BaseIdentityToken):
         super().__init__(identity_token)
-        # Mock data storage
-        self._users = {}
-        self._groups = {}
+        self._users: dict[str, dict[str, str]] = {}
+        self._groups: dict[str, dict[str, str]] = {}
 
     def get_current_user_security_groups(self, query: APIFilterQuery | None = None) -> list[IdentityGroupResponse]:
         """Get security groups for current user."""

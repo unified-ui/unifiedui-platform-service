@@ -48,9 +48,9 @@ def get_cache_client() -> CacheClient | None:
 
     try:
         _cache_client = CacheClientFactory.create()
-        logger.info(f"Cache client initialized successfully ({cache_backend})")
+        logger.info("Cache client initialized successfully (%s)", cache_backend)
     except Exception as e:
-        logger.warning(f"Failed to initialize cache client: {e}. Continuing without cache.")
+        logger.warning("Failed to initialize cache client: %s. Continuing without cache.", e)
         _cache_client = None
 
     return _cache_client

@@ -11,7 +11,7 @@ from unifiedui.exc.tools import InvalidToolCredentialError, ToolConfigValidation
 from unifiedui.handlers.dependencies import get_tool_handler
 from unifiedui.handlers.tools import ToolHandler
 from unifiedui.logger import get_logger
-from unifiedui.schema.requests.tool_permissions import SetToolPermissionRequest
+from unifiedui.schema.requests.permissions import SetResourcePermissionRequest
 from unifiedui.schema.requests.tools import CreateToolRequest, UpdateToolRequest
 from unifiedui.schema.responses.principals import PrincipalWithRolesResponse, ResourcePrincipalsResponse
 from unifiedui.schema.responses.tools import ToolResponse
@@ -101,7 +101,7 @@ async def list_tools(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to list tools: {e}")
+        logger.error("Failed to list tools: %s", e)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to list tools")
 
 
@@ -140,16 +140,16 @@ async def create_tool(
             tenant_id=tenant_id, request=create_request, user_id=user.identity.get_id(), user=user
         )
     except InvalidToolCredentialError as e:
-        logger.warning(f"Invalid credential: {e}")
+        logger.warning("Invalid credential: %s", e)
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except ToolConfigValidationError as e:
-        logger.warning(f"Tool config validation failed: {e.message}", extra={"errors": e.errors})
+        logger.warning("Tool config validation failed: %s", e.message, extra={"errors": e.errors})
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Tool config validation failed: {e.message}. Errors: {'; '.join(e.errors)}",
         )
     except Exception as e:
-        logger.error(f"Failed to create tool: {e}")
+        logger.error("Failed to create tool: %s", e)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to create tool: {e!s}")
 
 
@@ -178,10 +178,10 @@ async def get_tool(
         )
         return handler.get_tool(tenant_id=tenant_id, tool_id=tool_id, user=user)
     except ToolNotFoundError as e:
-        logger.warning(f"Tool not found: {e}")
+        logger.warning("Tool not found: %s", e)
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
-        logger.error(f"Failed to get tool: {e}")
+        logger.error("Failed to get tool: %s", e)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to get tool")
 
 
@@ -215,19 +215,19 @@ async def update_tool(
             tenant_id=tenant_id, tool_id=tool_id, request=update_request, user_id=user.identity.get_id()
         )
     except ToolNotFoundError as e:
-        logger.warning(f"Tool not found: {e}")
+        logger.warning("Tool not found: %s", e)
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except InvalidToolCredentialError as e:
-        logger.warning(f"Invalid credential: {e}")
+        logger.warning("Invalid credential: %s", e)
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except ToolConfigValidationError as e:
-        logger.warning(f"Tool config validation failed: {e.message}", extra={"errors": e.errors})
+        logger.warning("Tool config validation failed: %s", e.message, extra={"errors": e.errors})
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Tool config validation failed: {e.message}. Errors: {'; '.join(e.errors)}",
         )
     except Exception as e:
-        logger.error(f"Failed to update tool: {e}")
+        logger.error("Failed to update tool: %s", e)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to update tool: {e!s}")
 
 
@@ -255,10 +255,10 @@ async def delete_tool(
         handler.delete_tool(tenant_id=tenant_id, tool_id=tool_id)
         return Response(status_code=status.HTTP_204_NO_CONTENT)
     except ToolNotFoundError as e:
-        logger.warning(f"Tool not found: {e}")
+        logger.warning("Tool not found: %s", e)
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
-        logger.error(f"Failed to delete tool: {e}")
+        logger.error("Failed to delete tool: %s", e)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to delete tool")
 
 
@@ -324,10 +324,10 @@ async def list_tool_permissions(
             order_direction=order_direction.value if order_direction else None,
         )
     except ToolNotFoundError as e:
-        logger.warning(f"Tool not found: {e}")
+        logger.warning("Tool not found: %s", e)
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
-        logger.error(f"Failed to list tool permissions: {e}")
+        logger.error("Failed to list tool permissions: %s", e)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to list tool permissions")
 
 
@@ -365,10 +365,10 @@ async def get_tool_permission(
         )
         return handler.get_tool_permission(tenant_id=tenant_id, tool_id=tool_id, principal_id=principal_id)
     except ToolNotFoundError as e:
-        logger.warning(f"Tool or permission not found: {e}")
+        logger.warning("Tool or permission not found: %s", e)
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
-        logger.error(f"Failed to get tool permission: {e}")
+        logger.error("Failed to get tool permission: %s", e)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to get tool permission")
 
 
@@ -391,7 +391,7 @@ async def set_tool_permission(
     request: Request,
     tenant_id: str,
     tool_id: str,
-    permission_request: SetToolPermissionRequest,
+    permission_request: SetResourcePermissionRequest,
     handler: ToolHandler = Depends(get_tool_handler),
 ) -> PrincipalWithRolesResponse:
     """
@@ -413,10 +413,10 @@ async def set_tool_permission(
             tenant_id=tenant_id, tool_id=tool_id, request=permission_request, user_id=user.identity.get_id(), user=user
         )
     except ToolNotFoundError as e:
-        logger.warning(f"Tool not found: {e}")
+        logger.warning("Tool not found: %s", e)
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
-        logger.error(f"Failed to set tool permission: {e}")
+        logger.error("Failed to set tool permission: %s", e)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to set tool permission")
 
 
@@ -468,10 +468,10 @@ async def delete_tool_permission(
         )
         return Response(status_code=status.HTTP_204_NO_CONTENT)
     except ToolNotFoundError as e:
-        logger.warning(f"Tool or permission not found: {e}")
+        logger.warning("Tool or permission not found: %s", e)
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
-        logger.error(f"Failed to delete tool permission: {e}")
+        logger.error("Failed to delete tool permission: %s", e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to delete tool permission"
         )

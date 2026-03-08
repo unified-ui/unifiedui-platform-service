@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 
 from sqlalchemy import delete, select
 
@@ -115,7 +115,7 @@ class TagHandler:
                     logger.debug("Returning cached tag list")
                     return [TagSummary(**item) for item in cached_data]
             except Exception as e:
-                logger.warning(f"Failed to get cached tag list: {e}")
+                logger.warning("Failed to get cached tag list: %s", e)
 
         with self.db_client.get_session() as session:
             # Data query with pagination (no total count needed)
@@ -137,7 +137,7 @@ class TagHandler:
                     self.cache_client.client.set(cache_key, data, ttl=300)
                     logger.debug("Cached tag list")
                 except Exception as e:
-                    logger.warning(f"Failed to cache tag list: {e}")
+                    logger.warning("Failed to cache tag list: %s", e)
 
             return tag_summaries
 
@@ -194,10 +194,10 @@ class TagHandler:
                     logger.debug("Returning cached resource tag list")
                     return [TagSummary(**item) for item in cached_data]
             except Exception as e:
-                logger.warning(f"Failed to get cached resource tag list: {e}")
+                logger.warning("Failed to get cached resource tag list: %s", e)
 
         config = RESOURCE_TAG_MAPPING[resource_type]
-        tag_model = config["tag_model"]
+        tag_model: type[Any] = cast("type[Any]", config["tag_model"])
 
         with self.db_client.get_session() as session:
             # Data query (no total count needed)
@@ -219,7 +219,7 @@ class TagHandler:
                     self.cache_client.client.set(cache_key, data, ttl=300)
                     logger.debug("Cached resource tag list")
                 except Exception as e:
-                    logger.warning(f"Failed to cache resource tag list: {e}")
+                    logger.warning("Failed to cache resource tag list: %s", e)
 
             return tag_summaries
 
@@ -250,7 +250,7 @@ class TagHandler:
                     logger.debug("Returning cached tag")
                     return TagResponse(**cached_data)
             except Exception as e:
-                logger.warning(f"Failed to get cached tag: {e}")
+                logger.warning("Failed to get cached tag: %s", e)
 
         with self.db_client.get_session() as session:
             tag = session.execute(select(Tag).where(Tag.id == tag_id, Tag.tenant_id == tenant_id)).scalar_one_or_none()
@@ -266,7 +266,7 @@ class TagHandler:
                     self.cache_client.client.set(cache_key, result.model_dump(), ttl=300)
                     logger.debug("Cached tag detail")
                 except Exception as e:
-                    logger.warning(f"Failed to cache tag: {e}")
+                    logger.warning("Failed to cache tag: %s", e)
 
             return result
 
@@ -376,8 +376,8 @@ class TagHandler:
         affected = []
 
         for resource_type, mapping in RESOURCE_TAG_MAPPING.items():
-            tag_model = mapping["tag_model"]
-            id_field = mapping["id_field"]
+            tag_model: type[Any] = cast("type[Any]", mapping["tag_model"])
+            id_field: str = cast("str", mapping["id_field"])
 
             results = (
                 session.execute(
@@ -428,10 +428,10 @@ class TagHandler:
                     logger.debug("Returning cached resource tags")
                     return [TagResponse(**item) for item in cached_data]
             except Exception as e:
-                logger.warning(f"Failed to get cached resource tags: {e}")
+                logger.warning("Failed to get cached resource tags: %s", e)
 
-        tag_model = mapping["tag_model"]
-        id_field = mapping["id_field"]
+        tag_model: type[Any] = cast("type[Any]", mapping["tag_model"])
+        id_field: str = cast("str", mapping["id_field"])
 
         with self.db_client.get_session() as session:
             # Join tag table with junction table
@@ -452,7 +452,7 @@ class TagHandler:
                     self.cache_client.client.set(cache_key, data, ttl=300)
                     logger.debug("Cached resource tags")
                 except Exception as e:
-                    logger.warning(f"Failed to cache resource tags: {e}")
+                    logger.warning("Failed to cache resource tags: %s", e)
 
             return tag_responses
 
@@ -486,8 +486,8 @@ class TagHandler:
         if not mapping:
             raise ValueError(f"Unknown resource type: {resource_type}")
 
-        tag_model = mapping["tag_model"]
-        id_field = mapping["id_field"]
+        tag_model: type[Any] = cast("type[Any]", mapping["tag_model"])
+        id_field: str = cast("str", mapping["id_field"])
         user_id = user.identity.get_id()
 
         with self.db_client.get_session() as session:
@@ -545,8 +545,8 @@ class TagHandler:
         if not mapping:
             raise ValueError(f"Unknown resource type: {resource_type}")
 
-        tag_model = mapping["tag_model"]
-        id_field = mapping["id_field"]
+        tag_model: type[Any] = cast("type[Any]", mapping["tag_model"])
+        id_field: str = cast("str", mapping["id_field"])
 
         with self.db_client.get_session() as session:
             session.execute(
@@ -581,8 +581,8 @@ class TagHandler:
         if not mapping:
             return {}
 
-        tag_model = mapping["tag_model"]
-        id_field = mapping["id_field"]
+        tag_model: type[Any] = cast("type[Any]", mapping["tag_model"])
+        id_field: str = cast("str", mapping["id_field"])
 
         # Query all tags for all resources in one query
         query = (
@@ -595,7 +595,7 @@ class TagHandler:
         results = session.execute(query).all()
 
         # Group by resource ID
-        tags_by_resource = {}
+        tags_by_resource: dict[str, list[TagSummary]] = {}
         for tag, res_id in results:
             if res_id not in tags_by_resource:
                 tags_by_resource[res_id] = []
@@ -611,7 +611,7 @@ class TagHandler:
                 self.cache_client.client.delete(cache_key)
                 logger.debug("Invalidated tag list cache")
             except Exception as e:
-                logger.warning(f"Failed to invalidate tag list cache: {e}")
+                logger.warning("Failed to invalidate tag list cache: %s", e)
 
     def _invalidate_tag_detail_cache(self, tenant_id: str, tag_id: int) -> None:
         """Invalidate the tag detail cache."""
@@ -621,7 +621,7 @@ class TagHandler:
                 self.cache_client.client.delete(cache_key)
                 logger.debug("Invalidated tag detail cache")
             except Exception as e:
-                logger.warning(f"Failed to invalidate tag detail cache: {e}")
+                logger.warning("Failed to invalidate tag detail cache: %s", e)
 
     def _invalidate_resource_tags_cache(self, tenant_id: str, resource_type: str, resource_id: str) -> None:
         """Invalidate the resource tags cache."""
@@ -631,7 +631,7 @@ class TagHandler:
                 self.cache_client.client.delete(cache_key)
                 logger.debug("Invalidated resource tags cache")
             except Exception as e:
-                logger.warning(f"Failed to invalidate resource tags cache: {e}")
+                logger.warning("Failed to invalidate resource tags cache: %s", e)
 
     def _invalidate_resource_detail_cache(self, tenant_id: str, resource_type: str, resource_id: str) -> None:
         """Invalidate the parent resource detail cache when tags change."""
@@ -641,11 +641,12 @@ class TagHandler:
                 return
 
             try:
-                cache_key = mapping["cache_key_pattern"].format(tenant_id=tenant_id, resource_id=resource_id)
+                cache_key_pattern: str = cast("str", mapping["cache_key_pattern"])
+                cache_key = cache_key_pattern.format(tenant_id=tenant_id, resource_id=resource_id)
                 self.cache_client.client.delete(cache_key)
-                logger.debug(f"Invalidated {resource_type} detail cache")
+                logger.debug("Invalidated %s detail cache", resource_type)
             except Exception as e:
-                logger.warning(f"Failed to invalidate {resource_type} detail cache: {e}")
+                logger.warning("Failed to invalidate %s detail cache: %s", resource_type, e)
 
     @staticmethod
     def _model_to_response(tag: Tag) -> TagResponse:

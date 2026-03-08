@@ -4,12 +4,15 @@ import base64
 import hashlib
 import os
 from abc import ABC, abstractmethod
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from cryptography.fernet import Fernet
 
 from unifiedui.core.vault.vault import BaseVault
 from unifiedui.logger import get_logger
+
+if TYPE_CHECKING:
+    from unifiedui.core.caching.client import BaseCacheClient
 
 logger = get_logger(__name__)
 
@@ -20,7 +23,7 @@ class BaseVaultClient(ABC):
     Provides secret management with optional encrypted caching.
     """
 
-    def __init__(self, cache_client: Any | None = None):
+    def __init__(self, cache_client: "BaseCacheClient | None" = None):
         """
         Initialize vault client.
 
@@ -47,7 +50,7 @@ class BaseVaultClient(ABC):
             key = base64.urlsafe_b64encode(hashlib.sha256(encryption_key.encode()).digest())
             return Fernet(key)
         except Exception as e:
-            logger.warning(f"Failed to initialize encryption cipher: {e}")
+            logger.warning("Failed to initialize encryption cipher: %s", e)
             return None
 
     def _encrypt_secret(self, secret: str) -> str | None:
@@ -67,7 +70,7 @@ class BaseVaultClient(ABC):
             encrypted = self._cipher.encrypt(secret.encode())
             return encrypted.decode()
         except Exception as e:
-            logger.error(f"Failed to encrypt secret: {e}")
+            logger.error("Failed to encrypt secret: %s", e)
             return None
 
     def _decrypt_secret(self, encrypted_secret: str) -> str | None:
@@ -87,7 +90,7 @@ class BaseVaultClient(ABC):
             decrypted = self._cipher.decrypt(encrypted_secret.encode())
             return decrypted.decode()
         except Exception as e:
-            logger.error(f"Failed to decrypt secret: {e}")
+            logger.error("Failed to decrypt secret: %s", e)
             return None
 
     @abstractmethod
@@ -145,10 +148,10 @@ class BaseVaultClient(ABC):
                 if cached_encrypted:
                     decrypted = self._decrypt_secret(cached_encrypted)
                     if decrypted:
-                        logger.debug(f"Returning cached secret for {uri}")
+                        logger.debug("Returning cached secret for %s", uri)
                         return decrypted
             except Exception as e:
-                logger.warning(f"Failed to get cached secret: {e}")
+                logger.warning("Failed to get cached secret: %s", e)
 
         # Fetch from vault
         secret = self.get_vault().get_secret(uri)
@@ -160,9 +163,9 @@ class BaseVaultClient(ABC):
                 if encrypted:
                     cache_key = f"vault:secret:{uri}"
                     self.cache_client.set(cache_key, encrypted, ttl=3600)  # Cache for 1 hour
-                    logger.debug(f"Cached encrypted secret for {uri}")
+                    logger.debug("Cached encrypted secret for %s", uri)
             except Exception as e:
-                logger.warning(f"Failed to cache secret: {e}")
+                logger.warning("Failed to cache secret: %s", e)
 
         return secret
 
@@ -185,9 +188,9 @@ class BaseVaultClient(ABC):
             try:
                 cache_key = f"vault:secret:{uri}"
                 self.cache_client.delete(cache_key)
-                logger.debug(f"Invalidated cache for secret {uri}")
+                logger.debug("Invalidated cache for secret %s", uri)
             except Exception as e:
-                logger.warning(f"Failed to invalidate secret cache: {e}")
+                logger.warning("Failed to invalidate secret cache: %s", e)
 
         return success
 
@@ -208,9 +211,9 @@ class BaseVaultClient(ABC):
             try:
                 cache_key = f"vault:secret:{uri}"
                 self.cache_client.delete(cache_key)
-                logger.debug(f"Invalidated cache for deleted secret {uri}")
+                logger.debug("Invalidated cache for deleted secret %s", uri)
             except Exception as e:
-                logger.warning(f"Failed to invalidate secret cache: {e}")
+                logger.warning("Failed to invalidate secret cache: %s", e)
 
         return success
 

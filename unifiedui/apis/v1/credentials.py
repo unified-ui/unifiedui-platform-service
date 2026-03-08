@@ -11,8 +11,8 @@ from unifiedui.exc.credentials import CredentialNotFoundError
 from unifiedui.handlers.credentials import CredentialHandler
 from unifiedui.handlers.dependencies import get_credential_handler
 from unifiedui.logger import get_logger
-from unifiedui.schema.requests.credential_permissions import SetCredentialPermissionRequest
 from unifiedui.schema.requests.credentials import CreateCredentialRequest, UpdateCredentialRequest
+from unifiedui.schema.requests.permissions import SetResourcePermissionRequest
 from unifiedui.schema.responses.credentials import CredentialResponse, CredentialSecretResponse
 from unifiedui.schema.responses.principals import PrincipalWithRolesResponse, ResourcePrincipalsResponse
 
@@ -102,7 +102,7 @@ async def list_credentials(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to list credentials: {e}")
+        logger.error("Failed to list credentials: %s", e)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to list credentials")
 
 
@@ -153,7 +153,7 @@ async def create_credential(
             tenant_id=tenant_id, request=create_request, user_id=user.identity.get_id(), user=user
         )
     except Exception as e:
-        logger.error(f"Failed to create credential: {e}")
+        logger.error("Failed to create credential: %s", e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to create credential: {e!s}"
         )
@@ -196,10 +196,10 @@ async def get_credential(
         )
         return handler.get_credential(tenant_id=tenant_id, credential_id=credential_id, user=user)
     except CredentialNotFoundError as e:
-        logger.warning(f"Credential not found: {e}")
+        logger.warning("Credential not found: %s", e)
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
-        logger.error(f"Failed to get credential: {e}")
+        logger.error("Failed to get credential: %s", e)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to get credential")
 
 
@@ -254,12 +254,12 @@ async def get_credential_secret(
 
         return CredentialSecretResponse(credential_id=credential_id, secret_value=secret_value)
     except CredentialNotFoundError as e:
-        logger.warning(f"Credential not found: {e}")
+        logger.warning("Credential not found: %s", e)
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to get credential secret: {e}", exc_info=True)
+        logger.error("Failed to get credential secret: %s", e, exc_info=True)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to get credential secret")
 
 
@@ -307,10 +307,10 @@ async def update_credential(
             tenant_id=tenant_id, credential_id=credential_id, request=update_request, user_id=user.identity.get_id()
         )
     except CredentialNotFoundError as e:
-        logger.warning(f"Credential not found: {e}")
+        logger.warning("Credential not found: %s", e)
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
-        logger.error(f"Failed to update credential: {e}")
+        logger.error("Failed to update credential: %s", e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to update credential: {e!s}"
         )
@@ -354,10 +354,10 @@ async def delete_credential(
         handler.delete_credential(tenant_id=tenant_id, credential_id=credential_id)
         return Response(status_code=status.HTTP_204_NO_CONTENT)
     except CredentialNotFoundError as e:
-        logger.warning(f"Credential not found: {e}")
+        logger.warning("Credential not found: %s", e)
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
-        logger.error(f"Failed to delete credential: {e}")
+        logger.error("Failed to delete credential: %s", e)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to delete credential")
 
 
@@ -428,10 +428,10 @@ async def list_credential_permissions(
             order_direction=order_direction,
         )
     except CredentialNotFoundError as e:
-        logger.warning(f"Credential not found: {e}")
+        logger.warning("Credential not found: %s", e)
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
-        logger.error(f"Failed to list credential permissions: {e}")
+        logger.error("Failed to list credential permissions: %s", e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to list credential permissions"
         )
@@ -482,10 +482,10 @@ async def get_credential_permission(
             tenant_id=tenant_id, credential_id=credential_id, principal_id=principal_id
         )
     except CredentialNotFoundError as e:
-        logger.warning(f"Permission not found: {e}")
+        logger.warning("Permission not found: %s", e)
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
-        logger.error(f"Failed to get credential permission: {e}")
+        logger.error("Failed to get credential permission: %s", e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to get credential permission"
         )
@@ -503,7 +503,7 @@ async def set_credential_permission(
     request: Request,
     tenant_id: str,
     credential_id: str,
-    permission_request: SetCredentialPermissionRequest,
+    permission_request: SetResourcePermissionRequest,
     handler: CredentialHandler = Depends(get_credential_handler),
 ) -> PrincipalWithRolesResponse:
     """
@@ -540,10 +540,10 @@ async def set_credential_permission(
             user=user,
         )
     except CredentialNotFoundError as e:
-        logger.warning(f"Credential not found: {e}")
+        logger.warning("Credential not found: %s", e)
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
-        logger.error(f"Failed to set credential permission: {e}")
+        logger.error("Failed to set credential permission: %s", e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to set credential permission: {e!s}"
         )
@@ -561,7 +561,7 @@ async def delete_credential_permission(
     request: Request,
     tenant_id: str,
     credential_id: str,
-    delete_request: SetCredentialPermissionRequest,
+    delete_request: SetResourcePermissionRequest,
     handler: CredentialHandler = Depends(get_credential_handler),
 ) -> Response:
     """
@@ -599,10 +599,10 @@ async def delete_credential_permission(
         )
         return Response(status_code=status.HTTP_204_NO_CONTENT)
     except CredentialNotFoundError as e:
-        logger.warning(f"Permission not found: {e}")
+        logger.warning("Permission not found: %s", e)
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
-        logger.error(f"Failed to delete credential permission: {e}")
+        logger.error("Failed to delete credential permission: %s", e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to delete credential permission"
         )

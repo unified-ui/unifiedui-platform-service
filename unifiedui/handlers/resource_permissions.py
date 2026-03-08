@@ -258,10 +258,10 @@ class ResourcePermissionsHandler:
             try:
                 cached_data = self.cache_client.client.get(cache_key)
                 if cached_data is not None:
-                    logger.debug(f"Returning cached permissions list for {resource_type}")
+                    logger.debug("Returning cached permissions list for %s", resource_type)
                     return cached_data
             except Exception as e:
-                logger.warning(f"Failed to get cached permissions: {e}")
+                logger.warning("Failed to get cached permissions: %s", e)
 
         with self.db_client.get_session() as session:
             from sqlalchemy import func, or_
@@ -344,9 +344,9 @@ class ResourcePermissionsHandler:
             if use_cache and self.cache_client:
                 try:
                     self.cache_client.client.set(cache_key, result, ttl=300)
-                    logger.debug(f"Cached permissions list for {resource_type}")
+                    logger.debug("Cached permissions list for %s", resource_type)
                 except Exception as e:
-                    logger.warning(f"Failed to cache permissions: {e}")
+                    logger.warning("Failed to cache permissions: %s", e)
 
             return result
 
@@ -509,16 +509,16 @@ class ResourcePermissionsHandler:
                 session.add(member)
                 session.commit()
                 session.refresh(member)
-                logger.info(f"Created member for {resource_type}", extra={"member_id": member_id})
+                logger.info("Created member for %s", resource_type, extra={"member_id": member_id})
             elif member.role != role_value:
                 # Update existing member's role
                 member.role = role_value
                 member.updated_by = user_id
                 session.commit()
                 session.refresh(member)
-                logger.info(f"Updated member role for {resource_type}", extra={"member_id": member.id})
+                logger.info("Updated member role for %s", resource_type, extra={"member_id": member.id})
             else:
-                logger.info(f"Member already has role for {resource_type}", extra={"member_id": member.id})
+                logger.info("Member already has role for %s", resource_type, extra={"member_id": member.id})
 
             # Invalidate caches
             self._invalidate_permissions_cache(resource_type, tenant_id, resource_id)
@@ -588,7 +588,7 @@ class ResourcePermissionsHandler:
 
             session.delete(member)
             session.commit()
-            logger.info(f"Deleted member with role for {resource_type}")
+            logger.info("Deleted member with role for %s", resource_type)
 
             # Invalidate caches
             self._invalidate_permissions_cache(resource_type, tenant_id, resource_id)
@@ -743,9 +743,9 @@ class ResourcePermissionsHandler:
         if self.cache_client and principal_type == PrincipalTypeEnum.IDENTITY_USER.value:
             try:
                 self.cache_client.clear_cache_for_user(principal_id)
-                logger.debug(f"Cleared cache for user {principal_id}")
+                logger.debug("Cleared cache for user %s", principal_id)
             except Exception as e:
-                logger.warning(f"Failed to clear user cache: {e}")
+                logger.warning("Failed to clear user cache: %s", e)
 
     def add_creator_permission(
         self,
@@ -796,4 +796,4 @@ class ResourcePermissionsHandler:
         }
         member = member_model(**member_kwargs)
         session.add(member)
-        logger.info(f"Added creator permission for {resource_type}", extra={"member_id": member_id})
+        logger.info("Added creator permission for %s", resource_type, extra={"member_id": member_id})

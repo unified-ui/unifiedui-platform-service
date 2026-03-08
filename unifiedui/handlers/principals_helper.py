@@ -46,7 +46,7 @@ def ensure_principal_exists(
     ).scalar_one_or_none()
 
     if existing:
-        logger.debug(f"Principal {principal_id} already exists in tenant {tenant_id}")
+        logger.debug("Principal %s already exists in tenant %s", principal_id, tenant_id)
         return existing
 
     # For CUSTOM_GROUP, it must already exist
@@ -68,10 +68,10 @@ def ensure_principal_exists(
                 mail=idp_data.mail,
                 description=None,
             )
-            logger.info(f"Fetched and created IDENTITY_USER principal {principal_id} from IDP")
+            logger.info("Fetched and created IDENTITY_USER principal %s from IDP", principal_id)
 
         elif principal_type == PrincipalTypeEnum.IDENTITY_GROUP.value:
-            idp_data = user.idp.get_group_by_id(principal_id)
+            idp_data = user.idp.get_group_by_id(principal_id)  # type: ignore[assignment]
             principal = Principal(
                 tenant_id=tenant_id,
                 principal_id=principal_id,
@@ -81,7 +81,7 @@ def ensure_principal_exists(
                 mail=None,
                 description=None,
             )
-            logger.info(f"Fetched and created IDENTITY_GROUP principal {principal_id} from IDP")
+            logger.info("Fetched and created IDENTITY_GROUP principal %s from IDP", principal_id)
 
         else:
             raise ValueError(f"Unknown principal type: {principal_type}")
@@ -91,7 +91,7 @@ def ensure_principal_exists(
         return principal
 
     except Exception as e:
-        logger.error(f"Failed to fetch principal {principal_id} from IDP: {e}")
+        logger.error("Failed to fetch principal %s from IDP: %s", principal_id, e)
         raise ValueError(f"Failed to fetch principal {principal_id} from identity provider: {e!s}")
 
 
@@ -142,5 +142,5 @@ def get_or_create_principal(
     session.add(principal)
     session.flush()
 
-    logger.info(f"Created principal {principal_id} of type {principal_type} in tenant {tenant_id}")
+    logger.info("Created principal %s of type %s in tenant %s", principal_id, principal_type, tenant_id)
     return principal

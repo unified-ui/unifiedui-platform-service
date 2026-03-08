@@ -10,6 +10,7 @@ from sqlalchemy.orm import selectinload
 
 from unifiedui.core.database.enums import PermissionActionEnum, ToolTypeEnum
 from unifiedui.core.database.models import Credential, Tool, ToolMember, ToolTag
+from unifiedui.handlers.cache_utils import ResourceCacheInvalidator
 from unifiedui.handlers.permission_resolver import (
     check_is_admin,
     get_principal_ids,
@@ -18,12 +19,14 @@ from unifiedui.handlers.permission_resolver import (
 )
 
 if TYPE_CHECKING:
+    from sqlalchemy.orm import Session
+
     from unifiedui.caching.client import CacheClient
     from unifiedui.core.database.client import SQLAlchemyClient
     from unifiedui.core.identity.users import ContextIdentityUser
     from unifiedui.handlers.resource_permissions import ResourcePermissionsHandler
     from unifiedui.handlers.resource_tags import ResourceTagsHandler
-    from unifiedui.schema.requests.tool_permissions import SetToolPermissionRequest
+    from unifiedui.schema.requests.permissions import SetResourcePermissionRequest
     from unifiedui.schema.requests.tools import CreateToolRequest, UpdateToolRequest
 
 from unifiedui.exc.tools import InvalidToolCredentialError, ToolNotFoundError
@@ -60,6 +63,7 @@ class ToolHandler:
         self.cache_client = cache_client
         self._permissions_handler = permissions_handler
         self._tags_handler = tags_handler
+        self._cache = ResourceCacheInvalidator(cache_client, "tools", "tool")
 
     @property
     def permissions_handler(self) -> ResourcePermissionsHandler:
@@ -155,7 +159,7 @@ class ToolHandler:
                         return [QuickListItemResponse(**item) for item in cached_data]
                     return [ToolResponse(**item) for item in cached_data]
             except Exception as e:
-                logger.warning(f"Failed to get cached tool list: {e}")
+                logger.warning("Failed to get cached tool list: %s", e)
 
         with self.db_client.get_session() as session:
             query = (
@@ -235,7 +239,7 @@ class ToolHandler:
                     self.cache_client.client.set(cache_key, data, ttl=300)
                     logger.debug("Cached tool list")
                 except Exception as e:
-                    logger.warning(f"Failed to cache tool list: {e}")
+                    logger.warning("Failed to cache tool list: %s", e)
 
             return result
 
@@ -273,7 +277,7 @@ class ToolHandler:
                             result.my_permission = self._resolve_user_permission(session, tenant_id, tool_id, user)
                     return result
             except Exception as e:
-                logger.warning(f"Failed to get cached tool: {e}")
+                logger.warning("Failed to get cached tool: %s", e)
 
         with self.db_client.get_session() as session:
             query = (
@@ -294,7 +298,7 @@ class ToolHandler:
                     self.cache_client.client.set(cache_key, result.model_dump(), ttl=300)
                     logger.debug("Cached tool detail")
                 except Exception as e:
-                    logger.warning(f"Failed to cache tool: {e}")
+                    logger.warning("Failed to cache tool: %s", e)
 
             if user:
                 result.my_permission = self._resolve_user_permission(session, tenant_id, tool_id, user)
@@ -480,21 +484,15 @@ class ToolHandler:
 
     def _invalidate_list_cache(self, tenant_id: str) -> None:
         """Invalidate list cache for a tenant."""
-        if self.cache_client:
-            pattern = f"tools:list:tenant:{tenant_id}:*"
-            self.cache_client.client.delete_pattern(pattern)
+        self._cache.invalidate_list(tenant_id)
 
     def _invalidate_detail_cache(self, tenant_id: str, tool_id: str) -> None:
         """Invalidate detail cache for a tool."""
-        if self.cache_client:
-            cache_key = f"tools:detail:tenant:{tenant_id}:tool:{tool_id}"
-            self.cache_client.client.delete(cache_key)
+        self._cache.invalidate_detail(tenant_id, tool_id)
 
     def _invalidate_permissions_cache(self, tenant_id: str, tool_id: str) -> None:
         """Invalidate permissions cache for a tool."""
-        if self.cache_client:
-            pattern = f"tools:permissions:tenant:{tenant_id}:tool:{tool_id}:*"
-            self.cache_client.client.delete_pattern(pattern)
+        self._cache.invalidate_permissions(tenant_id, tool_id)
 
     # ========== Permission Management Methods ==========
 
@@ -592,7 +590,12 @@ class ToolHandler:
         )
 
     def set_tool_permission(
-        self, tenant_id: str, tool_id: str, request: SetToolPermissionRequest, user_id: str, user: ContextIdentityUser
+        self,
+        tenant_id: str,
+        tool_id: str,
+        request: SetResourcePermissionRequest,
+        user_id: str,
+        user: ContextIdentityUser,
     ) -> PrincipalWithRolesResponse:
         """
         Set or update a permission for a principal on a tool.
@@ -654,7 +657,7 @@ class ToolHandler:
             raise ToolNotFoundError(str(e)) from e
 
     def _resolve_user_permission(
-        self, session: object, tenant_id: str, tool_id: str, user: ContextIdentityUser
+        self, session: Session, tenant_id: str, tool_id: str, user: ContextIdentityUser
     ) -> str | None:
         """Resolve the user's permission level on a specific tool.
 

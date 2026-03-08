@@ -4,6 +4,16 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from unifiedui.core.database.enums import PermissionActionEnum, PrincipalTypeEnum
+
+
+class SetResourcePermissionRequest(BaseModel):
+    """Request model for setting a permission on any resource."""
+
+    principal_id: str = Field(..., min_length=1, description="ID of the principal (user, group, or custom group)")
+    principal_type: PrincipalTypeEnum = Field(..., description="Type of principal")
+    role: PermissionActionEnum = Field(..., description="Permission level (READ, WRITE, ADMIN)")
+
 
 class PermissionAssignmentRequest(BaseModel):
     """Request to assign permission to a user or group."""

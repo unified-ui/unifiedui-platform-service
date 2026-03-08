@@ -82,7 +82,7 @@ class PrincipalHandler:
             # For users, principal_name is their email/principal_name from identity data
             principal_name = identity_data.principal_name or identity_data.mail or display_name
         else:  # IDENTITY_GROUP
-            identity_data = user.idp.get_group_by_id(principal_id)
+            identity_data = user.idp.get_group_by_id(principal_id)  # type: ignore[assignment]
             display_name = identity_data.display_name
             mail = None
             description = None
@@ -152,7 +152,7 @@ class PrincipalHandler:
                     logger.debug("Returning cached principal")
                     return PrincipalResponse(**cached_data)
             except Exception as e:
-                logger.warning(f"Failed to get cached principal: {e}")
+                logger.warning("Failed to get cached principal: %s", e)
 
         with self.db_client.get_session() as session:
             principal = session.execute(
@@ -170,7 +170,7 @@ class PrincipalHandler:
                     self.cache_client.client.set(cache_key, result.model_dump(), ttl=300)
                     logger.debug("Cached principal detail")
                 except Exception as e:
-                    logger.warning(f"Failed to cache principal: {e}")
+                    logger.warning("Failed to cache principal: %s", e)
 
             return result
 
@@ -672,19 +672,19 @@ class PrincipalHandler:
                 )
                 members = session.execute(member_query).scalars().all()
                 users_to_invalidate.extend(members)
-                logger.debug(f"Found {len(members)} users in custom group {principal_id} to invalidate")
+                logger.debug("Found %s users in custom group %s to invalidate", len(members), principal_id)
             elif principal_type == "IDENTITY_GROUP":
                 # Identity group - invalidate all group and permission caches
                 pattern = "identity:groups:user:*"
                 self.cache_client.client.delete_pattern(pattern)
                 pattern = "tenants:user:*:with_permissions"
                 self.cache_client.client.delete_pattern(pattern)
-                logger.debug(f"Cleared identity group cache patterns for group {principal_id}")
+                logger.debug("Cleared identity group cache patterns for group %s", principal_id)
 
             # Invalidate cache for each affected user
             for user_id_to_clear in users_to_invalidate:
                 deleted_count = self.cache_client.clear_cache_for_user(user_id_to_clear)
-                logger.debug(f"Cleared {deleted_count} cache entries for user {user_id_to_clear}")
+                logger.debug("Cleared %s cache entries for user %s", deleted_count, user_id_to_clear)
 
             # Also clear cache for the user making the change
             if user_id:
@@ -693,7 +693,7 @@ class PrincipalHandler:
             # Invalidate tenant list caches
             self.cache_client.invalidate_tenant_list_cache()
         except Exception as e:
-            logger.warning(f"Failed to clear user cache: {e}")
+            logger.warning("Failed to clear user cache: %s", e)
 
     def _invalidate_principal_caches(self, tenant_id: str, principal_id: str) -> None:
         """Invalidate caches related to a principal."""
@@ -711,4 +711,4 @@ class PrincipalHandler:
 
             logger.debug("Invalidated principal caches", extra={"tenant_id": tenant_id, "principal_id": principal_id})
         except Exception as e:
-            logger.warning(f"Failed to invalidate principal caches: {e}")
+            logger.warning("Failed to invalidate principal caches: %s", e)

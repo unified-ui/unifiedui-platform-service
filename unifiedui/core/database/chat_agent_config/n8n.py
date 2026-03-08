@@ -12,6 +12,6 @@ class N8NAuthenticationConfig:
 
 @dataclass
 class N8NChatAgentConfig(BaseChatAgentConfig):
-    type: str = "n8n"
     n8n_base_url: str
     authentication: N8NAuthenticationConfig
+    type: str = "n8n"

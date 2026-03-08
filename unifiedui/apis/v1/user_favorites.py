@@ -57,7 +57,7 @@ async def list_user_favorites(
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except Exception as e:
-        logger.error(f"Failed to list user favorites: {e}", exc_info=True)
+        logger.error("Failed to list user favorites: %s", e, exc_info=True)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to list user favorites")
 
 
@@ -108,7 +108,7 @@ async def add_user_favorite(
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except Exception as e:
-        logger.error(f"Failed to add user favorite: {e}", exc_info=True)
+        logger.error("Failed to add user favorite: %s", e, exc_info=True)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to add user favorite")
 
 
@@ -160,5 +160,5 @@ async def remove_user_favorite(
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except Exception as e:
-        logger.error(f"Failed to remove user favorite: {e}", exc_info=True)
+        logger.error("Failed to remove user favorite: %s", e, exc_info=True)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to remove user favorite")

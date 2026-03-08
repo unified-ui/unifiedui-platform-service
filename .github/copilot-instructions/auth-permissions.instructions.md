@@ -101,7 +101,7 @@ Permission check applied after `@authenticate()`.
 ```
 
 **Permission resolution flow:**
-1. **Tenant-level bypass**: If user has `GLOBAL_ADMIN` → pass
+1. **Tenant-level bypass**: If user has `TENANT_GLOBAL_ADMIN` → pass
 2. **Resource-specific admin**: If user has `{RESOURCE}_ADMIN` on tenant → pass
 3. **Resource-level check**: Query `{resource}_members` table for user's principal_ids with allowed roles
 
@@ -121,10 +121,13 @@ Permission check applied after `@authenticate()`.
 | `conversation` | ConversationMember | `conversation_id` |
 | `chat_widget` | ChatWidgetMember | `chat_widget_id` |
 | `tool` | ToolMember | `tool_id` |
+| `organization` | OrganizationMember | `organization_id` |
 | `tag` | (uses IS_CREATOR check) | `tag_id` |
 | `user_favorite` | (uses IS_CREATOR check) | `user_id` |
 
 **Note**: `tenant_ai_model` uses `@authenticate_service_key()` instead of `@check_permissions()` — no member table, no RBAC. Only agent-service can access via service key.
+
+**Note**: `ReActAgent` is a sub-type of ChatAgent (`ChatAgentTypeEnum.REACT_AGENT`). It uses `ChatAgentMember` for permissions — there is no standalone `ReActAgentMember`.
 
 ### 3. `@authenticate_autonomous_agent_api_key()`
 API key authentication without Bearer token.
@@ -266,7 +269,7 @@ ChatAgent, AutonomousAgent, ChatWidget, ReActAgent, Conversation, Credential, To
 
 ### Adding New Roles
 
-When adding new `TenantPermissionEnum` roles:
+When adding new `TenantRolesEnum` roles:
 
 1. Add the enum value in `core/database/enums.py`
 2. Create an Alembic migration

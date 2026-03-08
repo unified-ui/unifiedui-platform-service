@@ -10,6 +10,7 @@ from sqlalchemy.orm import selectinload
 
 from unifiedui.core.database.enums import PermissionActionEnum
 from unifiedui.core.database.models import Credential, CredentialMember, CredentialTag
+from unifiedui.handlers.cache_utils import ResourceCacheInvalidator
 from unifiedui.handlers.permission_resolver import (
     check_is_admin,
     get_principal_ids,
@@ -18,14 +19,16 @@ from unifiedui.handlers.permission_resolver import (
 )
 
 if TYPE_CHECKING:
+    from sqlalchemy.orm import Session
+
     from unifiedui.caching.client import CacheClient
     from unifiedui.core.database.client import SQLAlchemyClient
     from unifiedui.core.identity.users import ContextIdentityUser
     from unifiedui.core.vault.client import BaseVaultClient
     from unifiedui.handlers.resource_permissions import ResourcePermissionsHandler
     from unifiedui.handlers.resource_tags import ResourceTagsHandler
-    from unifiedui.schema.requests.credential_permissions import SetCredentialPermissionRequest
     from unifiedui.schema.requests.credentials import CreateCredentialRequest, UpdateCredentialRequest
+    from unifiedui.schema.requests.permissions import SetResourcePermissionRequest
 
 from unifiedui.exc.credentials import CredentialNotFoundError
 from unifiedui.handlers.validators.credential_validator import (
@@ -66,6 +69,7 @@ class CredentialHandler:
         self.cache_client = cache_client
         self._permissions_handler = permissions_handler
         self._tags_handler = tags_handler
+        self._cache = ResourceCacheInvalidator(cache_client, "credentials", "cred")
 
     @property
     def permissions_handler(self) -> ResourcePermissionsHandler:
@@ -158,7 +162,7 @@ class CredentialHandler:
                         return [QuickListItemResponse(**item) for item in cached_data]
                     return [CredentialResponse(**item) for item in cached_data]
             except Exception as e:
-                logger.warning(f"Failed to get cached credential list: {e}")
+                logger.warning("Failed to get cached credential list: %s", e)
 
         with self.db_client.get_session() as session:
             query = (
@@ -236,7 +240,7 @@ class CredentialHandler:
                     self.cache_client.client.set(cache_key, cache_data, ttl=30)  # 30 seconds
                     logger.debug("Cached credential list (TTL: 30s)")
                 except Exception as e:
-                    logger.warning(f"Failed to cache credential list: {e}")
+                    logger.warning("Failed to cache credential list: %s", e)
 
             return result
 
@@ -268,7 +272,7 @@ class CredentialHandler:
             try:
                 cached_data = self.cache_client.client.get(cache_key)
                 if cached_data is not None:
-                    logger.debug(f"Returning cached credential {credential_id}")
+                    logger.debug("Returning cached credential %s", credential_id)
                     result = CredentialResponse(**cached_data)
                     if user:
                         with self.db_client.get_session() as session:
@@ -277,7 +281,7 @@ class CredentialHandler:
                             )
                     return result
             except Exception as e:
-                logger.warning(f"Failed to get cached credential: {e}")
+                logger.warning("Failed to get cached credential: %s", e)
 
         with self.db_client.get_session() as session:
             query = (
@@ -298,9 +302,9 @@ class CredentialHandler:
             if self.cache_client:
                 try:
                     self.cache_client.client.set(cache_key, result.model_dump(), ttl=60)  # 1 minute
-                    logger.debug(f"Cached credential {credential_id} (TTL: 60s)")
+                    logger.debug("Cached credential %s (TTL: 60s)", credential_id)
                 except Exception as e:
-                    logger.warning(f"Failed to cache credential: {e}")
+                    logger.warning("Failed to cache credential: %s", e)
 
             if user:
                 result.my_permission = self._resolve_user_permission(session, tenant_id, credential_id, user)
@@ -334,7 +338,7 @@ class CredentialHandler:
 
             # Fetch secret from vault
             secret = self.vault_client.get_secret(credential.credential_uri, use_cache=use_cache)
-            logger.debug(f"Retrieved secret for credential {credential_id}")
+            logger.debug("Retrieved secret for credential %s", credential_id)
             return secret
 
     def create_credential(
@@ -372,9 +376,9 @@ class CredentialHandler:
             vault_uri = self.vault_client.store_secret(
                 key=f"{tenant_id}/{credential_id}", value=validated_secret, metadata=request.metadata
             )
-            logger.info(f"Stored secret in vault for credential {credential_id}")
+            logger.info("Stored secret in vault for credential %s", credential_id)
         except Exception as e:
-            logger.error(f"Failed to store secret in vault: {e}")
+            logger.error("Failed to store secret in vault: %s", e)
             raise
 
         with self.db_client.get_session() as session:
@@ -410,7 +414,7 @@ class CredentialHandler:
                     self._invalidate_permissions_cache(tenant_id, credential_id)
                     logger.debug("Invalidated credential list and permissions cache")
                 except Exception as e:
-                    logger.warning(f"Failed to invalidate cache: {e}")
+                    logger.warning("Failed to invalidate cache: %s", e)
 
             session.flush()
             session.commit()  # Explicit commit to ensure data is visible
@@ -466,9 +470,9 @@ class CredentialHandler:
                     self.vault_client.update_secret(
                         uri=credential.credential_uri, value=validated_secret, metadata=request.metadata
                     )
-                    logger.info(f"Updated secret in vault for credential {credential_id}")
+                    logger.info("Updated secret in vault for credential %s", credential_id)
                 except Exception as e:
-                    logger.error(f"Failed to update secret in vault: {e}")
+                    logger.error("Failed to update secret in vault: %s", e)
                     raise
 
             # Update credential metadata
@@ -491,9 +495,9 @@ class CredentialHandler:
                 try:
                     self._invalidate_list_cache(tenant_id)
                     self._invalidate_detail_cache(tenant_id, credential_id)
-                    logger.debug(f"Invalidated caches for credential {credential_id}")
+                    logger.debug("Invalidated caches for credential %s", credential_id)
                 except Exception as e:
-                    logger.warning(f"Failed to invalidate cache: {e}")
+                    logger.warning("Failed to invalidate cache: %s", e)
 
             session.flush()
 
@@ -504,6 +508,7 @@ class CredentialHandler:
                 .where(Credential.id == credential_id, Credential.tenant_id == tenant_id)
             )
             credential = session.execute(query).scalar_one_or_none()
+            assert credential is not None
 
             logger.info("Credential updated", extra={"credential_id": credential_id})
             return self._model_to_response(credential)
@@ -536,9 +541,9 @@ class CredentialHandler:
                     self._invalidate_list_cache(tenant_id)
                     self._invalidate_detail_cache(tenant_id, credential_id)
                     self._invalidate_permissions_cache(tenant_id, credential_id)
-                    logger.debug(f"Invalidated caches for credential {credential_id}")
+                    logger.debug("Invalidated caches for credential %s", credential_id)
                 except Exception as e:
-                    logger.warning(f"Failed to invalidate cache: {e}")
+                    logger.warning("Failed to invalidate cache: %s", e)
 
             # Delete from database
             session.delete(credential)
@@ -547,30 +552,24 @@ class CredentialHandler:
             # Delete from vault
             try:
                 self.vault_client.delete_secret(vault_uri)
-                logger.info(f"Deleted secret from vault for credential {credential_id}")
+                logger.info("Deleted secret from vault for credential %s", credential_id)
             except Exception as e:
-                logger.warning(f"Failed to delete secret from vault: {e}")
+                logger.warning("Failed to delete secret from vault: %s", e)
                 # Continue even if vault deletion fails
 
             logger.info("Credential deleted", extra={"credential_id": credential_id})
 
     def _invalidate_list_cache(self, tenant_id: str) -> None:
         """Invalidate all list caches for a tenant."""
-        if self.cache_client:
-            pattern = f"credentials:list:tenant:{tenant_id}:*"
-            self.cache_client.client.delete_pattern(pattern)
+        self._cache.invalidate_list(tenant_id)
 
     def _invalidate_detail_cache(self, tenant_id: str, credential_id: str) -> None:
         """Invalidate detail cache for a specific credential."""
-        if self.cache_client:
-            cache_key = f"credentials:detail:tenant:{tenant_id}:cred:{credential_id}"
-            self.cache_client.client.delete(cache_key)
+        self._cache.invalidate_detail(tenant_id, credential_id)
 
     def _invalidate_permissions_cache(self, tenant_id: str, credential_id: str) -> None:
         """Invalidate permissions cache for a specific credential."""
-        if self.cache_client:
-            cache_key = f"credentials:permissions:tenant:{tenant_id}:cred:{credential_id}"
-            self.cache_client.client.delete(cache_key)
+        self._cache.invalidate_permissions(tenant_id, credential_id)
 
     # ========== Permission Management Methods ==========
 
@@ -689,7 +688,7 @@ class CredentialHandler:
         self,
         tenant_id: str,
         credential_id: str,
-        request: SetCredentialPermissionRequest,
+        request: SetResourcePermissionRequest,
         user_id: str,
         user: ContextIdentityUser,
     ) -> PrincipalWithRolesResponse:
@@ -772,7 +771,7 @@ class CredentialHandler:
             raise CredentialNotFoundError(str(e)) from e
 
     def _resolve_user_permission(
-        self, session: object, tenant_id: str, credential_id: str, user: ContextIdentityUser
+        self, session: Session, tenant_id: str, credential_id: str, user: ContextIdentityUser
     ) -> str | None:
         """Resolve the user's permission level on a specific credential.
 

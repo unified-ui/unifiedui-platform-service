@@ -21,6 +21,7 @@ dependencies = [
     "pyjwt>=2.8.0",
     "azure-identity>=1.25.1",
     "openapi-spec-validator>=0.7.0",
+    "httpx>=0.28.1",
 ]
 
 [tool.setuptools]
@@ -49,8 +50,11 @@ asyncio_default_fixture_loop_scope = "function"
 
 [dependency-groups]
 dev = [
+    "mypy>=1.15.0",
+    "pytest-cov>=7.0.0",
     "pytest-xdist>=3.8.0",
     "ruff>=0.15.2",
+    "types-requests>=2.32.4.20260107",
 ]
 
 [tool.ruff]
@@ -92,3 +96,10 @@ known-first-party = ["unifiedui"]
 "unifiedui/schema/**" = ["TC001", "TC002", "TC003"]
 "unifiedui/core/database/models.py" = ["TC001", "TC002", "TC003"]
 "tests/conftest.py" = ["E402", "N806"]
+
+[tool.mypy]
+python_version = "3.13"
+warn_unused_configs = true
+ignore_missing_imports = true
+plugins = ["pydantic.mypy"]
+exclude = ["alembic", "notebooks", "htmlcov"]

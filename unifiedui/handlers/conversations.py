@@ -9,6 +9,7 @@ from sqlalchemy import select
 
 from unifiedui.core.database.enums import ChatAgentTypeEnum, PermissionActionEnum, PrincipalTypeEnum
 from unifiedui.core.database.models import ChatAgent, Conversation, ConversationMember
+from unifiedui.handlers.cache_utils import ResourceCacheInvalidator
 from unifiedui.handlers.permission_resolver import (
     check_is_admin,
     get_principal_ids,
@@ -17,12 +18,14 @@ from unifiedui.handlers.permission_resolver import (
 )
 
 if TYPE_CHECKING:
+    from sqlalchemy.orm import Session
+
     from unifiedui.caching.client import CacheClient
     from unifiedui.core.database.client import SQLAlchemyClient
     from unifiedui.core.identity.users import ContextIdentityUser
     from unifiedui.handlers.resource_permissions import ResourcePermissionsHandler
-    from unifiedui.schema.requests.conversation_permissions import SetConversationPermissionRequest
     from unifiedui.schema.requests.conversations import CreateConversationRequest, UpdateConversationRequest
+    from unifiedui.schema.requests.permissions import SetResourcePermissionRequest
     from unifiedui.services.agent_service_client import AgentServiceClient
 
 from unifiedui.exc.conversations import ConversationNotFoundError, FoundryConversationCreationError
@@ -58,6 +61,7 @@ class ConversationHandler:
         self.cache_client = cache_client
         self._permissions_handler = permissions_handler
         self._agent_service_client = agent_service_client
+        self._cache = ResourceCacheInvalidator(cache_client, "conversations", "conv")
 
     @property
     def permissions_handler(self) -> ResourcePermissionsHandler:
@@ -80,7 +84,7 @@ class ConversationHandler:
         order_direction: str | None = None,
         view: str | None = None,
         use_cache: bool = True,
-    ) -> list[ConversationResponse] | list[QuickListItemResponse]:
+    ) -> list[ConversationResponse] | list[QuickListItemResponse] | list[ConversationQuickListItemResponse]:
         """
         Get a list of conversations for a tenant (filtered by permissions).
 
@@ -145,7 +149,7 @@ class ConversationHandler:
                         return [QuickListItemResponse(**item) for item in cached_data]
                     return [ConversationResponse(**item) for item in cached_data]
             except Exception as e:
-                logger.warning(f"Failed to get cached conversation list: {e}")
+                logger.warning("Failed to get cached conversation list: %s", e)
 
         with self.db_client.get_session() as session:
             query = select(Conversation).where(Conversation.tenant_id == tenant_id)
@@ -198,7 +202,7 @@ class ConversationHandler:
                         data = [r.model_dump() for r in quick_result]
                         self.cache_client.client.set(cache_key, data, ttl=300)
                     except Exception as e:
-                        logger.warning(f"Failed to cache conversation list: {e}")
+                        logger.warning("Failed to cache conversation list: %s", e)
                 return quick_result
 
             result = [self._model_to_response(conv) for conv in conversations]
@@ -222,7 +226,7 @@ class ConversationHandler:
                     self.cache_client.client.set(cache_key, data, ttl=300)
                     logger.debug("Cached conversation list")
                 except Exception as e:
-                    logger.warning(f"Failed to cache conversation list: {e}")
+                    logger.warning("Failed to cache conversation list: %s", e)
 
             return result
 
@@ -263,7 +267,7 @@ class ConversationHandler:
                             )
                     return result
             except Exception as e:
-                logger.warning(f"Failed to get cached conversation: {e}")
+                logger.warning("Failed to get cached conversation: %s", e)
 
         with self.db_client.get_session() as session:
             query = select(Conversation).where(Conversation.id == conversation_id, Conversation.tenant_id == tenant_id)
@@ -280,7 +284,7 @@ class ConversationHandler:
                     self.cache_client.client.set(cache_key, result.model_dump(), ttl=300)
                     logger.debug("Cached conversation detail")
                 except Exception as e:
-                    logger.warning(f"Failed to cache conversation: {e}")
+                    logger.warning("Failed to cache conversation: %s", e)
 
             if user:
                 result.my_permission = self._resolve_user_permission(session, tenant_id, conversation_id, user)
@@ -353,7 +357,7 @@ class ConversationHandler:
                         "Created Foundry external conversation", extra={"ext_conversation_id": ext_conversation_id}
                     )
                 except MicrosoftFoundryError as e:
-                    logger.error(f"Failed to create Foundry conversation: {e}")
+                    logger.error("Failed to create Foundry conversation: %s", e)
                     raise FoundryConversationCreationError(
                         message=f"Failed to create Foundry conversation: {e.message}", status_code=e.status_code
                     ) from e
@@ -474,21 +478,15 @@ class ConversationHandler:
 
     def _invalidate_list_cache(self, tenant_id: str) -> None:
         """Invalidate list cache for a tenant."""
-        if self.cache_client:
-            self.cache_client.client.delete_pattern(f"conversations:list:tenant:{tenant_id}:*")
+        self._cache.invalidate_list(tenant_id)
 
     def _invalidate_detail_cache(self, tenant_id: str, conversation_id: str) -> None:
         """Invalidate detail cache for a conversation."""
-        if self.cache_client:
-            cache_key = f"conversations:detail:tenant:{tenant_id}:conv:{conversation_id}"
-            self.cache_client.client.delete(cache_key)
+        self._cache.invalidate_detail(tenant_id, conversation_id)
 
     def _invalidate_permissions_cache(self, tenant_id: str, conversation_id: str) -> None:
         """Invalidate permissions cache for a conversation."""
-        if self.cache_client:
-            self.cache_client.client.delete_pattern(
-                f"conversations:permissions:tenant:{tenant_id}:conv:{conversation_id}:*"
-            )
+        self._cache.invalidate_permissions(tenant_id, conversation_id)
 
     # ========== Permission Management Methods ==========
 
@@ -612,7 +610,7 @@ class ConversationHandler:
         self,
         tenant_id: str,
         conversation_id: str,
-        request: SetConversationPermissionRequest,
+        request: SetResourcePermissionRequest,
         user_id: str,
         user: ContextIdentityUser,
     ) -> PrincipalWithRolesResponse:
@@ -694,7 +692,7 @@ class ConversationHandler:
             raise ConversationNotFoundError(str(e)) from e
 
     def _resolve_user_permission(
-        self, session: object, tenant_id: str, conversation_id: str, user: ContextIdentityUser
+        self, session: Session, tenant_id: str, conversation_id: str, user: ContextIdentityUser
     ) -> str | None:
         """Resolve the user's permission level on a specific conversation.
 

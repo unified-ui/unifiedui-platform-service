@@ -25,12 +25,12 @@ class ContextIdentityUser:
         self.identity = IdentityTokenFactory.create(token)
         self.idp = IdentityProviderFactory.create(self.identity)
         self._use_cache = use_cache
-        self._groups = None
-        self._custom_groups = None
-        self._identity_groups = None
-        self._idp_group_ids = None
-        self._tenants = None
-        self._organization_context = None
+        self._groups: list[IdentityGroupResponse] | None = None
+        self._custom_groups: list[IdentityGroupResponse] | None = None
+        self._identity_groups: list[IdentityGroupResponse] | None = None
+        self._idp_group_ids: list[str] | None = None
+        self._tenants: list[dict] | None = None
+        self._organization_context: OrganizationContextResponse | None = None
         self._cache = cache_client
         self._database_client = database_client
 
@@ -48,24 +48,24 @@ class ContextIdentityUser:
                 cached_data = self._cache.client.get(cache_key)
                 if cached_data is not None:
                     self._idp_group_ids = cached_data
-                    logger.debug(f"Returning cached IDP group IDs for user {user_id}")
+                    logger.debug("Returning cached IDP group IDs for user %s", user_id)
                     return self._idp_group_ids
             except Exception as e:
-                logger.warning(f"Failed to get cached IDP group IDs: {e}")
+                logger.warning("Failed to get cached IDP group IDs: %s", e)
 
         # Fetch from identity provider
         query = APIFilterQuery(top=999)
         idp_groups = self.idp.get_current_user_security_groups(query=query)
         self._idp_group_ids = [g.id for g in idp_groups]
-        logger.debug(f"Fetched {len(self._idp_group_ids)} IDP group IDs from identity provider")
+        logger.debug("Fetched %s IDP group IDs from identity provider", len(self._idp_group_ids))
 
         # Cache the group IDs with 60s TTL
         if self._cache:
             try:
                 self._cache.client.set(cache_key, self._idp_group_ids, ttl=60)
-                logger.debug(f"Cached IDP group IDs for user {user_id} (TTL: 60s)")
+                logger.debug("Cached IDP group IDs for user %s (TTL: 60s)", user_id)
             except Exception as e:
-                logger.warning(f"Failed to cache IDP group IDs: {e}")
+                logger.warning("Failed to cache IDP group IDs: %s", e)
 
         return self._idp_group_ids
 
@@ -91,10 +91,10 @@ class ContextIdentityUser:
                 cached_data = self._cache.client.get(cache_key)
                 if cached_data is not None:
                     self._groups = [IdentityGroupResponse(**item) for item in cached_data]
-                    logger.debug(f"Returning cached groups for user {user_id}")
+                    logger.debug("Returning cached groups for user %s", user_id)
                     return self._groups
             except Exception as e:
-                logger.warning(f"Failed to get cached groups: {e}")
+                logger.warning("Failed to get cached groups: %s", e)
 
         if not self._database_client:
             logger.warning("No database client available, returning empty groups list")
@@ -158,9 +158,9 @@ class ContextIdentityUser:
             try:
                 groups_data = [g.model_dump() for g in self._groups]
                 self._cache.client.set(cache_key, groups_data, ttl=300)
-                logger.debug(f"Cached groups for user {user_id} (TTL: 300s)")
+                logger.debug("Cached groups for user %s (TTL: 300s)", user_id)
             except Exception as e:
-                logger.warning(f"Failed to cache groups: {e}")
+                logger.warning("Failed to cache groups: %s", e)
 
         return self._groups
 
@@ -224,7 +224,7 @@ class ContextIdentityUser:
             use_cache=self._use_cache,
         )
 
-        logger.debug(f"Fetched {len(self._tenants)} tenants with permissions for user {user_id}")
+        logger.debug("Fetched %s tenants with permissions for user %s", len(self._tenants), user_id)
 
         return self._tenants
 

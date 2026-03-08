@@ -39,6 +39,8 @@ class TestGetVaultClient:
         mock_settings.cache_enabled = True
         mock_settings.secrets_encryption_key = "encryption-key"
         mock_cache_client = Mock()
+        mock_base_cache_client = Mock()
+        mock_cache_client.client = mock_base_cache_client
         mock_cache.return_value = mock_cache_client
         mock_vault_instance = Mock()
         mock_vault_class.return_value = mock_vault_instance
@@ -47,7 +49,7 @@ class TestGetVaultClient:
 
         assert result is mock_vault_instance
         mock_vault_class.assert_called_once_with(
-            vault_url="https://my-vault.vault.azure.net/", cache_client=mock_cache_client
+            vault_url="https://my-vault.vault.azure.net/", cache_client=mock_base_cache_client
         )
 
     @patch("unifiedui.handlers.dependencies.vault.settings")
@@ -93,6 +95,8 @@ class TestGetVaultClient:
         mock_settings.cache_enabled = True
         mock_settings.secrets_encryption_key = "key"
         mock_cache_client = Mock()
+        mock_base_cache_client = Mock()
+        mock_cache_client.client = mock_base_cache_client
         mock_cache.return_value = mock_cache_client
         mock_vault_instance = Mock()
         mock_vault_class.return_value = mock_vault_instance
@@ -101,7 +105,7 @@ class TestGetVaultClient:
 
         assert result is mock_vault_instance
         mock_vault_class.assert_called_once_with(
-            url="http://vault.example.com:8200", token="test-token", cache_client=mock_cache_client
+            url="http://vault.example.com:8200", token="test-token", cache_client=mock_base_cache_client
         )
 
     @patch("unifiedui.handlers.dependencies.vault.settings")

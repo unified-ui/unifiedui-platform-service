@@ -41,5 +41,5 @@ async def get_dashboard_stats(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to get dashboard stats: {e}")
+        logger.error("Failed to get dashboard stats: %s", e)
         raise HTTPException(status_code=500, detail="Failed to get dashboard stats")

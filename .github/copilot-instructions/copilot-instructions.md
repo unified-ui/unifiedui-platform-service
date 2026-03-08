@@ -6,7 +6,7 @@ applyTo: '**'
 
 ## Project Overview
 
-**unified-ui** is a multi-tenant integration platform for AI agent systems with role-based access control (RBAC). This platform service is the core backend providing management APIs for tenants, chat agents, autonomous agents, ReACT agents, conversations, credentials, chat widgets, tools, tags, permissions, tenant AI models, recent visits, dashboard, and global search.
+**unified-ui** is a multi-tenant integration platform for AI agent systems with role-based access control (RBAC). This platform service is the core backend providing management APIs for organizations, tenants, chat agents, autonomous agents, ReACT agents (a ChatAgent sub-type), conversations, credentials, chat widgets, tools, tags, permissions, tenant AI models, recent visits, dashboard, and global search.
 
 **Tech Stack**: Python 3.13+ · FastAPI · SQLAlchemy · PostgreSQL · Redis · HashiCorp Vault / Azure Key Vault · MSAL · Pydantic v2 · Alembic
 
@@ -35,7 +35,7 @@ Read the relevant instruction file **before** working in that area.
 1. **No comments in code** — Comments only for class docstrings and function docstrings (those are **mandatory**). No inline comments, no block comments explaining logic. Code must be self-documenting.
 2. **ALL business logic in handlers** — Routes (`apis/v1/`) are thin wrappers. Zero logic, zero data transformation. Only: accept params → call handler → return response.
 3. **Factory pattern for infrastructure** — All infrastructure components (database, cache, vault, identity) use factory pattern with interface in `core/` and implementation outside.
-4. **Type annotations everywhere** — All function parameters, return types, and variables. No `Any` unless absolutely unavoidable.
+4. **Type annotations everywhere** — ALL function signatures must have annotations on every parameter and return type, no exceptions (public, private, nested). No `Any` unless absolutely unavoidable. No `# type: ignore` without a specific error code (e.g. `# type: ignore[override]`). Run `uv run mypy unifiedui/` to verify — **zero errors required**.
 5. **Pydantic for all schemas** — Separate request and response models. Never return raw dicts from handlers.
 6. **Permission filtering on every list** — List operations MUST join `{resource}_members` and filter by user's principal_id. Users only see what they have access to.
 7. **Dependency injection** — Never instantiate DB/cache/vault clients in handlers. Always inject via `Depends()` or constructor.
@@ -59,7 +59,7 @@ Read the relevant instruction file **before** working in that area.
 | Exception | `{Resource}{Error}Error` in `exc/` | `ChatAgentNotFoundError` |
 | Handler class | `{Resource}Handler` | `ChatAgentHandler` |
 | Dependency | `get_{resource}_handler` in `handlers/dependencies/` | `get_chat_agent_handler` |
-| Validator | `{Resource}ConfigValidator` in `handlers/validators/` | `ChatAgentConfigValidator` |
+| Validator | `{Resource}ConfigValidatorFactory` in `handlers/validators/` | `ChatAgentConfigValidatorFactory` |
 | Enum | `{Name}Enum` in `core/database/enums.py` | `PermissionActionEnum` |
 | Test file (CRUD) | `test_{resource}.py` | `test_chat_agents.py` |
 | Test file (RBAC) | `test_{resource}_rbac.py` | `test_chat_agents_rbac.py` |
@@ -80,9 +80,11 @@ Read the relevant instruction file **before** working in that area.
 - **Migrations**: `alembic upgrade head` / `alembic revision --autogenerate -m "description"`
 - **Entry point**: `unifiedui/app.py` → `create_app()`
 - **Config**: `unifiedui/core/config.py` → `Settings` (Pydantic-Settings, env vars)
-- **Models**: `unifiedui/core/database/models.py` (~1020 lines, includes RecentVisit + ReActAgent + UserFavorites for all 5 resource types)
-- **Enums**: `unifiedui/core/database/enums.py`
+- **Models**: `unifiedui/core/database/models.py` (~1009 lines, includes RecentVisit, ReActAgentVersion, UserFavorites for 5 resource types, Organization + OrganizationMember)
+- **Enums**: `unifiedui/core/database/enums.py` (includes `TenantRolesEnum`, `OrganizationRoleEnum`, `EnvironmentTypeEnum`, `ChatAgentTypeEnum` with `REACT_AGENT`)
 - **Auth middleware**: `unifiedui/core/middleware/apis/v1/auth.py` (4 decorators: `authenticate`, `authenticate_service_key`, `authenticate_autonomous_agent_api_key`, `check_permissions`)
+- **Key root files**: `CONTRIBUTING.md`, `SECURITY.md`, `SPONSORS.md`, `CHANGELOG.md`
+- **Docs**: `docs/` with ADRs in `docs/adr/`
 
 ---
 

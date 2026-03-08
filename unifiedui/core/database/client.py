@@ -89,7 +89,7 @@ class SQLAlchemyClient:
             session.commit()
         except Exception as e:
             session.rollback()
-            logger.error(f"Session error: {e}", exc_info=True)
+            logger.error("Session error: %s", e, exc_info=True)
             raise
         finally:
             session.close()

@@ -11,6 +11,7 @@ from sqlalchemy.orm import selectinload
 
 from unifiedui.core.database.enums import AutonomousAgentTypeEnum, PermissionActionEnum, PrincipalTypeEnum
 from unifiedui.core.database.models import AutonomousAgent, AutonomousAgentMember, AutonomousAgentTag
+from unifiedui.handlers.cache_utils import ResourceCacheInvalidator
 from unifiedui.handlers.permission_resolver import (
     check_is_admin,
     get_principal_ids,
@@ -19,14 +20,16 @@ from unifiedui.handlers.permission_resolver import (
 )
 
 if TYPE_CHECKING:
+    from sqlalchemy.orm import Session
+
     from unifiedui.caching.client import CacheClient
     from unifiedui.core.database.client import SQLAlchemyClient
     from unifiedui.core.identity.users import ContextIdentityUser
     from unifiedui.core.vault.client import BaseVaultClient
     from unifiedui.handlers.resource_permissions import ResourcePermissionsHandler
     from unifiedui.handlers.resource_tags import ResourceTagsHandler
-    from unifiedui.schema.requests.autonomous_agent_permissions import SetAutonomousAgentPermissionRequest
     from unifiedui.schema.requests.autonomous_agents import CreateAutonomousAgentRequest, UpdateAutonomousAgentRequest
+    from unifiedui.schema.requests.permissions import SetResourcePermissionRequest
     from unifiedui.services.agent_service_client import AgentServiceClient
 
 from datetime import UTC
@@ -76,6 +79,7 @@ class AutonomousAgentHandler:
         self._permissions_handler = permissions_handler
         self._tags_handler = tags_handler
         self._agent_service_client = agent_service_client
+        self._cache = ResourceCacheInvalidator(cache_client, "autonomous_agents", "agent")
 
     @property
     def permissions_handler(self) -> ResourcePermissionsHandler:
@@ -168,12 +172,12 @@ class AutonomousAgentHandler:
             try:
                 cached_data = self.cache_client.client.get(cache_key)
                 if cached_data is not None:
-                    logger.debug(f"Returning cached autonomous agents for tenant {tenant_id}, user {user_id}")
+                    logger.debug("Returning cached autonomous agents for tenant %s, user %s", tenant_id, user_id)
                     if view == "quick-list":
                         return [QuickListItemResponse(**item) for item in cached_data]
                     return [AutonomousAgentResponse(**item) for item in cached_data]
             except Exception as e:
-                logger.warning(f"Failed to get cached autonomous agents: {e}")
+                logger.warning("Failed to get cached autonomous agents: %s", e)
 
         with self.db_client.get_session() as session:
             # If user is admin, return all autonomous agents
@@ -279,9 +283,9 @@ class AutonomousAgentHandler:
                 try:
                     cache_data = [r.model_dump() for r in responses]
                     self.cache_client.client.set(cache_key, cache_data, ttl=300)
-                    logger.debug(f"Cached autonomous agents list for tenant {tenant_id}, user {user_id}")
+                    logger.debug("Cached autonomous agents list for tenant %s, user %s", tenant_id, user_id)
                 except Exception as e:
-                    logger.warning(f"Failed to cache autonomous agents: {e}")
+                    logger.warning("Failed to cache autonomous agents: %s", e)
 
             return responses
 
@@ -315,7 +319,7 @@ class AutonomousAgentHandler:
             try:
                 cached_data = self.cache_client.client.get(cache_key)
                 if cached_data is not None:
-                    logger.debug(f"Returning cached autonomous agent {autonomous_agent_id}")
+                    logger.debug("Returning cached autonomous agent %s", autonomous_agent_id)
                     result = AutonomousAgentResponse(**cached_data)
                     if user:
                         with self.db_client.get_session() as session:
@@ -324,7 +328,7 @@ class AutonomousAgentHandler:
                             )
                     return result
             except Exception as e:
-                logger.warning(f"Failed to get cached autonomous agent: {e}")
+                logger.warning("Failed to get cached autonomous agent: %s", e)
 
         with self.db_client.get_session() as session:
             query = (
@@ -343,9 +347,9 @@ class AutonomousAgentHandler:
             if use_cache and self.cache_client:
                 try:
                     self.cache_client.client.set(cache_key, result.model_dump(), ttl=300)
-                    logger.debug(f"Cached autonomous agent {autonomous_agent_id}")
+                    logger.debug("Cached autonomous agent %s", autonomous_agent_id)
                 except Exception as e:
-                    logger.warning(f"Failed to cache autonomous agent: {e}")
+                    logger.warning("Failed to cache autonomous agent: %s", e)
 
             if user:
                 result.my_permission = self._resolve_user_permission(session, tenant_id, autonomous_agent_id, user)
@@ -441,9 +445,9 @@ class AutonomousAgentHandler:
                         "key_type": "secondary",
                     },
                 )
-                logger.info(f"Stored API keys in vault for autonomous agent {autonomous_agent_id}")
+                logger.info("Stored API keys in vault for autonomous agent %s", autonomous_agent_id)
             except Exception as e:
-                logger.error(f"Failed to store API keys in vault: {e}")
+                logger.error("Failed to store API keys in vault: %s", e)
                 raise
         else:
             logger.warning("No vault client configured - API keys will not be stored")
@@ -484,7 +488,7 @@ class AutonomousAgentHandler:
         # Invalidate list cache
         self._invalidate_list_cache(tenant_id)
 
-        logger.info(f"Created autonomous agent {autonomous_agent_id}")
+        logger.info("Created autonomous agent %s", autonomous_agent_id)
         return response
 
     def update_autonomous_agent(
@@ -552,6 +556,7 @@ class AutonomousAgentHandler:
                 .where(AutonomousAgent.id == autonomous_agent_id, AutonomousAgent.tenant_id == tenant_id)
             )
             autonomous_agent = session.execute(query).scalar_one_or_none()
+            assert autonomous_agent is not None
 
             response = self._model_to_response(autonomous_agent)
 
@@ -559,7 +564,7 @@ class AutonomousAgentHandler:
             self._invalidate_list_cache(tenant_id)
             self._invalidate_detail_cache(tenant_id, autonomous_agent_id)
 
-            logger.info(f"Updated autonomous agent {autonomous_agent_id}")
+            logger.info("Updated autonomous agent %s", autonomous_agent_id)
             return response
 
     def delete_autonomous_agent(self, tenant_id: str, autonomous_agent_id: str) -> None:
@@ -596,7 +601,7 @@ class AutonomousAgentHandler:
             self._invalidate_detail_cache(tenant_id, autonomous_agent_id)
             self._invalidate_permissions_cache(tenant_id, autonomous_agent_id)
 
-            logger.info(f"Deleted autonomous agent {autonomous_agent_id}")
+            logger.info("Deleted autonomous agent %s", autonomous_agent_id)
 
     def _cascade_delete_agent_data(
         self, tenant_id: str, autonomous_agent_id: str, autonomous_agent: AutonomousAgent
@@ -626,20 +631,15 @@ class AutonomousAgentHandler:
 
     def _invalidate_list_cache(self, tenant_id: str) -> None:
         """Invalidate all list caches for a tenant."""
-        if self.cache_client:
-            self.cache_client.client.delete_pattern(f"autonomous_agents:list:tenant:{tenant_id}:*")
+        self._cache.invalidate_list(tenant_id)
 
     def _invalidate_detail_cache(self, tenant_id: str, autonomous_agent_id: str) -> None:
         """Invalidate detail cache for a specific autonomous agent."""
-        if self.cache_client:
-            self.cache_client.client.delete(f"autonomous_agents:detail:tenant:{tenant_id}:agent:{autonomous_agent_id}")
+        self._cache.invalidate_detail(tenant_id, autonomous_agent_id)
 
     def _invalidate_permissions_cache(self, tenant_id: str, autonomous_agent_id: str) -> None:
         """Invalidate permissions cache for a specific autonomous agent."""
-        if self.cache_client:
-            self.cache_client.client.delete(
-                f"autonomous_agents:permissions:tenant:{tenant_id}:agent:{autonomous_agent_id}"
-            )
+        self._cache.invalidate_permissions(tenant_id, autonomous_agent_id)
 
     @staticmethod
     def _generate_api_key() -> str:
@@ -716,7 +716,7 @@ class AutonomousAgentHandler:
                 api_credential = credential_handler.get_credential(tenant_id, api_credential_id)
                 api_secret = credential_handler.get_credential_secret(tenant_id, api_credential_id)
             except Exception as e:
-                logger.error(f"Failed to fetch API credential: {e}")
+                logger.error("Failed to fetch API credential: %s", e)
                 raise InvalidCredentialError(
                     credential_id=api_credential_id,
                     message=f"Invalid or inaccessible API credential with ID '{api_credential_id}'",
@@ -899,7 +899,7 @@ class AutonomousAgentHandler:
             # Invalidate caches
             self._invalidate_detail_cache(tenant_id, autonomous_agent_id)
 
-            logger.info(f"Rotated key {key_number} for autonomous agent {autonomous_agent_id}")
+            logger.info("Rotated key %s for autonomous agent %s", key_number, autonomous_agent_id)
             return AutonomousAgentKeyResponse(key=new_key, key_number=key_number)
 
     def update_last_full_import(
@@ -1079,7 +1079,7 @@ class AutonomousAgentHandler:
         self,
         tenant_id: str,
         autonomous_agent_id: str,
-        request: SetAutonomousAgentPermissionRequest,
+        request: SetResourcePermissionRequest,
         user_id: str,
         user: ContextIdentityUser,
     ) -> PrincipalWithRolesResponse:
@@ -1211,7 +1211,7 @@ class AutonomousAgentHandler:
         )
 
     def _resolve_user_permission(
-        self, session: object, tenant_id: str, autonomous_agent_id: str, user: ContextIdentityUser
+        self, session: Session, tenant_id: str, autonomous_agent_id: str, user: ContextIdentityUser
     ) -> str | None:
         """Resolve the user's permission level on a specific autonomous agent."""
         from unifiedui.core.database.enums import TenantRolesEnum

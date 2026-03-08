@@ -44,7 +44,7 @@ class DotEnvVault(BaseVault):
         with self._lock:
             self._secrets[key] = value
             uri = f"dotenv://{key}"
-            logger.debug(f"Stored secret in DotEnv vault: {key}")
+            logger.debug("Stored secret in DotEnv vault: %s", key)
             return uri
 
     def build_secret_uri(self, key_name: str) -> str:
@@ -68,17 +68,17 @@ class DotEnvVault(BaseVault):
         # First check environment variables
         value = os.getenv(key)
         if value:
-            logger.debug(f"Retrieved secret from environment: {key}")
+            logger.debug("Retrieved secret from environment: %s", key)
             return value
 
         # Then check in-memory store
         with self._lock:
             value = self._secrets.get(key)
             if value:
-                logger.debug(f"Retrieved secret from in-memory store: {key}")
+                logger.debug("Retrieved secret from in-memory store: %s", key)
                 return value
 
-        logger.warning(f"Secret not found: {key}")
+        logger.warning("Secret not found: %s", key)
         return None
 
     def update_secret(self, uri: str, value: str, metadata: dict[str, Any] | None = None) -> bool:
@@ -100,7 +100,7 @@ class DotEnvVault(BaseVault):
 
         with self._lock:
             self._secrets[key] = value
-            logger.debug(f"Updated secret in DotEnv vault: {key}")
+            logger.debug("Updated secret in DotEnv vault: %s", key)
             return True
 
     def delete_secret(self, uri: str) -> bool:
@@ -121,10 +121,10 @@ class DotEnvVault(BaseVault):
         with self._lock:
             if key in self._secrets:
                 del self._secrets[key]
-                logger.debug(f"Deleted secret from DotEnv vault: {key}")
+                logger.debug("Deleted secret from DotEnv vault: %s", key)
                 return True
 
-            logger.debug(f"Secret not found for deletion: {key}")
+            logger.debug("Secret not found for deletion: %s", key)
             return False
 
     def ping(self) -> bool:

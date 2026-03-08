@@ -12,6 +12,7 @@ from fastapi import status
 from starlette.testclient import TestClient
 
 from tests.conftest import create_auth_headers
+from tests.helpers.tenant import create_tenant_for_user
 from unifiedui.handlers.dependencies.autonomous_agents import get_autonomous_agent_handler
 from unifiedui.handlers.dependencies.chat_agents import get_chat_agent_handler
 from unifiedui.handlers.dependencies.chat_widgets import get_chat_widget_handler
@@ -35,18 +36,6 @@ class FailingHandler:
             raise RuntimeError("Unexpected error")
 
         return _fail
-
-
-def create_tenant_for_user(test_client: TestClient, user_token: Any, tenant_name: str = "Test Tenant") -> str:
-    """Create a tenant and return its ID."""
-    headers = create_auth_headers(user_token, use_cache=False)
-    response = test_client.post(
-        "/api/v1/platform-service/tenants",
-        json={"name": tenant_name, "description": "Test"},
-        headers=headers,
-    )
-    assert response.status_code == status.HTTP_201_CREATED
-    return response.json()["id"]
 
 
 def make_failing_handler() -> FailingHandler:

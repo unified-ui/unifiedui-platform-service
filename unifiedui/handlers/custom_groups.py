@@ -85,10 +85,12 @@ class CustomGroupHandler:
             try:
                 cached_data = self.cache_client.client.get(cache_key)
                 if cached_data is not None:
-                    logger.debug(f"Returning cached custom group list (tenant={tenant_id}, skip={skip}, limit={limit})")
+                    logger.debug(
+                        "Returning cached custom group list (tenant=%s, skip=%s, limit=%s)", tenant_id, skip, limit
+                    )
                     return [CustomGroupResponse(**item) for item in cached_data]
             except Exception as e:
-                logger.warning(f"Failed to get cached custom group list: {e}")
+                logger.warning("Failed to get cached custom group list: %s", e)
 
         with self.db_client.get_session() as session:
             query = select(Principal).where(
@@ -122,7 +124,7 @@ class CustomGroupHandler:
                     self.cache_client.client.set(cache_key, cache_data, ttl=300)  # Cache for 5 minutes
                     logger.debug("Cached custom group list (TTL: 300s)")
                 except Exception as e:
-                    logger.warning(f"Failed to cache custom group list: {e}")
+                    logger.warning("Failed to cache custom group list: %s", e)
 
             return result
 
@@ -152,10 +154,10 @@ class CustomGroupHandler:
             try:
                 cached_data = self.cache_client.client.get(cache_key)
                 if cached_data is not None:
-                    logger.debug(f"Returning cached custom group {custom_group_id}")
+                    logger.debug("Returning cached custom group %s", custom_group_id)
                     return CustomGroupResponse(**cached_data)
             except Exception as e:
-                logger.warning(f"Failed to get cached custom group: {e}")
+                logger.warning("Failed to get cached custom group: %s", e)
 
         with self.db_client.get_session() as session:
             query = select(Principal).where(
@@ -176,9 +178,9 @@ class CustomGroupHandler:
             if self.cache_client:
                 try:
                     self.cache_client.client.set(cache_key, result.model_dump(), ttl=600)  # Cache for 10 minutes
-                    logger.debug(f"Cached custom group {custom_group_id} (TTL: 600s)")
+                    logger.debug("Cached custom group %s (TTL: 600s)", custom_group_id)
                 except Exception as e:
-                    logger.warning(f"Failed to cache custom group: {e}")
+                    logger.warning("Failed to cache custom group: %s", e)
 
             return result
 
@@ -251,9 +253,9 @@ class CustomGroupHandler:
                     self.cache_client.invalidate_custom_group_list_cache(tenant_id)
                     # Clear user cache since user got ADMIN permission
                     self.cache_client.clear_cache_for_user(user_id)
-                    logger.debug(f"Invalidated custom group list cache and user cache for {user_id}")
+                    logger.debug("Invalidated custom group list cache and user cache for %s", user_id)
                 except Exception as e:
-                    logger.warning(f"Failed to invalidate cache: {e}")
+                    logger.warning("Failed to invalidate cache: %s", e)
 
             logger.info("Custom group created", extra={"custom_group_id": group_id})
             return self._principal_to_response(group)
@@ -311,9 +313,9 @@ class CustomGroupHandler:
                     self.cache_client.invalidate_custom_group_list_cache(tenant_id)
                     # Invalidate specific custom group cache
                     self.cache_client.invalidate_custom_group_cache(tenant_id, custom_group_id)
-                    logger.debug(f"Invalidated caches for custom group {custom_group_id}")
+                    logger.debug("Invalidated caches for custom group %s", custom_group_id)
                 except Exception as e:
-                    logger.warning(f"Failed to invalidate cache: {e}")
+                    logger.warning("Failed to invalidate cache: %s", e)
 
             logger.info("Custom group updated", extra={"custom_group_id": custom_group_id})
             return self._principal_to_response(group)
@@ -357,9 +359,9 @@ class CustomGroupHandler:
                     # Clear all user caches (all users who had access to this group)
                     pattern = "*user:*:*"
                     self.cache_client.client.delete_pattern(pattern)
-                    logger.debug(f"Invalidated caches for deleted custom group {custom_group_id}")
+                    logger.debug("Invalidated caches for deleted custom group %s", custom_group_id)
                 except Exception as e:
-                    logger.warning(f"Failed to invalidate cache: {e}")
+                    logger.warning("Failed to invalidate cache: %s", e)
 
             logger.info("Custom group deleted", extra={"custom_group_id": custom_group_id})
 
@@ -614,14 +616,14 @@ class CustomGroupHandler:
                     updated_by=user_id,
                 )
                 session.add(member)
-                logger.info(f"Created new membership with role {role} for {principal_id}")
+                logger.info("Created new membership with role %s for %s", role, principal_id)
             elif member.role != role:
                 # Update existing membership role
                 member.role = role
                 member.updated_by = user_id
-                logger.info(f"Updated membership role from {member.role} to {role} for {principal_id}")
+                logger.info("Updated membership role from %s to %s for %s", member.role, role, principal_id)
             else:
-                logger.info(f"Membership with role {role} already exists for {principal_id}")
+                logger.info("Membership with role %s already exists for %s", role, principal_id)
 
             session.commit()
 
@@ -630,11 +632,11 @@ class CustomGroupHandler:
                 try:
                     self.cache_client.clear_cache_for_user(principal_id)
                     self.cache_client.clear_cache_for_user(user_id)
-                    logger.debug(f"Cleared cache for user {principal_id} after membership change")
+                    logger.debug("Cleared cache for user %s after membership change", principal_id)
                 except Exception as e:
-                    logger.warning(f"Failed to clear user cache: {e}")
+                    logger.warning("Failed to clear user cache: %s", e)
 
-            logger.info(f"Set {role} role for {principal_id} in custom group {custom_group_id}")
+            logger.info("Set %s role for %s in custom group %s", role, principal_id, custom_group_id)
 
             return self.get_member_role(tenant_id, custom_group_id, principal_id)
 
@@ -682,13 +684,13 @@ class CustomGroupHandler:
                 if self.cache_client:
                     try:
                         self.cache_client.clear_cache_for_user(principal_id)
-                        logger.debug(f"Cleared cache for user {principal_id} after membership removal")
+                        logger.debug("Cleared cache for user %s after membership removal", principal_id)
                     except Exception as e:
-                        logger.warning(f"Failed to clear user cache: {e}")
+                        logger.warning("Failed to clear user cache: %s", e)
 
-                logger.info(f"Deleted membership for {principal_id} in custom group {custom_group_id}")
+                logger.info("Deleted membership for %s in custom group %s", principal_id, custom_group_id)
             else:
-                logger.info(f"No membership found for {principal_id} in custom group {custom_group_id}")
+                logger.info("No membership found for %s in custom group %s", principal_id, custom_group_id)
 
     # Legacy method names for backwards compatibility with routes
     def list_custom_group_principals(

@@ -15,6 +15,7 @@ from unifiedui.exc.tenant_ai_models import (
     InvalidAIModelCredentialError,
     TenantAIModelNotFoundError,
 )
+from unifiedui.handlers.cache_utils import ResourceCacheInvalidator
 from unifiedui.handlers.validators.tenant_ai_model_validator import AIModelConfigValidatorFactory
 from unifiedui.logger import get_logger
 from unifiedui.schema.responses.tenant_ai_models import AIModelWithSecretResponse, TenantAIModelResponse
@@ -49,6 +50,7 @@ class TenantAIModelHandler:
         self.db_client = db_client
         self.cache_client = cache_client
         self.vault_client = vault_client
+        self._cache = ResourceCacheInvalidator(cache_client, "ai_models", "model")
 
     def list_tenant_ai_models(
         self,
@@ -96,7 +98,7 @@ class TenantAIModelHandler:
                 if cached_data is not None:
                     return [TenantAIModelResponse(**item) for item in cached_data]
             except Exception as e:
-                logger.warning(f"Failed to get cached AI model list: {e}")
+                logger.warning("Failed to get cached AI model list: %s", e)
 
         with self.db_client.get_session() as session:
             query = select(TenantAIModel).where(TenantAIModel.tenant_id == tenant_id)
@@ -124,7 +126,7 @@ class TenantAIModelHandler:
                     data = [r.model_dump() for r in result]
                     self.cache_client.client.set(cache_key, data, ttl=300)
                 except Exception as e:
-                    logger.warning(f"Failed to cache AI model list: {e}")
+                    logger.warning("Failed to cache AI model list: %s", e)
 
             return result
 
@@ -155,7 +157,7 @@ class TenantAIModelHandler:
                 if cached_data is not None:
                     return TenantAIModelResponse(**cached_data)
             except Exception as e:
-                logger.warning(f"Failed to get cached AI model: {e}")
+                logger.warning("Failed to get cached AI model: %s", e)
 
         with self.db_client.get_session() as session:
             model = session.execute(
@@ -174,7 +176,7 @@ class TenantAIModelHandler:
                 try:
                     self.cache_client.client.set(cache_key, result.model_dump(), ttl=300)
                 except Exception as e:
-                    logger.warning(f"Failed to cache AI model: {e}")
+                    logger.warning("Failed to cache AI model: %s", e)
 
             return result
 
@@ -407,7 +409,7 @@ class TenantAIModelHandler:
                                 except (json.JSONDecodeError, ValueError):
                                     credential_secret = {"api_key": secret_str}
                         except Exception as e:
-                            logger.error(f"Failed to decrypt credential secret: {e}")
+                            logger.error("Failed to decrypt credential secret: %s", e)
 
                 result.append(
                     AIModelWithSecretResponse(
@@ -428,11 +430,7 @@ class TenantAIModelHandler:
         Args:
             tenant_id: The tenant ID for cache scoping.
         """
-        if self.cache_client:
-            try:
-                self.cache_client.client.delete_pattern(f"ai_models:list:tenant:{tenant_id}:*")
-            except Exception as e:
-                logger.warning(f"Failed to invalidate AI model list cache: {e}")
+        self._cache.invalidate_list(tenant_id)
 
     def _invalidate_detail_cache(self, tenant_id: str, model_id: str) -> None:
         """Invalidate cached AI model detail.
@@ -441,12 +439,7 @@ class TenantAIModelHandler:
             tenant_id: The tenant ID for cache scoping.
             model_id: The AI model ID.
         """
-        if self.cache_client:
-            try:
-                cache_key = f"ai_models:detail:tenant:{tenant_id}:model:{model_id}"
-                self.cache_client.client.delete(cache_key)
-            except Exception as e:
-                logger.warning(f"Failed to invalidate AI model detail cache: {e}")
+        self._cache.invalidate_detail(tenant_id, model_id)
 
     @staticmethod
     def _model_to_response(model: TenantAIModel) -> TenantAIModelResponse:

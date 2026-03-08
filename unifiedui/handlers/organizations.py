@@ -36,6 +36,8 @@ from unifiedui.schema.responses.organizations import (
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
     from sqlalchemy.orm import Session
 
     from unifiedui.caching.client import CacheClient
@@ -606,13 +608,13 @@ class OrganizationHandler:
             if user_id:
                 self.cache_client.clear_cache_for_user(user_id)
         except Exception as e:
-            logger.warning(f"Failed to invalidate cache: {e}")
+            logger.warning("Failed to invalidate cache: %s", e)
 
     @staticmethod
     def _resolve_principal_info(
         session: Session,
         organization_id: str,
-        members: list[OrganizationMember],
+        members: Sequence[OrganizationMember],
     ) -> dict[str, dict[str, str | None]]:
         """Resolve display_name, principal_name, mail from the Principal table.
 

@@ -6,7 +6,8 @@ from fastapi import status
 from starlette.testclient import TestClient
 
 from tests.conftest import create_auth_headers
-from unifiedui.core.database.enums import PermissionActionEnum, PrincipalTypeEnum, TenantRolesEnum
+from tests.helpers.tenant import add_user_to_tenant_with_token, create_tenant_for_user
+from unifiedui.core.database.enums import PermissionActionEnum, PrincipalTypeEnum
 
 # API Endpoints
 ENDPOINT_CONVERSATIONS = "/api/v1/platform-service/tenants/{tenant_id}/conversations"
@@ -25,18 +26,6 @@ ROLE_ADMIN = PermissionActionEnum.ADMIN.value
 PRINCIPAL_TYPE_USER = PrincipalTypeEnum.IDENTITY_USER.value
 
 
-def create_tenant_for_user(test_client: TestClient, user_token: Any, tenant_name: str = "Test Tenant") -> str:
-    """Helper function to create a tenant and return its ID."""
-    headers = create_auth_headers(user_token, use_cache=False)
-    response = test_client.post(
-        "/api/v1/platform-service/tenants",
-        json={"name": tenant_name, "description": f"Tenant for {user_token.get_id()}"},
-        headers=headers,
-    )
-    assert response.status_code == status.HTTP_201_CREATED
-    return response.json()["id"]
-
-
 def create_chat_agent_for_user(
     test_client: TestClient, user_token: Any, tenant_id: str, app_name: str = "Test App"
 ) -> str:
@@ -49,17 +38,6 @@ def create_chat_agent_for_user(
     )
     assert response.status_code == status.HTTP_201_CREATED
     return response.json()["id"]
-
-
-def add_user_to_tenant(test_client: TestClient, creator_token: Any, tenant_id: str, user_id: str) -> None:
-    """Helper function to add a user to a tenant."""
-    headers = create_auth_headers(creator_token, use_cache=False)
-    response = test_client.put(
-        f"/api/v1/platform-service/tenants/{tenant_id}/principals",
-        json={"principal_id": user_id, "principal_type": PRINCIPAL_TYPE_USER, "role": TenantRolesEnum.READER.value},
-        headers=headers,
-    )
-    assert response.status_code == status.HTTP_200_OK
 
 
 class TestConversationRBAC:
@@ -119,7 +97,7 @@ class TestConversationRBAC:
         # Create user2 and add to tenant
         user2_token = test_client.create_test_user("user-2", "User Two")
         user2_id = user2_token.get_id()
-        add_user_to_tenant(test_client, user1_token, tenant_id, user2_id)
+        add_user_to_tenant_with_token(test_client, user1_token, tenant_id, user2_id)
         headers2 = create_auth_headers(user2_token, use_cache=False)
 
         # Grant READ permission to user2
@@ -152,7 +130,7 @@ class TestConversationRBAC:
         # Create user2 and add to tenant
         user2_token = test_client.create_test_user("user-2", "User Two")
         user2_id = user2_token.get_id()
-        add_user_to_tenant(test_client, user1_token, tenant_id, user2_id)
+        add_user_to_tenant_with_token(test_client, user1_token, tenant_id, user2_id)
         headers2 = create_auth_headers(user2_token, use_cache=False)
 
         # Grant READ permission to user2
@@ -187,7 +165,7 @@ class TestConversationRBAC:
         # Create user2 and add to tenant
         user2_token = test_client.create_test_user("user-2", "User Two")
         user2_id = user2_token.get_id()
-        add_user_to_tenant(test_client, user1_token, tenant_id, user2_id)
+        add_user_to_tenant_with_token(test_client, user1_token, tenant_id, user2_id)
         headers2 = create_auth_headers(user2_token, use_cache=False)
 
         # Grant READ permission to user2
@@ -222,7 +200,7 @@ class TestConversationRBAC:
         # Create user2 and add to tenant
         user2_token = test_client.create_test_user("user-2", "User Two")
         user2_id = user2_token.get_id()
-        add_user_to_tenant(test_client, user1_token, tenant_id, user2_id)
+        add_user_to_tenant_with_token(test_client, user1_token, tenant_id, user2_id)
         headers2 = create_auth_headers(user2_token, use_cache=False)
 
         # Grant READ permission to user2
@@ -257,7 +235,7 @@ class TestConversationRBAC:
         # Create user2 and add to tenant
         user2_token = test_client.create_test_user("user-2", "User Two")
         user2_id = user2_token.get_id()
-        add_user_to_tenant(test_client, user1_token, tenant_id, user2_id)
+        add_user_to_tenant_with_token(test_client, user1_token, tenant_id, user2_id)
         headers2 = create_auth_headers(user2_token, use_cache=False)
 
         # Grant WRITE permission to user2
@@ -292,7 +270,7 @@ class TestConversationRBAC:
         # Create user2 and add to tenant
         user2_token = test_client.create_test_user("user-2", "User Two")
         user2_id = user2_token.get_id()
-        add_user_to_tenant(test_client, user1_token, tenant_id, user2_id)
+        add_user_to_tenant_with_token(test_client, user1_token, tenant_id, user2_id)
         headers2 = create_auth_headers(user2_token, use_cache=False)
 
         # Grant WRITE permission to user2
@@ -328,7 +306,7 @@ class TestConversationRBAC:
         # Create user2 and add to tenant
         user2_token = test_client.create_test_user("user-2", "User Two")
         user2_id = user2_token.get_id()
-        add_user_to_tenant(test_client, user1_token, tenant_id, user2_id)
+        add_user_to_tenant_with_token(test_client, user1_token, tenant_id, user2_id)
         headers2 = create_auth_headers(user2_token, use_cache=False)
 
         # Grant WRITE permission to user2
@@ -363,7 +341,7 @@ class TestConversationRBAC:
         # Create user2 and add to tenant
         user2_token = test_client.create_test_user("user-2", "User Two")
         user2_id = user2_token.get_id()
-        add_user_to_tenant(test_client, user1_token, tenant_id, user2_id)
+        add_user_to_tenant_with_token(test_client, user1_token, tenant_id, user2_id)
         headers2 = create_auth_headers(user2_token, use_cache=False)
 
         # Grant ADMIN permission to user2
@@ -420,7 +398,7 @@ class TestConversationRBAC:
         # Create user2 and add to tenant (but no conversation permissions)
         user2_token = test_client.create_test_user("user-2", "User Two")
         user2_id = user2_token.get_id()
-        add_user_to_tenant(test_client, user1_token, tenant_id, user2_id)
+        add_user_to_tenant_with_token(test_client, user1_token, tenant_id, user2_id)
         headers2 = create_auth_headers(user2_token, use_cache=False)
 
         # User2 CANNOT view conversation
@@ -461,7 +439,7 @@ class TestConversationRBAC:
         # Create user2 and add to tenant
         user2_token = test_client.create_test_user("user-2", "User Two")
         user2_id = user2_token.get_id()
-        add_user_to_tenant(test_client, user1_token, tenant_id, user2_id)
+        add_user_to_tenant_with_token(test_client, user1_token, tenant_id, user2_id)
         headers2 = create_auth_headers(user2_token, use_cache=False)
 
         # Grant user2 access to only conversation 1 and 3

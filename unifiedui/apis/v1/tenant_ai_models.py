@@ -88,7 +88,7 @@ async def list_tenant_ai_models(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to list tenant AI models: {e}")
+        logger.error("Failed to list tenant AI models: %s", e)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to list tenant AI models")
 
 
@@ -130,18 +130,18 @@ async def create_tenant_ai_model(
             user_id=user.identity.get_id(),
         )
     except InvalidAIModelCredentialError as e:
-        logger.warning(f"Invalid credential: {e}")
+        logger.warning("Invalid credential: %s", e)
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except TenantAIModelConfigValidationError as e:
-        logger.warning(f"Config validation error: {e}")
+        logger.warning("Config validation error: %s", e)
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=e.message)
     except UnsupportedAIModelProviderError as e:
-        logger.warning(f"Unsupported provider: {e}")
+        logger.warning("Unsupported provider: %s", e)
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to create tenant AI model: {e}")
+        logger.error("Failed to create tenant AI model: %s", e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to create tenant AI model: {e!s}"
         )
@@ -176,12 +176,12 @@ async def get_tenant_ai_model(
             model_id=model_id,
         )
     except TenantAIModelNotFoundError as e:
-        logger.warning(f"AI model not found: {e}")
+        logger.warning("AI model not found: %s", e)
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to get tenant AI model: {e}")
+        logger.error("Failed to get tenant AI model: %s", e)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to get tenant AI model")
 
 
@@ -224,18 +224,18 @@ async def update_tenant_ai_model(
             user_id=user.identity.get_id(),
         )
     except TenantAIModelNotFoundError as e:
-        logger.warning(f"AI model not found: {e}")
+        logger.warning("AI model not found: %s", e)
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except InvalidAIModelCredentialError as e:
-        logger.warning(f"Invalid credential: {e}")
+        logger.warning("Invalid credential: %s", e)
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except TenantAIModelConfigValidationError as e:
-        logger.warning(f"Config validation error: {e}")
+        logger.warning("Config validation error: %s", e)
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=e.message)
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to update tenant AI model: {e}")
+        logger.error("Failed to update tenant AI model: %s", e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to update tenant AI model: {e!s}"
         )
@@ -278,12 +278,12 @@ async def delete_tenant_ai_model(
         )
         return Response(status_code=status.HTTP_204_NO_CONTENT)
     except TenantAIModelNotFoundError as e:
-        logger.warning(f"AI model not found: {e}")
+        logger.warning("AI model not found: %s", e)
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to delete tenant AI model: {e}")
+        logger.error("Failed to delete tenant AI model: %s", e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to delete tenant AI model"
         )
@@ -320,7 +320,7 @@ async def get_models_by_purpose(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to get AI models by purpose: {e}")
+        logger.error("Failed to get AI models by purpose: %s", e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to get AI models by purpose"
         )

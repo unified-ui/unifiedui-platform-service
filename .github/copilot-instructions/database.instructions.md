@@ -10,11 +10,11 @@ SQLAlchemy with declarative models in `unifiedui/core/database/models.py`.
 ### TenantRolesEnum
 Tenant-level roles that can be assigned to tenant members:
 - `READER` — View-only access to the tenant
-- `GLOBAL_ADMIN` — Full access to everything
+- `TENANT_GLOBAL_ADMIN` — Full access to everything
 - `{RESOURCE}_ADMIN` — Full access to specific resource type (e.g., `CHAT_AGENTS_ADMIN`)
 - `{RESOURCE}_CREATOR` — Can create new instances of resource type (e.g., `CHAT_AGENTS_CREATOR`)
 
-Supported resources: chat_agents, credentials, conversations, autonomous_agents, chat_widgets, custom_groups, react_agent (tools), tenant_ai_models
+Supported resources: chat_agents, credentials, conversations, autonomous_agents, chat_widgets, custom_groups, react_agent (tools), tenant_ai_models, organizations
 
 ### PermissionActionEnum
 Resource-level roles (one per member entry in `{resource}_members` table):
@@ -31,7 +31,7 @@ Who can receive permissions:
 - `CUSTOM_GROUP` — Custom group defined within unifiedui
 
 ### Other Enums
-- `ChatAgentTypeEnum`: `N8N`, `MICROSOFT_FOUNDRY`, `REST_API`
+- `ChatAgentTypeEnum`: `N8N`, `MICROSOFT_FOUNDRY`, `REST_API`, `REACT_AGENT`
 - `AutonomousAgentTypeEnum`: `N8N`
 - `ChatWidgetTypeEnum`: `IFRAME`, `FORM`
 - `ToolTypeEnum`: `MCP_SERVER`, `OPENAPI_DEFINITION`
@@ -41,6 +41,8 @@ Who can receive permissions:
 - `UserPermissionEnum`: `IS_CREATOR` (special — used for tag/favorite ownership)
 - `OrderDirectionEnum`: `asc`, `desc`
 - `ListViewEnum`: `full`, `quick-list`
+- `OrganizationRoleEnum`: `ORGANISATION_GLOBAL_ADMIN`, `ORGANISATION_TENANT_ADMIN`, `ORGANISATION_TENANT_CREATOR`
+- `EnvironmentTypeEnum`: `SANDBOX`, `PRODUCTION`
 
 ---
 
@@ -112,8 +114,10 @@ class ChatAgentMember(Base, IdMixin, AuditMixin):
 | Conversation | ConversationMember | — | No |
 | ChatWidget | ChatWidgetMember | — | Yes |
 | CustomGroup | CustomGroupMember | — | No |
-| Tool | ToolMember | ToolValidator | No |
-| ReActAgent | ReActAgentMember | — | Yes |
+| Tool | ToolMember | ToolConfigValidatorFactory | Yes (ToolTag) |
+| ReActAgent | — (sub-type of ChatAgent, uses `ChatAgentMember`) | — | Yes (via ChatAgentTag) |
+| ReActAgentVersion | — (linked to ChatAgent via FK, stores versioned config) | — | No |
+| Organization | OrganizationMember | — | No |
 | TenantAIModel | — (no RBAC, S2S-only via `@authenticate_service_key`) | TenantAIModelValidator | No |
 | Tag | — (uses `created_by` for ownership) | — | N/A |
 | UserFavorite | — (scoped by user_id, per resource: `ChatAgentUserFavorite`, `AutonomousAgentUserFavorite`, `ChatWidgetUserFavorite`, `ConversationUserFavorite`, `ReActAgentUserFavorite`) | — | No |

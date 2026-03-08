@@ -57,14 +57,14 @@ def _validate_service_key(request: Request, required_service_auth_key: str) -> b
     expected_key = _resolve_service_key(required_service_auth_key)
 
     if not expected_key:
-        logger.error(f"Service key {required_service_auth_key} not configured")
+        logger.error("Service key %s not configured", required_service_auth_key)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Service authentication not configured: {required_service_auth_key}",
         )
 
     if service_key_header != expected_key:
-        logger.warning(f"Invalid service key provided for {required_service_auth_key}")
+        logger.warning("Invalid service key provided for %s", required_service_auth_key)
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid service key")
 
     return True
@@ -101,7 +101,7 @@ def _resolve_service_key(required_service_auth_key: str) -> str | None:
                     if secret:
                         return secret
                 except Exception:
-                    logger.warning(f"Failed to retrieve service key from app vault for {key_lower}")
+                    logger.warning("Failed to retrieve service key from app vault for %s", key_lower)
 
     return getattr(settings, key_lower, None)
 
@@ -212,7 +212,7 @@ def authenticate_autonomous_agent_api_key() -> Callable:
                         if primary_key and primary_key == api_key_header:
                             is_valid = True
                     except Exception as e:
-                        logger.warning(f"Failed to retrieve primary key from vault: {e}")
+                        logger.warning("Failed to retrieve primary key from vault: %s", e)
 
                 if not is_valid and autonomous_agent.secondary_key_vault_uri:
                     try:
@@ -223,10 +223,10 @@ def authenticate_autonomous_agent_api_key() -> Callable:
                         if secondary_key and secondary_key == api_key_header:
                             is_valid = True
                     except Exception as e:
-                        logger.warning(f"Failed to retrieve secondary key from vault: {e}")
+                        logger.warning("Failed to retrieve secondary key from vault: %s", e)
 
                 if not is_valid:
-                    logger.warning(f"Invalid API key for autonomous agent {autonomous_agent_id}")
+                    logger.warning("Invalid API key for autonomous agent %s", autonomous_agent_id)
                     raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid API key")
 
                 # Store autonomous agent in request state for handler use
@@ -438,7 +438,7 @@ def authenticate(required_service_auth_key: str | None = None) -> Callable:
                 else:
                     request.state.organization_context = None
             except Exception as e:
-                logger.warning(f"Failed to load organization context: {e}")
+                logger.warning("Failed to load organization context: %s", e)
                 request.state.organization_context = None
 
             # Check tenant access if tenant_id is in path parameters
@@ -586,12 +586,12 @@ def check_permissions(
             if entity != "organization" and required_org_roles is None:
                 org_context = getattr(request.state, "organization_context", None)
                 if org_context:
-                    org_roles = set(org_context.get("roles", []))
+                    org_role_set = set(org_context.get("roles", []))
                     org_bypass_roles = {
                         OrganizationRoleEnum.ORGANISATION_GLOBAL_ADMIN.value,
                         OrganizationRoleEnum.ORGANISATION_TENANT_ADMIN.value,
                     }
-                    if org_roles & org_bypass_roles:
+                    if org_role_set & org_bypass_roles:
                         return await func(*args, **kwargs)
 
             if entity == "tenant":
@@ -614,7 +614,9 @@ def check_permissions(
                 # Check if user has any of the required permissions
                 # matching_tenant["roles"] is already a list of permission strings
                 user_roles = matching_tenant["roles"]
-                required_perms_str = [perm.value if hasattr(perm, "value") else perm for perm in required_permissions]
+                required_perms_str = [
+                    perm.value if hasattr(perm, "value") else perm for perm in (required_permissions or [])
+                ]
                 has_permission = any(perm in user_roles for perm in required_perms_str)
 
                 if not has_permission:
@@ -645,13 +647,15 @@ def check_permissions(
                     user_tenant_permissions = matching_tenant["roles"]
 
                     # Check for TenantRolesEnum permissions (like TENANT_GLOBAL_ADMIN)
-                    tenant_role_perms = [perm for perm in required_permissions if isinstance(perm, TenantRolesEnum)]
+                    tenant_role_perms = [
+                        perm for perm in (required_permissions or []) if isinstance(perm, TenantRolesEnum)
+                    ]
                     for perm in tenant_role_perms:
                         if perm.value in user_tenant_permissions:
                             return await func(*args, **kwargs)
 
                 # Check IS_CREATOR permission
-                if UserPermissionEnum.IS_CREATOR in required_permissions:
+                if required_permissions and UserPermissionEnum.IS_CREATOR in required_permissions:
                     user_id = user.identity.get_id()
                     db_client = get_db_client()
 
@@ -684,7 +688,7 @@ def check_permissions(
                     )
 
                 # Check if requesting user is the target user (IS_CREATOR check for favorites)
-                if UserPermissionEnum.IS_CREATOR in required_permissions:
+                if required_permissions and UserPermissionEnum.IS_CREATOR in required_permissions:
                     current_user_id = user.identity.get_id()
                     if current_user_id == target_user_id:
                         return await func(*args, **kwargs)
@@ -715,7 +719,8 @@ def check_permissions(
                         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Unsupported entity type: {entity}"
                     )
 
-                member_model, entity_id_param = entity_config[entity]
+                member_model_tuple: tuple[type[Any], str] = entity_config[entity]
+                member_model, entity_id_param = member_model_tuple
 
                 # Get entity_id from path parameters
                 entity_id = request.path_params.get(entity_id_param)
@@ -774,7 +779,9 @@ def check_permissions(
 
                 # Query member with role directly - NO JOIN needed anymore
                 db_client = get_db_client()
-                required_perms_str = [perm.value if hasattr(perm, "value") else perm for perm in required_permissions]
+                required_perms_str = [
+                    perm.value if hasattr(perm, "value") else perm for perm in (required_permissions or [])
+                ]
 
                 # Build role hierarchy: ADMIN >= WRITE >= READ
                 # If user requires READ, accept ADMIN, WRITE, or READ
@@ -783,7 +790,7 @@ def check_permissions(
                 allowed_roles = set()
                 if any(
                     perm in [PermissionActionEnum.READ.value, PermissionActionEnum.READ]
-                    for perm in required_permissions
+                    for perm in (required_permissions or [])
                 ):
                     # READ required -> allow ADMIN, WRITE, READ
                     allowed_roles.update(
@@ -795,13 +802,13 @@ def check_permissions(
                     )
                 elif any(
                     perm in [PermissionActionEnum.WRITE.value, PermissionActionEnum.WRITE]
-                    for perm in required_permissions
+                    for perm in (required_permissions or [])
                 ):
                     # WRITE required -> allow ADMIN, WRITE
                     allowed_roles.update([PermissionActionEnum.WRITE.value, PermissionActionEnum.ADMIN.value])
                 elif any(
                     perm in [PermissionActionEnum.ADMIN.value, PermissionActionEnum.ADMIN]
-                    for perm in required_permissions
+                    for perm in (required_permissions or [])
                 ):
                     # ADMIN required -> allow only ADMIN
                     allowed_roles.add(PermissionActionEnum.ADMIN.value)

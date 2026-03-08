@@ -43,7 +43,7 @@ class MockIdentityToken(BaseIdentityToken):
         return self.deserialized_token
 
     def get_id(self) -> str:
-        return self.deserialized_token.get("oid")
+        return self.deserialized_token.get("oid", "")
 
     def get_identity_tenant_id(self) -> str:
         return self.deserialized_token.get("tid", "")

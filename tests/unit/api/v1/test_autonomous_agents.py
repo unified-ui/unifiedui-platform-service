@@ -6,6 +6,7 @@ from fastapi import status
 from starlette.testclient import TestClient
 
 from tests.conftest import create_auth_headers
+from tests.helpers.tenant import create_tenant_for_user
 from unifiedui.core.database.enums import AutonomousAgentTypeEnum, PermissionActionEnum, PrincipalTypeEnum
 
 # API Endpoints
@@ -50,18 +51,6 @@ ENDPOINT_AUTONOMOUS_AGENT_CONFIG = (
 
 # API Key header name
 API_KEY_HEADER = "X-Unified-UI-Autonomous-Agent-API-Key"
-
-
-def create_tenant_for_user(test_client: TestClient, user_token: Any, tenant_name: str = "Test Tenant") -> str:
-    """Helper function to create a tenant and return its ID."""
-    headers = create_auth_headers(user_token, use_cache=False)
-    response = test_client.post(
-        "/api/v1/platform-service/tenants",
-        json={"name": tenant_name, "description": f"Tenant for {user_token.get_id()}"},
-        headers=headers,
-    )
-    assert response.status_code == status.HTTP_201_CREATED
-    return response.json()["id"]
 
 
 class TestAutonomousAgentRoutes:

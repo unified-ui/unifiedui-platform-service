@@ -86,7 +86,7 @@ class MicrosoftFoundryClient:
             ) from e
 
         except requests.exceptions.RequestException as e:
-            logger.error(f"Failed to create Foundry conversation: {e}")
+            logger.error("Failed to create Foundry conversation: %s", e)
             raise MicrosoftFoundryError(message=f"Failed to create Foundry conversation: {e!s}") from e
 
     def get_conversation_id(self, metadata: dict[str, Any] | None = None) -> str:

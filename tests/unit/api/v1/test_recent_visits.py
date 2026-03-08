@@ -1,28 +1,16 @@
 """Tests for recent visits API endpoints."""
 
 import uuid
-from typing import Any
 
 from fastapi import status
 from starlette.testclient import TestClient
 
 from tests.conftest import create_auth_headers
+from tests.helpers.tenant import create_tenant_for_user
 from unifiedui.core.database.models import RecentVisit
 
 ENDPOINT_RECENT_VISITS = "/api/v1/platform-service/tenants/{tenant_id}/users/{user_id}/recent-visits"
 ENDPOINT_SYNC = "/api/v1/platform-service/tenants/{tenant_id}/users/{user_id}/recent-visits/sync"
-
-
-def create_tenant_for_user(test_client: TestClient, user_token: Any, tenant_name: str = "Test Tenant") -> str:
-    """Create a tenant and return its ID."""
-    headers = create_auth_headers(user_token, use_cache=False)
-    response = test_client.post(
-        "/api/v1/platform-service/tenants",
-        json={"name": tenant_name, "description": f"Tenant for {user_token.get_id()}"},
-        headers=headers,
-    )
-    assert response.status_code == status.HTTP_201_CREATED
-    return response.json()["id"]
 
 
 def create_visit_in_db(

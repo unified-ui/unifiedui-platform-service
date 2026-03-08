@@ -7,6 +7,11 @@ unified-ui-platform-service/
 ├── alembic/                    # Database migrations
 │   ├── env.py
 │   └── versions/               # Migration files
+├── docs/                       # Project documentation
+│   ├── README.md               # Docs index
+│   ├── CONCEPT.md              # Platform concept document
+│   ├── MARKETING.md            # Marketing copy
+│   └── adr/                    # Architecture Decision Records
 ├── tests/                      # All tests → see testing.instructions.md
 │   ├── conftest.py             # Root conftest (imports all fixtures)
 │   ├── fixtures/               # Shared test fixtures
@@ -40,7 +45,7 @@ unified-ui-platform-service/
 │   │   ├── config.py           # Settings (pydantic-settings, env vars)
 │   │   ├── security.py         # Security utilities
 │   │   ├── database/           # DB models, enums, client interface
-│   │   │   ├── models.py       # SQLAlchemy models (~840 lines)
+│   │   │   ├── models.py       # SQLAlchemy models (~1009 lines)
 │   │   │   ├── enums.py        # All enums (roles, permissions, types)
 │   │   │   ├── client.py       # SQLAlchemyClient
 │   │   │   └── config.py       # DatabaseConfig
@@ -75,7 +80,11 @@ unified-ui-platform-service/
 │   └── utils/                  # Utility functions
 ├── pyproject.toml              # Project config + pytest config
 ├── alembic.ini                 # Alembic config
-└── docker-compose.yml          # Local infrastructure
+├── docker-compose.yml          # Local infrastructure
+├── CONTRIBUTING.md             # Contribution guidelines
+├── SECURITY.md                 # Security policy
+├── SPONSORS.md                 # Sponsor information
+└── CHANGELOG.md                # Version history
 ```
 
 ---
@@ -114,6 +123,7 @@ All `Depends()` factories live in `handlers/dependencies/`:
 | `vault.py` | `get_vault_client()`, `get_secrets_vault()` |
 | `chat_agents.py` | `get_chat_agent_handler()` |
 | `autonomous_agents.py` | `get_autonomous_agent_handler()` |
+| `organizations.py` | `get_organization_handler()` |
 | `conversations.py` | `get_conversation_handler()` |
 | `credentials.py` | `get_credential_handler()` |
 | `custom_groups.py` | `get_custom_group_handler()` |

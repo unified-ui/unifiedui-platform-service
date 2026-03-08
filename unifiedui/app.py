@@ -258,7 +258,7 @@ def create_app() -> FastAPI:
     @app.exception_handler(InvalidToolCredentialError)
     async def invalid_tool_credential_handler(request: Request, exc: InvalidToolCredentialError):
         """Handle invalid tool credential errors."""
-        return JSONResponse(status_code=400, content={"detail": exc.message, "credential_id": exc.credential_id})
+        return JSONResponse(status_code=400, content={"detail": str(exc), "credential_id": exc.credential_id})
 
     @app.exception_handler(TenantAIModelNotFoundError)
     async def tenant_ai_model_not_found_handler(request: Request, exc: TenantAIModelNotFoundError):

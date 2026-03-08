@@ -1,12 +1,12 @@
 """Tests for dashboard API endpoints."""
 
 import uuid
-from typing import Any
 
 from fastapi import status
 from starlette.testclient import TestClient
 
 from tests.conftest import create_auth_headers
+from tests.helpers.tenant import create_tenant_for_user
 from unifiedui.core.database.enums import PermissionActionEnum, PrincipalTypeEnum
 from unifiedui.core.database.models import (
     AutonomousAgent,
@@ -18,18 +18,6 @@ from unifiedui.core.database.models import (
 )
 
 ENDPOINT_DASHBOARD_STATS = "/api/v1/platform-service/tenants/{tenant_id}/dashboard/stats"
-
-
-def create_tenant_for_user(test_client: TestClient, user_token: Any, tenant_name: str = "Test Tenant") -> str:
-    """Create a tenant and return its ID."""
-    headers = create_auth_headers(user_token, use_cache=False)
-    response = test_client.post(
-        "/api/v1/platform-service/tenants",
-        json={"name": tenant_name, "description": f"Tenant for {user_token.get_id()}"},
-        headers=headers,
-    )
-    assert response.status_code == status.HTTP_201_CREATED
-    return response.json()["id"]
 
 
 def create_chat_agent_in_db(

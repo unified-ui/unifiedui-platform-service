@@ -127,7 +127,7 @@ class N8NConfigValidator(BaseChatAgentConfigValidator):
             validated = N8NChatAgentConfig(**config)
             return validated.model_dump()
         except Exception as e:
-            logger.error(f"N8N config validation failed: {e}")
+            logger.error("N8N config validation failed: %s", e)
             raise ChatAgentConfigValidationError(message=f"N8N configuration validation failed: {e!s}", errors=[str(e)])
 
     def get_supported_type(self) -> ChatAgentTypeEnum:
@@ -205,7 +205,7 @@ class MicrosoftFoundryConfigValidator(BaseChatAgentConfigValidator):
             validated = MicrosoftFoundryChatAgentConfig(**config)
             return validated.model_dump()
         except Exception as e:
-            logger.error(f"Microsoft Foundry config validation failed: {e}")
+            logger.error("Microsoft Foundry config validation failed: %s", e)
             raise ChatAgentConfigValidationError(
                 message=f"Microsoft Foundry configuration validation failed: {e!s}", errors=[str(e)]
             )

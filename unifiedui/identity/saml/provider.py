@@ -41,7 +41,7 @@ class SAMLIdentityProvider(BaseIdentityProvider):
         Returns:
             List of group responses from assertion groups claim.
         """
-        groups_claim = self.identity_token.get_deserialized_token().get("groups", [])
+        groups_claim = self.identity_token.deserialized_token.get("groups", [])
         if not isinstance(groups_claim, list):
             return []
 

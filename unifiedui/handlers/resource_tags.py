@@ -176,10 +176,10 @@ class ResourceTagsHandler:
             try:
                 cached_data = self.cache_client.client.get(cache_key)
                 if cached_data is not None:
-                    logger.debug(f"Returning cached tags for {resource_type}")
+                    logger.debug("Returning cached tags for %s", resource_type)
                     return cached_data
             except Exception as e:
-                logger.warning(f"Failed to get cached tags: {e}")
+                logger.warning("Failed to get cached tags: %s", e)
 
         with self.db_client.get_session() as session:
             # Verify resource exists
@@ -201,9 +201,9 @@ class ResourceTagsHandler:
             if use_cache and self.cache_client:
                 try:
                     self.cache_client.client.set(cache_key, result, ttl=300)
-                    logger.debug(f"Cached tags for {resource_type}")
+                    logger.debug("Cached tags for %s", resource_type)
                 except Exception as e:
-                    logger.warning(f"Failed to cache tags: {e}")
+                    logger.warning("Failed to cache tags: %s", e)
 
             return result
 
@@ -272,7 +272,7 @@ class ResourceTagsHandler:
                 session.add(tag_assoc)
 
             session.commit()
-            logger.info(f"Set {len(tags)} tags for {resource_type}")
+            logger.info("Set %s tags for %s", len(tags), resource_type)
 
             # Invalidate caches
             self._invalidate_resource_caches(resource_type, tenant_id, resource_id)
@@ -339,9 +339,9 @@ class ResourceTagsHandler:
                 tag_assoc = tag_model(**tag_assoc_kwargs)
                 session.add(tag_assoc)
                 session.commit()
-                logger.info(f"Added tag to {resource_type}")
+                logger.info("Added tag to %s", resource_type)
             else:
-                logger.info(f"Tag already exists on {resource_type}")
+                logger.info("Tag already exists on %s", resource_type)
 
             # Invalidate caches
             self._invalidate_resource_caches(resource_type, tenant_id, resource_id)
@@ -385,10 +385,10 @@ class ResourceTagsHandler:
             result = session.execute(delete_stmt)
             session.commit()
 
-            if result.rowcount == 0:
-                logger.warning(f"Tag association not found for {resource_type}")
+            if result.rowcount == 0:  # type: ignore[attr-defined]
+                logger.warning("Tag association not found for %s", resource_type)
             else:
-                logger.info(f"Removed tag from {resource_type}")
+                logger.info("Removed tag from %s", resource_type)
 
             # Invalidate caches
             self._invalidate_resource_caches(resource_type, tenant_id, resource_id)

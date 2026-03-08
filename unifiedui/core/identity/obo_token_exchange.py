@@ -29,7 +29,7 @@ class OBOTokenExchangeClient:
         self._client_id = client_id
         self._client_secret = client_secret
         self._token_url = f"https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token"
-        self._cache: dict[str, tuple[str, float]] = {}
+        self._cache: dict[int, tuple[str, float]] = {}
         self._lock = threading.Lock()
 
     def exchange_for_graph_token(self, user_token: str) -> str:
@@ -72,7 +72,7 @@ class OBOTokenExchangeClient:
                 response.json() if response.headers.get("content-type", "").startswith("application/json") else {}
             )
             error_desc = error_data.get("error_description", response.text)
-            logger.warning(f"OBO token exchange failed: {error_desc}")
+            logger.warning("OBO token exchange failed: %s", error_desc)
             raise ValueError(f"OBO token exchange failed: {error_desc}")
 
         token_data = response.json()

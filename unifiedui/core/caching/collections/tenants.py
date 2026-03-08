@@ -58,7 +58,7 @@ class TenantsCacheCollection:
             try:
                 return TenantResponse(**data)
             except Exception as e:
-                logger.warning(f"Failed to deserialize cached tenant: {e}")
+                logger.warning("Failed to deserialize cached tenant: %s", e)
                 return None
         return None
 
@@ -97,7 +97,7 @@ class TenantsCacheCollection:
             try:
                 return [TenantResponse(**item) for item in data]
             except Exception as e:
-                logger.warning(f"Failed to deserialize cached tenant list: {e}")
+                logger.warning("Failed to deserialize cached tenant list: %s", e)
                 return None
         return None
 
@@ -135,7 +135,7 @@ class TenantsCacheCollection:
             pattern = f"tenant:{tenant_id}:*"
 
         deleted = self.cache_client.delete_pattern(pattern)
-        logger.info(f"Invalidated {deleted} cache entries for tenant {tenant_id}")
+        logger.info("Invalidated %s cache entries for tenant %s", deleted, tenant_id)
         return deleted
 
     def invalidate_user(self, user_id: str) -> int:
@@ -150,7 +150,7 @@ class TenantsCacheCollection:
         """
         pattern = f"tenant:*:user:{user_id}:*"
         deleted = self.cache_client.delete_pattern(pattern)
-        logger.info(f"Invalidated {deleted} cache entries for user {user_id}")
+        logger.info("Invalidated %s cache entries for user %s", deleted, user_id)
         return deleted
 
     def invalidate_all(self) -> int:
@@ -162,5 +162,5 @@ class TenantsCacheCollection:
         """
         pattern = "tenant:*"
         deleted = self.cache_client.delete_pattern(pattern)
-        logger.info(f"Invalidated {deleted} tenant cache entries")
+        logger.info("Invalidated %s tenant cache entries", deleted)
         return deleted

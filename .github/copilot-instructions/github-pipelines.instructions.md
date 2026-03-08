@@ -12,10 +12,8 @@ All workflow files follow a prefix-based naming convention:
 |--------|---------|---------|
 | `ci-` | Continuous Integration (lint, test, build) | `ci-tests-and-lint.yml` |
 | `cd-` | Continuous Deployment (deploy to environments) | `cd-deploy-staging.yml` |
-| `ci-int-tests-` | Integration test suites | `ci-int-tests-database.yml` |
-| `ci-e2e-tests-` | End-to-end test suites | `ci-e2e-tests-api.yml` |
 
-The `name:` field inside each workflow MUST match the filename (without `.yml`).
+The `name:` field inside each workflow uses the format `CI — Description` or `CD — Description`.
 
 ---
 
@@ -23,7 +21,8 @@ The `name:` field inside each workflow MUST match the filename (without `.yml`).
 
 ### ci-tests-and-lint.yml
 
-**Triggers**: push, pull_request, workflow_dispatch
+**Name**: `CI — Tests & Lint`
+**Triggers**: push to `main`/`develop`, pull_request, workflow_dispatch
 
 | Job | What it does |
 |-----|-------------|
@@ -34,17 +33,67 @@ The `name:` field inside each workflow MUST match the filename (without `.yml`).
 
 ### ci-pr-branch-check.yml
 
-**Triggers**: pull_request to `main`
+**Name**: `CI — PR Branch Check`
+**Triggers**: pull_request (opened, synchronize, reopened, edited)
 
-Validates that PRs to `main` originate from a `release/*` branch.
+| Job | What it does |
+|-----|-------------|
+| **branch-naming** | Validates `<type>/` prefix convention (`feat/`, `fix/`, `docs/`, etc.) |
+| **branch-target** | Enforces: `develop` or `hotfix/*` → `main`; typed branches → `develop` |
+
+### codeql.yml
+
+**Name**: `CodeQL Security Scan`
+**Triggers**: push/PR to `main`/`develop`, weekly schedule (Monday 06:00 UTC)
+
+Runs CodeQL analysis with `security-extended` and `security-and-quality` query suites.
+
+### auto-labeler.yml
+
+**Name**: `Auto Labeler`
+**Triggers**: pull_request_target (opened, synchronize, reopened)
+
+Labels PRs based on changed files using `.github/labeler.yml` config. Labels: `api`, `handlers`, `database`, `core`, `schema`, `tests`, `documentation`, `ci`, `docker`, `dependencies`.
+
+### pr-size-labeler.yml
+
+**Name**: `PR Size Labeler`
+**Triggers**: pull_request_target (opened, synchronize, reopened)
+
+Labels PRs by size: `size/XS` (≤10), `size/S` (≤100), `size/M` (≤500), `size/L` (≤1000), `size/XL` (>1000).
+
+### release-drafter.yml
+
+**Name**: `Release Drafter`
+**Triggers**: push to `main`, workflow_dispatch
+
+Auto-drafts GitHub releases using `.github/release-drafter.yml` config. Categorizes changes by labels (features, bug fixes, maintenance, documentation, security).
+
+### stale.yml
+
+**Name**: `Stale Issues`
+**Triggers**: daily schedule (06:00 UTC), workflow_dispatch
+
+Marks issues stale after 60 days, closes after 14 more. Marks PRs stale after 30 days, closes after 7 more. Exempts: `pinned`, `security`, `bug`, `enhancement`, `work-in-progress`.
+
+---
+
+## Configuration Files
+
+| File | Purpose |
+|------|---------|
+| `.github/dependabot.yml` | Weekly dependency updates (pip, github-actions, docker) |
+| `.github/labeler.yml` | File-path-to-label mappings for auto-labeler |
+| `.github/release-drafter.yml` | Release notes template and version resolver |
+| `.github/CODEOWNERS` | Default reviewers for PRs |
 
 ---
 
 ## Adding a New Workflow
 
-1. Choose the correct prefix (`ci-`, `cd-`, `ci-int-tests-`, `ci-e2e-tests-`)
+1. Choose the correct prefix (`ci-`, `cd-`)
 2. Create `.github/workflows/{prefix}{descriptive-name}.yml`
-3. Set `name:` to match filename without extension
+3. Set `name:` to `CI — Description` or `CD — Description`
 4. Add appropriate triggers (`on:`)
 5. Update this instruction file
 
@@ -55,7 +104,7 @@ Validates that PRs to `main` originate from a `release/*` branch.
 | Tool | Version | Config |
 |------|---------|--------|
 | Python | 3.13 | `pyproject.toml` |
-| uv | latest | `astral-sh/setup-uv@v4` |
+| uv | latest | `astral-sh/setup-uv@v7` |
 | ruff | ≥0.15.2 | `[tool.ruff]` in `pyproject.toml` |
 | pytest | ≥8.0 | `[tool.pytest.ini_options]` in `pyproject.toml` |
 | pytest-xdist | ≥3.5 | `-n auto` for parallel tests |

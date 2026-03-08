@@ -20,12 +20,12 @@ from unifiedui.handlers.chat_agents import ChatAgentHandler
 from unifiedui.handlers.credentials import CredentialHandler
 from unifiedui.handlers.dependencies import get_chat_agent_handler, get_credential_handler
 from unifiedui.logger import get_logger
-from unifiedui.schema.requests.chat_agent_permissions import SetChatAgentPermissionRequest
 from unifiedui.schema.requests.chat_agents import (
     CreateChatAgentRequest,
     UpdateChatAgentRequest,
     UpdateReActAgentVersionRequest,
 )
+from unifiedui.schema.requests.permissions import SetResourcePermissionRequest
 from unifiedui.schema.responses.chat_agents import ChatAgentConfigResponse, ChatAgentResponse
 from unifiedui.schema.responses.principals import PrincipalWithRolesResponse, ResourcePrincipalsResponse
 from unifiedui.schema.responses.re_act_agents import ReActAgentVersionResponse
@@ -124,7 +124,7 @@ async def list_chat_agents(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to list chat agents: {e}")
+        logger.error("Failed to list chat agents: %s", e)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to list chat agents")
 
 
@@ -172,7 +172,7 @@ async def create_chat_agent(
             tenant_id=tenant_id, request=create_request, user_id=user.identity.get_id(), user=user
         )
     except Exception as e:
-        logger.error(f"Failed to create chat agent: {e}")
+        logger.error("Failed to create chat agent: %s", e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to create chat agent: {e!s}"
         )
@@ -221,10 +221,10 @@ async def get_chat_agent(
         )
         return handler.get_chat_agent(tenant_id=tenant_id, chat_agent_id=chat_agent_id, user=user)
     except ChatAgentNotFoundError as e:
-        logger.warning(f"Chat agent not found: {e}")
+        logger.warning("Chat agent not found: %s", e)
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
-        logger.error(f"Failed to get chat agent: {e}")
+        logger.error("Failed to get chat agent: %s", e)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to get chat agent")
 
 
@@ -277,10 +277,10 @@ async def update_chat_agent(
             tenant_id=tenant_id, chat_agent_id=chat_agent_id, request=update_request, user_id=user.identity.get_id()
         )
     except ChatAgentNotFoundError as e:
-        logger.warning(f"Chat agent not found: {e}")
+        logger.warning("Chat agent not found: %s", e)
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
-        logger.error(f"Failed to update chat agent: {e}")
+        logger.error("Failed to update chat agent: %s", e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to update chat agent: {e!s}"
         )
@@ -328,10 +328,10 @@ async def delete_chat_agent(
         handler.delete_chat_agent(tenant_id=tenant_id, chat_agent_id=chat_agent_id)
         return Response(status_code=status.HTTP_204_NO_CONTENT)
     except ChatAgentNotFoundError as e:
-        logger.warning(f"Chat agent not found: {e}")
+        logger.warning("Chat agent not found: %s", e)
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
-        logger.error(f"Failed to delete chat agent: {e}")
+        logger.error("Failed to delete chat agent: %s", e)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to delete chat agent")
 
 
@@ -391,13 +391,13 @@ async def get_chat_agent_config(
             tenant_id=tenant_id, chat_agent_id=chat_agent_id, user=user, credential_handler=credential_handler
         )
     except ChatAgentNotFoundError as e:
-        logger.warning(f"Chat agent not found: {e}")
+        logger.warning("Chat agent not found: %s", e)
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except InvalidCredentialError as e:
-        logger.error(f"Invalid credential: {e}")
+        logger.error("Invalid credential: %s", e)
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e.message))
     except Exception as e:
-        logger.error(f"Failed to get chat agent config: {e}")
+        logger.error("Failed to get chat agent config: %s", e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to get chat agent config: {e!s}"
         )
@@ -456,7 +456,7 @@ async def update_chat_agent_version(
     except ChatAgentNotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
-        logger.error(f"Failed to update chat agent version: {e}")
+        logger.error("Failed to update chat agent version: %s", e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to update chat agent version"
         )
@@ -511,7 +511,7 @@ async def list_chat_agent_versions(
     except ChatAgentNotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
-        logger.error(f"Failed to list chat agent versions: {e}")
+        logger.error("Failed to list chat agent versions: %s", e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to list chat agent versions"
         )
@@ -562,7 +562,7 @@ async def get_chat_agent_version(
     except (ChatAgentNotFoundError, ReActAgentVersionNotFoundError) as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
-        logger.error(f"Failed to get chat agent version: {e}")
+        logger.error("Failed to get chat agent version: %s", e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to get chat agent version"
         )
@@ -618,7 +618,7 @@ async def restore_chat_agent_version(
     except (ChatAgentNotFoundError, ReActAgentVersionNotFoundError) as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
-        logger.error(f"Failed to restore chat agent version: {e}")
+        logger.error("Failed to restore chat agent version: %s", e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to restore chat agent version"
         )
@@ -700,10 +700,10 @@ async def list_chat_agent_permissions(
             order_direction=order_direction,
         )
     except ChatAgentNotFoundError as e:
-        logger.warning(f"Chat agent not found: {e}")
+        logger.warning("Chat agent not found: %s", e)
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
-        logger.error(f"Failed to list chat agent permissions: {e}")
+        logger.error("Failed to list chat agent permissions: %s", e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to list chat agent permissions"
         )
@@ -763,10 +763,10 @@ async def get_chat_agent_permission(
             tenant_id=tenant_id, chat_agent_id=chat_agent_id, principal_id=principal_id
         )
     except ChatAgentNotFoundError as e:
-        logger.warning(f"Permission not found: {e}")
+        logger.warning("Permission not found: %s", e)
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
-        logger.error(f"Failed to get chat agent permission: {e}")
+        logger.error("Failed to get chat agent permission: %s", e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to get chat agent permission"
         )
@@ -791,7 +791,7 @@ async def set_chat_agent_permission(
     request: Request,
     tenant_id: str,
     chat_agent_id: str,
-    permission_request: SetChatAgentPermissionRequest,
+    permission_request: SetResourcePermissionRequest,
     handler: ChatAgentHandler = Depends(get_chat_agent_handler),
 ) -> PrincipalWithRolesResponse:
     """
@@ -828,10 +828,10 @@ async def set_chat_agent_permission(
             user=user,
         )
     except ChatAgentNotFoundError as e:
-        logger.warning(f"Chat agent not found: {e}")
+        logger.warning("Chat agent not found: %s", e)
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
-        logger.error(f"Failed to set chat agent permission: {e}")
+        logger.error("Failed to set chat agent permission: %s", e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to set chat agent permission: {e!s}"
         )
@@ -856,7 +856,7 @@ async def delete_chat_agent_permission(
     request: Request,
     tenant_id: str,
     chat_agent_id: str,
-    delete_request: SetChatAgentPermissionRequest,
+    delete_request: SetResourcePermissionRequest,
     handler: ChatAgentHandler = Depends(get_chat_agent_handler),
 ) -> Response:
     """
@@ -894,10 +894,10 @@ async def delete_chat_agent_permission(
         )
         return Response(status_code=status.HTTP_204_NO_CONTENT)
     except ChatAgentNotFoundError as e:
-        logger.warning(f"Permission not found: {e}")
+        logger.warning("Permission not found: %s", e)
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
-        logger.error(f"Failed to delete chat agent permission: {e}")
+        logger.error("Failed to delete chat agent permission: %s", e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to delete chat agent permission"
         )

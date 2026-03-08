@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from sqlalchemy import or_, select
 
@@ -284,7 +284,9 @@ class SearchHandler:
         with self.db_client.get_session() as session:
             for search_type in search_types:
                 config = SEARCH_TYPE_CONFIG[search_type]
-                is_admin = self._check_admin_for_type(user, tenant_id, config["admin_roles"])
+                is_admin = self._check_admin_for_type(
+                    user, tenant_id, cast("list[TenantRolesEnum]", config["admin_roles"])
+                )
                 type_results = self._search_entity_type(
                     session=session,
                     tenant_id=tenant_id,

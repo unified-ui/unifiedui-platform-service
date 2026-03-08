@@ -11,8 +11,8 @@ from unifiedui.exc.chat_widgets import ChatWidgetNotFoundError
 from unifiedui.handlers.chat_widgets import ChatWidgetHandler
 from unifiedui.handlers.dependencies import get_chat_widget_handler
 from unifiedui.logger import get_logger
-from unifiedui.schema.requests.chat_widget_permissions import SetChatWidgetPermissionRequest
 from unifiedui.schema.requests.chat_widgets import CreateChatWidgetRequest, UpdateChatWidgetRequest
+from unifiedui.schema.requests.permissions import SetResourcePermissionRequest
 from unifiedui.schema.responses.chat_widgets import ChatWidgetResponse
 from unifiedui.schema.responses.principals import PrincipalWithRolesResponse, ResourcePrincipalsResponse
 
@@ -102,7 +102,7 @@ async def list_chat_widgets(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to list chat widgets: {e}")
+        logger.error("Failed to list chat widgets: %s", e)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to list chat widgets")
 
 
@@ -150,7 +150,7 @@ async def create_chat_widget(
             tenant_id=tenant_id, request=create_request, user_id=user.identity.get_id(), user=user
         )
     except Exception as e:
-        logger.error(f"Failed to create chat widget: {e}")
+        logger.error("Failed to create chat widget: %s", e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to create chat widget: {e!s}"
         )
@@ -199,10 +199,10 @@ async def get_chat_widget(
         )
         return handler.get_chat_widget(tenant_id=tenant_id, chat_widget_id=chat_widget_id, user=user)
     except ChatWidgetNotFoundError as e:
-        logger.warning(f"Chat widget not found: {e}")
+        logger.warning("Chat widget not found: %s", e)
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
-        logger.error(f"Failed to get chat widget: {e}")
+        logger.error("Failed to get chat widget: %s", e)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to get chat widget")
 
 
@@ -255,10 +255,10 @@ async def update_chat_widget(
             tenant_id=tenant_id, chat_widget_id=chat_widget_id, request=update_request, user_id=user.identity.get_id()
         )
     except ChatWidgetNotFoundError as e:
-        logger.warning(f"Chat widget not found: {e}")
+        logger.warning("Chat widget not found: %s", e)
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
-        logger.error(f"Failed to update chat widget: {e}")
+        logger.error("Failed to update chat widget: %s", e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to update chat widget: {e!s}"
         )
@@ -306,10 +306,10 @@ async def delete_chat_widget(
         handler.delete_chat_widget(tenant_id=tenant_id, chat_widget_id=chat_widget_id)
         return Response(status_code=status.HTTP_204_NO_CONTENT)
     except ChatWidgetNotFoundError as e:
-        logger.warning(f"Chat widget not found: {e}")
+        logger.warning("Chat widget not found: %s", e)
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
-        logger.error(f"Failed to delete chat widget: {e}")
+        logger.error("Failed to delete chat widget: %s", e)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to delete chat widget")
 
 
@@ -389,10 +389,10 @@ async def list_chat_widget_permissions(
             order_direction=order_direction,
         )
     except ChatWidgetNotFoundError as e:
-        logger.warning(f"Chat widget not found: {e}")
+        logger.warning("Chat widget not found: %s", e)
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
-        logger.error(f"Failed to list chat widget permissions: {e}")
+        logger.error("Failed to list chat widget permissions: %s", e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to list chat widget permissions"
         )
@@ -452,10 +452,10 @@ async def get_chat_widget_permission(
             tenant_id=tenant_id, chat_widget_id=chat_widget_id, principal_id=principal_id
         )
     except ChatWidgetNotFoundError as e:
-        logger.warning(f"Permission not found: {e}")
+        logger.warning("Permission not found: %s", e)
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
-        logger.error(f"Failed to get chat widget permission: {e}")
+        logger.error("Failed to get chat widget permission: %s", e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to get chat widget permission"
         )
@@ -480,7 +480,7 @@ async def set_chat_widget_permission(
     request: Request,
     tenant_id: str,
     chat_widget_id: str,
-    permission_request: SetChatWidgetPermissionRequest,
+    permission_request: SetResourcePermissionRequest,
     handler: ChatWidgetHandler = Depends(get_chat_widget_handler),
 ) -> PrincipalWithRolesResponse:
     """
@@ -517,10 +517,10 @@ async def set_chat_widget_permission(
             user=user,
         )
     except ChatWidgetNotFoundError as e:
-        logger.warning(f"Chat widget not found: {e}")
+        logger.warning("Chat widget not found: %s", e)
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
-        logger.error(f"Failed to set chat widget permission: {e}")
+        logger.error("Failed to set chat widget permission: %s", e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to set chat widget permission: {e!s}"
         )
@@ -545,7 +545,7 @@ async def delete_chat_widget_permission(
     request: Request,
     tenant_id: str,
     chat_widget_id: str,
-    delete_request: SetChatWidgetPermissionRequest,
+    delete_request: SetResourcePermissionRequest,
     handler: ChatWidgetHandler = Depends(get_chat_widget_handler),
 ) -> Response:
     """
@@ -583,10 +583,10 @@ async def delete_chat_widget_permission(
         )
         return Response(status_code=status.HTTP_204_NO_CONTENT)
     except ChatWidgetNotFoundError as e:
-        logger.warning(f"Permission not found: {e}")
+        logger.warning("Permission not found: %s", e)
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
-        logger.error(f"Failed to delete chat widget permission: {e}")
+        logger.error("Failed to delete chat widget permission: %s", e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to delete chat widget permission"
         )

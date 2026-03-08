@@ -46,5 +46,5 @@ async def global_search(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Search failed: {e}")
+        logger.error("Search failed: %s", e)
         raise HTTPException(status_code=500, detail="Search failed")

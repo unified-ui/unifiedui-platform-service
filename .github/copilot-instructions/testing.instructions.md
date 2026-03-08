@@ -37,7 +37,9 @@ Every resource in `tests/unit/api/v1/` has **exactly three test files**:
 | `test_{resource}_caching.py` | Cache hit/miss, invalidation, isolation | `use_cache=True` (default) |
 
 ### Resources with three-file pattern:
-chat_agents, autonomous_agents, chat_widgets, conversations, credentials, custom_groups, identity, principals, tags, tenant_ai_models, tenants, tools, user_favorites
+chat_agents, autonomous_agents, chat_widgets, conversations, credentials, custom_groups, identity, organizations, principals, tags, tenant_ai_models, tenants, tools, user_favorites
+
+**Note**: ReACT agents are a sub-type of ChatAgent (`ChatAgentTypeEnum.REACT_AGENT`) — they are covered within the chat_agents test files. Additionally, `test_org_role_bypass_rbac.py` tests organization role bypass scenarios.
 
 ---
 
@@ -163,7 +165,7 @@ class Test{Resource}RBAC:
 
     # === Tenant admin bypass ===
     def test_tenant_global_admin_bypasses_permissions(self, test_client):
-        """GLOBAL_ADMIN can access all resources without explicit membership."""
+        """TENANT_GLOBAL_ADMIN can access all resources without explicit membership."""
 
     def test_tenant_resource_admin_bypasses_permissions(self, test_client):
         """{RESOURCE}_ADMIN can access all resources of this type."""
@@ -185,7 +187,7 @@ class Test{Resource}RBAC:
 6. Multiple users with ADMIN
 7. Role replacement (grant new role replaces old)
 8. Role removal (revoke → blocked)
-9. GLOBAL_ADMIN bypasses resource permissions
+9. GLOBAL_ADMIN (TENANT_GLOBAL_ADMIN) bypasses resource permissions
 10. {RESOURCE}_ADMIN bypasses resource permissions
 11. Service key + Bearer for `/config` endpoints
 12. Identity group grants indirect access

@@ -26,8 +26,8 @@ class OpenAIConfig(BaseModel):
     """Validation model for OpenAI provider config."""
 
     model_name: str = Field(..., min_length=1)
-    organization: str = Field(None)
-    base_url: str = Field(None)
+    organization: str | None = Field(None)
+    base_url: str | None = Field(None)
 
 
 class AnthropicConfig(BaseModel):

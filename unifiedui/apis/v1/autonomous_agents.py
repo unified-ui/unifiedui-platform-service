@@ -24,8 +24,8 @@ from unifiedui.handlers.autonomous_agents import AutonomousAgentHandler
 from unifiedui.handlers.credentials import CredentialHandler
 from unifiedui.handlers.dependencies import get_autonomous_agent_handler, get_credential_handler
 from unifiedui.logger import get_logger
-from unifiedui.schema.requests.autonomous_agent_permissions import SetAutonomousAgentPermissionRequest
 from unifiedui.schema.requests.autonomous_agents import CreateAutonomousAgentRequest, UpdateAutonomousAgentRequest
+from unifiedui.schema.requests.permissions import SetResourcePermissionRequest
 from unifiedui.schema.responses.autonomous_agents import (
     AutonomousAgentConfigResponse,
     AutonomousAgentKeyResponse,
@@ -113,7 +113,7 @@ async def list_autonomous_agents(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to list autonomous agents: {e}", exc_info=True)
+        logger.error("Failed to list autonomous agents: %s", e, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to list autonomous agents"
         )
@@ -166,7 +166,7 @@ async def create_autonomous_agent(
     except UnsupportedAutonomousAgentTypeError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except Exception as e:
-        logger.error(f"Failed to create autonomous agent: {e}", exc_info=True)
+        logger.error("Failed to create autonomous agent: %s", e, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to create autonomous agent"
         )
@@ -215,7 +215,7 @@ async def get_autonomous_agent(
     except AutonomousAgentNotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
-        logger.error(f"Failed to get autonomous agent: {e}", exc_info=True)
+        logger.error("Failed to get autonomous agent: %s", e, exc_info=True)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to get autonomous agent")
 
 
@@ -269,7 +269,7 @@ async def update_autonomous_agent(
     except AutonomousAgentConfigValidationError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except Exception as e:
-        logger.error(f"Failed to update autonomous agent: {e}", exc_info=True)
+        logger.error("Failed to update autonomous agent: %s", e, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to update autonomous agent"
         )
@@ -316,7 +316,7 @@ async def delete_autonomous_agent(
     except AutonomousAgentNotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
-        logger.error(f"Failed to delete autonomous agent: {e}", exc_info=True)
+        logger.error("Failed to delete autonomous agent: %s", e, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to delete autonomous agent"
         )
@@ -394,7 +394,7 @@ async def list_autonomous_agent_permissions(
     except AutonomousAgentNotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
-        logger.error(f"Failed to list autonomous agent permissions: {e}", exc_info=True)
+        logger.error("Failed to list autonomous agent permissions: %s", e, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to list autonomous agent permissions"
         )
@@ -446,7 +446,7 @@ async def get_autonomous_agent_permission(
     except AutonomousAgentNotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
-        logger.error(f"Failed to get autonomous agent permission: {e}", exc_info=True)
+        logger.error("Failed to get autonomous agent permission: %s", e, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to get autonomous agent permission"
         )
@@ -471,7 +471,7 @@ async def set_autonomous_agent_permission(
     request: Request,
     tenant_id: str,
     autonomous_agent_id: str,
-    permission_request: SetAutonomousAgentPermissionRequest,
+    permission_request: SetResourcePermissionRequest,
     handler: AutonomousAgentHandler = Depends(get_autonomous_agent_handler),
 ) -> PrincipalWithRolesResponse:
     """
@@ -503,7 +503,7 @@ async def set_autonomous_agent_permission(
     except AutonomousAgentNotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
-        logger.error(f"Failed to set autonomous agent permission: {e}", exc_info=True)
+        logger.error("Failed to set autonomous agent permission: %s", e, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to set autonomous agent permission"
         )
@@ -528,7 +528,7 @@ async def delete_autonomous_agent_permission(
     request: Request,
     tenant_id: str,
     autonomous_agent_id: str,
-    delete_request: SetAutonomousAgentPermissionRequest,
+    delete_request: SetResourcePermissionRequest,
     handler: AutonomousAgentHandler = Depends(get_autonomous_agent_handler),
 ) -> Response:
     """
@@ -560,7 +560,7 @@ async def delete_autonomous_agent_permission(
     except AutonomousAgentPermissionNotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
-        logger.error(f"Failed to delete autonomous agent permission: {e}", exc_info=True)
+        logger.error("Failed to delete autonomous agent permission: %s", e, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to delete autonomous agent permission"
         )
@@ -623,7 +623,7 @@ async def get_autonomous_agent_key(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to get autonomous agent key: {e}", exc_info=True)
+        logger.error("Failed to get autonomous agent key: %s", e, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to get autonomous agent key"
         )
@@ -689,7 +689,7 @@ async def rotate_autonomous_agent_key(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to rotate autonomous agent key: {e}", exc_info=True)
+        logger.error("Failed to rotate autonomous agent key: %s", e, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to rotate autonomous agent key"
         )
@@ -786,7 +786,7 @@ async def get_autonomous_agent_config(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to get autonomous agent config: {e}", exc_info=True)
+        logger.error("Failed to get autonomous agent config: %s", e, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to get autonomous agent configuration"
         )
@@ -854,7 +854,7 @@ async def get_autonomous_agent_config_bearer(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to get autonomous agent config: {e}", exc_info=True)
+        logger.error("Failed to get autonomous agent config: %s", e, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to get autonomous agent configuration"
         )

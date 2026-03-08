@@ -1,11 +1,16 @@
 """HashiCorp Vault client implementation."""
 
-from typing import Any
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 from unifiedui.core.vault.client import BaseVaultClient
-from unifiedui.core.vault.vault import BaseVault
 from unifiedui.logger import get_logger
 from unifiedui.vault.hashicorp_vault.vault import HashiCorpVault
+
+if TYPE_CHECKING:
+    from unifiedui.core.caching.client import BaseCacheClient
+    from unifiedui.core.vault.vault import BaseVault
 
 logger = get_logger(__name__)
 
@@ -18,7 +23,7 @@ class HashiCorpVaultClient(BaseVaultClient):
         url: str | None = None,
         token: str | None = None,
         mount_point: str = "secret",
-        cache_client: Any | None = None,
+        cache_client: BaseCacheClient | None = None,
     ):
         """
         Initialize HashiCorp Vault client.

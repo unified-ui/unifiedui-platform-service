@@ -20,5 +20,5 @@ def to_dict[T](cls: type[T]) -> type[T]:
     def to_dict(self) -> dict:
         return asdict(self)
 
-    cls.to_dict = to_dict
+    cls.to_dict = to_dict  # type: ignore[attr-defined]
     return cls

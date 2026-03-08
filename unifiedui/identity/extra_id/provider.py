@@ -44,7 +44,7 @@ class ExtraIDIdentityProvider(BaseIdentityProvider, APIJSONBearerClient):
     def _is_service_principal_token(self) -> bool:
         """Check if the current token belongs to a service principal (app) or user."""
         payload = self._decode_token_payload(self.identity_token.token)
-        return payload.get("idtyp") == "app" or (payload.get("appid") and not payload.get("upn"))
+        return bool(payload.get("idtyp") == "app" or (payload.get("appid") and not payload.get("upn")))
 
     def _get_oid_from_token(self) -> str | None:
         """Extract object ID (oid) from token."""
@@ -70,7 +70,7 @@ class ExtraIDIdentityProvider(BaseIdentityProvider, APIJSONBearerClient):
 
         if query.next_link:
             url = query.next_link
-            params = {}
+            params: dict[str, str | int] = {}
         else:
             if self._is_service_principal_token():
                 oid = self._get_oid_from_token()
@@ -108,7 +108,7 @@ class ExtraIDIdentityProvider(BaseIdentityProvider, APIJSONBearerClient):
 
         if query.next_link:
             url = query.next_link
-            params = {}
+            params: dict[str, str | int] = {}
         else:
             url = self._url("/groups")
             params = {"$select": "displayName,id", "$top": query.top, "$filter": "securityEnabled eq true"}
@@ -143,7 +143,7 @@ class ExtraIDIdentityProvider(BaseIdentityProvider, APIJSONBearerClient):
 
         if query.next_link:
             url = query.next_link
-            params = {}
+            params: dict[str, str | int] = {}
         else:
             url = self._url("/users")
             params = {"$select": "displayName,id,userPrincipalName", "$top": query.top}

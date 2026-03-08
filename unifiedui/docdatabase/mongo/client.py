@@ -2,7 +2,7 @@ from typing import TYPE_CHECKING
 
 from pymongo import MongoClient
 
-from unifiedui.core.docdatabase.base import BaseDatabaseClient
+from unifiedui.core.docdatabase.base import BaseDatabaseClient  # type: ignore[attr-defined]
 from unifiedui.docdatabase.mongo.repos.custom_groups import MongoDBCustomGroupsCollection
 from unifiedui.docdatabase.mongo.repos.permissions import MongoDBPermissionsCollection
 from unifiedui.docdatabase.mongo.repos.tenants import MongoDBTenantsCollection
@@ -19,8 +19,8 @@ class MongoDBDatabaseClient(BaseDatabaseClient):
         self._database_name = database_name
         self._client: MongoClient = None
         self._db: Database = None
-        self._tenants_collection = None
-        self._custom_groups_collection = None
+        self._tenants_collection: MongoDBTenantsCollection | None = None
+        self._custom_groups_collection: MongoDBCustomGroupsCollection | None = None
 
     def connect(self) -> None:
         """Establish database connection."""

@@ -98,7 +98,7 @@ def list_{resources}(self, tenant_id: str, user: ContextIdentityUser, ...):
 
     # Check admin bypass
     is_admin = self._check_tenant_admin(user, tenant_id, [
-        TenantRolesEnum.GLOBAL_ADMIN, TenantRolesEnum.{RESOURCE}_ADMIN
+        TenantRolesEnum.TENANT_GLOBAL_ADMIN, TenantRolesEnum.{RESOURCE}_ADMIN
     ])
 
     # Collect principal IDs for permission filtering
@@ -145,6 +145,11 @@ RESOURCE_PERMISSION_CONFIG = {
 ```
 
 Provides: `list_permissions()`, `get_permission()`, `set_permission()`, `delete_permission()`, `add_creator_permission()`
+
+### PrincipalsHelper
+**Location**: `handlers/principals_helper.py`
+
+Shared helper for resolving principal IDs (user + identity groups + custom groups) used across handlers for permission-filtered queries.
 
 ### ResourceTagsHandler
 **Location**: `handlers/resource_tags.py`
@@ -205,11 +210,11 @@ Config validators live in `handlers/validators/`. Used to validate runtime confi
 
 | Validator | Purpose |
 |-----------|---------|
-| `ChatAgentConfigValidatorFactory` | Validates N8N / Foundry / REST API configs |
-| `AutonomousAgentConfigValidator` | Validates autonomous agent configs |
-| `CredentialValidator` | Validates credential data |
-| `ToolValidator` | Validates tool (MCP / OpenAPI) configs |
-| `TenantAIModelValidator` | Validates AI model provider configs |
+| `ChatAgentConfigValidatorFactory` | Validates N8N / Foundry / REST API / ReACT Agent configs |
+| `AutonomousAgentConfigValidatorFactory` | Validates autonomous agent configs |
+| `CredentialValidator` | Validates credential data (Pydantic-based, no factory) |
+| `ToolConfigValidatorFactory` | Validates tool (MCP / OpenAPI) configs |
+| `AIModelConfigValidatorFactory` | Validates AI model provider configs |
 
 ---
 

@@ -37,7 +37,7 @@ def get_cache_client() -> CacheClient | None:
             _cache_client = create_cache_client()
             logger.info("Cache client initialized successfully")
         except Exception as e:
-            logger.error(f"Failed to initialize cache client: {e}")
+            logger.error("Failed to initialize cache client: %s", e)
             return None
 
     return _cache_client
@@ -55,7 +55,7 @@ def close_cache_client() -> None:
             _cache_client.close()
             logger.info("Cache client closed")
         except Exception as e:
-            logger.error(f"Error closing cache client: {e}")
+            logger.error("Error closing cache client: %s", e)
         finally:
             _cache_client = None
             # Clear the lru cache

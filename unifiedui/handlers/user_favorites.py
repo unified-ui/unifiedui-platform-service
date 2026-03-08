@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 
 from sqlalchemy import delete, select
 
@@ -80,8 +80,8 @@ class UserFavoritesHandler:
         if not mapping:
             raise ValueError(f"Unknown resource type: {resource_type}")
 
-        model = mapping["model"]
-        id_field = mapping["id_field"]
+        model: type[Any] = cast("type[Any]", mapping["model"])
+        id_field: str = cast("str", mapping["id_field"])
 
         cache_key = f"user_favorites:{resource_type}:tenant:{tenant_id}:user:{user_id}"
 
@@ -96,7 +96,7 @@ class UserFavoritesHandler:
                         total=cached_data["total"],
                     )
             except Exception as e:
-                logger.warning(f"Failed to get cached user favorites: {e}")
+                logger.warning("Failed to get cached user favorites: %s", e)
 
         with self.db_client.get_session() as session:
             query = select(model).where(model.tenant_id == tenant_id, model.user_id == user_id)
@@ -127,7 +127,7 @@ class UserFavoritesHandler:
                     self.cache_client.client.set(cache_key, data, ttl=300)
                     logger.debug("Cached user favorites")
                 except Exception as e:
-                    logger.warning(f"Failed to cache user favorites: {e}")
+                    logger.warning("Failed to cache user favorites: %s", e)
 
             return result
 
@@ -160,8 +160,8 @@ class UserFavoritesHandler:
         if not mapping:
             raise ValueError(f"Unknown resource type: {resource_type}")
 
-        model = mapping["model"]
-        id_field = mapping["id_field"]
+        model: type[Any] = cast("type[Any]", mapping["model"])
+        id_field: str = cast("str", mapping["id_field"])
 
         with self.db_client.get_session() as session:
             # Check if already exists
@@ -233,8 +233,8 @@ class UserFavoritesHandler:
         if not mapping:
             raise ValueError(f"Unknown resource type: {resource_type}")
 
-        model = mapping["model"]
-        id_field = mapping["id_field"]
+        model: type[Any] = cast("type[Any]", mapping["model"])
+        id_field: str = cast("str", mapping["id_field"])
 
         with self.db_client.get_session() as session:
             session.execute(
@@ -256,4 +256,4 @@ class UserFavoritesHandler:
                 self.cache_client.client.delete(cache_key)
                 logger.debug("Invalidated user favorites cache")
             except Exception as e:
-                logger.warning(f"Failed to invalidate user favorites cache: {e}")
+                logger.warning("Failed to invalidate user favorites cache: %s", e)
