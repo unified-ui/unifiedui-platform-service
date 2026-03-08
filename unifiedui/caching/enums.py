@@ -1,7 +1,9 @@
 """Enums for cache types."""
-from enum import Enum
+
+from enum import StrEnum
 
 
-class CacheTypeEnum(str, Enum):
+class CacheTypeEnum(StrEnum):
     """Supported cache backend types."""
+
     REDIS = "REDIS"

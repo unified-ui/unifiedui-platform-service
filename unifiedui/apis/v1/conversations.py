@@ -1,96 +1,91 @@
 """API routes for conversation management."""
-from typing import Optional, List
 
-from fastapi import APIRouter, Depends, HTTPException, status, Request, Query
+from typing import TYPE_CHECKING
+
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, status
 from fastapi.responses import Response
 
-from unifiedui.core.identity.users import ContextIdentityUser
+from unifiedui.core.database.enums import ListViewEnum, OrderDirectionEnum, PermissionActionEnum, TenantRolesEnum
+from unifiedui.core.middleware.apis.v1.auth import authenticate, check_permissions
+from unifiedui.exc.conversations import ConversationNotFoundError, FoundryConversationCreationError
 from unifiedui.handlers.conversations import ConversationHandler
 from unifiedui.handlers.dependencies import get_conversation_handler
-from unifiedui.schema.requests.conversations import CreateConversationRequest, UpdateConversationRequest
-from unifiedui.schema.requests.conversation_permissions import SetConversationPermissionRequest
-from unifiedui.schema.responses.conversations import ConversationResponse
-from unifiedui.schema.responses.principals import (
-    PrincipalWithRolesResponse,
-    ResourcePrincipalsResponse
-)
-from unifiedui.exc.conversations import ConversationNotFoundError
-from unifiedui.core.middleware.apis.v1.auth import authenticate, check_permissions
-from unifiedui.core.database.enums import TenantRolesEnum, PermissionActionEnum, OrderDirectionEnum
 from unifiedui.logger import get_logger
+from unifiedui.schema.requests.conversations import CreateConversationRequest, UpdateConversationRequest
+from unifiedui.schema.requests.permissions import SetResourcePermissionRequest
+from unifiedui.schema.responses.conversations import ConversationResponse
+from unifiedui.schema.responses.principals import PrincipalWithRolesResponse, ResourcePrincipalsResponse
+
+if TYPE_CHECKING:
+    from unifiedui.core.identity.users import ContextIdentityUser
 
 logger = get_logger(__name__)
 
-router = APIRouter(
-    prefix="/conversations"
-)
+router = APIRouter(prefix="/conversations")
 
 
 @router.get(
     "",
-    response_model=List[ConversationResponse],
     summary="List conversations",
-    description="Get a paginated list of conversations for the current tenant"
+    description="Get a paginated list of conversations for the current tenant. Use view=quick-list to get only id and name.",
 )
-@authenticate
+@authenticate()
 async def list_conversations(
     request: Request,
     tenant_id: str,
     skip: int = Query(0, ge=0, description="Number of items to skip"),
     limit: int = Query(100, ge=1, le=1000, description="Maximum number of items to return"),
-    name_filter: Optional[str] = Query(None, description="Filter by conversation name"),
-    is_active: Optional[int] = Query(None, ge=0, le=1, description="Filter by active status (1=active, 0=inactive)"),
-    order_by: Optional[str] = Query(None, description="Column name to order by (e.g., 'name', 'created_at', 'updated_at')"),
-    order_direction: Optional[OrderDirectionEnum] = Query(None, description="Sort direction: 'asc' or 'desc'"),
-    handler: ConversationHandler = Depends(get_conversation_handler)
-) -> List[ConversationResponse]:
+    name: str | None = Query(None, description="Filter by conversation name"),
+    is_active: int | None = Query(None, ge=0, le=1, description="Filter by active status (1=active, 0=inactive)"),
+    order_by: str | None = Query(
+        None, description="Column name to order by (e.g., 'name', 'created_at', 'updated_at')"
+    ),
+    order_direction: OrderDirectionEnum | None = Query(None, description="Sort direction: 'asc' or 'desc'"),
+    view: ListViewEnum | None = Query(
+        None, description="View type: 'full' (default) or 'quick-list' (returns only id and name)"
+    ),
+    handler: ConversationHandler = Depends(get_conversation_handler),
+):
     """
     List conversations for a tenant.
-    
+
     Users see only conversations they have permissions for, unless they have
-    GLOBAL_ADMIN or CONVERSATIONS_ADMIN on tenant level.
-    
+    TENANT_GLOBAL_ADMIN or CONVERSATIONS_ADMIN on tenant level.
+
     Args:
         request: FastAPI request with user in state
         tenant_id: Tenant ID from path
         skip: Number of items to skip
         limit: Maximum number of items to return
-        name_filter: Optional filter by conversation name
+        name: Optional filter by conversation name
         is_active: Optional filter by active status (None=all, 1=active, 0=inactive)
         handler: Conversation handler dependency
-        
+
     Returns:
         List of conversations
     """
     try:
         user: ContextIdentityUser = request.state.user
-        
+
         logger.info(
             "API: List conversations",
-            extra={
-                "tenant_id": tenant_id,
-                "user_id": user.identity.get_id(),
-                "skip": skip,
-                "limit": limit
-            }
+            extra={"tenant_id": tenant_id, "user_id": user.identity.get_id(), "skip": skip, "limit": limit},
         )
-        
+
         return handler.list_conversations(
             tenant_id=tenant_id,
             skip=skip,
             limit=limit,
-            name_filter=name_filter,
+            name_filter=name,
             is_active=is_active,
             order_by=order_by,
             order_direction=order_direction.value if order_direction else None,
-            user=user
+            view=view.value if view else None,
+            user=user,
         )
     except Exception as e:
-        logger.error(f"Failed to list conversations: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to list conversations"
-        )
+        logger.error("Failed to list conversations: %s", e)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to list conversations")
 
 
 @router.post(
@@ -98,32 +93,37 @@ async def list_conversations(
     response_model=ConversationResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Create conversation",
-    description="Create a new conversation"
+    description="Create a new conversation. For MICROSOFT_FOUNDRY chat agents, include the X-Microsoft-Foundry-API-Key header.",
 )
-@authenticate
+@authenticate()
 @check_permissions(
     entity="tenant",
     required_permissions=[
-        TenantRolesEnum.GLOBAL_ADMIN,
+        TenantRolesEnum.TENANT_GLOBAL_ADMIN,
         TenantRolesEnum.CONVERSATIONS_ADMIN,
-        TenantRolesEnum.CONVERSATIONS_CREATOR
-    ]
+        TenantRolesEnum.CONVERSATIONS_CREATOR,
+    ],
 )
 async def create_conversation(
     request: Request,
     tenant_id: str,
     create_request: CreateConversationRequest,
-    handler: ConversationHandler = Depends(get_conversation_handler)
+    handler: ConversationHandler = Depends(get_conversation_handler),
+    x_microsoft_foundry_api_key: str | None = Header(None, alias="X-Microsoft-Foundry-API-Key"),
 ) -> ConversationResponse:
     """
     Create a new conversation.
-    
+
+    For MICROSOFT_FOUNDRY chat agents, a conversation will also be created in the
+    Foundry service. The X-Microsoft-Foundry-API-Key header is required for these chat agents.
+
     Args:
         request: FastAPI request with user in state
         tenant_id: Tenant ID from path
         create_request: Conversation creation data
         handler: Conversation handler dependency
-        
+        x_microsoft_foundry_api_key: Optional API key for Microsoft Foundry
+
     Returns:
         Created conversation
     """
@@ -131,23 +131,22 @@ async def create_conversation(
         user: ContextIdentityUser = request.state.user
         logger.info(
             "API: Create conversation",
-            extra={
-                "tenant_id": tenant_id,
-                "user_id": user.identity.get_id(),
-                "conversation_name": create_request.name
-            }
+            extra={"tenant_id": tenant_id, "user_id": user.identity.get_id(), "conversation_name": create_request.name},
         )
         return handler.create_conversation(
             tenant_id=tenant_id,
             request=create_request,
             user_id=user.identity.get_id(),
-            user=user
+            user=user,
+            foundry_api_key=x_microsoft_foundry_api_key,
         )
+    except FoundryConversationCreationError as e:
+        logger.error("Failed to create Foundry conversation: %s", e)
+        raise HTTPException(status_code=e.status_code or status.HTTP_502_BAD_GATEWAY, detail=e.message)
     except Exception as e:
-        logger.error(f"Failed to create conversation: {e}")
+        logger.error("Failed to create conversation: %s", e)
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to create conversation: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to create conversation: {e!s}"
         )
 
 
@@ -155,37 +154,37 @@ async def create_conversation(
     "/{conversation_id}",
     response_model=ConversationResponse,
     summary="Get conversation",
-    description="Get a specific conversation by ID"
+    description="Get a specific conversation by ID",
 )
-@authenticate
+@authenticate()
 @check_permissions(
     entity="conversation",
     required_permissions=[
-        TenantRolesEnum.GLOBAL_ADMIN,
+        TenantRolesEnum.TENANT_GLOBAL_ADMIN,
         TenantRolesEnum.CONVERSATIONS_ADMIN,
         PermissionActionEnum.ADMIN,
         PermissionActionEnum.WRITE,
-        PermissionActionEnum.READ
-    ]
+        PermissionActionEnum.READ,
+    ],
 )
 async def get_conversation(
     request: Request,
     tenant_id: str,
     conversation_id: str,
-    handler: ConversationHandler = Depends(get_conversation_handler)
+    handler: ConversationHandler = Depends(get_conversation_handler),
 ) -> ConversationResponse:
     """
     Get a specific conversation.
-    
+
     Args:
         request: FastAPI request with user in state
         tenant_id: Tenant ID from path
         conversation_id: Conversation ID from path
         handler: Conversation handler dependency
-        
+
     Returns:
         Conversation details
-        
+
     Raises:
         HTTPException: If conversation not found or access denied
     """
@@ -193,66 +192,53 @@ async def get_conversation(
         user: ContextIdentityUser = request.state.user
         logger.info(
             "API: Get conversation",
-            extra={
-                "tenant_id": tenant_id,
-                "conversation_id": conversation_id,
-                "user_id": user.identity.get_id()
-            }
+            extra={"tenant_id": tenant_id, "conversation_id": conversation_id, "user_id": user.identity.get_id()},
         )
-        return handler.get_conversation(
-            tenant_id=tenant_id,
-            conversation_id=conversation_id
-        )
+        return handler.get_conversation(tenant_id=tenant_id, conversation_id=conversation_id, user=user)
     except ConversationNotFoundError as e:
-        logger.warning(f"Conversation not found: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e)
-        )
+        logger.warning("Conversation not found: %s", e)
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
-        logger.error(f"Failed to get conversation: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to get conversation"
-        )
+        logger.error("Failed to get conversation: %s", e)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to get conversation")
 
 
 @router.patch(
     "/{conversation_id}",
     response_model=ConversationResponse,
     summary="Update conversation",
-    description="Update an existing conversation"
+    description="Update an existing conversation",
 )
-@authenticate
+@authenticate()
 @check_permissions(
     entity="conversation",
     required_permissions=[
-        TenantRolesEnum.GLOBAL_ADMIN,
+        TenantRolesEnum.TENANT_GLOBAL_ADMIN,
         TenantRolesEnum.CONVERSATIONS_ADMIN,
         PermissionActionEnum.ADMIN,
-        PermissionActionEnum.WRITE
-    ]
+        PermissionActionEnum.WRITE,
+    ],
 )
 async def update_conversation(
     request: Request,
     tenant_id: str,
     conversation_id: str,
     update_request: UpdateConversationRequest,
-    handler: ConversationHandler = Depends(get_conversation_handler)
+    handler: ConversationHandler = Depends(get_conversation_handler),
 ) -> ConversationResponse:
     """
     Update a conversation.
-    
+
     Args:
         request: FastAPI request with user in state
         tenant_id: Tenant ID from path
         conversation_id: Conversation ID from path
         update_request: Conversation update data
         handler: Conversation handler dependency
-        
+
     Returns:
         Updated conversation
-        
+
     Raises:
         HTTPException: If conversation not found or update fails
     """
@@ -260,29 +246,18 @@ async def update_conversation(
         user: ContextIdentityUser = request.state.user
         logger.info(
             "API: Update conversation",
-            extra={
-                "tenant_id": tenant_id,
-                "conversation_id": conversation_id,
-                "user_id": user.identity.get_id()
-            }
+            extra={"tenant_id": tenant_id, "conversation_id": conversation_id, "user_id": user.identity.get_id()},
         )
         return handler.update_conversation(
-            tenant_id=tenant_id,
-            conversation_id=conversation_id,
-            request=update_request,
-            user_id=user.identity.get_id()
+            tenant_id=tenant_id, conversation_id=conversation_id, request=update_request, user_id=user.identity.get_id()
         )
     except ConversationNotFoundError as e:
-        logger.warning(f"Conversation not found: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e)
-        )
+        logger.warning("Conversation not found: %s", e)
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
-        logger.error(f"Failed to update conversation: {e}")
+        logger.error("Failed to update conversation: %s", e)
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to update conversation: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to update conversation: {e!s}"
         )
 
 
@@ -290,35 +265,35 @@ async def update_conversation(
     "/{conversation_id}",
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Delete conversation",
-    description="Delete a conversation"
+    description="Delete a conversation",
 )
-@authenticate
+@authenticate()
 @check_permissions(
     entity="conversation",
     required_permissions=[
-        TenantRolesEnum.GLOBAL_ADMIN,
+        TenantRolesEnum.TENANT_GLOBAL_ADMIN,
         TenantRolesEnum.CONVERSATIONS_ADMIN,
-        PermissionActionEnum.ADMIN
-    ]
+        PermissionActionEnum.ADMIN,
+    ],
 )
 async def delete_conversation(
     request: Request,
     tenant_id: str,
     conversation_id: str,
-    handler: ConversationHandler = Depends(get_conversation_handler)
+    handler: ConversationHandler = Depends(get_conversation_handler),
 ) -> Response:
     """
     Delete a conversation.
-    
+
     Args:
         request: FastAPI request with user in state
         tenant_id: Tenant ID from path
         conversation_id: Conversation ID from path
         handler: Conversation handler dependency
-        
+
     Returns:
         No content (204)
-        
+
     Raises:
         HTTPException: If conversation not found or deletion fails
     """
@@ -326,49 +301,37 @@ async def delete_conversation(
         user: ContextIdentityUser = request.state.user
         logger.info(
             "API: Delete conversation",
-            extra={
-                "tenant_id": tenant_id,
-                "conversation_id": conversation_id,
-                "user_id": user.identity.get_id()
-            }
+            extra={"tenant_id": tenant_id, "conversation_id": conversation_id, "user_id": user.identity.get_id()},
         )
-        handler.delete_conversation(
-            tenant_id=tenant_id,
-            conversation_id=conversation_id
-        )
+        handler.delete_conversation(tenant_id=tenant_id, conversation_id=conversation_id)
         return Response(status_code=status.HTTP_204_NO_CONTENT)
     except ConversationNotFoundError as e:
-        logger.warning(f"Conversation not found: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e)
-        )
+        logger.warning("Conversation not found: %s", e)
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
-        logger.error(f"Failed to delete conversation: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to delete conversation"
-        )
+        logger.error("Failed to delete conversation: %s", e)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to delete conversation")
 
 
 # ========== Conversation Permission Endpoints ==========
+
 
 @router.get(
     "/{conversation_id}/principals",
     response_model=ResourcePrincipalsResponse,
     summary="List conversation permissions",
-    description="Get all principals with permissions for a conversation"
+    description="Get all principals with permissions for a conversation",
 )
-@authenticate
+@authenticate()
 @check_permissions(
     entity="conversation",
     required_permissions=[
-        TenantRolesEnum.GLOBAL_ADMIN,
+        TenantRolesEnum.TENANT_GLOBAL_ADMIN,
         TenantRolesEnum.CONVERSATIONS_ADMIN,
         PermissionActionEnum.ADMIN,
         PermissionActionEnum.WRITE,
-        PermissionActionEnum.READ
-    ]
+        PermissionActionEnum.READ,
+    ],
 )
 async def list_conversation_permissions(
     request: Request,
@@ -376,18 +339,18 @@ async def list_conversation_permissions(
     conversation_id: str,
     skip: int = Query(0, ge=0, description="Number of principals to skip"),
     limit: int = Query(100, ge=1, le=500, description="Maximum number of principals to return"),
-    search: Optional[str] = Query(None, description="Search term for display_name, principal_name, or mail"),
-    roles: Optional[str] = Query(None, description="Comma-separated roles to filter by (OR logic)"),
-    is_active: Optional[bool] = Query(None, description="Filter by is_active status"),
-    order_by: Optional[str] = Query(None, enum=["display_name"], description="Column to order by"),
-    order_direction: Optional[str] = Query("asc", enum=["asc", "desc"], description="Sort direction"),
-    handler: ConversationHandler = Depends(get_conversation_handler)
+    search: str | None = Query(None, description="Search term for display_name, principal_name, or mail"),
+    roles: str | None = Query(None, description="Comma-separated roles to filter by (OR logic)"),
+    is_active: bool | None = Query(None, description="Filter by is_active status"),
+    order_by: str | None = Query(None, enum=["display_name"], description="Column to order by"),
+    order_direction: str | None = Query("asc", enum=["asc", "desc"], description="Sort direction"),
+    handler: ConversationHandler = Depends(get_conversation_handler),
 ) -> ResourcePrincipalsResponse:
     """
     List all permissions for a conversation.
-    
+
     Requires ADMIN permission on the conversation or CONVERSATIONS_ADMIN on tenant.
-    
+
     Args:
         request: FastAPI request with user in state
         tenant_id: Tenant ID from path
@@ -400,7 +363,7 @@ async def list_conversation_permissions(
         order_by: Column to order by
         order_direction: Sort direction
         handler: Conversation handler dependency
-        
+
     Returns:
         Grouped principals with their permissions
     """
@@ -408,16 +371,12 @@ async def list_conversation_permissions(
         user: ContextIdentityUser = request.state.user
         logger.info(
             "API: List conversation permissions",
-            extra={
-                "tenant_id": tenant_id,
-                "conversation_id": conversation_id,
-                "user_id": user.identity.get_id()
-            }
+            extra={"tenant_id": tenant_id, "conversation_id": conversation_id, "user_id": user.identity.get_id()},
         )
-        
+
         # Parse comma-separated roles
         roles_list = [r.strip() for r in roles.split(",")] if roles else None
-        
+
         return handler.list_conversation_permissions(
             tenant_id=tenant_id,
             conversation_id=conversation_id,
@@ -427,19 +386,15 @@ async def list_conversation_permissions(
             roles=roles_list,
             is_active=is_active,
             order_by=order_by,
-            order_direction=order_direction
+            order_direction=order_direction,
         )
     except ConversationNotFoundError as e:
-        logger.warning(f"Conversation not found: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e)
-        )
+        logger.warning("Conversation not found: %s", e)
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
-        logger.error(f"Failed to list conversation permissions: {e}")
+        logger.error("Failed to list conversation permissions: %s", e)
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to list conversation permissions"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to list conversation permissions"
         )
 
 
@@ -447,38 +402,38 @@ async def list_conversation_permissions(
     "/{conversation_id}/principals/{principal_id}",
     response_model=PrincipalWithRolesResponse,
     summary="Get conversation permissions for principal",
-    description="Get all permissions for a specific principal on a conversation"
+    description="Get all permissions for a specific principal on a conversation",
 )
-@authenticate
+@authenticate()
 @check_permissions(
     entity="conversation",
     required_permissions=[
-        TenantRolesEnum.GLOBAL_ADMIN,
+        TenantRolesEnum.TENANT_GLOBAL_ADMIN,
         TenantRolesEnum.CONVERSATIONS_ADMIN,
         PermissionActionEnum.ADMIN,
         PermissionActionEnum.WRITE,
-        PermissionActionEnum.READ
-    ]
+        PermissionActionEnum.READ,
+    ],
 )
 async def get_conversation_permission(
     request: Request,
     tenant_id: str,
     conversation_id: str,
     principal_id: str,
-    handler: ConversationHandler = Depends(get_conversation_handler)
+    handler: ConversationHandler = Depends(get_conversation_handler),
 ) -> PrincipalWithRolesResponse:
     """
     Get all permissions for a specific principal on a conversation.
-    
+
     Requires ADMIN permission on the conversation or CONVERSATIONS_ADMIN on tenant.
-    
+
     Args:
         request: FastAPI request with user in state
         tenant_id: Tenant ID from path
         conversation_id: Conversation ID from path
         principal_id: Principal ID from path
         handler: Conversation handler dependency
-        
+
     Returns:
         Principal with all their permissions
     """
@@ -490,25 +445,19 @@ async def get_conversation_permission(
                 "tenant_id": tenant_id,
                 "conversation_id": conversation_id,
                 "principal_id": principal_id,
-                "user_id": user.identity.get_id()
-            }
+                "user_id": user.identity.get_id(),
+            },
         )
         return handler.get_conversation_permission(
-            tenant_id=tenant_id,
-            conversation_id=conversation_id,
-            principal_id=principal_id
+            tenant_id=tenant_id, conversation_id=conversation_id, principal_id=principal_id
         )
     except ConversationNotFoundError as e:
-        logger.warning(f"Permission not found: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e)
-        )
+        logger.warning("Permission not found: %s", e)
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
-        logger.error(f"Failed to get conversation permission: {e}")
+        logger.error("Failed to get conversation permission: %s", e)
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to get conversation permission"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to get conversation permission"
         )
 
 
@@ -516,36 +465,36 @@ async def get_conversation_permission(
     "/{conversation_id}/principals",
     response_model=PrincipalWithRolesResponse,
     summary="Set conversation permission",
-    description="Set or update a principal's permission for a conversation"
+    description="Set or update a principal's permission for a conversation",
 )
-@authenticate
+@authenticate()
 @check_permissions(
     entity="conversation",
     required_permissions=[
-        TenantRolesEnum.GLOBAL_ADMIN,
+        TenantRolesEnum.TENANT_GLOBAL_ADMIN,
         TenantRolesEnum.CONVERSATIONS_ADMIN,
-        PermissionActionEnum.ADMIN
-    ]
+        PermissionActionEnum.ADMIN,
+    ],
 )
 async def set_conversation_permission(
     request: Request,
     tenant_id: str,
     conversation_id: str,
-    permission_request: SetConversationPermissionRequest,
-    handler: ConversationHandler = Depends(get_conversation_handler)
+    permission_request: SetResourcePermissionRequest,
+    handler: ConversationHandler = Depends(get_conversation_handler),
 ) -> PrincipalWithRolesResponse:
     """
     Set or update a conversation permission.
-    
+
     Requires ADMIN permission on the conversation or CONVERSATIONS_ADMIN on tenant.
-    
+
     Args:
         request: FastAPI request with user in state
         tenant_id: Tenant ID from path
         conversation_id: Conversation ID from path
         permission_request: Permission data
         handler: Conversation handler dependency
-        
+
     Returns:
         Created or updated permission
     """
@@ -557,27 +506,23 @@ async def set_conversation_permission(
                 "tenant_id": tenant_id,
                 "conversation_id": conversation_id,
                 "principal_id": permission_request.principal_id,
-                "user_id": user.identity.get_id()
-            }
+                "user_id": user.identity.get_id(),
+            },
         )
         return handler.set_conversation_permission(
             tenant_id=tenant_id,
             conversation_id=conversation_id,
             request=permission_request,
             user_id=user.identity.get_id(),
-            user=user
+            user=user,
         )
     except ConversationNotFoundError as e:
-        logger.warning(f"Conversation not found: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e)
-        )
+        logger.warning("Conversation not found: %s", e)
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
-        logger.error(f"Failed to set conversation permission: {e}")
+        logger.error("Failed to set conversation permission: %s", e)
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to set conversation permission: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to set conversation permission: {e!s}"
         )
 
 
@@ -585,36 +530,36 @@ async def set_conversation_permission(
     "/{conversation_id}/principals",
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Delete conversation permission",
-    description="Remove a principal's permission for a conversation"
+    description="Remove a principal's permission for a conversation",
 )
-@authenticate
+@authenticate()
 @check_permissions(
     entity="conversation",
     required_permissions=[
-        TenantRolesEnum.GLOBAL_ADMIN,
+        TenantRolesEnum.TENANT_GLOBAL_ADMIN,
         TenantRolesEnum.CONVERSATIONS_ADMIN,
-        PermissionActionEnum.ADMIN
-    ]
+        PermissionActionEnum.ADMIN,
+    ],
 )
 async def delete_conversation_permission(
     request: Request,
     tenant_id: str,
     conversation_id: str,
-    delete_request: SetConversationPermissionRequest,
-    handler: ConversationHandler = Depends(get_conversation_handler)
+    delete_request: SetResourcePermissionRequest,
+    handler: ConversationHandler = Depends(get_conversation_handler),
 ) -> Response:
     """
     Delete a conversation permission.
-    
+
     Requires ADMIN permission on the conversation or CONVERSATIONS_ADMIN on tenant.
-    
+
     Args:
         request: FastAPI request with user in state
         tenant_id: Tenant ID from path
         conversation_id: Conversation ID from path
         delete_request: Permission deletion data (principal_id, principal_type, permission)
         handler: Conversation handler dependency
-        
+
     Returns:
         No content (204)
     """
@@ -626,26 +571,22 @@ async def delete_conversation_permission(
                 "tenant_id": tenant_id,
                 "conversation_id": conversation_id,
                 "principal_id": delete_request.principal_id,
-                "user_id": user.identity.get_id()
-            }
+                "user_id": user.identity.get_id(),
+            },
         )
         handler.delete_conversation_permission(
             tenant_id=tenant_id,
             conversation_id=conversation_id,
             principal_id=delete_request.principal_id,
             principal_type=delete_request.principal_type.value,
-            role=delete_request.role.value
+            role=delete_request.role.value,
         )
         return Response(status_code=status.HTTP_204_NO_CONTENT)
     except ConversationNotFoundError as e:
-        logger.warning(f"Permission not found: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e)
-        )
+        logger.warning("Permission not found: %s", e)
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
-        logger.error(f"Failed to delete conversation permission: {e}")
+        logger.error("Failed to delete conversation permission: %s", e)
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to delete conversation permission"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to delete conversation permission"
         )

@@ -2,18 +2,18 @@
 from abc import ABC, abstractmethod
 from typing import Any, Optional
 
-from unifiedui.core.database.collections.applications import BaseApplicationsCollectionClient
+from unifiedui.core.database.collections.chat_agents import BaseChatAgentsCollectionClient
 
 class BaseDatabaseClient(ABC):
     """Abstract base class for database clients."""
 
     @property
     @abstractmethod
-    def applications(self) -> BaseApplicationsCollectionClient:
-        """Access the applications collection client.
+    def chat_agents(self) -> BaseChatAgentsCollectionClient:
+        """Access the chat agents collection client.
 
         Returns:
-            BaseApplicationsCollectionClient: The applications collection client.
+            BaseChatAgentsCollectionClient: The chat agents collection client.
         """
         pass
 '''

@@ -1,0 +1,55 @@
+# Labels PRs based on files changed
+
+# API changes
+api:
+  - changed-files:
+    - any-glob-to-any-file: 'unifiedui/apis/**/*'
+
+# Handler changes
+handlers:
+  - changed-files:
+    - any-glob-to-any-file: 'unifiedui/handlers/**/*'
+
+# Database/Models
+database:
+  - changed-files:
+    - any-glob-to-any-file: 'unifiedui/core/database/**/*'
+    - any-glob-to-any-file: 'alembic/**/*'
+
+# Core changes
+core:
+  - changed-files:
+    - any-glob-to-any-file: 'unifiedui/core/**/*'
+
+# Schema changes
+schema:
+  - changed-files:
+    - any-glob-to-any-file: 'unifiedui/schema/**/*'
+
+# Tests
+tests:
+  - changed-files:
+    - any-glob-to-any-file: 'tests/**/*'
+
+# Documentation
+documentation:
+  - changed-files:
+    - any-glob-to-any-file: '**/*.md'
+
+# CI/CD
+ci:
+  - changed-files:
+    - any-glob-to-any-file: '.github/**/*'
+
+# Docker
+docker:
+  - changed-files:
+    - any-glob-to-any-file: 'docker/**/*'
+    - any-glob-to-any-file: '**/Dockerfile*'
+    - any-glob-to-any-file: '**/.dockerignore'
+
+# Dependencies
+dependencies:
+  - changed-files:
+    - any-glob-to-any-file: 'pyproject.toml'
+    - any-glob-to-any-file: 'uv.lock'

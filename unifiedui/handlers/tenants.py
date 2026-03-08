@@ -1,29 +1,26 @@
 """Business logic handlers for tenant operations using SQLAlchemy."""
+
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional, List
 import uuid
-from datetime import datetime
+from typing import TYPE_CHECKING
 
-from sqlalchemy import select, and_, or_, func
-from sqlalchemy.orm import Session
+from sqlalchemy import select
 
-from unifiedui.core.database.client import SQLAlchemyClient
-from unifiedui.core.database.models import Tenant, TenantMember, Principal, CustomGroupMember
-from unifiedui.schema.requests.tenants import CreateTenantRequest, UpdateTenantRequest
-from unifiedui.schema.responses.tenants import (
-    TenantResponse,
-    TenantPrincipalsResponse,
-    TenantPrincipalResponse,
-    TenantRoleDetailResponse,
-)
+from unifiedui.core.database.models import Principal, Tenant, TenantMember
+from unifiedui.exc.organizations import TenantCannotBeDeletedError
 from unifiedui.exc.tenants import TenantNotFoundError
-from unifiedui.caching.client import CacheClient
 from unifiedui.handlers.principals_helper import ensure_principal_exists
 from unifiedui.logger import get_logger
+from unifiedui.schema.responses.tenants import TenantResponse
 
 if TYPE_CHECKING:
+    from sqlalchemy.orm import Session
+
+    from unifiedui.caching.client import CacheClient
+    from unifiedui.core.database.client import SQLAlchemyClient
     from unifiedui.core.identity.users import ContextIdentityUser
+    from unifiedui.schema.requests.tenants import CreateTenantRequest, UpdateTenantRequest
 
 logger = get_logger(__name__)
 
@@ -31,10 +28,10 @@ logger = get_logger(__name__)
 class TenantHandler:
     """Handler class for tenant business logic using SQLAlchemy."""
 
-    def __init__(self, db_client: SQLAlchemyClient, cache_client: Optional[CacheClient] = None):
+    def __init__(self, db_client: SQLAlchemyClient, cache_client: CacheClient | None = None):
         """
         Initialize the tenant handler.
-        
+
         Args:
             db_client: SQLAlchemy database client instance
             cache_client: Optional cache client for Redis caching
@@ -46,14 +43,14 @@ class TenantHandler:
         self,
         skip: int = 0,
         limit: int = 100,
-        name_filter: Optional[str] = None,
-        order_by: Optional[str] = None,
-        order_direction: Optional[str] = None,
-        use_cache: bool = True
-    ) -> List[TenantResponse]:
+        name_filter: str | None = None,
+        order_by: str | None = None,
+        order_direction: str | None = None,
+        use_cache: bool = True,
+    ) -> list[TenantResponse]:
         """
         Get a list of tenants.
-        
+
         Args:
             skip: Number of items to skip
             limit: Maximum number of items to return
@@ -61,149 +58,145 @@ class TenantHandler:
             order_by: Optional column name to order by
             order_direction: Optional sort direction ('asc' or 'desc')
             use_cache: Whether to use caching (default: True)
-            
+
         Returns:
             List of tenant responses
         """
         logger.info("Listing tenants", extra={"skip": skip, "limit": limit, "name_filter": name_filter})
-        
+
         # Build cache key (without filters - caching only for unfiltered results)
         cache_key = f"tenants:list:skip:{skip}:limit:{limit}"
-        
+
         # Check if any filters are applied
         has_filters = name_filter is not None or order_by is not None
-        
+
         # Check cache (disable caching when any filters are applied)
         cached_data = self._get_from_cache(cache_key, use_cache and not has_filters)
         if cached_data is not None:
             return [TenantResponse(**item) for item in cached_data]
-        
+
         with self.db_client.get_session() as session:
             query = select(Tenant)
-            
+
             # Apply name filter if provided
             if name_filter:
                 query = query.where(Tenant.name.ilike(f"%{name_filter}%"))
-            
+
             # Apply ordering if specified
             if order_by and hasattr(Tenant, order_by):
                 column = getattr(Tenant, order_by)
-                if order_direction == "desc":
-                    query = query.order_by(column.desc())
-                else:
-                    query = query.order_by(column.asc())
-            
+                query = query.order_by(column.desc()) if order_direction == "desc" else query.order_by(column.asc())
+
             # Apply pagination
             query = query.offset(skip).limit(limit)
-            
+
             tenants = session.execute(query).scalars().all()
-            
+
             logger.info("Retrieved tenants", extra={"count": len(tenants)})
             result = [self._model_to_response(tenant) for tenant in tenants]
-            
+
             # Cache the result (only when no filters are applied)
             if not has_filters:
                 cache_data = [item.model_dump() for item in result]
                 self._set_to_cache(cache_key, cache_data, ttl=300)
-            
+
             return result
 
     def get_tenant(self, tenant_id: str, use_cache: bool = True) -> TenantResponse:
         """
         Get a specific tenant by ID.
-        
+
         Args:
             tenant_id: The ID of the tenant
             use_cache: Whether to use caching (default: True)
-            
+
         Returns:
             Tenant response
-            
+
         Raises:
             TenantNotFoundError: If tenant not found
         """
         logger.info("Fetching tenant", extra={"tenant_id": tenant_id})
-        
+
         # Build cache key
         cache_key = f"tenants:detail:{tenant_id}"
-        
+
         # Check cache
         cached_data = self._get_from_cache(cache_key, use_cache)
         if cached_data is not None:
             return TenantResponse(**cached_data)
-        
+
         with self.db_client.get_session() as session:
             tenant = self._validate_tenant_exists(session, tenant_id)
-            
+
             logger.info("Tenant retrieved", extra={"tenant_id": tenant_id})
             result = self._model_to_response(tenant)
-            
+
             # Cache the result
             self._set_to_cache(cache_key, result.model_dump(), ttl=600)
-            
+
             return result
 
-    def create_tenant(
-        self,
-        request: CreateTenantRequest,
-        user_id: str,
-        user: ContextIdentityUser
-    ) -> TenantResponse:
+    def create_tenant(self, request: CreateTenantRequest, user_id: str, user: ContextIdentityUser) -> TenantResponse:
         """
-        Create a new tenant and assign the creator as GLOBAL_ADMIN.
-        
+        Create a new tenant and assign the creator as TENANT_GLOBAL_ADMIN.
+
+        Resolves the organization from the user's identity context.
+        The tenant is created within the user's organization.
+
         Args:
             request: Tenant creation data
             user_id: ID of the user creating the tenant (principal_id)
             user: The authenticated user context (for IDP access)
-            
+
         Returns:
             Created tenant response
+
+        Raises:
+            TenantNotFoundError: If no organization found for the user's IDP tenant.
         """
         logger.info("Creating tenant", extra={"tenant_name": request.name, "user_id": user_id})
-        
+
+        organization_id = self._resolve_user_organization_id(user)
+
         tenant_id = str(uuid.uuid4())
-        
+
         with self.db_client.get_session() as session:
-            # Create tenant
             tenant = Tenant(
                 id=tenant_id,
                 name=request.name,
                 description=request.description,
+                organization_id=organization_id,
                 created_by=user_id,
-                updated_by=user_id
+                updated_by=user_id,
             )
             session.add(tenant)
-            session.flush()  # Flush to get the tenant ID for the member
-            
+            session.flush()
+
             # Ensure principal exists (fetches from IDP if needed)
             ensure_principal_exists(
-                session=session,
-                tenant_id=tenant_id,
-                principal_id=user_id,
-                principal_type="IDENTITY_USER",
-                user=user
+                session=session, tenant_id=tenant_id, principal_id=user_id, principal_type="IDENTITY_USER", user=user
             )
-            
-            # Create GLOBAL_ADMIN role for the creator
+
+            # Create TENANT_GLOBAL_ADMIN role for the creator
             role_id = str(uuid.uuid4())
             tenant_role = TenantMember(
                 id=role_id,
                 tenant_id=tenant_id,
                 principal_id=user_id,
-                role="GLOBAL_ADMIN",
+                role="TENANT_GLOBAL_ADMIN",
                 created_by=user_id,
-                updated_by=user_id
+                updated_by=user_id,
             )
             session.add(tenant_role)
             session.flush()
-            
+
             # Commit happens automatically in context manager
             logger.info(
-                "Tenant created with GLOBAL_ADMIN role",
-                extra={"tenant_id": tenant_id, "user_id": user_id, "role_id": role_id}
+                "Tenant created with TENANT_GLOBAL_ADMIN role",
+                extra={"tenant_id": tenant_id, "user_id": user_id, "role_id": role_id},
             )
-            
+
             # Invalidate caches
             if self.cache_client:
                 try:
@@ -211,53 +204,48 @@ class TenantHandler:
                     self.cache_client.invalidate_tenant_list_cache()
                     # Clear user cache since permissions changed
                     self.cache_client.clear_cache_for_user(user_id)
-                    logger.debug(f"Invalidated tenant list cache and user cache for {user_id}")
+                    logger.debug("Invalidated tenant list cache and user cache for %s", user_id)
                 except Exception as e:
-                    logger.warning(f"Failed to invalidate cache: {e}")
-            
+                    logger.warning("Failed to invalidate cache: %s", e)
+
             return self._model_to_response(tenant)
 
-    def update_tenant(
-        self,
-        tenant_id: str,
-        request: UpdateTenantRequest,
-        user_id: str
-    ) -> TenantResponse:
+    def update_tenant(self, tenant_id: str, request: UpdateTenantRequest, user_id: str) -> TenantResponse:
         """
         Update an existing tenant.
-        
+
         Args:
             tenant_id: The ID of the tenant to update
             request: Tenant update data
             user_id: ID of the user updating the tenant
-            
+
         Returns:
             Updated tenant response
-            
+
         Raises:
             TenantNotFoundError: If tenant not found
         """
         logger.info("Updating tenant", extra={"tenant_id": tenant_id, "user_id": user_id})
-        
+
         with self.db_client.get_session() as session:
             tenant = session.get(Tenant, tenant_id)
-            
+
             if not tenant:
                 logger.warning("Tenant not found for update", extra={"tenant_id": tenant_id})
                 raise TenantNotFoundError(tenant_id)
-            
+
             # Update fields if provided
             if request.name is not None:
                 tenant.name = request.name
             if request.description is not None:
                 tenant.description = request.description
-            
+
             # Set updated_by
             tenant.updated_by = user_id
-            
+
             # Commit happens automatically in context manager
             logger.info("Tenant updated", extra={"tenant_id": tenant_id, "user_id": user_id})
-            
+
             # Invalidate caches
             if self.cache_client:
                 try:
@@ -265,34 +253,39 @@ class TenantHandler:
                     self.cache_client.invalidate_tenant_list_cache()
                     # Invalidate specific tenant cache
                     self.cache_client.invalidate_tenant_cache(tenant_id)
-                    logger.debug(f"Invalidated caches for tenant {tenant_id}")
+                    logger.debug("Invalidated caches for tenant %s", tenant_id)
                 except Exception as e:
-                    logger.warning(f"Failed to invalidate cache: {e}")
-            
+                    logger.warning("Failed to invalidate cache: %s", e)
+
             return self._model_to_response(tenant)
 
     def delete_tenant(self, tenant_id: str) -> None:
         """
         Delete a tenant by ID.
-        
+
         Args:
             tenant_id: The ID of the tenant to delete
-            
+
         Raises:
             TenantNotFoundError: If tenant not found
+            TenantCannotBeDeletedError: If tenant has can_be_deleted=False
         """
         logger.info("Deleting tenant", extra={"tenant_id": tenant_id})
-        
+
         with self.db_client.get_session() as session:
             tenant = session.get(Tenant, tenant_id)
-            
+
             if not tenant:
                 logger.warning("Tenant not found for deletion", extra={"tenant_id": tenant_id})
                 raise TenantNotFoundError(tenant_id)
-            
+
+            if not tenant.can_be_deleted:
+                logger.warning("Tenant cannot be deleted", extra={"tenant_id": tenant_id})
+                raise TenantCannotBeDeletedError(tenant_id)
+
             session.delete(tenant)
             # Commit happens automatically in context manager
-            
+
             # Invalidate caches
             if self.cache_client:
                 try:
@@ -303,28 +296,24 @@ class TenantHandler:
                     # Clear all user caches (all users who had access to this tenant)
                     pattern = "tenants:user:*:with_permissions"
                     self.cache_client.client.delete_pattern(pattern)
-                    logger.debug(f"Invalidated caches for deleted tenant {tenant_id}")
+                    logger.debug("Invalidated caches for deleted tenant %s", tenant_id)
                 except Exception as e:
-                    logger.warning(f"Failed to invalidate cache: {e}")
-            
+                    logger.warning("Failed to invalidate cache: %s", e)
+
             logger.info("Tenant deleted", extra={"tenant_id": tenant_id})
-    
+
     def get_user_tenants_with_permissions(
-        self,
-        user_id: str,
-        identity_group_ids: List[str],
-        custom_group_ids: List[str],
-        use_cache: bool = True
-    ) -> List[dict]:
+        self, user_id: str, identity_group_ids: list[str], custom_group_ids: list[str], use_cache: bool = True
+    ) -> list[dict]:
         """
         Get all tenants and permissions for a user based on their user ID, identity groups, and custom groups.
-        
+
         Args:
             user_id: The identity user ID
             identity_group_ids: List of identity group IDs the user belongs to
             custom_group_ids: List of custom group IDs the user belongs to
             use_cache: Whether to use caching (default: True)
-            
+
         Returns:
             List of dicts with 'tenant' and 'permissions' keys, where permissions are deduplicated
         """
@@ -333,25 +322,25 @@ class TenantHandler:
             extra={
                 "user_id": user_id,
                 "identity_groups_count": len(identity_group_ids),
-                "custom_groups_count": len(custom_group_ids)
-            }
+                "custom_groups_count": len(custom_group_ids),
+            },
         )
-        
+
         cache_key = f"tenants:user:{user_id}:with_permissions"
-        
+
         # Check cache
         cached_data = self._get_from_cache(cache_key, use_cache)
         if cached_data is not None:
             return cached_data
-        
+
         with self.db_client.get_session() as session:
             # Build conditions for all principal IDs
             # We now use the Principal table via JOIN to filter by principal_type
-            all_principal_ids = [user_id] + identity_group_ids + custom_group_ids
-            
+            all_principal_ids = [user_id, *identity_group_ids, *custom_group_ids]
+
             if not all_principal_ids:
                 return []
-            
+
             # Query to get all tenant member roles
             # TenantMember now directly references tenant and principal
             query = (
@@ -360,49 +349,45 @@ class TenantHandler:
                 .where(TenantMember.principal_id.in_(all_principal_ids))
                 .order_by(Tenant.name, TenantMember.role)
             )
-            
+
             results = session.execute(query).all()
-            
+
             # Group by tenant and deduplicate roles
             tenants_dict = {}
             for tenant, role in results:
                 if tenant.id not in tenants_dict:
                     tenants_dict[tenant.id] = {
                         "tenant": tenant,
-                        "roles": set()  # Use set for deduplication
+                        "roles": set(),  # Use set for deduplication
                     }
                 # Add role to set (automatically deduplicates)
                 tenants_dict[tenant.id]["roles"].add(role.role)
-            
+
             # Convert to response format
             response = []
             for tenant_data in tenants_dict.values():
                 tenant_response = self._model_to_response(tenant_data["tenant"])
                 # Convert set of permissions to sorted list
                 roles_list = sorted(list(tenant_data["roles"]))
-                response.append({
-                    "tenant": tenant_response.model_dump(),
-                    "roles": roles_list
-                })
-            
+                response.append({"tenant": tenant_response.model_dump(), "roles": roles_list})
+
             logger.info(
-                "Retrieved user tenants with permissions",
-                extra={"user_id": user_id, "tenant_count": len(response)}
+                "Retrieved user tenants with permissions", extra={"user_id": user_id, "tenant_count": len(response)}
             )
-            
+
             # Cache the result
             self._set_to_cache(cache_key, response, ttl=300)
-            
+
             return response
-    
+
     @staticmethod
     def _model_to_response(tenant: Tenant) -> TenantResponse:
         """
         Convert a tenant model to a response object.
-        
+
         Args:
             tenant: Tenant SQLAlchemy model
-            
+
         Returns:
             Tenant response
         """
@@ -410,419 +395,41 @@ class TenantHandler:
             id=tenant.id,
             name=tenant.name,
             description=tenant.description,
+            organization_id=tenant.organization_id,
+            environment_type=tenant.environment_type,
+            is_default=tenant.is_default,
+            can_be_deleted=tenant.can_be_deleted,
             created_at=tenant.created_at,
             updated_at=tenant.updated_at,
             created_by=tenant.created_by,
-            updated_by=tenant.updated_by
+            updated_by=tenant.updated_by,
         )
-    
-    def list_tenant_principals(
-        self,
-        tenant_id: str,
-        skip: int = 0,
-        limit: int = 100,
-        search: Optional[str] = None,
-        roles: Optional[List[str]] = None,
-        is_active: Optional[bool] = None,
-        order_by: Optional[str] = None,
-        order_direction: Optional[str] = "asc"
-    ) -> TenantPrincipalsResponse:
-        """
-        Get all principals and their roles for a specific tenant.
-        
+
+    def _resolve_user_organization_id(self, user: ContextIdentityUser) -> str:
+        """Resolve the organization ID for the authenticated user.
+
         Args:
-            tenant_id: The ID of the tenant
-            skip: Number of principals to skip (for pagination)
-            limit: Maximum number of principals to return
-            search: Search term for display_name, principal_name, or mail
-            roles: List of roles to filter by (OR logic)
-            is_active: Filter by principal's active status
-            order_by: Column to order by (currently only 'display_name')
-            order_direction: Sort direction ('asc' or 'desc')
-            
+            user: The authenticated user context.
+
         Returns:
-            TenantPrincipalsResponse with tenant_id and list of principals with their roles
-            
+            The organization ID.
+
         Raises:
-            TenantNotFoundError: If tenant not found
+            TenantNotFoundError: If no organization exists for the user's IDP tenant.
         """
-        logger.info("Listing all principals for tenant", extra={"tenant_id": tenant_id})
-        
-        with self.db_client.get_session() as session:
-            # Check if tenant exists
-            tenant = session.get(Tenant, tenant_id)
-            if not tenant:
-                logger.warning("Tenant not found", extra={"tenant_id": tenant_id})
-                raise TenantNotFoundError(tenant_id)
-            
-            # Build base query joining TenantMember with Principal
-            query = (
-                select(TenantMember, Principal)
-                .join(
-                    Principal,
-                    and_(
-                        TenantMember.tenant_id == Principal.tenant_id,
-                        TenantMember.principal_id == Principal.principal_id
-                    )
-                )
-                .where(TenantMember.tenant_id == tenant_id)
-            )
-            
-            # Apply role filter (filter members with matching roles)
-            if roles:
-                query = query.where(TenantMember.role.in_(roles))
-            
-            # Apply is_active filter
-            if is_active is not None:
-                query = query.where(Principal.is_active == is_active)
-            
-            # Apply search filter (case-insensitive)
-            if search:
-                search_term = f"%{search.lower()}%"
-                query = query.where(
-                    or_(
-                        func.lower(Principal.display_name).like(search_term),
-                        func.lower(Principal.principal_name).like(search_term),
-                        func.lower(Principal.mail).like(search_term)
-                    )
-                )
-            
-            # Execute query
-            results = session.execute(query).all()
-            
-            # Group roles by principal_id
-            principals_dict: dict = {}
-            for member, principal in results:
-                if member.principal_id not in principals_dict:
-                    principals_dict[member.principal_id] = {
-                        "principal_id": member.principal_id,
-                        "principal_type": principal.principal_type,
-                        "display_name": principal.display_name,
-                        "principal_name": principal.principal_name,
-                        "mail": principal.mail,
-                        "description": principal.description,
-                        "is_active": principal.is_active,
-                        "roles": []
-                    }
-                # Append role with details
-                principals_dict[member.principal_id]["roles"].append(
-                    TenantRoleDetailResponse(
-                        role=member.role,
-                        display_name=self._get_role_display_name(member.role),
-                        created_at=member.created_at
-                    )
-                )
-            
-            # Convert to list of TenantPrincipalResponse
-            principals = [
-                TenantPrincipalResponse(**data) for data in principals_dict.values()
-            ]
-            
-            # Apply sorting
-            if order_by == "display_name":
-                reverse = order_direction == "desc"
-                principals.sort(
-                    key=lambda p: (p.display_name or "").lower(),
-                    reverse=reverse
-                )
-            else:
-                # Default: sort by display_name ascending
-                principals.sort(key=lambda p: (p.display_name or "").lower())
-            
-            # Apply pagination after grouping
-            paginated_principals = principals[skip:skip + limit]
-            
-            logger.info(
-                "Retrieved tenant principals",
-                extra={"tenant_id": tenant_id, "principal_count": len(paginated_principals), "total": len(principals)}
-            )
-            
-            return TenantPrincipalsResponse(
-                tenant_id=tenant_id,
-                principals=paginated_principals
-            )
-    
-    def _get_role_display_name(self, role: str) -> str:
-        """Get a human-readable display name for a role."""
-        role_display_names = {
-            "GLOBAL_ADMIN": "Global Administrator",
-            "READER": "Reader",
-            "CUSTOM_GROUPS_ADMIN": "Custom Groups Administrator",
-            "CUSTOM_GROUP_CREATOR": "Custom Group Creator",
-            "APPLICATIONS_ADMIN": "Applications Administrator",
-            "APPLICATIONS_CREATOR": "Application Creator",
-            "CREDENTIALS_ADMIN": "Credentials Administrator",
-            "CREDENTIALS_CREATOR": "Credential Creator",
-            "CONVERSATIONS_ADMIN": "Conversations Administrator",
-            "CONVERSATIONS_CREATOR": "Conversation Creator",
-            "AUTONOMOUS_AGENTS_ADMIN": "Autonomous Agents Administrator",
-            "AUTONOMOUS_AGENTS_CREATOR": "Autonomous Agent Creator",
-            "DEVELOPMENT_PLATFORMS_ADMIN": "Development Platforms Administrator",
-            "DEVELOPMENT_PLATFORMS_CREATOR": "Development Platform Creator",
-            "CHAT_WIDGETS_ADMIN": "Chat Widgets Administrator",
-            "CHAT_WIDGETS_CREATOR": "Chat Widget Creator",
-        }
-        return role_display_names.get(role, role.replace("_", " ").title())
-    
-    def get_principal_permissions(
-        self,
-        tenant_id: str,
-        principal_id: str
-    ) -> dict:
-        """
-        Get all permissions for a specific principal on a tenant.
-        
-        Args:
-            tenant_id: The ID of the tenant
-            principal_id: The ID of the principal
-            
-        Returns:
-            Dict with tenant_id, principal_id, and roles list
-            
-        Raises:
-            TenantNotFoundError: If tenant not found
-        """
-        logger.info(
-            "Getting principal roles",
-            extra={"tenant_id": tenant_id, "principal_id": principal_id}
-        )
-        
-        with self.db_client.get_session() as session:
-            # Check if tenant exists
-            tenant = session.get(Tenant, tenant_id)
-            if not tenant:
-                logger.warning("Tenant not found", extra={"tenant_id": tenant_id})
-                raise TenantNotFoundError(tenant_id)
-            
-            # Query member roles, joining with Principal to get principal_type
-            query = (
-                select(TenantMember, Principal)
-                .join(
-                    Principal,
-                    and_(
-                        TenantMember.tenant_id == Principal.tenant_id,
-                        TenantMember.principal_id == Principal.principal_id
-                    )
-                )
-                .where(
-                    TenantMember.tenant_id == tenant_id,
-                    TenantMember.principal_id == principal_id
-                )
-            )
-            
-            results = session.execute(query).all()
-            
-            # Extract principal_type and is_active from first result's Principal (all should have same type)
-            principal_type = results[0][1].principal_type if results else None
-            is_active = results[0][1].is_active if results else True
-            # Extract just the role strings
-            roles = [role.role for role, principal in results]
-            
-            logger.info(
-                "Retrieved principal permissions",
-                extra={"tenant_id": tenant_id, "principal_id": principal_id, "permission_count": len(roles)}
-            )
-            
-            return {
-                "tenant_id": tenant_id,
-                "principal_id": principal_id,
-                "principal_type": principal_type,
-                "is_active": is_active,
-                "roles": roles
-            }
-    
-    def set_principal_permission(
-        self,
-        tenant_id: str,
-        principal_id: str,
-        principal_type: str,
-        permission: str,
-        user_id: str,
-        user: ContextIdentityUser
-    ) -> dict:
-        """
-        Add or update a permission for a principal on a tenant.
-        
-        Args:
-            tenant_id: The ID of the tenant
-            principal_id: The ID of the principal
-            principal_type: The type of principal (IDENTITY_USER, IDENTITY_GROUP, CUSTOM_GROUP)
-            permission: The permission to assign
-            user_id: The ID of the user making the change
-            
-        Returns:
-            Dict with tenant_id, principal_id, and updated roles list
-            
-        Raises:
-            TenantNotFoundError: If tenant not found
-        """
-        logger.info(
-            "Setting principal permission",
-            extra={"tenant_id": tenant_id, "principal_id": principal_id, "principal_type": principal_type, "permission": permission, "user_id": user_id}
-        )
-        
-        with self.db_client.get_session() as session:
-            # Check if tenant exists
-            self._validate_tenant_exists(session, tenant_id)
-            
-            # Ensure principal exists (fetches from IDP if needed)
-            ensure_principal_exists(
-                session=session,
-                tenant_id=tenant_id,
-                principal_id=principal_id,
-                principal_type=principal_type,
-                user=user
-            )
-            
-            # Check if role already exists for this principal
-            role_query = (
-                select(TenantMember)
-                .where(
-                    TenantMember.tenant_id == tenant_id,
-                    TenantMember.principal_id == principal_id,
-                    TenantMember.role == permission
-                )
-            )
-            existing_role = session.execute(role_query).scalar_one_or_none()
-            
-            if not existing_role:
-                # Create new role
-                role_id = str(uuid.uuid4())
-                role = TenantMember(
-                    id=role_id,
-                    tenant_id=tenant_id,
-                    principal_id=principal_id,
-                    role=permission,
-                    created_by=user_id,
-                    updated_by=user_id
-                )
-                session.add(role)
-                session.flush()
-                logger.info(
-                    "Created new tenant member role",
-                    extra={"tenant_id": tenant_id, "principal_id": principal_id, "role_id": role_id, "role": permission}
-                )
-            else:
-                logger.info(
-                    "Role already exists for this principal",
-                    extra={"tenant_id": tenant_id, "principal_id": principal_id, "role": permission}
-                )
-            
-            # Commit the changes before invalidating cache
-            session.commit()
-            
-            # Invalidate cache for affected users
-            self._invalidate_cache_for_principal(session, principal_id, principal_type, user_id)
-            
-            # Get all roles for this principal
-            query = (
-                select(TenantMember)
-                .where(
-                    TenantMember.tenant_id == tenant_id,
-                    TenantMember.principal_id == principal_id
-                )
-                .order_by(TenantMember.role)
-            )
-            results = session.execute(query).all()
-            
-            # Extract just the role strings
-            roles = [role[0].role for role in results]
-            
-            return {
-                "tenant_id": tenant_id,
-                "principal_id": principal_id,
-                "principal_type": principal_type,
-                "roles": roles
-            }
-    
-    def delete_principal_permission(
-        self,
-        tenant_id: str,
-        principal_id: str,
-        principal_type: str,
-        permission: str
-    ) -> dict:
-        """
-        Remove a specific permission from a principal on a tenant.
-        
-        Args:
-            tenant_id: The ID of the tenant
-            principal_id: The ID of the principal
-            principal_type: The type of principal (IDENTITY_USER, IDENTITY_GROUP, CUSTOM_GROUP)
-            permission: The permission to remove
-            
-        Returns:
-            Dict with tenant_id, principal_id, and remaining roles list
-            
-        Raises:
-            TenantNotFoundError: If tenant not found
-        """
-        logger.info(
-            "Deleting principal permission",
-            extra={"tenant_id": tenant_id, "principal_id": principal_id, "principal_type": principal_type, "permission": permission}
-        )
-        
-        with self.db_client.get_session() as session:
-            # Check if tenant exists
-            self._validate_tenant_exists(session, tenant_id)
-            
-            # Find and delete the specific role
-            role_query = (
-                select(TenantMember)
-                .where(
-                    TenantMember.tenant_id == tenant_id,
-                    TenantMember.principal_id == principal_id,
-                    TenantMember.role == permission
-                )
-            )
-            role = session.execute(role_query).scalar_one_or_none()
-            
-            if role:
-                session.delete(role)
-                logger.info(
-                    "Deleted principal role",
-                    extra={"tenant_id": tenant_id, "principal_id": principal_id, "principal_type": principal_type, "role": permission}
-                )
-            else:
-                logger.info(
-                    "Role not found, nothing to delete",
-                    extra={"tenant_id": tenant_id, "principal_id": principal_id, "principal_type": principal_type, "role": permission}
-                )
-            
-            session.flush()
-            
-            # Invalidate cache for affected users (uses admin user_id=None for tracking)
-            self._invalidate_cache_for_principal(session, principal_id, principal_type, "")
-            
-            # Get remaining roles for this principal
-            query = (
-                select(TenantMember)
-                .where(
-                    TenantMember.tenant_id == tenant_id,
-                    TenantMember.principal_id == principal_id
-                )
-                .order_by(TenantMember.role)
-            )
-            remaining_results = session.execute(query).all()
-            
-            # Extract just the role strings
-            roles = [role[0].role for role in remaining_results]
-            
-            return {
-                "tenant_id": tenant_id,
-                "principal_id": principal_id,
-                "principal_type": principal_type,
-                "roles": roles
-            }
-    
+        org_context = user.organization_context
+        if org_context is None:
+            raise TenantNotFoundError("No organization found for user")
+        return org_context.id
+
     def _get_from_cache(self, cache_key: str, use_cache: bool = True):
         """
         Get data from cache if available.
-        
+
         Args:
             cache_key: Cache key to retrieve
             use_cache: Whether to use cache
-            
+
         Returns:
             Cached data or None
         """
@@ -830,16 +437,16 @@ class TenantHandler:
             try:
                 cached_data = self.cache_client.client.get(cache_key)
                 if cached_data is not None:
-                    logger.debug(f"Cache hit: {cache_key}")
+                    logger.debug("Cache hit: %s", cache_key)
                     return cached_data
             except Exception as e:
-                logger.warning(f"Failed to get from cache {cache_key}: {e}")
+                logger.warning("Failed to get from cache %s: %s", cache_key, e)
         return None
-    
+
     def _set_to_cache(self, cache_key: str, data, ttl: int = 300):
         """
         Set data to cache.
-        
+
         Args:
             cache_key: Cache key to set
             data: Data to cache
@@ -848,21 +455,21 @@ class TenantHandler:
         if self.cache_client:
             try:
                 self.cache_client.client.set(cache_key, data, ttl=ttl)
-                logger.debug(f"Cached: {cache_key} (TTL: {ttl}s)")
+                logger.debug("Cached: %s (TTL: %ss)", cache_key, ttl)
             except Exception as e:
-                logger.warning(f"Failed to cache {cache_key}: {e}")
-    
+                logger.warning("Failed to cache %s: %s", cache_key, e)
+
     def _validate_tenant_exists(self, session: Session, tenant_id: str) -> Tenant:
         """
         Validate that a tenant exists.
-        
+
         Args:
             session: Database session
             tenant_id: ID of the tenant
-            
+
         Returns:
             Tenant model
-            
+
         Raises:
             TenantNotFoundError: If tenant not found
         """
@@ -871,76 +478,21 @@ class TenantHandler:
             logger.warning("Tenant not found", extra={"tenant_id": tenant_id})
             raise TenantNotFoundError(tenant_id)
         return tenant
-    
-    def _invalidate_cache_for_principal(self, session: Session, principal_id: str, principal_type: str, user_id: str):
-        """
-        Invalidate cache for affected users based on principal type.
-        
-        Args:
-            session: Database session
-            principal_id: ID of the principal
-            principal_type: Type of principal (IDENTITY_USER, CUSTOM_GROUP, IDENTITY_GROUP)
-            user_id: ID of the user making the change
-        """
-        if not self.cache_client:
-            return
-        
-        try:
-            users_to_invalidate = []
-            
-            if principal_type == "IDENTITY_USER":
-                # Direct user - invalidate their cache
-                users_to_invalidate.append(principal_id)
-            elif principal_type == "CUSTOM_GROUP":
-                # Custom group - invalidate cache for all group members who are users
-                member_query = (
-                    select(CustomGroupMember.principal_id)
-                    .join(Principal, and_(
-                        CustomGroupMember.tenant_id == Principal.tenant_id,
-                        CustomGroupMember.principal_id == Principal.principal_id
-                    ))
-                    .where(
-                        CustomGroupMember.custom_group_id == principal_id,
-                        Principal.principal_type == "IDENTITY_USER"
-                    )
-                )
-                members = session.execute(member_query).scalars().all()
-                users_to_invalidate.extend(members)
-                logger.debug(f"Found {len(members)} users in custom group {principal_id} to invalidate")
-            elif principal_type == "IDENTITY_GROUP":
-                # Identity group - invalidate all group and permission caches
-                pattern = "identity:groups:user:*"
-                self.cache_client.client.delete_pattern(pattern)
-                pattern = "tenants:user:*:with_permissions"
-                self.cache_client.client.delete_pattern(pattern)
-                logger.debug(f"Cleared identity group cache patterns for group {principal_id}")
-            
-            # Invalidate cache for each affected user
-            for user_id_to_clear in users_to_invalidate:
-                deleted_count = self.cache_client.clear_cache_for_user(user_id_to_clear)
-                logger.debug(f"Cleared {deleted_count} cache entries for user {user_id_to_clear}")
-            
-            # Also clear cache for the user making the change
-            self.cache_client.clear_cache_for_user(user_id)
-            
-            # Invalidate tenant list caches
-            self.cache_client.invalidate_tenant_list_cache()
-        except Exception as e:
-            logger.warning(f"Failed to clear user cache: {e}")
-    
+
     @staticmethod
     def _role_to_response(role: TenantMember, principal: Principal):
         """
         Convert a tenant member role to a role response object.
-        
+
         Args:
             role: TenantMember SQLAlchemy model
             principal: Principal SQLAlchemy model
-            
+
         Returns:
             TenantRoleResponse
         """
         from unifiedui.schema.responses.tenants import TenantRoleResponse
+
         # Generate a human-readable name from the role value
         role_name = role.role.replace("_", " ").title() if role.role else None
         return TenantRoleResponse(
@@ -949,5 +501,5 @@ class TenantHandler:
             role=role.role,
             name=role_name,
             description=None,
-            created_at=role.created_at
+            created_at=role.created_at,
         )

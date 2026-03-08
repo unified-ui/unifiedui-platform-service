@@ -1,24 +1,18 @@
 """Tenants API endpoints."""
-from typing import Optional
-from fastapi import APIRouter, status, Query, Depends, Request
 
-from unifiedui.handlers.tenants import TenantHandler
-from unifiedui.handlers.dependencies import get_tenant_handler
+from typing import TYPE_CHECKING
+
+from fastapi import APIRouter, Depends, Query, Request, status
+
+from unifiedui.core.database.enums import OrderDirectionEnum, TenantRolesEnum
 from unifiedui.core.middleware.apis.v1.auth import authenticate, check_permissions
-from unifiedui.core.identity.users import ContextIdentityUser
-from unifiedui.core.database.enums import TenantRolesEnum, OrderDirectionEnum
-from unifiedui.schema.requests.tenants import (
-    CreateTenantRequest,
-    UpdateTenantRequest,
-    SetPrincipalRequest,
-    DeletePrincipalRequest
-)
-from unifiedui.schema.responses.tenants import (
-    TenantResponse,
-    PrincipalsResponse,
-    TenantPrincipalsResponse
-)
+from unifiedui.handlers.dependencies import get_tenant_handler
+from unifiedui.handlers.tenants import TenantHandler
+from unifiedui.schema.requests.tenants import CreateTenantRequest, UpdateTenantRequest
+from unifiedui.schema.responses.tenants import TenantResponse
 
+if TYPE_CHECKING:
+    from unifiedui.core.identity.users import ContextIdentityUser
 
 router = APIRouter()
 
@@ -28,28 +22,30 @@ router = APIRouter()
     response_model=list[TenantResponse],
     status_code=status.HTTP_200_OK,
     summary="List Tenants",
-    description="Get a paginated list of tenants"
+    description="Get a paginated list of tenants",
 )
-@authenticate
+@authenticate()
 async def list_tenants(
     request: Request,
     skip: int = Query(0, ge=0, description="Number of items to skip"),
     limit: int = Query(100, ge=1, le=1000, description="Maximum number of items to return"),
-    name: Optional[str] = Query(None, description="Filter by tenant name"),
-    order_by: Optional[str] = Query(None, description="Column name to order by (e.g., 'name', 'created_at', 'updated_at')"),
-    order_direction: Optional[OrderDirectionEnum] = Query(None, description="Sort direction: 'asc' or 'desc'"),
-    handler: TenantHandler = Depends(get_tenant_handler)
+    name: str | None = Query(None, description="Filter by tenant name"),
+    order_by: str | None = Query(
+        None, description="Column name to order by (e.g., 'name', 'created_at', 'updated_at')"
+    ),
+    order_direction: OrderDirectionEnum | None = Query(None, description="Sort direction: 'asc' or 'desc'"),
+    handler: TenantHandler = Depends(get_tenant_handler),
 ) -> list[TenantResponse]:
     """
     Get a paginated list of tenants.
-    
+
     Args:
         request: FastAPI request object
         skip: Number of items to skip (for pagination)
         limit: Maximum number of items to return
         name: Optional filter by tenant name
         handler: Tenant handler dependency
-    
+
     Returns:
         list[TenantResponse]: List of tenants
     """
@@ -58,7 +54,7 @@ async def list_tenants(
         limit=limit,
         name_filter=name,
         order_by=order_by,
-        order_direction=order_direction.value if order_direction else None
+        order_direction=order_direction.value if order_direction else None,
     )
 
 
@@ -67,25 +63,23 @@ async def list_tenants(
     response_model=TenantResponse,
     status_code=status.HTTP_200_OK,
     summary="Get Tenant",
-    description="Get a specific tenant by ID"
+    description="Get a specific tenant by ID",
 )
-@authenticate
+@authenticate()
 async def get_tenant(
-    request: Request,
-    tenant_id: str,
-    handler: TenantHandler = Depends(get_tenant_handler)
+    request: Request, tenant_id: str, handler: TenantHandler = Depends(get_tenant_handler)
 ) -> TenantResponse:
     """
     Get a specific tenant by ID.
-    
+
     Args:
         request: FastAPI request object
         tenant_id: The ID of the tenant to retrieve
         handler: Tenant handler dependency
-    
+
     Returns:
         TenantResponse: The tenant information
-    
+
     Raises:
         TenantNotFoundError: If tenant not found (handled by global exception handler)
     """
@@ -97,28 +91,26 @@ async def get_tenant(
     response_model=TenantResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Create Tenant",
-    description="Create a new tenant and assign creator as GLOBAL_ADMIN"
+    description="Create a new tenant and assign creator as TENANT_GLOBAL_ADMIN",
 )
-@authenticate
+@authenticate()
 async def create_tenant(
-    request: Request,
-    tenant_data: CreateTenantRequest,
-    handler: TenantHandler = Depends(get_tenant_handler)
+    request: Request, tenant_data: CreateTenantRequest, handler: TenantHandler = Depends(get_tenant_handler)
 ) -> TenantResponse:
     """
-    Create a new tenant and assign the creator as GLOBAL_ADMIN.
-    
+    Create a new tenant and assign the creator as TENANT_GLOBAL_ADMIN.
+
     Args:
         request: FastAPI request object (contains user in request.state)
         tenant_data: Tenant creation data
         handler: Tenant handler dependency
-    
+
     Returns:
         TenantResponse: The created tenant
     """
     user: ContextIdentityUser = request.state.user
     user_id = user.identity.get_id()
-    
+
     return handler.create_tenant(tenant_data, user_id, user)
 
 
@@ -127,235 +119,52 @@ async def create_tenant(
     response_model=TenantResponse,
     status_code=status.HTTP_200_OK,
     summary="Update Tenant",
-    description="Update an existing tenant"
+    description="Update an existing tenant",
 )
-@authenticate
-@check_permissions(entity="tenant", required_permissions=[TenantRolesEnum.GLOBAL_ADMIN])
+@authenticate()
+@check_permissions(entity="tenant", required_permissions=[TenantRolesEnum.TENANT_GLOBAL_ADMIN])
 async def update_tenant(
     request: Request,
     tenant_id: str,
     tenant_data: UpdateTenantRequest,
-    handler: TenantHandler = Depends(get_tenant_handler)
+    handler: TenantHandler = Depends(get_tenant_handler),
 ) -> TenantResponse:
     """
     Update an existing tenant.
-    
+
     Args:
         request: FastAPI request object (contains user in request.state)
         tenant_id: The ID of the tenant to update
         tenant_data: Tenant update data
         handler: Tenant handler dependency
-    
+
     Returns:
         TenantResponse: The updated tenant
-    
+
     Raises:
         TenantNotFoundError: If tenant not found (handled by global exception handler)
     """
     user: ContextIdentityUser = request.state.user
     user_id = user.identity.get_id()
-    
+
     return handler.update_tenant(tenant_id, tenant_data, user_id)
 
 
 @router.delete(
-    "/{tenant_id}",
-    status_code=status.HTTP_204_NO_CONTENT,
-    summary="Delete Tenant",
-    description="Delete a tenant by ID"
+    "/{tenant_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Delete Tenant", description="Delete a tenant by ID"
 )
-@authenticate
-@check_permissions(entity="tenant", required_permissions=[TenantRolesEnum.GLOBAL_ADMIN])
-async def delete_tenant(
-    request: Request,
-    tenant_id: str,
-    handler: TenantHandler = Depends(get_tenant_handler)
-) -> None:
+@authenticate()
+@check_permissions(entity="tenant", required_permissions=[TenantRolesEnum.TENANT_GLOBAL_ADMIN])
+async def delete_tenant(request: Request, tenant_id: str, handler: TenantHandler = Depends(get_tenant_handler)) -> None:
     """
     Delete a tenant by ID.
-    
+
     Args:
         request: FastAPI request object
         tenant_id: The ID of the tenant to delete
         handler: Tenant handler dependency
-    
+
     Raises:
         TenantNotFoundError: If tenant not found (handled by global exception handler)
     """
     handler.delete_tenant(tenant_id)
-
-
-# Principal Role Management Routes
-
-@router.get(
-    "/{tenant_id}/principals",
-    response_model=TenantPrincipalsResponse,
-    status_code=status.HTTP_200_OK,
-    summary="List Tenant Principals",
-    description="Get all principals and their roles for a tenant with optional filtering, search, and pagination"
-)
-@authenticate
-async def list_tenant_principals(
-    request: Request,
-    tenant_id: str,
-    skip: int = Query(0, ge=0, description="Number of principals to skip"),
-    limit: int = Query(100, ge=1, le=500, description="Maximum number of principals to return"),
-    search: Optional[str] = Query(None, description="Search term for display_name, principal_name, or mail"),
-    roles: Optional[str] = Query(None, description="Comma-separated roles to filter by (OR logic)"),
-    is_active: Optional[bool] = Query(None, description="Filter by is_active status"),
-    order_by: Optional[str] = Query(None, enum=["display_name"], description="Column to order by"),
-    order_direction: Optional[str] = Query("asc", enum=["asc", "desc"], description="Sort direction"),
-    handler: TenantHandler = Depends(get_tenant_handler)
-) -> TenantPrincipalsResponse:
-    """
-    Get all principals and their roles for a specific tenant.
-    
-    Args:
-        request: FastAPI request object
-        tenant_id: The ID of the tenant
-        skip: Number of principals to skip (for pagination)
-        limit: Maximum number of principals to return
-        search: Search term for display_name, principal_name, or mail
-        roles: Comma-separated list of roles to filter by (OR logic)
-        is_active: Filter by principal's active status
-        order_by: Column to order by (currently only 'display_name')
-        order_direction: Sort direction ('asc' or 'desc')
-        handler: Tenant handler dependency
-    
-    Returns:
-        TenantPrincipalsResponse: All principals with their roles on the tenant
-    
-    Raises:
-        TenantNotFoundError: If tenant not found
-    """
-    # Parse comma-separated roles
-    roles_list = [r.strip() for r in roles.split(",")] if roles else None
-    
-    return handler.list_tenant_principals(
-        tenant_id=tenant_id,
-        skip=skip,
-        limit=limit,
-        search=search,
-        roles=roles_list,
-        is_active=is_active,
-        order_by=order_by,
-        order_direction=order_direction
-    )
-
-
-@router.get(
-    "/{tenant_id}/principals/{principal_id}",
-    response_model=PrincipalsResponse,
-    status_code=status.HTTP_200_OK,
-    summary="Get Principal Roles",
-    description="Get all roles for a specific principal on a tenant"
-)
-@authenticate
-async def get_principal_permissions(
-    request: Request,
-    tenant_id: str,
-    principal_id: str,
-    handler: TenantHandler = Depends(get_tenant_handler)
-) -> PrincipalsResponse:
-    """
-    Get all roles for a specific principal on a tenant.
-    
-    Args:
-        request: FastAPI request object
-        tenant_id: The ID of the tenant
-        principal_id: The ID of the principal
-        handler: Tenant handler dependency
-    
-    Returns:
-        PrincipalsResponse: Principal's roles on the tenant
-    
-    Raises:
-        TenantNotFoundError: If tenant not found
-    """
-    result = handler.get_principal_permissions(tenant_id, principal_id)
-    return PrincipalsResponse(**result)
-
-
-@router.put(
-    "/{tenant_id}/principals",
-    response_model=PrincipalsResponse,
-    status_code=status.HTTP_200_OK,
-    summary="Set Principal Role",
-    description="Add or update a role for a principal on a tenant"
-)
-@authenticate
-@check_permissions(entity="tenant", required_permissions=[TenantRolesEnum.GLOBAL_ADMIN])
-async def set_principal_permission(
-    request: Request,
-    tenant_id: str,
-    role_data: SetPrincipalRequest,
-    handler: TenantHandler = Depends(get_tenant_handler)
-) -> PrincipalsResponse:
-    """
-    Add or update a role for a principal on a tenant.
-    
-    Args:
-        request: FastAPI request object
-        tenant_id: The ID of the tenant
-        principal_id: The ID of the principal
-        role_data: Role data to set
-        handler: Tenant handler dependency
-    
-    Returns:
-        PrincipalsResponse: Updated principal's roles on the tenant
-    
-    Raises:
-        TenantNotFoundError: If tenant not found
-    """
-    user: ContextIdentityUser = request.state.user
-    user_id = user.identity.get_id()
-    
-    result = handler.set_principal_permission(
-        tenant_id=tenant_id,
-        principal_id=role_data.principal_id,
-        principal_type=role_data.principal_type,
-        permission=role_data.role,
-        user_id=user_id,
-        user=user
-    )
-    return PrincipalsResponse(**result)
-
-
-@router.delete(
-    "/{tenant_id}/principals",
-    response_model=PrincipalsResponse,
-    status_code=status.HTTP_200_OK,
-    summary="Delete Principal Role",
-    description="Remove a specific role from a principal on a tenant"
-)
-@authenticate
-@check_permissions(entity="tenant", required_permissions=[TenantRolesEnum.GLOBAL_ADMIN])
-async def delete_principal_permission(
-    request: Request,
-    tenant_id: str,
-    role_data: DeletePrincipalRequest,
-    handler: TenantHandler = Depends(get_tenant_handler)
-) -> PrincipalsResponse:
-    """
-    Remove a specific role from a principal on a tenant.
-    
-    Args:
-        request: FastAPI request object
-        tenant_id: The ID of the tenant
-        principal_id: The ID of the principal
-        role_data: Role data to delete
-        handler: Tenant handler dependency
-    
-    Returns:
-        PrincipalsResponse: Remaining principal's roles on the tenant
-    
-    Raises:
-        TenantNotFoundError: If tenant not found
-    """
-    result = handler.delete_principal_permission(
-        tenant_id=tenant_id,
-        principal_id=role_data.principal_id,
-        principal_type=role_data.principal_type,
-        permission=role_data.role
-    )
-    return PrincipalsResponse(**result)

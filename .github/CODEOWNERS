@@ -1,0 +1,33 @@
+# CODEOWNERS for unified-ui Platform Service
+# These owners will be requested for review on PRs
+
+# Default owners for everything in the repo
+*                           @enricogoerlitz
+
+# Python application code
+/unifiedui/                 @enricogoerlitz
+
+# API routes
+/unifiedui/apis/            @enricogoerlitz
+
+# Handlers and business logic
+/unifiedui/handlers/        @enricogoerlitz
+
+# Database models and migrations
+/unifiedui/core/database/   @enricogoerlitz
+/alembic/                   @enricogoerlitz
+
+# Infrastructure and core components
+/unifiedui/core/            @enricogoerlitz
+
+# Tests
+/tests/                     @enricogoerlitz
+
+# CI/CD workflows
+/.github/                   @enricogoerlitz
+
+# Documentation
+*.md                        @enricogoerlitz
+
+# Docker and deployment
+/docker/                    @enricogoerlitz

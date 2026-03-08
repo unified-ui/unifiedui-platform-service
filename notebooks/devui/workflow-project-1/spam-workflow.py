@@ -2,11 +2,11 @@
 
 # from spam-workflow import workflow
 # import asyncio
-# 
+#
 # async def main():
 #     response = await workflow.run("Hello!")
 #     print(response)
-# 
+#
 # asyncio.run(main())
 
 """Spam Detection Workflow Sample for DevUI.

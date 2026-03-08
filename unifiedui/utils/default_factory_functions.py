@@ -1,9 +1,9 @@
-from datetime import datetime, timezone
 import uuid
+from datetime import UTC, datetime
 
 
 def current_iso_datetime() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def generate_id() -> str:

@@ -1,14 +1,14 @@
 from dataclasses import asdict
-from typing import TypeVar, Type
+from typing import TypeVar
 
-T = TypeVar('T')
+T = TypeVar("T")
 
 
-def to_dict(cls: Type[T]) -> Type[T]:
+def to_dict[T](cls: type[T]) -> type[T]:
     """
     Decorator that adds a to_dict() method to a dataclass.
     The method returns a dictionary representation using dataclasses.asdict().
-    
+
     Usage:
         @with_to_dict
         @dataclass
@@ -16,8 +16,9 @@ def to_dict(cls: Type[T]) -> Type[T]:
             field1: str
             field2: int
     """
+
     def to_dict(self) -> dict:
         return asdict(self)
-    
-    cls.to_dict = to_dict
+
+    cls.to_dict = to_dict  # type: ignore[attr-defined]
     return cls

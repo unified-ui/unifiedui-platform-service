@@ -16,18 +16,18 @@ _db_client: Optional[DatabaseClient] = None
 def get_db_client() -> DatabaseClient:
     """
     Get or create a singleton database client instance.
-    
+
     This function is cached to ensure only one database connection
     is created and reused across the application.
-    
+
     Returns:
         DatabaseClient: The database client instance
     """
     global _db_client
-    
+
     if _db_client is None:
         _db_client = get_database_client()
-    
+
     return _db_client
 
 
@@ -37,7 +37,7 @@ def close_db_client() -> None:
     Should be called on application shutdown.
     """
     global _db_client
-    
+
     if _db_client is not None:
         _db_client.disconnect()
         _db_client = None
