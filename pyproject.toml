@@ -20,6 +20,7 @@ dependencies = [
     "fakeredis>=2.33.0",
     "pyjwt>=2.8.0",
     "azure-identity>=1.25.1",
+    "openapi-spec-validator>=0.7.0",
 ]
 
 [tool.setuptools]

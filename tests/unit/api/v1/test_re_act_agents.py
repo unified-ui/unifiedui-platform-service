@@ -11,6 +11,14 @@ from unifiedui.core.database.enums import PermissionActionEnum, PrincipalTypeEnu
 # API Endpoints
 ENDPOINT_RE_ACT_AGENTS = "/api/v1/platform-service/tenants/{tenant_id}/re-act-agents"
 ENDPOINT_RE_ACT_AGENT_DETAIL = "/api/v1/platform-service/tenants/{tenant_id}/re-act-agents/{re_act_agent_id}"
+ENDPOINT_RE_ACT_AGENT_VERSIONS = "/api/v1/platform-service/tenants/{tenant_id}/re-act-agents/{re_act_agent_id}/versions"
+ENDPOINT_RE_ACT_AGENT_VERSION_DETAIL = (
+    "/api/v1/platform-service/tenants/{tenant_id}/re-act-agents/{re_act_agent_id}/versions/{version}"
+)
+ENDPOINT_RE_ACT_AGENT_VERSION_RESTORE = (
+    "/api/v1/platform-service/tenants/{tenant_id}/re-act-agents/{re_act_agent_id}/versions/{version}/restore"
+)
+ENDPOINT_RE_ACT_AGENT_PUBLISH = "/api/v1/platform-service/tenants/{tenant_id}/re-act-agents/{re_act_agent_id}/publish"
 ENDPOINT_RE_ACT_AGENT_PRINCIPALS = (
     "/api/v1/platform-service/tenants/{tenant_id}/re-act-agents/{re_act_agent_id}/principals"
 )
@@ -293,21 +301,21 @@ class TestReActAgentRoutes:
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
     def test_update_re_act_agent_partial(self, test_client: TestClient, test_user_token: Any) -> None:
-        """Test partial update of a ReACT agent."""
+        """Test partial update of a ReACT agent metadata."""
         tenant_id = create_tenant_for_user(test_client, test_user_token)
         created = create_re_act_agent(test_client, test_user_token, tenant_id)
         headers = create_auth_headers(test_user_token, use_cache=False)
 
         response = test_client.patch(
             ENDPOINT_RE_ACT_AGENT_DETAIL.format(tenant_id=tenant_id, re_act_agent_id=created["id"]),
-            json={"system_prompt": "New prompt"},
+            json={"name": "Partially Updated"},
             headers=headers,
         )
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
-        assert data["system_prompt"] == "New prompt"
-        assert data["name"] == created["name"]
+        assert data["name"] == "Partially Updated"
+        assert data["description"] == created["description"]
 
     def test_delete_re_act_agent_success(self, test_client: TestClient, test_user_token: Any) -> None:
         """Test deleting a ReACT agent."""
@@ -516,3 +524,240 @@ class TestReActAgentPermissions:
         )
 
         assert response.status_code == status.HTTP_200_OK
+
+
+class TestReActAgentVersions:
+    """Test suite for ReACT agent version management."""
+
+    def test_create_version_success(self, test_client: TestClient, test_user_token: Any) -> None:
+        """Test creating a new version of a ReACT agent config."""
+        tenant_id = create_tenant_for_user(test_client, test_user_token)
+        created = create_re_act_agent(test_client, test_user_token, tenant_id)
+        headers = create_auth_headers(test_user_token, use_cache=False)
+
+        response = test_client.patch(
+            ENDPOINT_RE_ACT_AGENT_VERSIONS.format(tenant_id=tenant_id, re_act_agent_id=created["id"]),
+            json={"system_prompt": "Updated system prompt v2"},
+            headers=headers,
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert data["current_version"] == 2
+        assert data["system_prompt"] == "Updated system prompt v2"
+
+    def test_create_version_partial_update(self, test_client: TestClient, test_user_token: Any) -> None:
+        """Test that creating a version carries over unchanged fields from the previous version."""
+        tenant_id = create_tenant_for_user(test_client, test_user_token)
+        created = create_re_act_agent(test_client, test_user_token, tenant_id)
+        headers = create_auth_headers(test_user_token, use_cache=False)
+
+        response = test_client.patch(
+            ENDPOINT_RE_ACT_AGENT_VERSIONS.format(tenant_id=tenant_id, re_act_agent_id=created["id"]),
+            json={"security_prompt": "Be safe"},
+            headers=headers,
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert data["current_version"] == 2
+        assert data["security_prompt"] == "Be safe"
+        assert data["system_prompt"] == created["system_prompt"]
+
+    def test_list_versions_success(self, test_client: TestClient, test_user_token: Any) -> None:
+        """Test listing all versions of a ReACT agent."""
+        tenant_id = create_tenant_for_user(test_client, test_user_token)
+        created = create_re_act_agent(test_client, test_user_token, tenant_id)
+        headers = create_auth_headers(test_user_token, use_cache=False)
+
+        test_client.patch(
+            ENDPOINT_RE_ACT_AGENT_VERSIONS.format(tenant_id=tenant_id, re_act_agent_id=created["id"]),
+            json={"system_prompt": "v2"},
+            headers=headers,
+        )
+
+        response = test_client.get(
+            ENDPOINT_RE_ACT_AGENT_VERSIONS.format(tenant_id=tenant_id, re_act_agent_id=created["id"]),
+            headers=headers,
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert len(data) == 2
+        assert data[0]["version"] == 2
+        assert data[1]["version"] == 1
+
+    def test_get_version_success(self, test_client: TestClient, test_user_token: Any) -> None:
+        """Test getting a specific version."""
+        tenant_id = create_tenant_for_user(test_client, test_user_token)
+        created = create_re_act_agent(test_client, test_user_token, tenant_id)
+        headers = create_auth_headers(test_user_token, use_cache=False)
+
+        response = test_client.get(
+            ENDPOINT_RE_ACT_AGENT_VERSION_DETAIL.format(tenant_id=tenant_id, re_act_agent_id=created["id"], version=1),
+            headers=headers,
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert data["version"] == 1
+        assert data["system_prompt"] == "You are a helpful assistant."
+
+    def test_get_version_not_found(self, test_client: TestClient, test_user_token: Any) -> None:
+        """Test getting a non-existent version."""
+        tenant_id = create_tenant_for_user(test_client, test_user_token)
+        created = create_re_act_agent(test_client, test_user_token, tenant_id)
+        headers = create_auth_headers(test_user_token, use_cache=False)
+
+        response = test_client.get(
+            ENDPOINT_RE_ACT_AGENT_VERSION_DETAIL.format(
+                tenant_id=tenant_id, re_act_agent_id=created["id"], version=999
+            ),
+            headers=headers,
+        )
+
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+
+    def test_restore_version_success(self, test_client: TestClient, test_user_token: Any) -> None:
+        """Test restoring a previous version creates a new version."""
+        tenant_id = create_tenant_for_user(test_client, test_user_token)
+        created = create_re_act_agent(test_client, test_user_token, tenant_id)
+        headers = create_auth_headers(test_user_token, use_cache=False)
+
+        test_client.patch(
+            ENDPOINT_RE_ACT_AGENT_VERSIONS.format(tenant_id=tenant_id, re_act_agent_id=created["id"]),
+            json={"system_prompt": "v2 prompt"},
+            headers=headers,
+        )
+
+        response = test_client.post(
+            ENDPOINT_RE_ACT_AGENT_VERSION_RESTORE.format(tenant_id=tenant_id, re_act_agent_id=created["id"], version=1),
+            headers=headers,
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert data["current_version"] == 3
+        assert data["system_prompt"] == "You are a helpful assistant."
+
+    def test_restore_version_not_found(self, test_client: TestClient, test_user_token: Any) -> None:
+        """Test restoring a non-existent version."""
+        tenant_id = create_tenant_for_user(test_client, test_user_token)
+        created = create_re_act_agent(test_client, test_user_token, tenant_id)
+        headers = create_auth_headers(test_user_token, use_cache=False)
+
+        response = test_client.post(
+            ENDPOINT_RE_ACT_AGENT_VERSION_RESTORE.format(
+                tenant_id=tenant_id, re_act_agent_id=created["id"], version=999
+            ),
+            headers=headers,
+        )
+
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+
+    def test_initial_version_created_on_agent_create(self, test_client: TestClient, test_user_token: Any) -> None:
+        """Test that creating an agent automatically creates version 1."""
+        tenant_id = create_tenant_for_user(test_client, test_user_token)
+        created = create_re_act_agent(test_client, test_user_token, tenant_id)
+
+        assert created["current_version"] == 1
+
+
+class TestReActAgentPublish:
+    """Test suite for ReACT agent publishing."""
+
+    def test_publish_success(self, test_client: TestClient, test_user_token: Any) -> None:
+        """Test publishing a ReACT agent as a chat agent."""
+        tenant_id = create_tenant_for_user(test_client, test_user_token)
+        created = create_re_act_agent(test_client, test_user_token, tenant_id)
+        headers = create_auth_headers(test_user_token, use_cache=False)
+
+        response = test_client.post(
+            ENDPOINT_RE_ACT_AGENT_PUBLISH.format(tenant_id=tenant_id, re_act_agent_id=created["id"]),
+            json={"is_active": True},
+            headers=headers,
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert data["re_act_agent_id"] == created["id"]
+        assert data["chat_agent_type"] == "REACT_AGENT"
+        assert data["is_active"]
+        assert "chat_agent_id" in data
+
+    def test_publish_with_name_override(self, test_client: TestClient, test_user_token: Any) -> None:
+        """Test publishing with a custom chat agent name."""
+        tenant_id = create_tenant_for_user(test_client, test_user_token)
+        created = create_re_act_agent(test_client, test_user_token, tenant_id)
+        headers = create_auth_headers(test_user_token, use_cache=False)
+
+        response = test_client.post(
+            ENDPOINT_RE_ACT_AGENT_PUBLISH.format(tenant_id=tenant_id, re_act_agent_id=created["id"]),
+            json={"name": "Published Agent Name", "is_active": True},
+            headers=headers,
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert data["chat_agent_name"] == "Published Agent Name"
+
+    def test_publish_updates_re_act_agent(self, test_client: TestClient, test_user_token: Any) -> None:
+        """Test that publishing sets the published_chat_agent_id on the ReACT agent."""
+        tenant_id = create_tenant_for_user(test_client, test_user_token)
+        created = create_re_act_agent(test_client, test_user_token, tenant_id)
+        headers = create_auth_headers(test_user_token, use_cache=False)
+
+        publish_response = test_client.post(
+            ENDPOINT_RE_ACT_AGENT_PUBLISH.format(tenant_id=tenant_id, re_act_agent_id=created["id"]),
+            json={"is_active": True},
+            headers=headers,
+        )
+
+        assert publish_response.status_code == status.HTTP_200_OK
+        chat_agent_id = publish_response.json()["chat_agent_id"]
+
+        get_response = test_client.get(
+            ENDPOINT_RE_ACT_AGENT_DETAIL.format(tenant_id=tenant_id, re_act_agent_id=created["id"]),
+            headers=headers,
+        )
+
+        assert get_response.status_code == status.HTTP_200_OK
+        assert get_response.json()["published_chat_agent_id"] == chat_agent_id
+
+    def test_republish_updates_existing_chat_agent(self, test_client: TestClient, test_user_token: Any) -> None:
+        """Test that republishing updates the existing chat agent."""
+        tenant_id = create_tenant_for_user(test_client, test_user_token)
+        created = create_re_act_agent(test_client, test_user_token, tenant_id)
+        headers = create_auth_headers(test_user_token, use_cache=False)
+
+        first_publish = test_client.post(
+            ENDPOINT_RE_ACT_AGENT_PUBLISH.format(tenant_id=tenant_id, re_act_agent_id=created["id"]),
+            json={"name": "First Name", "is_active": True},
+            headers=headers,
+        )
+        first_chat_agent_id = first_publish.json()["chat_agent_id"]
+
+        second_publish = test_client.post(
+            ENDPOINT_RE_ACT_AGENT_PUBLISH.format(tenant_id=tenant_id, re_act_agent_id=created["id"]),
+            json={"name": "Updated Name", "is_active": False},
+            headers=headers,
+        )
+
+        assert second_publish.status_code == status.HTTP_200_OK
+        assert second_publish.json()["chat_agent_id"] == first_chat_agent_id
+        assert second_publish.json()["chat_agent_name"] == "Updated Name"
+        assert not second_publish.json()["is_active"]
+
+    def test_publish_not_found(self, test_client: TestClient, test_user_token: Any) -> None:
+        """Test publishing a non-existent ReACT agent."""
+        tenant_id = create_tenant_for_user(test_client, test_user_token)
+        create_re_act_agent(test_client, test_user_token, tenant_id)
+        headers = create_auth_headers(test_user_token, use_cache=False)
+
+        response = test_client.post(
+            ENDPOINT_RE_ACT_AGENT_PUBLISH.format(tenant_id=tenant_id, re_act_agent_id=NON_EXISTENT_ID),
+            json={"is_active": True},
+            headers=headers,
+        )
+
+        assert response.status_code == status.HTTP_404_NOT_FOUND

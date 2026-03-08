@@ -1,8 +1,8 @@
-"""001_initial_schema
+"""initial_schema_with_versioned_react_agents
 
-Revision ID: c2b6c43bb09f
+Revision ID: ca036afff6ef
 Revises:
-Create Date: 2026-02-22 09:05:18.930555
+Create Date: 2026-03-08 08:57:19.666139
 
 """
 from typing import Sequence, Union
@@ -12,8 +12,10 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import mssql
 from sqlalchemy.dialects import postgresql
 
+from unifiedui.core.database.models import HighPrecisionDateTime
+
 # revision identifiers, used by Alembic.
-revision: str = 'c2b6c43bb09f'
+revision: str = 'ca036afff6ef'
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -29,12 +31,10 @@ def upgrade() -> None:
     sa.Column('identity_provider', sa.String(length=50), nullable=False),
     sa.Column('identity_tenant_id', sa.String(length=255), nullable=False),
     sa.Column('subscription_tier', sa.String(length=50), nullable=False),
-    sa.Column('max_tenants', sa.Integer(), nullable=False),
-    sa.Column('max_users', sa.Integer(), nullable=False),
     sa.Column('is_active', sa.Boolean(), nullable=False),
     sa.Column('id', sa.String(length=36), nullable=False),
-    sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
-    sa.Column('updated_at', sa.DateTime(timezone=True), nullable=False),
+    sa.Column('created_at', HighPrecisionDateTime(), nullable=False),
+    sa.Column('updated_at', HighPrecisionDateTime(), nullable=False),
     sa.Column('created_by', sa.String(length=50), nullable=True),
     sa.Column('updated_by', sa.String(length=50), nullable=True),
     sa.PrimaryKeyConstraint('id'),
@@ -47,10 +47,10 @@ def upgrade() -> None:
     sa.Column('organization_id', sa.String(length=36), nullable=False),
     sa.Column('principal_id', sa.String(length=50), nullable=False),
     sa.Column('principal_type', sa.Enum('IDENTITY_USER', 'IDENTITY_GROUP', 'CUSTOM_GROUP', name='principal_type', native_enum=False, create_constraint=True), nullable=False),
-    sa.Column('role', sa.Enum('ORGANISATION_GLOBAL_ADMIN', 'ORGANISATION_ADMIN', 'ORGANISATION_TENANT_ADMIN', 'ORGANISATION_TENANT_CREATOR', 'ORGANISATION_MEMBER', name='organization_role', native_enum=False, create_constraint=True), nullable=False),
+    sa.Column('role', sa.Enum('ORGANISATION_GLOBAL_ADMIN', 'ORGANISATION_TENANT_ADMIN', 'ORGANISATION_TENANT_CREATOR', name='organization_role', native_enum=False, create_constraint=True), nullable=False),
     sa.Column('id', sa.String(length=36), nullable=False),
-    sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
-    sa.Column('updated_at', sa.DateTime(timezone=True), nullable=False),
+    sa.Column('created_at', HighPrecisionDateTime(), nullable=False),
+    sa.Column('updated_at', HighPrecisionDateTime(), nullable=False),
     sa.Column('created_by', sa.String(length=50), nullable=True),
     sa.Column('updated_by', sa.String(length=50), nullable=True),
     sa.ForeignKeyConstraint(['organization_id'], ['organizations.id'], ondelete='CASCADE'),
@@ -60,7 +60,7 @@ def upgrade() -> None:
     op.create_index('ix_org_member_org', 'organization_members', ['organization_id'], unique=False)
     op.create_index('ix_org_member_principal', 'organization_members', ['principal_id'], unique=False)
     op.create_table('tenants',
-    sa.Column('organization_id', sa.String(length=36), nullable=True),
+    sa.Column('organization_id', sa.String(length=36), nullable=False),
     sa.Column('environment_type', sa.Enum('SANDBOX', 'PRODUCTION', name='environment_type', native_enum=False, create_constraint=True), nullable=False),
     sa.Column('previous_stage_id', sa.String(length=36), nullable=True),
     sa.Column('is_default', sa.Boolean(), nullable=False),
@@ -68,8 +68,8 @@ def upgrade() -> None:
     sa.Column('name', sa.String(length=255), nullable=False),
     sa.Column('description', sa.String(length=2000), nullable=True),
     sa.Column('id', sa.String(length=36), nullable=False),
-    sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
-    sa.Column('updated_at', sa.DateTime(timezone=True), nullable=False),
+    sa.Column('created_at', HighPrecisionDateTime(), nullable=False),
+    sa.Column('updated_at', HighPrecisionDateTime(), nullable=False),
     sa.Column('created_by', sa.String(length=50), nullable=True),
     sa.Column('updated_by', sa.String(length=50), nullable=True),
     sa.ForeignKeyConstraint(['organization_id'], ['organizations.id'], ondelete='CASCADE'),
@@ -83,12 +83,12 @@ def upgrade() -> None:
     sa.Column('allow_api_keys', sa.Boolean(), nullable=False),
     sa.Column('primary_key_vault_uri', sa.String(length=2000), nullable=True),
     sa.Column('secondary_key_vault_uri', sa.String(length=2000), nullable=True),
-    sa.Column('last_full_import', sa.DateTime(timezone=True), nullable=True),
+    sa.Column('last_full_import', HighPrecisionDateTime(), nullable=True),
     sa.Column('name', sa.String(length=255), nullable=False),
     sa.Column('description', sa.String(length=2000), nullable=True),
     sa.Column('id', sa.String(length=36), nullable=False),
-    sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
-    sa.Column('updated_at', sa.DateTime(timezone=True), nullable=False),
+    sa.Column('created_at', HighPrecisionDateTime(), nullable=False),
+    sa.Column('updated_at', HighPrecisionDateTime(), nullable=False),
     sa.Column('created_by', sa.String(length=50), nullable=True),
     sa.Column('updated_by', sa.String(length=50), nullable=True),
     sa.Column('tenant_id', sa.String(length=36), nullable=False),
@@ -97,15 +97,15 @@ def upgrade() -> None:
     )
     op.create_index('ix_autonomous_agents_tenant', 'autonomous_agents', ['tenant_id'], unique=False)
     op.create_table('chat_agents',
-    sa.Column('type', sa.Enum('N8N', 'MICROSOFT_FOUNDRY', 'REST_API', name='chat_agent_type', native_enum=False, create_constraint=True), nullable=False),
+    sa.Column('type', sa.Enum('N8N', 'MICROSOFT_FOUNDRY', 'REST_API', 'REACT_AGENT', name='chat_agent_type', native_enum=False, create_constraint=True), nullable=False),
     sa.Column('config', sa.JSON().with_variant(mssql.JSON(), 'mssql').with_variant(postgresql.JSONB(astext_type=sa.Text()), 'postgresql'), nullable=False),
     sa.Column('is_active', sa.Boolean(), nullable=False),
     sa.Column('embed_allowed_origins', sa.String(length=2000), nullable=True),
     sa.Column('name', sa.String(length=255), nullable=False),
     sa.Column('description', sa.String(length=2000), nullable=True),
     sa.Column('id', sa.String(length=36), nullable=False),
-    sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
-    sa.Column('updated_at', sa.DateTime(timezone=True), nullable=False),
+    sa.Column('created_at', HighPrecisionDateTime(), nullable=False),
+    sa.Column('updated_at', HighPrecisionDateTime(), nullable=False),
     sa.Column('created_by', sa.String(length=50), nullable=True),
     sa.Column('updated_by', sa.String(length=50), nullable=True),
     sa.Column('tenant_id', sa.String(length=36), nullable=False),
@@ -120,8 +120,8 @@ def upgrade() -> None:
     sa.Column('name', sa.String(length=255), nullable=False),
     sa.Column('description', sa.String(length=2000), nullable=True),
     sa.Column('id', sa.String(length=36), nullable=False),
-    sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
-    sa.Column('updated_at', sa.DateTime(timezone=True), nullable=False),
+    sa.Column('created_at', HighPrecisionDateTime(), nullable=False),
+    sa.Column('updated_at', HighPrecisionDateTime(), nullable=False),
     sa.Column('created_by', sa.String(length=50), nullable=True),
     sa.Column('updated_by', sa.String(length=50), nullable=True),
     sa.Column('tenant_id', sa.String(length=36), nullable=False),
@@ -137,8 +137,8 @@ def upgrade() -> None:
     sa.Column('name', sa.String(length=255), nullable=False),
     sa.Column('description', sa.String(length=2000), nullable=True),
     sa.Column('id', sa.String(length=36), nullable=False),
-    sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
-    sa.Column('updated_at', sa.DateTime(timezone=True), nullable=False),
+    sa.Column('created_at', HighPrecisionDateTime(), nullable=False),
+    sa.Column('updated_at', HighPrecisionDateTime(), nullable=False),
     sa.Column('created_by', sa.String(length=50), nullable=True),
     sa.Column('updated_by', sa.String(length=50), nullable=True),
     sa.Column('tenant_id', sa.String(length=36), nullable=False),
@@ -155,8 +155,8 @@ def upgrade() -> None:
     sa.Column('principal_name', sa.String(length=255), nullable=False),
     sa.Column('description', sa.String(length=2000), nullable=True),
     sa.Column('is_active', sa.Boolean(), nullable=False),
-    sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
-    sa.Column('updated_at', sa.DateTime(timezone=True), nullable=False),
+    sa.Column('created_at', HighPrecisionDateTime(), nullable=False),
+    sa.Column('updated_at', HighPrecisionDateTime(), nullable=False),
     sa.ForeignKeyConstraint(['tenant_id'], ['tenants.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('tenant_id', 'principal_id')
     )
@@ -164,34 +164,12 @@ def upgrade() -> None:
     op.create_index('ix_principals_mail', 'principals', ['mail'], unique=False)
     op.create_index('ix_principals_principal_type', 'principals', ['principal_type'], unique=False)
     op.create_index('ix_principals_tenant', 'principals', ['tenant_id'], unique=False)
-    op.create_table('re_act_agents',
-    sa.Column('ai_model_ids', sa.JSON().with_variant(mssql.JSON(), 'mssql').with_variant(postgresql.JSONB(astext_type=sa.Text()), 'postgresql'), nullable=False),
-    sa.Column('system_prompt', sa.String(length=8000), nullable=True),
-    sa.Column('tool_ids', sa.JSON().with_variant(mssql.JSON(), 'mssql').with_variant(postgresql.JSONB(astext_type=sa.Text()), 'postgresql'), nullable=False),
-    sa.Column('security_prompt', sa.String(length=8000), nullable=True),
-    sa.Column('tool_use_prompt', sa.String(length=8000), nullable=True),
-    sa.Column('response_prompt', sa.String(length=8000), nullable=True),
-    sa.Column('greeting_messages', sa.JSON().with_variant(mssql.JSON(), 'mssql').with_variant(postgresql.JSONB(astext_type=sa.Text()), 'postgresql'), nullable=False),
-    sa.Column('config', sa.JSON().with_variant(mssql.JSON(), 'mssql').with_variant(postgresql.JSONB(astext_type=sa.Text()), 'postgresql'), nullable=False),
-    sa.Column('is_active', sa.Boolean(), nullable=False),
-    sa.Column('name', sa.String(length=255), nullable=False),
-    sa.Column('description', sa.String(length=2000), nullable=True),
-    sa.Column('id', sa.String(length=36), nullable=False),
-    sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
-    sa.Column('updated_at', sa.DateTime(timezone=True), nullable=False),
-    sa.Column('created_by', sa.String(length=50), nullable=True),
-    sa.Column('updated_by', sa.String(length=50), nullable=True),
-    sa.Column('tenant_id', sa.String(length=36), nullable=False),
-    sa.ForeignKeyConstraint(['tenant_id'], ['tenants.id'], ondelete='CASCADE'),
-    sa.PrimaryKeyConstraint('id')
-    )
-    op.create_index('ix_re_act_agents_tenant', 're_act_agents', ['tenant_id'], unique=False)
     op.create_table('recent_visits',
     sa.Column('user_id', sa.String(length=255), nullable=False),
     sa.Column('resource_type', sa.String(length=50), nullable=False),
     sa.Column('resource_id', sa.String(length=36), nullable=False),
     sa.Column('resource_name', sa.String(length=255), nullable=False),
-    sa.Column('visited_at', sa.DateTime(timezone=True), nullable=False),
+    sa.Column('visited_at', HighPrecisionDateTime(), nullable=False),
     sa.Column('id', sa.String(length=36), nullable=False),
     sa.Column('tenant_id', sa.String(length=36), nullable=False),
     sa.ForeignKeyConstraint(['tenant_id'], ['tenants.id'], ondelete='CASCADE'),
@@ -203,8 +181,8 @@ def upgrade() -> None:
     sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),
     sa.Column('tenant_id', sa.String(length=36), nullable=False),
     sa.Column('name', sa.String(length=255), nullable=False),
-    sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
-    sa.Column('updated_at', sa.DateTime(timezone=True), nullable=False),
+    sa.Column('created_at', HighPrecisionDateTime(), nullable=False),
+    sa.Column('updated_at', HighPrecisionDateTime(), nullable=False),
     sa.Column('created_by', sa.String(length=50), nullable=True),
     sa.Column('updated_by', sa.String(length=50), nullable=True),
     sa.ForeignKeyConstraint(['tenant_id'], ['tenants.id'], ondelete='CASCADE'),
@@ -219,8 +197,8 @@ def upgrade() -> None:
     sa.Column('principal_id', sa.String(length=50), nullable=False),
     sa.Column('role', sa.Enum('READ', 'WRITE', 'ADMIN', name='permission_action', native_enum=False, create_constraint=True), nullable=False),
     sa.Column('id', sa.String(length=36), nullable=False),
-    sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
-    sa.Column('updated_at', sa.DateTime(timezone=True), nullable=False),
+    sa.Column('created_at', HighPrecisionDateTime(), nullable=False),
+    sa.Column('updated_at', HighPrecisionDateTime(), nullable=False),
     sa.Column('created_by', sa.String(length=50), nullable=True),
     sa.Column('updated_by', sa.String(length=50), nullable=True),
     sa.ForeignKeyConstraint(['autonomous_agent_id'], ['autonomous_agents.id'], ondelete='CASCADE'),
@@ -234,8 +212,8 @@ def upgrade() -> None:
     sa.Column('tenant_id', sa.String(length=36), nullable=False),
     sa.Column('tag_id', sa.Integer(), nullable=False),
     sa.Column('autonomous_agent_id', sa.String(length=36), nullable=False),
-    sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
-    sa.Column('updated_at', sa.DateTime(timezone=True), nullable=False),
+    sa.Column('created_at', HighPrecisionDateTime(), nullable=False),
+    sa.Column('updated_at', HighPrecisionDateTime(), nullable=False),
     sa.Column('created_by', sa.String(length=50), nullable=True),
     sa.Column('updated_by', sa.String(length=50), nullable=True),
     sa.ForeignKeyConstraint(['autonomous_agent_id'], ['autonomous_agents.id'], ondelete='CASCADE'),
@@ -248,8 +226,8 @@ def upgrade() -> None:
     sa.Column('tenant_id', sa.String(length=36), nullable=False),
     sa.Column('user_id', sa.String(length=50), nullable=False),
     sa.Column('autonomous_agent_id', sa.String(length=36), nullable=False),
-    sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
-    sa.Column('updated_at', sa.DateTime(timezone=True), nullable=False),
+    sa.Column('created_at', HighPrecisionDateTime(), nullable=False),
+    sa.Column('updated_at', HighPrecisionDateTime(), nullable=False),
     sa.Column('created_by', sa.String(length=50), nullable=True),
     sa.Column('updated_by', sa.String(length=50), nullable=True),
     sa.ForeignKeyConstraint(['autonomous_agent_id'], ['autonomous_agents.id'], ondelete='CASCADE'),
@@ -265,8 +243,8 @@ def upgrade() -> None:
     sa.Column('principal_id', sa.String(length=50), nullable=False),
     sa.Column('role', sa.Enum('READ', 'WRITE', 'ADMIN', name='permission_action', native_enum=False, create_constraint=True), nullable=False),
     sa.Column('id', sa.String(length=36), nullable=False),
-    sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
-    sa.Column('updated_at', sa.DateTime(timezone=True), nullable=False),
+    sa.Column('created_at', HighPrecisionDateTime(), nullable=False),
+    sa.Column('updated_at', HighPrecisionDateTime(), nullable=False),
     sa.Column('created_by', sa.String(length=50), nullable=True),
     sa.Column('updated_by', sa.String(length=50), nullable=True),
     sa.ForeignKeyConstraint(['chat_agent_id'], ['chat_agents.id'], ondelete='CASCADE'),
@@ -280,8 +258,8 @@ def upgrade() -> None:
     sa.Column('tenant_id', sa.String(length=36), nullable=False),
     sa.Column('tag_id', sa.Integer(), nullable=False),
     sa.Column('chat_agent_id', sa.String(length=36), nullable=False),
-    sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
-    sa.Column('updated_at', sa.DateTime(timezone=True), nullable=False),
+    sa.Column('created_at', HighPrecisionDateTime(), nullable=False),
+    sa.Column('updated_at', HighPrecisionDateTime(), nullable=False),
     sa.Column('created_by', sa.String(length=50), nullable=True),
     sa.Column('updated_by', sa.String(length=50), nullable=True),
     sa.ForeignKeyConstraint(['chat_agent_id'], ['chat_agents.id'], ondelete='CASCADE'),
@@ -294,8 +272,8 @@ def upgrade() -> None:
     sa.Column('tenant_id', sa.String(length=36), nullable=False),
     sa.Column('user_id', sa.String(length=50), nullable=False),
     sa.Column('chat_agent_id', sa.String(length=36), nullable=False),
-    sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
-    sa.Column('updated_at', sa.DateTime(timezone=True), nullable=False),
+    sa.Column('created_at', HighPrecisionDateTime(), nullable=False),
+    sa.Column('updated_at', HighPrecisionDateTime(), nullable=False),
     sa.Column('created_by', sa.String(length=50), nullable=True),
     sa.Column('updated_by', sa.String(length=50), nullable=True),
     sa.ForeignKeyConstraint(['chat_agent_id'], ['chat_agents.id'], ondelete='CASCADE'),
@@ -311,8 +289,8 @@ def upgrade() -> None:
     sa.Column('principal_id', sa.String(length=50), nullable=False),
     sa.Column('role', sa.Enum('READ', 'WRITE', 'ADMIN', name='permission_action', native_enum=False, create_constraint=True), nullable=False),
     sa.Column('id', sa.String(length=36), nullable=False),
-    sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
-    sa.Column('updated_at', sa.DateTime(timezone=True), nullable=False),
+    sa.Column('created_at', HighPrecisionDateTime(), nullable=False),
+    sa.Column('updated_at', HighPrecisionDateTime(), nullable=False),
     sa.Column('created_by', sa.String(length=50), nullable=True),
     sa.Column('updated_by', sa.String(length=50), nullable=True),
     sa.ForeignKeyConstraint(['chat_widget_id'], ['chat_widgets.id'], ondelete='CASCADE'),
@@ -326,8 +304,8 @@ def upgrade() -> None:
     sa.Column('tenant_id', sa.String(length=36), nullable=False),
     sa.Column('tag_id', sa.Integer(), nullable=False),
     sa.Column('chat_widget_id', sa.String(length=36), nullable=False),
-    sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
-    sa.Column('updated_at', sa.DateTime(timezone=True), nullable=False),
+    sa.Column('created_at', HighPrecisionDateTime(), nullable=False),
+    sa.Column('updated_at', HighPrecisionDateTime(), nullable=False),
     sa.Column('created_by', sa.String(length=50), nullable=True),
     sa.Column('updated_by', sa.String(length=50), nullable=True),
     sa.ForeignKeyConstraint(['chat_widget_id'], ['chat_widgets.id'], ondelete='CASCADE'),
@@ -340,8 +318,8 @@ def upgrade() -> None:
     sa.Column('tenant_id', sa.String(length=36), nullable=False),
     sa.Column('user_id', sa.String(length=50), nullable=False),
     sa.Column('chat_widget_id', sa.String(length=36), nullable=False),
-    sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
-    sa.Column('updated_at', sa.DateTime(timezone=True), nullable=False),
+    sa.Column('created_at', HighPrecisionDateTime(), nullable=False),
+    sa.Column('updated_at', HighPrecisionDateTime(), nullable=False),
     sa.Column('created_by', sa.String(length=50), nullable=True),
     sa.Column('updated_by', sa.String(length=50), nullable=True),
     sa.ForeignKeyConstraint(['chat_widget_id'], ['chat_widgets.id'], ondelete='CASCADE'),
@@ -358,8 +336,8 @@ def upgrade() -> None:
     sa.Column('name', sa.String(length=255), nullable=False),
     sa.Column('description', sa.String(length=2000), nullable=True),
     sa.Column('id', sa.String(length=36), nullable=False),
-    sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
-    sa.Column('updated_at', sa.DateTime(timezone=True), nullable=False),
+    sa.Column('created_at', HighPrecisionDateTime(), nullable=False),
+    sa.Column('updated_at', HighPrecisionDateTime(), nullable=False),
     sa.Column('created_by', sa.String(length=50), nullable=True),
     sa.Column('updated_by', sa.String(length=50), nullable=True),
     sa.Column('tenant_id', sa.String(length=36), nullable=False),
@@ -375,8 +353,8 @@ def upgrade() -> None:
     sa.Column('principal_id', sa.String(length=50), nullable=False),
     sa.Column('role', sa.Enum('READ', 'WRITE', 'ADMIN', name='permission_action', native_enum=False, create_constraint=True), nullable=False),
     sa.Column('id', sa.String(length=36), nullable=False),
-    sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
-    sa.Column('updated_at', sa.DateTime(timezone=True), nullable=False),
+    sa.Column('created_at', HighPrecisionDateTime(), nullable=False),
+    sa.Column('updated_at', HighPrecisionDateTime(), nullable=False),
     sa.Column('created_by', sa.String(length=50), nullable=True),
     sa.Column('updated_by', sa.String(length=50), nullable=True),
     sa.ForeignKeyConstraint(['credential_id'], ['credentials.id'], ondelete='CASCADE'),
@@ -390,8 +368,8 @@ def upgrade() -> None:
     sa.Column('tenant_id', sa.String(length=36), nullable=False),
     sa.Column('tag_id', sa.Integer(), nullable=False),
     sa.Column('credential_id', sa.String(length=36), nullable=False),
-    sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
-    sa.Column('updated_at', sa.DateTime(timezone=True), nullable=False),
+    sa.Column('created_at', HighPrecisionDateTime(), nullable=False),
+    sa.Column('updated_at', HighPrecisionDateTime(), nullable=False),
     sa.Column('created_by', sa.String(length=50), nullable=True),
     sa.Column('updated_by', sa.String(length=50), nullable=True),
     sa.ForeignKeyConstraint(['credential_id'], ['credentials.id'], ondelete='CASCADE'),
@@ -406,8 +384,8 @@ def upgrade() -> None:
     sa.Column('principal_id', sa.String(length=50), nullable=False),
     sa.Column('role', sa.Enum('READ', 'WRITE', 'ADMIN', name='permission_action', native_enum=False, create_constraint=True), nullable=False),
     sa.Column('id', sa.String(length=36), nullable=False),
-    sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
-    sa.Column('updated_at', sa.DateTime(timezone=True), nullable=False),
+    sa.Column('created_at', HighPrecisionDateTime(), nullable=False),
+    sa.Column('updated_at', HighPrecisionDateTime(), nullable=False),
     sa.Column('created_by', sa.String(length=50), nullable=True),
     sa.Column('updated_by', sa.String(length=50), nullable=True),
     sa.ForeignKeyConstraint(['tenant_id', 'custom_group_id'], ['principals.tenant_id', 'principals.principal_id'], name='fk_custom_group_members_custom_group', ondelete='CASCADE'),
@@ -419,52 +397,22 @@ def upgrade() -> None:
     op.create_index('ix_cgm_custom_group', 'custom_group_members', ['custom_group_id'], unique=False)
     op.create_index('ix_cgm_principal', 'custom_group_members', ['principal_id'], unique=False)
     op.create_index('ix_cgm_tenant', 'custom_group_members', ['tenant_id'], unique=False)
-    op.create_table('re_act_agent_members',
-    sa.Column('tenant_id', sa.String(length=36), nullable=False),
-    sa.Column('re_act_agent_id', sa.String(length=36), nullable=False),
-    sa.Column('principal_id', sa.String(length=50), nullable=False),
-    sa.Column('role', sa.Enum('READ', 'WRITE', 'ADMIN', name='permission_action', native_enum=False, create_constraint=True), nullable=False),
+    op.create_table('re_act_agents',
+    sa.Column('is_active', sa.Boolean(), nullable=False),
+    sa.Column('published_chat_agent_id', sa.String(length=36), nullable=True),
+    sa.Column('name', sa.String(length=255), nullable=False),
+    sa.Column('description', sa.String(length=2000), nullable=True),
     sa.Column('id', sa.String(length=36), nullable=False),
-    sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
-    sa.Column('updated_at', sa.DateTime(timezone=True), nullable=False),
+    sa.Column('created_at', HighPrecisionDateTime(), nullable=False),
+    sa.Column('updated_at', HighPrecisionDateTime(), nullable=False),
     sa.Column('created_by', sa.String(length=50), nullable=True),
     sa.Column('updated_by', sa.String(length=50), nullable=True),
-    sa.ForeignKeyConstraint(['re_act_agent_id'], ['re_act_agents.id'], ondelete='CASCADE'),
-    sa.ForeignKeyConstraint(['tenant_id', 'principal_id'], ['principals.tenant_id', 'principals.principal_id'], name='fk_re_act_agent_members_principal', ondelete='CASCADE'),
-    sa.PrimaryKeyConstraint('id'),
-    sa.UniqueConstraint('re_act_agent_id', 'principal_id', name='uq_re_act_agent_members')
-    )
-    op.create_index('ix_re_act_agent_members_agent', 're_act_agent_members', ['re_act_agent_id'], unique=False)
-    op.create_index('ix_re_act_agent_members_principal', 're_act_agent_members', ['principal_id'], unique=False)
-    op.create_table('re_act_agent_tags',
     sa.Column('tenant_id', sa.String(length=36), nullable=False),
-    sa.Column('tag_id', sa.Integer(), nullable=False),
-    sa.Column('re_act_agent_id', sa.String(length=36), nullable=False),
-    sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
-    sa.Column('updated_at', sa.DateTime(timezone=True), nullable=False),
-    sa.Column('created_by', sa.String(length=50), nullable=True),
-    sa.Column('updated_by', sa.String(length=50), nullable=True),
-    sa.ForeignKeyConstraint(['re_act_agent_id'], ['re_act_agents.id'], ondelete='CASCADE'),
-    sa.ForeignKeyConstraint(['tag_id'], ['tags.id'], ondelete='CASCADE'),
-    sa.PrimaryKeyConstraint('tenant_id', 'tag_id', 're_act_agent_id')
-    )
-    op.create_index('ix_rat_agent', 're_act_agent_tags', ['re_act_agent_id'], unique=False)
-    op.create_index('ix_rat_tag', 're_act_agent_tags', ['tag_id'], unique=False)
-    op.create_table('re_act_agent_user_favorites',
-    sa.Column('tenant_id', sa.String(length=36), nullable=False),
-    sa.Column('user_id', sa.String(length=50), nullable=False),
-    sa.Column('re_act_agent_id', sa.String(length=36), nullable=False),
-    sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
-    sa.Column('updated_at', sa.DateTime(timezone=True), nullable=False),
-    sa.Column('created_by', sa.String(length=50), nullable=True),
-    sa.Column('updated_by', sa.String(length=50), nullable=True),
-    sa.ForeignKeyConstraint(['re_act_agent_id'], ['re_act_agents.id'], ondelete='CASCADE'),
-    sa.ForeignKeyConstraint(['tenant_id', 'user_id'], ['principals.tenant_id', 'principals.principal_id'], name='fk_re_act_agent_user_favorites_principal', ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['published_chat_agent_id'], ['chat_agents.id'], ondelete='SET NULL'),
     sa.ForeignKeyConstraint(['tenant_id'], ['tenants.id'], ondelete='CASCADE'),
-    sa.PrimaryKeyConstraint('tenant_id', 'user_id', 're_act_agent_id')
+    sa.PrimaryKeyConstraint('id')
     )
-    op.create_index('ix_rauf_re_act_agent', 're_act_agent_user_favorites', ['re_act_agent_id'], unique=False)
-    op.create_index('ix_rauf_user', 're_act_agent_user_favorites', ['user_id'], unique=False)
+    op.create_index('ix_re_act_agents_tenant', 're_act_agents', ['tenant_id'], unique=False)
     op.create_table('tenant_ai_models',
     sa.Column('type', sa.Enum('LLM_MODEL', 'EMBEDDING_MODEL', name='ai_model_type', native_enum=False, create_constraint=True), nullable=False),
     sa.Column('provider', sa.Enum('AZURE_OPENAI', 'OPENAI', 'ANTHROPIC', 'GOOGLE_GENAI', 'OLLAMA', 'MISTRAL', 'GROQ', name='ai_model_provider', native_enum=False, create_constraint=True), nullable=False),
@@ -476,8 +424,8 @@ def upgrade() -> None:
     sa.Column('name', sa.String(length=255), nullable=False),
     sa.Column('description', sa.String(length=2000), nullable=True),
     sa.Column('id', sa.String(length=36), nullable=False),
-    sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
-    sa.Column('updated_at', sa.DateTime(timezone=True), nullable=False),
+    sa.Column('created_at', HighPrecisionDateTime(), nullable=False),
+    sa.Column('updated_at', HighPrecisionDateTime(), nullable=False),
     sa.Column('created_by', sa.String(length=50), nullable=True),
     sa.Column('updated_by', sa.String(length=50), nullable=True),
     sa.Column('tenant_id', sa.String(length=36), nullable=False),
@@ -489,10 +437,10 @@ def upgrade() -> None:
     op.create_table('tenant_members',
     sa.Column('tenant_id', sa.String(length=36), nullable=False),
     sa.Column('principal_id', sa.String(length=50), nullable=False),
-    sa.Column('role', sa.Enum('READER', 'GLOBAL_ADMIN', 'CUSTOM_GROUPS_ADMIN', 'CUSTOM_GROUP_CREATOR', 'CHAT_AGENTS_ADMIN', 'CHAT_AGENTS_CREATOR', 'CREDENTIALS_ADMIN', 'CREDENTIALS_CREATOR', 'CONVERSATIONS_ADMIN', 'CONVERSATIONS_CREATOR', 'AUTONOMOUS_AGENTS_ADMIN', 'AUTONOMOUS_AGENTS_CREATOR', 'CHAT_WIDGETS_ADMIN', 'CHAT_WIDGETS_CREATOR', 'REACT_AGENT_ADMIN', 'REACT_AGENT_CREATOR', 'TENANT_AI_MODELS_ADMIN', name='tenant_role', native_enum=False, create_constraint=True), nullable=False),
+    sa.Column('role', sa.Enum('READER', 'TENANT_GLOBAL_ADMIN', 'CUSTOM_GROUPS_ADMIN', 'CUSTOM_GROUP_CREATOR', 'CHAT_AGENTS_ADMIN', 'CHAT_AGENTS_CREATOR', 'CREDENTIALS_ADMIN', 'CREDENTIALS_CREATOR', 'CONVERSATIONS_ADMIN', 'CONVERSATIONS_CREATOR', 'AUTONOMOUS_AGENTS_ADMIN', 'AUTONOMOUS_AGENTS_CREATOR', 'CHAT_WIDGETS_ADMIN', 'CHAT_WIDGETS_CREATOR', 'REACT_AGENT_ADMIN', 'REACT_AGENT_CREATOR', 'TENANT_AI_MODELS_ADMIN', name='tenant_role', native_enum=False, create_constraint=True), nullable=False),
     sa.Column('id', sa.String(length=36), nullable=False),
-    sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
-    sa.Column('updated_at', sa.DateTime(timezone=True), nullable=False),
+    sa.Column('created_at', HighPrecisionDateTime(), nullable=False),
+    sa.Column('updated_at', HighPrecisionDateTime(), nullable=False),
     sa.Column('created_by', sa.String(length=50), nullable=True),
     sa.Column('updated_by', sa.String(length=50), nullable=True),
     sa.ForeignKeyConstraint(['tenant_id', 'principal_id'], ['principals.tenant_id', 'principals.principal_id'], name='fk_tenant_members_principal', ondelete='CASCADE'),
@@ -510,8 +458,8 @@ def upgrade() -> None:
     sa.Column('name', sa.String(length=255), nullable=False),
     sa.Column('description', sa.String(length=2000), nullable=True),
     sa.Column('id', sa.String(length=36), nullable=False),
-    sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
-    sa.Column('updated_at', sa.DateTime(timezone=True), nullable=False),
+    sa.Column('created_at', HighPrecisionDateTime(), nullable=False),
+    sa.Column('updated_at', HighPrecisionDateTime(), nullable=False),
     sa.Column('created_by', sa.String(length=50), nullable=True),
     sa.Column('updated_by', sa.String(length=50), nullable=True),
     sa.Column('tenant_id', sa.String(length=36), nullable=False),
@@ -526,8 +474,8 @@ def upgrade() -> None:
     sa.Column('principal_id', sa.String(length=50), nullable=False),
     sa.Column('role', sa.Enum('READ', 'WRITE', 'ADMIN', name='permission_action', native_enum=False, create_constraint=True), nullable=False),
     sa.Column('id', sa.String(length=36), nullable=False),
-    sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
-    sa.Column('updated_at', sa.DateTime(timezone=True), nullable=False),
+    sa.Column('created_at', HighPrecisionDateTime(), nullable=False),
+    sa.Column('updated_at', HighPrecisionDateTime(), nullable=False),
     sa.Column('created_by', sa.String(length=50), nullable=True),
     sa.Column('updated_by', sa.String(length=50), nullable=True),
     sa.ForeignKeyConstraint(['conversation_id'], ['conversations.id'], ondelete='CASCADE'),
@@ -541,8 +489,8 @@ def upgrade() -> None:
     sa.Column('tenant_id', sa.String(length=36), nullable=False),
     sa.Column('user_id', sa.String(length=50), nullable=False),
     sa.Column('conversation_id', sa.String(length=36), nullable=False),
-    sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
-    sa.Column('updated_at', sa.DateTime(timezone=True), nullable=False),
+    sa.Column('created_at', HighPrecisionDateTime(), nullable=False),
+    sa.Column('updated_at', HighPrecisionDateTime(), nullable=False),
     sa.Column('created_by', sa.String(length=50), nullable=True),
     sa.Column('updated_by', sa.String(length=50), nullable=True),
     sa.ForeignKeyConstraint(['conversation_id'], ['conversations.id'], ondelete='CASCADE'),
@@ -552,14 +500,82 @@ def upgrade() -> None:
     )
     op.create_index('ix_cuf_conversation', 'conversation_user_favorites', ['conversation_id'], unique=False)
     op.create_index('ix_cuf_user', 'conversation_user_favorites', ['user_id'], unique=False)
+    op.create_table('re_act_agent_members',
+    sa.Column('tenant_id', sa.String(length=36), nullable=False),
+    sa.Column('re_act_agent_id', sa.String(length=36), nullable=False),
+    sa.Column('principal_id', sa.String(length=50), nullable=False),
+    sa.Column('role', sa.Enum('READ', 'WRITE', 'ADMIN', name='permission_action', native_enum=False, create_constraint=True), nullable=False),
+    sa.Column('id', sa.String(length=36), nullable=False),
+    sa.Column('created_at', HighPrecisionDateTime(), nullable=False),
+    sa.Column('updated_at', HighPrecisionDateTime(), nullable=False),
+    sa.Column('created_by', sa.String(length=50), nullable=True),
+    sa.Column('updated_by', sa.String(length=50), nullable=True),
+    sa.ForeignKeyConstraint(['re_act_agent_id'], ['re_act_agents.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['tenant_id', 'principal_id'], ['principals.tenant_id', 'principals.principal_id'], name='fk_re_act_agent_members_principal', ondelete='CASCADE'),
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('re_act_agent_id', 'principal_id', name='uq_re_act_agent_members')
+    )
+    op.create_index('ix_re_act_agent_members_agent', 're_act_agent_members', ['re_act_agent_id'], unique=False)
+    op.create_index('ix_re_act_agent_members_principal', 're_act_agent_members', ['principal_id'], unique=False)
+    op.create_table('re_act_agent_tags',
+    sa.Column('tenant_id', sa.String(length=36), nullable=False),
+    sa.Column('tag_id', sa.Integer(), nullable=False),
+    sa.Column('re_act_agent_id', sa.String(length=36), nullable=False),
+    sa.Column('created_at', HighPrecisionDateTime(), nullable=False),
+    sa.Column('updated_at', HighPrecisionDateTime(), nullable=False),
+    sa.Column('created_by', sa.String(length=50), nullable=True),
+    sa.Column('updated_by', sa.String(length=50), nullable=True),
+    sa.ForeignKeyConstraint(['re_act_agent_id'], ['re_act_agents.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['tag_id'], ['tags.id'], ondelete='CASCADE'),
+    sa.PrimaryKeyConstraint('tenant_id', 'tag_id', 're_act_agent_id')
+    )
+    op.create_index('ix_rat_agent', 're_act_agent_tags', ['re_act_agent_id'], unique=False)
+    op.create_index('ix_rat_tag', 're_act_agent_tags', ['tag_id'], unique=False)
+    op.create_table('re_act_agent_user_favorites',
+    sa.Column('tenant_id', sa.String(length=36), nullable=False),
+    sa.Column('user_id', sa.String(length=50), nullable=False),
+    sa.Column('re_act_agent_id', sa.String(length=36), nullable=False),
+    sa.Column('created_at', HighPrecisionDateTime(), nullable=False),
+    sa.Column('updated_at', HighPrecisionDateTime(), nullable=False),
+    sa.Column('created_by', sa.String(length=50), nullable=True),
+    sa.Column('updated_by', sa.String(length=50), nullable=True),
+    sa.ForeignKeyConstraint(['re_act_agent_id'], ['re_act_agents.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['tenant_id', 'user_id'], ['principals.tenant_id', 'principals.principal_id'], name='fk_re_act_agent_user_favorites_principal', ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['tenant_id'], ['tenants.id'], ondelete='CASCADE'),
+    sa.PrimaryKeyConstraint('tenant_id', 'user_id', 're_act_agent_id')
+    )
+    op.create_index('ix_rauf_re_act_agent', 're_act_agent_user_favorites', ['re_act_agent_id'], unique=False)
+    op.create_index('ix_rauf_user', 're_act_agent_user_favorites', ['user_id'], unique=False)
+    op.create_table('re_act_agent_versions',
+    sa.Column('re_act_agent_id', sa.String(length=36), nullable=False),
+    sa.Column('version', sa.Integer(), nullable=False),
+    sa.Column('ai_model_ids', sa.JSON().with_variant(mssql.JSON(), 'mssql').with_variant(postgresql.JSONB(astext_type=sa.Text()), 'postgresql'), nullable=False),
+    sa.Column('system_prompt', sa.String(length=8000), nullable=True),
+    sa.Column('tool_ids', sa.JSON().with_variant(mssql.JSON(), 'mssql').with_variant(postgresql.JSONB(astext_type=sa.Text()), 'postgresql'), nullable=False),
+    sa.Column('security_prompt', sa.String(length=8000), nullable=True),
+    sa.Column('tool_use_prompt', sa.String(length=8000), nullable=True),
+    sa.Column('response_prompt', sa.String(length=8000), nullable=True),
+    sa.Column('greeting_messages', sa.JSON().with_variant(mssql.JSON(), 'mssql').with_variant(postgresql.JSONB(astext_type=sa.Text()), 'postgresql'), nullable=False),
+    sa.Column('config', sa.JSON().with_variant(mssql.JSON(), 'mssql').with_variant(postgresql.JSONB(astext_type=sa.Text()), 'postgresql'), nullable=False),
+    sa.Column('id', sa.String(length=36), nullable=False),
+    sa.Column('created_at', HighPrecisionDateTime(), nullable=False),
+    sa.Column('updated_at', HighPrecisionDateTime(), nullable=False),
+    sa.Column('created_by', sa.String(length=50), nullable=True),
+    sa.Column('updated_by', sa.String(length=50), nullable=True),
+    sa.ForeignKeyConstraint(['re_act_agent_id'], ['re_act_agents.id'], ondelete='CASCADE'),
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('re_act_agent_id', 'version', name='uq_re_act_agent_version')
+    )
+    op.create_index('ix_re_act_agent_versions_agent', 're_act_agent_versions', ['re_act_agent_id'], unique=False)
+    op.create_index('ix_re_act_agent_versions_agent_version', 're_act_agent_versions', ['re_act_agent_id', 'version'], unique=False)
     op.create_table('tool_members',
     sa.Column('tenant_id', sa.String(length=36), nullable=False),
     sa.Column('tool_id', sa.String(length=36), nullable=False),
     sa.Column('principal_id', sa.String(length=50), nullable=False),
     sa.Column('role', sa.Enum('READ', 'WRITE', 'ADMIN', name='permission_action', native_enum=False, create_constraint=True), nullable=False),
     sa.Column('id', sa.String(length=36), nullable=False),
-    sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
-    sa.Column('updated_at', sa.DateTime(timezone=True), nullable=False),
+    sa.Column('created_at', HighPrecisionDateTime(), nullable=False),
+    sa.Column('updated_at', HighPrecisionDateTime(), nullable=False),
     sa.Column('created_by', sa.String(length=50), nullable=True),
     sa.Column('updated_by', sa.String(length=50), nullable=True),
     sa.ForeignKeyConstraint(['tenant_id', 'principal_id'], ['principals.tenant_id', 'principals.principal_id'], name='fk_tool_members_principal', ondelete='CASCADE'),
@@ -573,8 +589,8 @@ def upgrade() -> None:
     sa.Column('tenant_id', sa.String(length=36), nullable=False),
     sa.Column('tag_id', sa.Integer(), nullable=False),
     sa.Column('tool_id', sa.String(length=36), nullable=False),
-    sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
-    sa.Column('updated_at', sa.DateTime(timezone=True), nullable=False),
+    sa.Column('created_at', HighPrecisionDateTime(), nullable=False),
+    sa.Column('updated_at', HighPrecisionDateTime(), nullable=False),
     sa.Column('created_by', sa.String(length=50), nullable=True),
     sa.Column('updated_by', sa.String(length=50), nullable=True),
     sa.ForeignKeyConstraint(['tag_id'], ['tags.id'], ondelete='CASCADE'),
@@ -595,6 +611,18 @@ def downgrade() -> None:
     op.drop_index('ix_tool_members_tool', table_name='tool_members')
     op.drop_index('ix_tool_members_principal', table_name='tool_members')
     op.drop_table('tool_members')
+    op.drop_index('ix_re_act_agent_versions_agent_version', table_name='re_act_agent_versions')
+    op.drop_index('ix_re_act_agent_versions_agent', table_name='re_act_agent_versions')
+    op.drop_table('re_act_agent_versions')
+    op.drop_index('ix_rauf_user', table_name='re_act_agent_user_favorites')
+    op.drop_index('ix_rauf_re_act_agent', table_name='re_act_agent_user_favorites')
+    op.drop_table('re_act_agent_user_favorites')
+    op.drop_index('ix_rat_tag', table_name='re_act_agent_tags')
+    op.drop_index('ix_rat_agent', table_name='re_act_agent_tags')
+    op.drop_table('re_act_agent_tags')
+    op.drop_index('ix_re_act_agent_members_principal', table_name='re_act_agent_members')
+    op.drop_index('ix_re_act_agent_members_agent', table_name='re_act_agent_members')
+    op.drop_table('re_act_agent_members')
     op.drop_index('ix_cuf_user', table_name='conversation_user_favorites')
     op.drop_index('ix_cuf_conversation', table_name='conversation_user_favorites')
     op.drop_table('conversation_user_favorites')
@@ -608,15 +636,8 @@ def downgrade() -> None:
     op.drop_table('tenant_members')
     op.drop_index('ix_tenant_ai_models_tenant', table_name='tenant_ai_models')
     op.drop_table('tenant_ai_models')
-    op.drop_index('ix_rauf_user', table_name='re_act_agent_user_favorites')
-    op.drop_index('ix_rauf_re_act_agent', table_name='re_act_agent_user_favorites')
-    op.drop_table('re_act_agent_user_favorites')
-    op.drop_index('ix_rat_tag', table_name='re_act_agent_tags')
-    op.drop_index('ix_rat_agent', table_name='re_act_agent_tags')
-    op.drop_table('re_act_agent_tags')
-    op.drop_index('ix_re_act_agent_members_principal', table_name='re_act_agent_members')
-    op.drop_index('ix_re_act_agent_members_agent', table_name='re_act_agent_members')
-    op.drop_table('re_act_agent_members')
+    op.drop_index('ix_re_act_agents_tenant', table_name='re_act_agents')
+    op.drop_table('re_act_agents')
     op.drop_index('ix_cgm_tenant', table_name='custom_group_members')
     op.drop_index('ix_cgm_principal', table_name='custom_group_members')
     op.drop_index('ix_cgm_custom_group', table_name='custom_group_members')
@@ -662,8 +683,6 @@ def downgrade() -> None:
     op.drop_table('tags')
     op.drop_index('ix_recent_visits_user_time', table_name='recent_visits')
     op.drop_table('recent_visits')
-    op.drop_index('ix_re_act_agents_tenant', table_name='re_act_agents')
-    op.drop_table('re_act_agents')
     op.drop_index('ix_principals_tenant', table_name='principals')
     op.drop_index('ix_principals_principal_type', table_name='principals')
     op.drop_index('ix_principals_mail', table_name='principals')

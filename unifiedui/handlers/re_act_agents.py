@@ -5,11 +5,17 @@ from __future__ import annotations
 import uuid
 from typing import TYPE_CHECKING
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
 
-from unifiedui.core.database.enums import PermissionActionEnum
-from unifiedui.core.database.models import ReActAgent, ReActAgentMember, ReActAgentTag
+from unifiedui.core.database.enums import ChatAgentTypeEnum, PermissionActionEnum
+from unifiedui.core.database.models import (
+    ChatAgent,
+    ReActAgent,
+    ReActAgentMember,
+    ReActAgentTag,
+    ReActAgentVersion,
+)
 from unifiedui.handlers.permission_resolver import (
     check_is_admin,
     get_principal_ids,
@@ -18,26 +24,40 @@ from unifiedui.handlers.permission_resolver import (
 )
 
 if TYPE_CHECKING:
+    from sqlalchemy.orm import Session
+
     from unifiedui.caching.client import CacheClient
     from unifiedui.core.database.client import SQLAlchemyClient
     from unifiedui.core.identity.users import ContextIdentityUser
     from unifiedui.handlers.resource_permissions import ResourcePermissionsHandler
     from unifiedui.handlers.resource_tags import ResourceTagsHandler
     from unifiedui.schema.requests.re_act_agent_permissions import SetReActAgentPermissionRequest
-    from unifiedui.schema.requests.re_act_agents import CreateReActAgentRequest, UpdateReActAgentRequest
+    from unifiedui.schema.requests.re_act_agents import (
+        CreateReActAgentRequest,
+        PublishReActAgentRequest,
+        UpdateReActAgentRequest,
+        UpdateReActAgentVersionRequest,
+    )
 
-from unifiedui.exc.re_act_agents import ReActAgentNotFoundError
+from unifiedui.exc.re_act_agents import (
+    ReActAgentNotFoundError,
+    ReActAgentVersionNotFoundError,
+)
 from unifiedui.logger import get_logger
 from unifiedui.schema.responses.common import QuickListItemResponse
 from unifiedui.schema.responses.principals import PrincipalWithRolesResponse, ResourcePrincipalsResponse
-from unifiedui.schema.responses.re_act_agents import ReActAgentResponse
+from unifiedui.schema.responses.re_act_agents import (
+    PublishReActAgentResponse,
+    ReActAgentResponse,
+    ReActAgentVersionResponse,
+)
 from unifiedui.schema.responses.tags import TagSummary
 
 logger = get_logger(__name__)
 
 
 class ReActAgentHandler:
-    """Handler class for ReACT agent business logic."""
+    """Handler class for ReACT agent business logic with versioned config."""
 
     def __init__(
         self,
@@ -150,7 +170,10 @@ class ReActAgentHandler:
         with self.db_client.get_session() as session:
             query = (
                 select(ReActAgent)
-                .options(selectinload(ReActAgent.tags).selectinload(ReActAgentTag.tag))
+                .options(
+                    selectinload(ReActAgent.tags).selectinload(ReActAgentTag.tag),
+                    selectinload(ReActAgent.versions),
+                )
                 .where(ReActAgent.tenant_id == tenant_id)
             )
 
@@ -222,7 +245,7 @@ class ReActAgentHandler:
     def get_re_act_agent(
         self, tenant_id: str, re_act_agent_id: str, user: ContextIdentityUser | None = None, use_cache: bool = True
     ) -> ReActAgentResponse:
-        """Get a specific ReACT agent by ID.
+        """Get a specific ReACT agent by ID with its latest version config.
 
         Args:
             tenant_id: Tenant ID for scoping
@@ -255,7 +278,10 @@ class ReActAgentHandler:
         with self.db_client.get_session() as session:
             query = (
                 select(ReActAgent)
-                .options(selectinload(ReActAgent.tags).selectinload(ReActAgentTag.tag))
+                .options(
+                    selectinload(ReActAgent.tags).selectinload(ReActAgentTag.tag),
+                    selectinload(ReActAgent.versions),
+                )
                 .where(ReActAgent.id == re_act_agent_id, ReActAgent.tenant_id == tenant_id)
             )
             agent = session.execute(query).scalar_one_or_none()
@@ -280,7 +306,7 @@ class ReActAgentHandler:
     def create_re_act_agent(
         self, tenant_id: str, request: CreateReActAgentRequest, user_id: str, user: ContextIdentityUser
     ) -> ReActAgentResponse:
-        """Create a new ReACT agent.
+        """Create a new ReACT agent with initial version (v1).
 
         Args:
             tenant_id: Tenant ID for scoping
@@ -294,6 +320,7 @@ class ReActAgentHandler:
         logger.info("Creating ReACT agent", extra={"tenant_id": tenant_id, "agent_name": request.name})
 
         agent_id = str(uuid.uuid4())
+        version_id = str(uuid.uuid4())
 
         with self.db_client.get_session() as session:
             agent = ReActAgent(
@@ -301,6 +328,16 @@ class ReActAgentHandler:
                 tenant_id=tenant_id,
                 name=request.name,
                 description=request.description,
+                is_active=request.is_active,
+                created_by=user_id,
+                updated_by=user_id,
+            )
+            session.add(agent)
+
+            version = ReActAgentVersion(
+                id=version_id,
+                re_act_agent_id=agent_id,
+                version=1,
                 ai_model_ids=request.ai_model_ids,
                 system_prompt=request.system_prompt,
                 tool_ids=request.tool_ids,
@@ -309,11 +346,10 @@ class ReActAgentHandler:
                 response_prompt=request.response_prompt,
                 greeting_messages=request.greeting_messages,
                 config=request.config or {},
-                is_active=request.is_active,
                 created_by=user_id,
                 updated_by=user_id,
             )
-            session.add(agent)
+            session.add(version)
 
             self.permissions_handler.add_creator_permission(
                 session=session,
@@ -325,7 +361,16 @@ class ReActAgentHandler:
             )
 
             session.commit()
-            session.refresh(agent)
+
+            query = (
+                select(ReActAgent)
+                .options(
+                    selectinload(ReActAgent.tags).selectinload(ReActAgentTag.tag),
+                    selectinload(ReActAgent.versions),
+                )
+                .where(ReActAgent.id == agent_id)
+            )
+            agent = session.execute(query).scalar_one()
 
             logger.info("ReACT agent created", extra={"agent_id": agent_id})
 
@@ -336,12 +381,12 @@ class ReActAgentHandler:
     def update_re_act_agent(
         self, tenant_id: str, re_act_agent_id: str, request: UpdateReActAgentRequest, user_id: str
     ) -> ReActAgentResponse:
-        """Update an existing ReACT agent.
+        """Update metadata of an existing ReACT agent (name, description, is_active).
 
         Args:
             tenant_id: Tenant ID for scoping
             re_act_agent_id: ReACT agent ID
-            request: Update request data
+            request: Update request data (metadata only)
             user_id: ID of the updating user
 
         Returns:
@@ -352,7 +397,10 @@ class ReActAgentHandler:
         with self.db_client.get_session() as session:
             query = (
                 select(ReActAgent)
-                .options(selectinload(ReActAgent.tags).selectinload(ReActAgentTag.tag))
+                .options(
+                    selectinload(ReActAgent.tags).selectinload(ReActAgentTag.tag),
+                    selectinload(ReActAgent.versions),
+                )
                 .where(ReActAgent.id == re_act_agent_id, ReActAgent.tenant_id == tenant_id)
             )
             agent = session.execute(query).scalar_one_or_none()
@@ -364,33 +412,19 @@ class ReActAgentHandler:
                 agent.name = request.name
             if request.description is not None:
                 agent.description = request.description
-            if request.ai_model_ids is not None:
-                agent.ai_model_ids = request.ai_model_ids
-            if request.system_prompt is not None:
-                agent.system_prompt = request.system_prompt
-            if request.tool_ids is not None:
-                agent.tool_ids = request.tool_ids
-            if request.security_prompt is not None:
-                agent.security_prompt = request.security_prompt
-            if request.tool_use_prompt is not None:
-                agent.tool_use_prompt = request.tool_use_prompt
-            if request.response_prompt is not None:
-                agent.response_prompt = request.response_prompt
-            if request.greeting_messages is not None:
-                agent.greeting_messages = request.greeting_messages
-            if request.config is not None:
-                agent.config = request.config
             if request.is_active is not None:
                 agent.is_active = request.is_active
 
             agent.updated_by = user_id
 
             session.commit()
-            session.refresh(agent)
 
             query = (
                 select(ReActAgent)
-                .options(selectinload(ReActAgent.tags).selectinload(ReActAgentTag.tag))
+                .options(
+                    selectinload(ReActAgent.tags).selectinload(ReActAgentTag.tag),
+                    selectinload(ReActAgent.versions),
+                )
                 .where(ReActAgent.id == re_act_agent_id)
             )
             agent = session.execute(query).scalar_one()
@@ -402,8 +436,432 @@ class ReActAgentHandler:
 
             return self._model_to_response(agent)
 
+    def update_re_act_agent_version(
+        self, tenant_id: str, re_act_agent_id: str, request: UpdateReActAgentVersionRequest, user_id: str
+    ) -> ReActAgentResponse:
+        """Create a new version of the ReACT agent config.
+
+        Takes the latest version, applies the partial update, and saves as a new version.
+
+        Args:
+            tenant_id: Tenant ID for scoping
+            re_act_agent_id: ReACT agent ID
+            request: Version config update data
+            user_id: ID of the updating user
+
+        Returns:
+            Updated ReACT agent response (with new latest version)
+        """
+        logger.info(
+            "Creating new ReACT agent version",
+            extra={"tenant_id": tenant_id, "re_act_agent_id": re_act_agent_id},
+        )
+
+        with self.db_client.get_session() as session:
+            agent = session.execute(
+                select(ReActAgent).where(ReActAgent.id == re_act_agent_id, ReActAgent.tenant_id == tenant_id)
+            ).scalar_one_or_none()
+
+            if not agent:
+                raise ReActAgentNotFoundError(re_act_agent_id)
+
+            latest_version = session.execute(
+                select(ReActAgentVersion)
+                .where(ReActAgentVersion.re_act_agent_id == re_act_agent_id)
+                .order_by(ReActAgentVersion.version.desc())
+                .limit(1)
+            ).scalar_one_or_none()
+
+            next_version_num = (latest_version.version + 1) if latest_version else 1
+
+            new_version = ReActAgentVersion(
+                id=str(uuid.uuid4()),
+                re_act_agent_id=re_act_agent_id,
+                version=next_version_num,
+                ai_model_ids=(
+                    request.ai_model_ids
+                    if request.ai_model_ids is not None
+                    else (latest_version.ai_model_ids if latest_version else [])
+                ),
+                system_prompt=(
+                    request.system_prompt
+                    if request.system_prompt is not None
+                    else (latest_version.system_prompt if latest_version else None)
+                ),
+                tool_ids=(
+                    request.tool_ids
+                    if request.tool_ids is not None
+                    else (latest_version.tool_ids if latest_version else [])
+                ),
+                security_prompt=(
+                    request.security_prompt
+                    if request.security_prompt is not None
+                    else (latest_version.security_prompt if latest_version else None)
+                ),
+                tool_use_prompt=(
+                    request.tool_use_prompt
+                    if request.tool_use_prompt is not None
+                    else (latest_version.tool_use_prompt if latest_version else None)
+                ),
+                response_prompt=(
+                    request.response_prompt
+                    if request.response_prompt is not None
+                    else (latest_version.response_prompt if latest_version else None)
+                ),
+                greeting_messages=(
+                    request.greeting_messages
+                    if request.greeting_messages is not None
+                    else (latest_version.greeting_messages if latest_version else [])
+                ),
+                config=(
+                    request.config if request.config is not None else (latest_version.config if latest_version else {})
+                ),
+                created_by=user_id,
+                updated_by=user_id,
+            )
+            session.add(new_version)
+
+            agent.updated_by = user_id
+            session.commit()
+
+            query = (
+                select(ReActAgent)
+                .options(
+                    selectinload(ReActAgent.tags).selectinload(ReActAgentTag.tag),
+                    selectinload(ReActAgent.versions),
+                )
+                .where(ReActAgent.id == re_act_agent_id)
+            )
+            agent = session.execute(query).scalar_one()
+
+            logger.info(
+                "ReACT agent version created",
+                extra={"re_act_agent_id": re_act_agent_id, "version": next_version_num},
+            )
+
+            self._invalidate_list_cache(tenant_id)
+            self._invalidate_detail_cache(tenant_id, re_act_agent_id)
+
+            return self._model_to_response(agent)
+
+    def list_re_act_agent_versions(
+        self,
+        tenant_id: str,
+        re_act_agent_id: str,
+        skip: int = 0,
+        limit: int = 50,
+    ) -> list[ReActAgentVersionResponse]:
+        """List all versions of a ReACT agent.
+
+        Args:
+            tenant_id: Tenant ID for scoping
+            re_act_agent_id: ReACT agent ID
+            skip: Number of items to skip
+            limit: Maximum number of items to return
+
+        Returns:
+            List of version responses ordered by version descending
+        """
+        logger.info(
+            "Listing ReACT agent versions",
+            extra={"tenant_id": tenant_id, "re_act_agent_id": re_act_agent_id},
+        )
+
+        with self.db_client.get_session() as session:
+            agent_exists = session.execute(
+                select(func.count())
+                .select_from(ReActAgent)
+                .where(ReActAgent.id == re_act_agent_id, ReActAgent.tenant_id == tenant_id)
+            ).scalar_one()
+
+            if not agent_exists:
+                raise ReActAgentNotFoundError(re_act_agent_id)
+
+            versions = (
+                session.execute(
+                    select(ReActAgentVersion)
+                    .where(ReActAgentVersion.re_act_agent_id == re_act_agent_id)
+                    .order_by(ReActAgentVersion.version.desc())
+                    .offset(skip)
+                    .limit(limit)
+                )
+                .scalars()
+                .all()
+            )
+
+            return [self._version_to_response(v) for v in versions]
+
+    def get_re_act_agent_version(
+        self,
+        tenant_id: str,
+        re_act_agent_id: str,
+        version: int,
+    ) -> ReActAgentVersionResponse:
+        """Get a specific version of a ReACT agent.
+
+        Args:
+            tenant_id: Tenant ID for scoping
+            re_act_agent_id: ReACT agent ID
+            version: Version number
+
+        Returns:
+            Version response
+        """
+        logger.info(
+            "Fetching ReACT agent version",
+            extra={"tenant_id": tenant_id, "re_act_agent_id": re_act_agent_id, "version": version},
+        )
+
+        with self.db_client.get_session() as session:
+            agent_exists = session.execute(
+                select(func.count())
+                .select_from(ReActAgent)
+                .where(ReActAgent.id == re_act_agent_id, ReActAgent.tenant_id == tenant_id)
+            ).scalar_one()
+
+            if not agent_exists:
+                raise ReActAgentNotFoundError(re_act_agent_id)
+
+            version_record = session.execute(
+                select(ReActAgentVersion).where(
+                    ReActAgentVersion.re_act_agent_id == re_act_agent_id,
+                    ReActAgentVersion.version == version,
+                )
+            ).scalar_one_or_none()
+
+            if not version_record:
+                raise ReActAgentVersionNotFoundError(re_act_agent_id, version)
+
+            return self._version_to_response(version_record)
+
+    def restore_re_act_agent_version(
+        self,
+        tenant_id: str,
+        re_act_agent_id: str,
+        version: int,
+        user_id: str,
+    ) -> ReActAgentResponse:
+        """Restore a previous version by creating a new version with the same config.
+
+        Args:
+            tenant_id: Tenant ID for scoping
+            re_act_agent_id: ReACT agent ID
+            version: Version number to restore
+            user_id: ID of the restoring user
+
+        Returns:
+            Updated ReACT agent response with the restored version as latest
+        """
+        logger.info(
+            "Restoring ReACT agent version",
+            extra={"tenant_id": tenant_id, "re_act_agent_id": re_act_agent_id, "version": version},
+        )
+
+        with self.db_client.get_session() as session:
+            agent = session.execute(
+                select(ReActAgent).where(ReActAgent.id == re_act_agent_id, ReActAgent.tenant_id == tenant_id)
+            ).scalar_one_or_none()
+
+            if not agent:
+                raise ReActAgentNotFoundError(re_act_agent_id)
+
+            source_version = session.execute(
+                select(ReActAgentVersion).where(
+                    ReActAgentVersion.re_act_agent_id == re_act_agent_id,
+                    ReActAgentVersion.version == version,
+                )
+            ).scalar_one_or_none()
+
+            if not source_version:
+                raise ReActAgentVersionNotFoundError(re_act_agent_id, version)
+
+            latest_version_num = (
+                session.execute(
+                    select(func.max(ReActAgentVersion.version)).where(
+                        ReActAgentVersion.re_act_agent_id == re_act_agent_id
+                    )
+                ).scalar_one()
+                or 0
+            )
+
+            new_version = ReActAgentVersion(
+                id=str(uuid.uuid4()),
+                re_act_agent_id=re_act_agent_id,
+                version=latest_version_num + 1,
+                ai_model_ids=source_version.ai_model_ids,
+                system_prompt=source_version.system_prompt,
+                tool_ids=source_version.tool_ids,
+                security_prompt=source_version.security_prompt,
+                tool_use_prompt=source_version.tool_use_prompt,
+                response_prompt=source_version.response_prompt,
+                greeting_messages=source_version.greeting_messages,
+                config=source_version.config,
+                created_by=user_id,
+                updated_by=user_id,
+            )
+            session.add(new_version)
+
+            agent.updated_by = user_id
+            session.commit()
+
+            query = (
+                select(ReActAgent)
+                .options(
+                    selectinload(ReActAgent.tags).selectinload(ReActAgentTag.tag),
+                    selectinload(ReActAgent.versions),
+                )
+                .where(ReActAgent.id == re_act_agent_id)
+            )
+            agent = session.execute(query).scalar_one()
+
+            logger.info(
+                "ReACT agent version restored",
+                extra={
+                    "re_act_agent_id": re_act_agent_id,
+                    "source_version": version,
+                    "new_version": latest_version_num + 1,
+                },
+            )
+
+            self._invalidate_list_cache(tenant_id)
+            self._invalidate_detail_cache(tenant_id, re_act_agent_id)
+
+            return self._model_to_response(agent)
+
+    def publish_re_act_agent(
+        self,
+        tenant_id: str,
+        re_act_agent_id: str,
+        request: PublishReActAgentRequest,
+        user_id: str,
+        user: ContextIdentityUser,
+    ) -> PublishReActAgentResponse:
+        """Publish a ReACT agent as a chat agent.
+
+        Creates or updates a chat_agent entry with type REACT_AGENT. The config
+        stores the react_agent_id; the latest version is resolved at query time.
+
+        Args:
+            tenant_id: Tenant ID for scoping
+            re_act_agent_id: ReACT agent ID
+            request: Publish request data
+            user_id: ID of the publishing user
+            user: Authenticated user context
+
+        Returns:
+            Publish response with the chat agent details
+        """
+        logger.info(
+            "Publishing ReACT agent",
+            extra={"tenant_id": tenant_id, "re_act_agent_id": re_act_agent_id},
+        )
+
+        with self.db_client.get_session() as session:
+            agent = session.execute(
+                select(ReActAgent).where(ReActAgent.id == re_act_agent_id, ReActAgent.tenant_id == tenant_id)
+            ).scalar_one_or_none()
+
+            if not agent:
+                raise ReActAgentNotFoundError(re_act_agent_id)
+
+            chat_agent_name = request.name or agent.name
+            chat_agent_description = request.description or agent.description
+            chat_agent_config = {"react_agent_id": re_act_agent_id}
+
+            if agent.published_chat_agent_id:
+                chat_agent = session.execute(
+                    select(ChatAgent).where(ChatAgent.id == agent.published_chat_agent_id)
+                ).scalar_one_or_none()
+
+                if chat_agent:
+                    chat_agent.name = chat_agent_name
+                    chat_agent.description = chat_agent_description
+                    chat_agent.config = chat_agent_config
+                    chat_agent.is_active = request.is_active
+                    chat_agent.updated_by = user_id
+                else:
+                    chat_agent = self._create_chat_agent(
+                        session,
+                        tenant_id,
+                        chat_agent_name,
+                        chat_agent_description,
+                        chat_agent_config,
+                        request.is_active,
+                        user_id,
+                    )
+                    agent.published_chat_agent_id = chat_agent.id
+            else:
+                chat_agent = self._create_chat_agent(
+                    session,
+                    tenant_id,
+                    chat_agent_name,
+                    chat_agent_description,
+                    chat_agent_config,
+                    request.is_active,
+                    user_id,
+                )
+                agent.published_chat_agent_id = chat_agent.id
+
+            agent.updated_by = user_id
+            session.commit()
+            session.refresh(chat_agent)
+
+            logger.info(
+                "ReACT agent published",
+                extra={"re_act_agent_id": re_act_agent_id, "chat_agent_id": chat_agent.id},
+            )
+
+            self._invalidate_list_cache(tenant_id)
+            self._invalidate_detail_cache(tenant_id, re_act_agent_id)
+
+            return PublishReActAgentResponse(
+                chat_agent_id=chat_agent.id,
+                re_act_agent_id=re_act_agent_id,
+                chat_agent_name=chat_agent.name,
+                chat_agent_type=ChatAgentTypeEnum.REACT_AGENT,
+                is_active=chat_agent.is_active,
+            )
+
+    @staticmethod
+    def _create_chat_agent(
+        session: Session,
+        tenant_id: str,
+        name: str,
+        description: str | None,
+        config: dict,
+        is_active: bool,
+        user_id: str,
+    ) -> ChatAgent:
+        """Create a new ChatAgent entry for a published ReACT agent.
+
+        Args:
+            session: SQLAlchemy session
+            tenant_id: Tenant ID
+            name: Chat agent name
+            description: Chat agent description
+            config: Chat agent config dict
+            is_active: Active flag
+            user_id: Creating user ID
+
+        Returns:
+            Created ChatAgent instance
+        """
+        chat_agent = ChatAgent(
+            id=str(uuid.uuid4()),
+            tenant_id=tenant_id,
+            name=name,
+            description=description,
+            type=ChatAgentTypeEnum.REACT_AGENT.value,
+            config=config,
+            is_active=is_active,
+            created_by=user_id,
+            updated_by=user_id,
+        )
+        session.add(chat_agent)
+        return chat_agent
+
     def delete_re_act_agent(self, tenant_id: str, re_act_agent_id: str) -> None:
-        """Delete a ReACT agent.
+        """Delete a ReACT agent and all its versions.
 
         Args:
             tenant_id: Tenant ID for scoping
@@ -643,7 +1101,7 @@ class ReActAgentHandler:
             raise ReActAgentNotFoundError(str(e)) from e
 
     def _resolve_user_permission(
-        self, session: object, tenant_id: str, re_act_agent_id: str, user: ContextIdentityUser
+        self, session: Session, tenant_id: str, re_act_agent_id: str, user: ContextIdentityUser
     ) -> str | None:
         """Resolve the user's permission level on a specific ReACT agent.
 
@@ -667,10 +1125,12 @@ class ReActAgentHandler:
 
     @staticmethod
     def _model_to_response(agent: ReActAgent) -> ReActAgentResponse:
-        """Convert a ReACT agent model to a response.
+        """Convert a ReACT agent model (with loaded versions) to a response.
+
+        The latest version's config fields are flattened into the response.
 
         Args:
-            agent: ReACT agent model instance
+            agent: ReACT agent model instance with versions loaded
 
         Returns:
             ReACT agent response
@@ -681,23 +1141,55 @@ class ReActAgentHandler:
                 if agent_tag.tag:
                     tags.append(TagSummary(id=agent_tag.tag.id, name=agent_tag.tag.name))
 
+        latest = agent.versions[0] if agent.versions else None
+
         return ReActAgentResponse(
             id=agent.id,
             tenant_id=agent.tenant_id,
             name=agent.name,
             description=agent.description,
-            ai_model_ids=agent.ai_model_ids or [],
-            system_prompt=agent.system_prompt,
-            tool_ids=agent.tool_ids or [],
-            security_prompt=agent.security_prompt,
-            tool_use_prompt=agent.tool_use_prompt,
-            response_prompt=agent.response_prompt,
-            greeting_messages=agent.greeting_messages or [],
-            config=agent.config or {},
             is_active=agent.is_active,
+            published_chat_agent_id=agent.published_chat_agent_id,
+            current_version=latest.version if latest else None,
+            ai_model_ids=latest.ai_model_ids if latest else [],
+            system_prompt=latest.system_prompt if latest else None,
+            tool_ids=latest.tool_ids if latest else [],
+            security_prompt=latest.security_prompt if latest else None,
+            tool_use_prompt=latest.tool_use_prompt if latest else None,
+            response_prompt=latest.response_prompt if latest else None,
+            greeting_messages=latest.greeting_messages if latest else [],
+            config=latest.config if latest else {},
             tags=tags,
             created_at=agent.created_at,
             updated_at=agent.updated_at,
             created_by=agent.created_by,
             updated_by=agent.updated_by,
+        )
+
+    @staticmethod
+    def _version_to_response(version: ReActAgentVersion) -> ReActAgentVersionResponse:
+        """Convert a ReACT agent version model to a response.
+
+        Args:
+            version: ReACT agent version model instance
+
+        Returns:
+            ReACT agent version response
+        """
+        return ReActAgentVersionResponse(
+            id=version.id,
+            re_act_agent_id=version.re_act_agent_id,
+            version=version.version,
+            ai_model_ids=version.ai_model_ids or [],
+            system_prompt=version.system_prompt,
+            tool_ids=version.tool_ids or [],
+            security_prompt=version.security_prompt,
+            tool_use_prompt=version.tool_use_prompt,
+            response_prompt=version.response_prompt,
+            greeting_messages=version.greeting_messages or [],
+            config=version.config or {},
+            created_at=version.created_at,
+            updated_at=version.updated_at,
+            created_by=version.created_by,
+            updated_by=version.updated_by,
         )

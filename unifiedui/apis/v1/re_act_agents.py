@@ -7,14 +7,23 @@ from fastapi.responses import Response
 
 from unifiedui.core.database.enums import ListViewEnum, OrderDirectionEnum, PermissionActionEnum, TenantRolesEnum
 from unifiedui.core.middleware.apis.v1.auth import authenticate, check_permissions
-from unifiedui.exc.re_act_agents import ReActAgentNotFoundError
+from unifiedui.exc.re_act_agents import ReActAgentNotFoundError, ReActAgentVersionNotFoundError
 from unifiedui.handlers.dependencies.re_act_agents import get_re_act_agent_handler
 from unifiedui.handlers.re_act_agents import ReActAgentHandler
 from unifiedui.logger import get_logger
 from unifiedui.schema.requests.re_act_agent_permissions import SetReActAgentPermissionRequest
-from unifiedui.schema.requests.re_act_agents import CreateReActAgentRequest, UpdateReActAgentRequest
+from unifiedui.schema.requests.re_act_agents import (
+    CreateReActAgentRequest,
+    PublishReActAgentRequest,
+    UpdateReActAgentRequest,
+    UpdateReActAgentVersionRequest,
+)
 from unifiedui.schema.responses.principals import PrincipalWithRolesResponse, ResourcePrincipalsResponse
-from unifiedui.schema.responses.re_act_agents import ReActAgentResponse
+from unifiedui.schema.responses.re_act_agents import (
+    PublishReActAgentResponse,
+    ReActAgentResponse,
+    ReActAgentVersionResponse,
+)
 
 if TYPE_CHECKING:
     from unifiedui.core.identity.users import ContextIdentityUser
@@ -240,6 +249,256 @@ async def delete_re_act_agent(
     except Exception as e:
         logger.error(f"Failed to delete ReACT agent: {e}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to delete ReACT agent")
+
+
+# ========== Version Endpoints ==========
+
+
+@router.patch(
+    "/{re_act_agent_id}/versions",
+    response_model=ReActAgentResponse,
+    summary="Create new version",
+    description="Create a new version of the ReACT agent config. Partial update on the latest version.",
+)
+@authenticate()
+@check_permissions(
+    entity="re_act_agent",
+    required_permissions=[
+        TenantRolesEnum.TENANT_GLOBAL_ADMIN,
+        TenantRolesEnum.REACT_AGENT_ADMIN,
+        PermissionActionEnum.ADMIN,
+        PermissionActionEnum.WRITE,
+    ],
+)
+async def update_re_act_agent_version(
+    request: Request,
+    tenant_id: str,
+    re_act_agent_id: str,
+    version_request: UpdateReActAgentVersionRequest,
+    handler: ReActAgentHandler = Depends(get_re_act_agent_handler),
+) -> ReActAgentResponse:
+    """Create a new version of the ReACT agent config."""
+    try:
+        user: ContextIdentityUser = request.state.user
+        logger.info(
+            "API: Update ReACT agent version",
+            extra={"tenant_id": tenant_id, "re_act_agent_id": re_act_agent_id, "user_id": user.identity.get_id()},
+        )
+        return handler.update_re_act_agent_version(
+            tenant_id=tenant_id,
+            re_act_agent_id=re_act_agent_id,
+            request=version_request,
+            user_id=user.identity.get_id(),
+        )
+    except ReActAgentNotFoundError as e:
+        logger.warning(f"ReACT agent not found: {e}")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except Exception as e:
+        logger.error(f"Failed to update ReACT agent version: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to update ReACT agent version: {e!s}"
+        )
+
+
+@router.get(
+    "/{re_act_agent_id}/versions",
+    response_model=list[ReActAgentVersionResponse],
+    summary="List versions",
+    description="List all versions of a ReACT agent config.",
+)
+@authenticate()
+@check_permissions(
+    entity="re_act_agent",
+    required_permissions=[
+        TenantRolesEnum.TENANT_GLOBAL_ADMIN,
+        TenantRolesEnum.REACT_AGENT_ADMIN,
+        PermissionActionEnum.ADMIN,
+        PermissionActionEnum.WRITE,
+        PermissionActionEnum.READ,
+    ],
+)
+async def list_re_act_agent_versions(
+    request: Request,
+    tenant_id: str,
+    re_act_agent_id: str,
+    skip: int = Query(0, ge=0, description="Number of versions to skip"),
+    limit: int = Query(50, ge=1, le=200, description="Maximum number of versions to return"),
+    handler: ReActAgentHandler = Depends(get_re_act_agent_handler),
+) -> list[ReActAgentVersionResponse]:
+    """List all versions of a ReACT agent."""
+    try:
+        user: ContextIdentityUser = request.state.user
+        logger.info(
+            "API: List ReACT agent versions",
+            extra={"tenant_id": tenant_id, "re_act_agent_id": re_act_agent_id, "user_id": user.identity.get_id()},
+        )
+        return handler.list_re_act_agent_versions(
+            tenant_id=tenant_id, re_act_agent_id=re_act_agent_id, skip=skip, limit=limit
+        )
+    except ReActAgentNotFoundError as e:
+        logger.warning(f"ReACT agent not found: {e}")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except Exception as e:
+        logger.error(f"Failed to list ReACT agent versions: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to list ReACT agent versions"
+        )
+
+
+@router.get(
+    "/{re_act_agent_id}/versions/{version}",
+    response_model=ReActAgentVersionResponse,
+    summary="Get version",
+    description="Get a specific version of a ReACT agent config.",
+)
+@authenticate()
+@check_permissions(
+    entity="re_act_agent",
+    required_permissions=[
+        TenantRolesEnum.TENANT_GLOBAL_ADMIN,
+        TenantRolesEnum.REACT_AGENT_ADMIN,
+        PermissionActionEnum.ADMIN,
+        PermissionActionEnum.WRITE,
+        PermissionActionEnum.READ,
+    ],
+)
+async def get_re_act_agent_version(
+    request: Request,
+    tenant_id: str,
+    re_act_agent_id: str,
+    version: int,
+    handler: ReActAgentHandler = Depends(get_re_act_agent_handler),
+) -> ReActAgentVersionResponse:
+    """Get a specific version of a ReACT agent."""
+    try:
+        user: ContextIdentityUser = request.state.user
+        logger.info(
+            "API: Get ReACT agent version",
+            extra={
+                "tenant_id": tenant_id,
+                "re_act_agent_id": re_act_agent_id,
+                "version": version,
+                "user_id": user.identity.get_id(),
+            },
+        )
+        return handler.get_re_act_agent_version(tenant_id=tenant_id, re_act_agent_id=re_act_agent_id, version=version)
+    except ReActAgentNotFoundError as e:
+        logger.warning(f"ReACT agent not found: {e}")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except ReActAgentVersionNotFoundError as e:
+        logger.warning(f"ReACT agent version not found: {e}")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except Exception as e:
+        logger.error(f"Failed to get ReACT agent version: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to get ReACT agent version"
+        )
+
+
+@router.post(
+    "/{re_act_agent_id}/versions/{version}/restore",
+    response_model=ReActAgentResponse,
+    summary="Restore version",
+    description="Restore a previous version by creating a new version with the same config.",
+)
+@authenticate()
+@check_permissions(
+    entity="re_act_agent",
+    required_permissions=[
+        TenantRolesEnum.TENANT_GLOBAL_ADMIN,
+        TenantRolesEnum.REACT_AGENT_ADMIN,
+        PermissionActionEnum.ADMIN,
+        PermissionActionEnum.WRITE,
+    ],
+)
+async def restore_re_act_agent_version(
+    request: Request,
+    tenant_id: str,
+    re_act_agent_id: str,
+    version: int,
+    handler: ReActAgentHandler = Depends(get_re_act_agent_handler),
+) -> ReActAgentResponse:
+    """Restore a previous version of a ReACT agent."""
+    try:
+        user: ContextIdentityUser = request.state.user
+        logger.info(
+            "API: Restore ReACT agent version",
+            extra={
+                "tenant_id": tenant_id,
+                "re_act_agent_id": re_act_agent_id,
+                "version": version,
+                "user_id": user.identity.get_id(),
+            },
+        )
+        return handler.restore_re_act_agent_version(
+            tenant_id=tenant_id,
+            re_act_agent_id=re_act_agent_id,
+            version=version,
+            user_id=user.identity.get_id(),
+        )
+    except ReActAgentNotFoundError as e:
+        logger.warning(f"ReACT agent not found: {e}")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except ReActAgentVersionNotFoundError as e:
+        logger.warning(f"ReACT agent version not found: {e}")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except Exception as e:
+        logger.error(f"Failed to restore ReACT agent version: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to restore ReACT agent version: {e!s}"
+        )
+
+
+# ========== Publish Endpoint ==========
+
+
+@router.post(
+    "/{re_act_agent_id}/publish",
+    response_model=PublishReActAgentResponse,
+    summary="Publish ReACT agent",
+    description="Publish a ReACT agent as a chat agent. Creates or updates the chat agent entry.",
+)
+@authenticate()
+@check_permissions(
+    entity="re_act_agent",
+    required_permissions=[
+        TenantRolesEnum.TENANT_GLOBAL_ADMIN,
+        TenantRolesEnum.REACT_AGENT_ADMIN,
+        PermissionActionEnum.ADMIN,
+    ],
+)
+async def publish_re_act_agent(
+    request: Request,
+    tenant_id: str,
+    re_act_agent_id: str,
+    publish_request: PublishReActAgentRequest,
+    handler: ReActAgentHandler = Depends(get_re_act_agent_handler),
+) -> PublishReActAgentResponse:
+    """Publish a ReACT agent as a chat agent."""
+    try:
+        user: ContextIdentityUser = request.state.user
+        logger.info(
+            "API: Publish ReACT agent",
+            extra={"tenant_id": tenant_id, "re_act_agent_id": re_act_agent_id, "user_id": user.identity.get_id()},
+        )
+        return handler.publish_re_act_agent(
+            tenant_id=tenant_id,
+            re_act_agent_id=re_act_agent_id,
+            request=publish_request,
+            user_id=user.identity.get_id(),
+            user=user,
+        )
+    except ReActAgentNotFoundError as e:
+        logger.warning(f"ReACT agent not found: {e}")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except Exception as e:
+        logger.error(f"Failed to publish ReACT agent: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to publish ReACT agent: {e!s}"
+        )
+
+
+# ========== Permission Endpoints ==========
 
 
 @router.get(

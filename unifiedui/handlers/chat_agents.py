@@ -609,6 +609,117 @@ class ChatAgentHandler:
                     project_endpoint=config.get("project_endpoint", ""),
                     agent_name=config.get("agent_name", ""),
                 )
+            elif app_type == ChatAgentTypeEnum.REACT_AGENT:
+                from sqlalchemy import select as sa_select
+
+                from unifiedui.core.database.models import ReActAgent, ReActAgentVersion, TenantAIModel, Tool
+                from unifiedui.schema.responses.re_act_agents import (
+                    ReActAgentAIModelResponse,
+                    ReActAgentConfigSettingsResponse,
+                )
+
+                react_agent_id = config.get("react_agent_id")
+                if not react_agent_id:
+                    raise ChatAgentNotFoundError(chat_agent_id)
+
+                react_agent = session.execute(
+                    sa_select(ReActAgent).where(
+                        ReActAgent.id == react_agent_id,
+                        ReActAgent.tenant_id == tenant_id,
+                    )
+                ).scalar_one_or_none()
+
+                if not react_agent:
+                    raise ChatAgentNotFoundError(chat_agent_id)
+
+                latest_version = session.execute(
+                    sa_select(ReActAgentVersion)
+                    .where(ReActAgentVersion.re_act_agent_id == react_agent_id)
+                    .order_by(ReActAgentVersion.version.desc())
+                    .limit(1)
+                ).scalar_one_or_none()
+
+                if not latest_version:
+                    raise ChatAgentNotFoundError(chat_agent_id)
+
+                resolved_tools: list[dict] = []
+                if latest_version.tool_ids:
+                    tools = (
+                        session.execute(
+                            sa_select(Tool).where(
+                                Tool.id.in_(latest_version.tool_ids),
+                                Tool.tenant_id == tenant_id,
+                            )
+                        )
+                        .scalars()
+                        .all()
+                    )
+
+                    for tool in tools:
+                        tool_data: dict = {
+                            "id": tool.id,
+                            "name": tool.name,
+                            "type": tool.type,
+                            "config": tool.config or {},
+                        }
+                        if tool.credential_id:
+                            try:
+                                cred = credential_handler.get_credential(tenant_id, tool.credential_id)
+                                secret = credential_handler.get_credential_secret(tenant_id, tool.credential_id)
+                                tool_data["credential"] = {
+                                    "id": cred.id,
+                                    "type": cred.type,
+                                    "secret": secret,
+                                }
+                            except Exception as e:
+                                logger.warning(f"Failed to resolve credential for tool {tool.id}: {e}")
+                        resolved_tools.append(tool_data)
+
+                resolved_ai_models: list[ReActAgentAIModelResponse] = []
+                if latest_version.ai_model_ids:
+                    ai_models = (
+                        session.execute(
+                            sa_select(TenantAIModel).where(
+                                TenantAIModel.id.in_(latest_version.ai_model_ids),
+                                TenantAIModel.tenant_id == tenant_id,
+                            )
+                        )
+                        .scalars()
+                        .all()
+                    )
+
+                    for ai_model in ai_models:
+                        credential_secret = None
+                        if ai_model.credential_id:
+                            try:
+                                secret = credential_handler.get_credential_secret(tenant_id, ai_model.credential_id)
+                                credential_secret = secret if isinstance(secret, dict) else {"api_key": secret}
+                            except Exception as e:
+                                logger.warning(f"Failed to resolve credential for AI model {ai_model.id}: {e}")
+                        resolved_ai_models.append(
+                            ReActAgentAIModelResponse(
+                                id=ai_model.id,
+                                provider=ai_model.provider,
+                                config=ai_model.config or {},
+                                credential_secret=credential_secret,
+                                priority=ai_model.priority,
+                            )
+                        )
+
+                settings = ReActAgentConfigSettingsResponse(
+                    react_agent_id=react_agent_id,
+                    version=latest_version.version,
+                    ai_model_ids=latest_version.ai_model_ids or [],
+                    ai_models=resolved_ai_models,
+                    system_prompt=latest_version.system_prompt,
+                    tool_ids=latest_version.tool_ids or [],
+                    tools=resolved_tools,
+                    security_prompt=latest_version.security_prompt,
+                    tool_use_prompt=latest_version.tool_use_prompt,
+                    response_prompt=latest_version.response_prompt,
+                    greeting_messages=latest_version.greeting_messages or [],
+                    config=latest_version.config or {},
+                )
             else:
                 # For unsupported types, return raw config
                 settings = config

@@ -993,10 +993,37 @@ class ToolTag(Base, AuditMixin):
 
 # ---------- ReACT Agents ----------
 class ReActAgent(Base, IdNameDescriptionMixin, TenantScopedMixin):
-    """ReACT Agent entity for LLM-based agent configurations."""
+    """ReACT Agent entity — identity and metadata only. Config is versioned in ReActAgentVersion."""
 
     __tablename__ = "re_act_agents"
 
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    published_chat_agent_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("chat_agents.id", ondelete="SET NULL"), nullable=True
+    )
+
+    published_chat_agent: Mapped[ChatAgent | None] = relationship(foreign_keys="[ReActAgent.published_chat_agent_id]")
+    versions: Mapped[list[ReActAgentVersion]] = relationship(
+        back_populates="re_act_agent", cascade="all, delete-orphan", order_by="ReActAgentVersion.version.desc()"
+    )
+    members: Mapped[list[ReActAgentMember]] = relationship(back_populates="re_act_agent", cascade="all, delete-orphan")
+    tags: Mapped[list[ReActAgentTag]] = relationship(back_populates="re_act_agent", cascade="all, delete-orphan")
+    user_favorites: Mapped[list[ReActAgentUserFavorite]] = relationship(
+        back_populates="re_act_agent", cascade="all, delete-orphan"
+    )
+
+    __table_args__ = (Index("ix_re_act_agents_tenant", "tenant_id"),)
+
+
+class ReActAgentVersion(Base, IdMixin, AuditMixin):
+    """Versioned configuration for a ReACT Agent."""
+
+    __tablename__ = "re_act_agent_versions"
+
+    re_act_agent_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("re_act_agents.id", ondelete="CASCADE"), nullable=False
+    )
+    version: Mapped[int] = mapped_column(Integer, nullable=False)
     ai_model_ids: Mapped[list] = mapped_column(PortableJSON, nullable=False, default=list)
     system_prompt: Mapped[str | None] = mapped_column(String(8000), nullable=True)
     tool_ids: Mapped[list] = mapped_column(PortableJSON, nullable=False, default=list)
@@ -1005,15 +1032,14 @@ class ReActAgent(Base, IdNameDescriptionMixin, TenantScopedMixin):
     response_prompt: Mapped[str | None] = mapped_column(String(8000), nullable=True)
     greeting_messages: Mapped[list] = mapped_column(PortableJSON, nullable=False, default=list)
     config: Mapped[dict] = mapped_column(PortableJSON, nullable=False, default=dict)
-    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
-    members: Mapped[list[ReActAgentMember]] = relationship(back_populates="re_act_agent", cascade="all, delete-orphan")
-    tags: Mapped[list[ReActAgentTag]] = relationship(back_populates="re_act_agent", cascade="all, delete-orphan")
-    user_favorites: Mapped[list[ReActAgentUserFavorite]] = relationship(
-        back_populates="re_act_agent", cascade="all, delete-orphan"
+    re_act_agent: Mapped[ReActAgent] = relationship(back_populates="versions")
+
+    __table_args__ = (
+        UniqueConstraint("re_act_agent_id", "version", name="uq_re_act_agent_version"),
+        Index("ix_re_act_agent_versions_agent", "re_act_agent_id"),
+        Index("ix_re_act_agent_versions_agent_version", "re_act_agent_id", "version"),
     )
-
-    __table_args__ = (Index("ix_re_act_agents_tenant", "tenant_id"),)
 
 
 class ReActAgentMember(Base, IdMixin, AuditMixin):

@@ -5,6 +5,7 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field
 
 from unifiedui.core.database.enums import ChatAgentTypeEnum
+from unifiedui.schema.responses.re_act_agents import ReActAgentConfigSettingsResponse
 from unifiedui.schema.responses.tags import TagSummary
 
 
@@ -96,9 +97,9 @@ class ChatAgentConfigResponse(BaseModel):
     type: ChatAgentTypeEnum = Field(..., description="Chat agent type")
     tenant_id: str = Field(..., description="Tenant ID")
     chat_agent_id: str = Field(..., description="Chat agent ID")
-    settings: N8NConfigSettingsResponse | MicrosoftFoundryConfigSettingsResponse | dict = Field(
-        ..., description="Chat agent settings with resolved credentials"
-    )
+    settings: (
+        N8NConfigSettingsResponse | MicrosoftFoundryConfigSettingsResponse | ReActAgentConfigSettingsResponse | dict
+    ) = Field(..., description="Chat agent settings with resolved credentials")
     user: UserInfoResponse = Field(..., description="User information")
 
     model_config = ConfigDict(from_attributes=True)

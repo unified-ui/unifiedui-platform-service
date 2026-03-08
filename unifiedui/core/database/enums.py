@@ -40,6 +40,7 @@ class ChatAgentTypeEnum(StrEnum):
     N8N = "N8N"
     MICROSOFT_FOUNDRY = "MICROSOFT_FOUNDRY"
     REST_API = "REST_API"
+    REACT_AGENT = "REACT_AGENT"
 
     @classmethod
     def all(cls) -> list[str]:
