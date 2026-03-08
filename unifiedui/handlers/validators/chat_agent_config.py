@@ -214,44 +214,6 @@ class MicrosoftFoundryConfigValidator(BaseChatAgentConfigValidator):
         return ChatAgentTypeEnum.MICROSOFT_FOUNDRY
 
 
-# ========== ReACT Agent Validator ==========
-
-
-class ReActAgentChatAgentConfig(BaseModel):
-    """Pydantic model for ReACT Agent chat agent configuration validation."""
-
-    react_agent_id: str = Field(..., min_length=1, description="ID of the ReACT Agent to use")
-
-
-class ReActAgentConfigValidator(BaseChatAgentConfigValidator):
-    """Validator for ReACT Agent chat agent configuration."""
-
-    def validate(self, config: dict[str, Any]) -> dict[str, Any]:
-        """Validate ReACT Agent configuration.
-
-        Args:
-            config: Configuration dictionary to validate
-
-        Returns:
-            Validated configuration dictionary
-
-        Raises:
-            ChatAgentConfigValidationError: If validation fails
-        """
-        try:
-            validated = ReActAgentChatAgentConfig(**config)
-            return validated.model_dump()
-        except Exception as e:
-            logger.error(f"ReACT Agent config validation failed: {e}")
-            raise ChatAgentConfigValidationError(
-                message=f"ReACT Agent configuration validation failed: {e!s}", errors=[str(e)]
-            )
-
-    def get_supported_type(self) -> ChatAgentTypeEnum:
-        """Get the chat agent type this validator supports."""
-        return ChatAgentTypeEnum.REACT_AGENT
-
-
 # ========== Config Validator Factory ==========
 
 
@@ -261,7 +223,6 @@ class ChatAgentConfigValidatorFactory:
     _validators: dict[ChatAgentTypeEnum, BaseChatAgentConfigValidator] = {
         ChatAgentTypeEnum.N8N: N8NConfigValidator(),
         ChatAgentTypeEnum.MICROSOFT_FOUNDRY: MicrosoftFoundryConfigValidator(),
-        ChatAgentTypeEnum.REACT_AGENT: ReActAgentConfigValidator(),
     }
 
     @classmethod

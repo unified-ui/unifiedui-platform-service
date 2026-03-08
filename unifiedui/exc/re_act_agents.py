@@ -1,29 +1,16 @@
-"""Custom exceptions for ReACT agents."""
-
-
-class ReActAgentNotFoundError(Exception):
-    """Exception raised when a ReACT agent is not found."""
-
-    def __init__(self, re_act_agent_id: str):
-        """Initialize ReActAgentNotFoundError.
-
-        Args:
-            re_act_agent_id: ID of the ReACT agent that was not found
-        """
-        self.re_act_agent_id = re_act_agent_id
-        super().__init__(f"ReACT Agent with ID '{re_act_agent_id}' not found")
+"""Custom exceptions for ReACT agent versions."""
 
 
 class ReActAgentVersionNotFoundError(Exception):
     """Exception raised when a ReACT agent version is not found."""
 
-    def __init__(self, re_act_agent_id: str, version: int):
+    def __init__(self, chat_agent_id: str, version: int):
         """Initialize ReActAgentVersionNotFoundError.
 
         Args:
-            re_act_agent_id: ID of the ReACT agent
+            chat_agent_id: ID of the chat agent
             version: Version number that was not found
         """
-        self.re_act_agent_id = re_act_agent_id
+        self.chat_agent_id = chat_agent_id
         self.version = version
-        super().__init__(f"Version {version} of ReACT Agent '{re_act_agent_id}' not found")
+        super().__init__(f"Version {version} of ReACT Agent '{chat_agent_id}' not found")

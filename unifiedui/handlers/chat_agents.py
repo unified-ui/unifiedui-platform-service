@@ -5,11 +5,11 @@ from __future__ import annotations
 import uuid
 from typing import TYPE_CHECKING
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
 
 from unifiedui.core.database.enums import ChatAgentTypeEnum, PermissionActionEnum
-from unifiedui.core.database.models import ChatAgent, ChatAgentMember, ChatAgentTag
+from unifiedui.core.database.models import ChatAgent, ChatAgentMember, ChatAgentTag, ReActAgentVersion
 from unifiedui.handlers.permission_resolver import (
     check_is_admin,
     get_principal_ids,
@@ -25,17 +25,23 @@ if TYPE_CHECKING:
     from unifiedui.handlers.resource_permissions import ResourcePermissionsHandler
     from unifiedui.handlers.resource_tags import ResourceTagsHandler
     from unifiedui.schema.requests.chat_agent_permissions import SetChatAgentPermissionRequest
-    from unifiedui.schema.requests.chat_agents import CreateChatAgentRequest, UpdateChatAgentRequest
+    from unifiedui.schema.requests.chat_agents import (
+        CreateChatAgentRequest,
+        UpdateChatAgentRequest,
+        UpdateReActAgentVersionRequest,
+    )
 
 from unifiedui.exc.chat_agent_config import (
     InvalidCredentialError,
 )
 from unifiedui.exc.chat_agents import ChatAgentNotFoundError
+from unifiedui.exc.re_act_agents import ReActAgentVersionNotFoundError
 from unifiedui.handlers.validators.chat_agent_config import ChatAgentConfigValidatorFactory
 from unifiedui.logger import get_logger
 from unifiedui.schema.responses.chat_agents import ChatAgentConfigResponse, ChatAgentResponse
 from unifiedui.schema.responses.common import QuickListItemResponse
 from unifiedui.schema.responses.principals import PrincipalWithRolesResponse, ResourcePrincipalsResponse
+from unifiedui.schema.responses.re_act_agents import ReActAgentVersionResponse
 from unifiedui.schema.responses.tags import TagSummary
 
 logger = get_logger(__name__)
@@ -98,6 +104,7 @@ class ChatAgentHandler:
         order_by: str | None = None,
         order_direction: str | None = None,
         view: str | None = None,
+        type_filter: str | None = None,
         use_cache: bool = True,
     ) -> list[ChatAgentResponse] | list[QuickListItemResponse]:
         """
@@ -144,10 +151,11 @@ class ChatAgentHandler:
         view_key = view or "full"
         order_key = f"{order_by or 'default'}:{order_direction or 'asc'}"
         is_active_key = "all" if is_active is None else str(is_active)
-        cache_key = f"chat_agents:list:tenant:{tenant_id}:user:{user_id}:skip:{skip}:limit:{limit}:view:{view_key}:order:{order_key}:active:{is_active_key}"
+        type_key = type_filter or "all"
+        cache_key = f"chat_agents:list:tenant:{tenant_id}:user:{user_id}:skip:{skip}:limit:{limit}:view:{view_key}:order:{order_key}:active:{is_active_key}:type:{type_key}"
 
         # Check if any filters are applied (name_filter and tag_ids disable caching)
-        has_filters = name_filter is not None or tag_ids is not None
+        has_filters = name_filter is not None or tag_ids is not None or type_filter is not None
 
         # Check cache (disable caching when any filters are applied)
         if use_cache and self.cache_client and not has_filters:
@@ -164,7 +172,10 @@ class ChatAgentHandler:
         with self.db_client.get_session() as session:
             query = (
                 select(ChatAgent)
-                .options(selectinload(ChatAgent.tags).selectinload(ChatAgentTag.tag))
+                .options(
+                    selectinload(ChatAgent.tags).selectinload(ChatAgentTag.tag),
+                    selectinload(ChatAgent.versions),
+                )
                 .where(ChatAgent.tenant_id == tenant_id)
             )
 
@@ -185,6 +196,9 @@ class ChatAgentHandler:
                 )
 
                 query = query.where(ChatAgent.id.in_(member_subquery))
+
+            if type_filter:
+                query = query.where(ChatAgent.type == type_filter)
 
             if name_filter:
                 query = query.where(ChatAgent.name.ilike(f"%{name_filter}%"))
@@ -282,7 +296,10 @@ class ChatAgentHandler:
         with self.db_client.get_session() as session:
             query = (
                 select(ChatAgent)
-                .options(selectinload(ChatAgent.tags).selectinload(ChatAgentTag.tag))
+                .options(
+                    selectinload(ChatAgent.tags).selectinload(ChatAgentTag.tag),
+                    selectinload(ChatAgent.versions),
+                )
                 .where(ChatAgent.id == chat_agent_id, ChatAgent.tenant_id == tenant_id)
             )
             chat_agent = session.execute(query).scalar_one_or_none()
@@ -326,9 +343,10 @@ class ChatAgentHandler:
         """
         logger.info("Creating chat agent", extra={"tenant_id": tenant_id, "app_name": request.name})
 
-        # Validate config based on chat agent type
-        validated_config = {}
-        if request.config:
+        is_react_agent = request.type == ChatAgentTypeEnum.REACT_AGENT
+
+        validated_config: dict = {}
+        if not is_react_agent and request.config:
             validated_config = ChatAgentConfigValidatorFactory.validate_config(
                 chat_agent_type=request.type, config=request.config
             )
@@ -336,7 +354,6 @@ class ChatAgentHandler:
         chat_agent_id = str(uuid.uuid4())
 
         with self.db_client.get_session() as session:
-            # Create chat agent
             chat_agent = ChatAgent(
                 id=chat_agent_id,
                 tenant_id=tenant_id,
@@ -351,7 +368,24 @@ class ChatAgentHandler:
             )
             session.add(chat_agent)
 
-            # Add creator as admin member using central handler
+            if is_react_agent:
+                version = ReActAgentVersion(
+                    id=str(uuid.uuid4()),
+                    chat_agent_id=chat_agent_id,
+                    version=1,
+                    ai_model_ids=request.ai_model_ids,
+                    system_prompt=request.system_prompt,
+                    tool_ids=request.tool_ids,
+                    security_prompt=request.security_prompt,
+                    tool_use_prompt=request.tool_use_prompt,
+                    response_prompt=request.response_prompt,
+                    greeting_messages=request.greeting_messages,
+                    config={},
+                    created_by=user_id,
+                    updated_by=user_id,
+                )
+                session.add(version)
+
             self.permissions_handler.add_creator_permission(
                 session=session,
                 resource_type="chat_agent",
@@ -362,11 +396,19 @@ class ChatAgentHandler:
             )
 
             session.commit()
-            session.refresh(chat_agent)
+
+            query = (
+                select(ChatAgent)
+                .options(
+                    selectinload(ChatAgent.tags).selectinload(ChatAgentTag.tag),
+                    selectinload(ChatAgent.versions),
+                )
+                .where(ChatAgent.id == chat_agent_id)
+            )
+            chat_agent = session.execute(query).scalar_one()
 
             logger.info("Chat agent created", extra={"chat_agent_id": chat_agent_id})
 
-            # Invalidate cache
             self._invalidate_list_cache(tenant_id)
 
             return self._model_to_response(chat_agent)
@@ -404,18 +446,16 @@ class ChatAgentHandler:
             if not chat_agent:
                 raise ChatAgentNotFoundError(chat_agent_id)
 
-            # Determine the chat agent type for config validation
             app_type = request.type if request.type is not None else ChatAgentTypeEnum(chat_agent.type)
+            is_react_agent = app_type == ChatAgentTypeEnum.REACT_AGENT
 
-            # Update fields if provided
             if request.name is not None:
                 chat_agent.name = request.name
             if request.description is not None:
                 chat_agent.description = request.description
             if request.type is not None:
                 chat_agent.type = request.type.value
-            if request.config is not None:
-                # Validate config based on chat agent type
+            if not is_react_agent and request.config is not None:
                 validated_config = ChatAgentConfigValidatorFactory.validate_config(
                     chat_agent_type=app_type, config=request.config
                 )
@@ -428,19 +468,19 @@ class ChatAgentHandler:
             chat_agent.updated_by = user_id
 
             session.commit()
-            session.refresh(chat_agent)
 
-            # Re-fetch with tags for response
             query = (
                 select(ChatAgent)
-                .options(selectinload(ChatAgent.tags).selectinload(ChatAgentTag.tag))
+                .options(
+                    selectinload(ChatAgent.tags).selectinload(ChatAgentTag.tag),
+                    selectinload(ChatAgent.versions),
+                )
                 .where(ChatAgent.id == chat_agent_id)
             )
             chat_agent = session.execute(query).scalar_one()
 
             logger.info("Chat agent updated", extra={"chat_agent_id": chat_agent_id})
 
-            # Invalidate cache
             self._invalidate_list_cache(tenant_id)
             self._invalidate_detail_cache(tenant_id, chat_agent_id)
 
@@ -610,31 +650,15 @@ class ChatAgentHandler:
                     agent_name=config.get("agent_name", ""),
                 )
             elif app_type == ChatAgentTypeEnum.REACT_AGENT:
-                from sqlalchemy import select as sa_select
-
-                from unifiedui.core.database.models import ReActAgent, ReActAgentVersion, TenantAIModel, Tool
+                from unifiedui.core.database.models import ReActAgentVersion, TenantAIModel, Tool
                 from unifiedui.schema.responses.re_act_agents import (
                     ReActAgentAIModelResponse,
                     ReActAgentConfigSettingsResponse,
                 )
 
-                react_agent_id = config.get("react_agent_id")
-                if not react_agent_id:
-                    raise ChatAgentNotFoundError(chat_agent_id)
-
-                react_agent = session.execute(
-                    sa_select(ReActAgent).where(
-                        ReActAgent.id == react_agent_id,
-                        ReActAgent.tenant_id == tenant_id,
-                    )
-                ).scalar_one_or_none()
-
-                if not react_agent:
-                    raise ChatAgentNotFoundError(chat_agent_id)
-
                 latest_version = session.execute(
-                    sa_select(ReActAgentVersion)
-                    .where(ReActAgentVersion.re_act_agent_id == react_agent_id)
+                    select(ReActAgentVersion)
+                    .where(ReActAgentVersion.chat_agent_id == chat_agent_id)
                     .order_by(ReActAgentVersion.version.desc())
                     .limit(1)
                 ).scalar_one_or_none()
@@ -646,7 +670,7 @@ class ChatAgentHandler:
                 if latest_version.tool_ids:
                     tools = (
                         session.execute(
-                            sa_select(Tool).where(
+                            select(Tool).where(
                                 Tool.id.in_(latest_version.tool_ids),
                                 Tool.tenant_id == tenant_id,
                             )
@@ -679,7 +703,7 @@ class ChatAgentHandler:
                 if latest_version.ai_model_ids:
                     ai_models = (
                         session.execute(
-                            sa_select(TenantAIModel).where(
+                            select(TenantAIModel).where(
                                 TenantAIModel.id.in_(latest_version.ai_model_ids),
                                 TenantAIModel.tenant_id == tenant_id,
                             )
@@ -707,7 +731,7 @@ class ChatAgentHandler:
                         )
 
                 settings = ReActAgentConfigSettingsResponse(
-                    react_agent_id=react_agent_id,
+                    chat_agent_id=chat_agent_id,
                     version=latest_version.version,
                     ai_model_ids=latest_version.ai_model_ids or [],
                     ai_models=resolved_ai_models,
@@ -750,6 +774,312 @@ class ChatAgentHandler:
         if self.cache_client:
             pattern = f"chat_agents:permissions:tenant:{tenant_id}:chat_agent:{chat_agent_id}:*"
             self.cache_client.client.delete_pattern(pattern)
+
+    # ========== Version Management Methods (REACT_AGENT) ==========
+
+    def update_chat_agent_version(
+        self, tenant_id: str, chat_agent_id: str, request: UpdateReActAgentVersionRequest, user_id: str
+    ) -> ChatAgentResponse:
+        """Create a new version of the chat agent config (REACT_AGENT only).
+
+        Takes the latest version, applies the partial update, and saves as a new version.
+
+        Args:
+            tenant_id: Tenant ID for scoping
+            chat_agent_id: Chat agent ID
+            request: Version config update data
+            user_id: ID of the updating user
+
+        Returns:
+            Updated chat agent response with new latest version
+
+        Raises:
+            ChatAgentNotFoundError: If chat agent not found
+        """
+        logger.info(
+            "Creating new chat agent version",
+            extra={"tenant_id": tenant_id, "chat_agent_id": chat_agent_id},
+        )
+
+        with self.db_client.get_session() as session:
+            chat_agent = session.execute(
+                select(ChatAgent).where(ChatAgent.id == chat_agent_id, ChatAgent.tenant_id == tenant_id)
+            ).scalar_one_or_none()
+
+            if not chat_agent:
+                raise ChatAgentNotFoundError(chat_agent_id)
+
+            latest_version = session.execute(
+                select(ReActAgentVersion)
+                .where(ReActAgentVersion.chat_agent_id == chat_agent_id)
+                .order_by(ReActAgentVersion.version.desc())
+                .limit(1)
+            ).scalar_one_or_none()
+
+            next_version_num = (latest_version.version + 1) if latest_version else 1
+
+            new_version = ReActAgentVersion(
+                id=str(uuid.uuid4()),
+                chat_agent_id=chat_agent_id,
+                version=next_version_num,
+                ai_model_ids=(
+                    request.ai_model_ids
+                    if request.ai_model_ids is not None
+                    else (latest_version.ai_model_ids if latest_version else [])
+                ),
+                system_prompt=(
+                    request.system_prompt
+                    if request.system_prompt is not None
+                    else (latest_version.system_prompt if latest_version else None)
+                ),
+                tool_ids=(
+                    request.tool_ids
+                    if request.tool_ids is not None
+                    else (latest_version.tool_ids if latest_version else [])
+                ),
+                security_prompt=(
+                    request.security_prompt
+                    if request.security_prompt is not None
+                    else (latest_version.security_prompt if latest_version else None)
+                ),
+                tool_use_prompt=(
+                    request.tool_use_prompt
+                    if request.tool_use_prompt is not None
+                    else (latest_version.tool_use_prompt if latest_version else None)
+                ),
+                response_prompt=(
+                    request.response_prompt
+                    if request.response_prompt is not None
+                    else (latest_version.response_prompt if latest_version else None)
+                ),
+                greeting_messages=(
+                    request.greeting_messages
+                    if request.greeting_messages is not None
+                    else (latest_version.greeting_messages if latest_version else [])
+                ),
+                config=(
+                    request.config if request.config is not None else (latest_version.config if latest_version else {})
+                ),
+                created_by=user_id,
+                updated_by=user_id,
+            )
+            session.add(new_version)
+
+            chat_agent.updated_by = user_id
+            session.commit()
+
+            query = (
+                select(ChatAgent)
+                .options(
+                    selectinload(ChatAgent.tags).selectinload(ChatAgentTag.tag),
+                    selectinload(ChatAgent.versions),
+                )
+                .where(ChatAgent.id == chat_agent_id)
+            )
+            chat_agent = session.execute(query).scalar_one()
+
+            logger.info(
+                "Chat agent version created",
+                extra={"chat_agent_id": chat_agent_id, "version": next_version_num},
+            )
+
+            self._invalidate_list_cache(tenant_id)
+            self._invalidate_detail_cache(tenant_id, chat_agent_id)
+
+            return self._model_to_response(chat_agent)
+
+    def list_chat_agent_versions(
+        self,
+        tenant_id: str,
+        chat_agent_id: str,
+        skip: int = 0,
+        limit: int = 50,
+    ) -> list[ReActAgentVersionResponse]:
+        """List all versions of a chat agent (REACT_AGENT only).
+
+        Args:
+            tenant_id: Tenant ID for scoping
+            chat_agent_id: Chat agent ID
+            skip: Number of items to skip
+            limit: Maximum number of items to return
+
+        Returns:
+            List of version responses ordered by version descending
+
+        Raises:
+            ChatAgentNotFoundError: If chat agent not found
+        """
+        logger.info(
+            "Listing chat agent versions",
+            extra={"tenant_id": tenant_id, "chat_agent_id": chat_agent_id},
+        )
+
+        with self.db_client.get_session() as session:
+            agent_exists = session.execute(
+                select(func.count())
+                .select_from(ChatAgent)
+                .where(ChatAgent.id == chat_agent_id, ChatAgent.tenant_id == tenant_id)
+            ).scalar_one()
+
+            if not agent_exists:
+                raise ChatAgentNotFoundError(chat_agent_id)
+
+            versions = (
+                session.execute(
+                    select(ReActAgentVersion)
+                    .where(ReActAgentVersion.chat_agent_id == chat_agent_id)
+                    .order_by(ReActAgentVersion.version.desc())
+                    .offset(skip)
+                    .limit(limit)
+                )
+                .scalars()
+                .all()
+            )
+
+            return [self._version_to_response(v) for v in versions]
+
+    def get_chat_agent_version(
+        self,
+        tenant_id: str,
+        chat_agent_id: str,
+        version: int,
+    ) -> ReActAgentVersionResponse:
+        """Get a specific version of a chat agent (REACT_AGENT only).
+
+        Args:
+            tenant_id: Tenant ID for scoping
+            chat_agent_id: Chat agent ID
+            version: Version number
+
+        Returns:
+            Version response
+
+        Raises:
+            ChatAgentNotFoundError: If chat agent not found
+            ReActAgentVersionNotFoundError: If version not found
+        """
+        logger.info(
+            "Fetching chat agent version",
+            extra={"tenant_id": tenant_id, "chat_agent_id": chat_agent_id, "version": version},
+        )
+
+        with self.db_client.get_session() as session:
+            agent_exists = session.execute(
+                select(func.count())
+                .select_from(ChatAgent)
+                .where(ChatAgent.id == chat_agent_id, ChatAgent.tenant_id == tenant_id)
+            ).scalar_one()
+
+            if not agent_exists:
+                raise ChatAgentNotFoundError(chat_agent_id)
+
+            version_record = session.execute(
+                select(ReActAgentVersion).where(
+                    ReActAgentVersion.chat_agent_id == chat_agent_id,
+                    ReActAgentVersion.version == version,
+                )
+            ).scalar_one_or_none()
+
+            if not version_record:
+                raise ReActAgentVersionNotFoundError(chat_agent_id, version)
+
+            return self._version_to_response(version_record)
+
+    def restore_chat_agent_version(
+        self,
+        tenant_id: str,
+        chat_agent_id: str,
+        version: int,
+        user_id: str,
+    ) -> ChatAgentResponse:
+        """Restore a previous version by creating a new version with the same config.
+
+        Args:
+            tenant_id: Tenant ID for scoping
+            chat_agent_id: Chat agent ID
+            version: Version number to restore
+            user_id: ID of the restoring user
+
+        Returns:
+            Updated chat agent response with the restored version as latest
+
+        Raises:
+            ChatAgentNotFoundError: If chat agent not found
+            ReActAgentVersionNotFoundError: If version not found
+        """
+        logger.info(
+            "Restoring chat agent version",
+            extra={"tenant_id": tenant_id, "chat_agent_id": chat_agent_id, "version": version},
+        )
+
+        with self.db_client.get_session() as session:
+            chat_agent = session.execute(
+                select(ChatAgent).where(ChatAgent.id == chat_agent_id, ChatAgent.tenant_id == tenant_id)
+            ).scalar_one_or_none()
+
+            if not chat_agent:
+                raise ChatAgentNotFoundError(chat_agent_id)
+
+            source_version = session.execute(
+                select(ReActAgentVersion).where(
+                    ReActAgentVersion.chat_agent_id == chat_agent_id,
+                    ReActAgentVersion.version == version,
+                )
+            ).scalar_one_or_none()
+
+            if not source_version:
+                raise ReActAgentVersionNotFoundError(chat_agent_id, version)
+
+            latest_version_num = (
+                session.execute(
+                    select(func.max(ReActAgentVersion.version)).where(ReActAgentVersion.chat_agent_id == chat_agent_id)
+                ).scalar_one()
+                or 0
+            )
+
+            new_version = ReActAgentVersion(
+                id=str(uuid.uuid4()),
+                chat_agent_id=chat_agent_id,
+                version=latest_version_num + 1,
+                ai_model_ids=source_version.ai_model_ids,
+                system_prompt=source_version.system_prompt,
+                tool_ids=source_version.tool_ids,
+                security_prompt=source_version.security_prompt,
+                tool_use_prompt=source_version.tool_use_prompt,
+                response_prompt=source_version.response_prompt,
+                greeting_messages=source_version.greeting_messages,
+                config=source_version.config,
+                created_by=user_id,
+                updated_by=user_id,
+            )
+            session.add(new_version)
+
+            chat_agent.updated_by = user_id
+            session.commit()
+
+            query = (
+                select(ChatAgent)
+                .options(
+                    selectinload(ChatAgent.tags).selectinload(ChatAgentTag.tag),
+                    selectinload(ChatAgent.versions),
+                )
+                .where(ChatAgent.id == chat_agent_id)
+            )
+            chat_agent = session.execute(query).scalar_one()
+
+            logger.info(
+                "Chat agent version restored",
+                extra={
+                    "chat_agent_id": chat_agent_id,
+                    "source_version": version,
+                    "new_version": latest_version_num + 1,
+                },
+            )
+
+            self._invalidate_list_cache(tenant_id)
+            self._invalidate_detail_cache(tenant_id, chat_agent_id)
+
+            return self._model_to_response(chat_agent)
 
     # ========== Permission Management Methods ==========
 
@@ -1012,12 +1342,29 @@ class ChatAgentHandler:
     @staticmethod
     def _model_to_response(chat_agent: ChatAgent) -> ChatAgentResponse:
         """Convert ChatAgent model to ChatAgentResponse."""
-        # Extract tags from the chat agent's tags relationship
         tags = []
         if hasattr(chat_agent, "tags") and chat_agent.tags:
             for app_tag in chat_agent.tags:
                 if app_tag.tag:
                     tags.append(TagSummary(id=app_tag.tag.id, name=app_tag.tag.name))
+
+        version_fields: dict = {}
+        if (
+            ChatAgentTypeEnum(chat_agent.type) == ChatAgentTypeEnum.REACT_AGENT
+            and hasattr(chat_agent, "versions")
+            and chat_agent.versions
+        ):
+            latest = chat_agent.versions[0]
+            version_fields = {
+                "current_version": latest.version,
+                "ai_model_ids": latest.ai_model_ids or [],
+                "system_prompt": latest.system_prompt,
+                "tool_ids": latest.tool_ids or [],
+                "security_prompt": latest.security_prompt,
+                "tool_use_prompt": latest.tool_use_prompt,
+                "response_prompt": latest.response_prompt,
+                "greeting_messages": latest.greeting_messages or [],
+            }
 
         return ChatAgentResponse(
             id=chat_agent.id,
@@ -1033,6 +1380,35 @@ class ChatAgentHandler:
             updated_at=chat_agent.updated_at,
             created_by=chat_agent.created_by,
             updated_by=chat_agent.updated_by,
+            **version_fields,
+        )
+
+    @staticmethod
+    def _version_to_response(version: ReActAgentVersion) -> ReActAgentVersionResponse:
+        """Convert a ReACT agent version model to a response.
+
+        Args:
+            version: ReACT agent version model instance
+
+        Returns:
+            ReACT agent version response
+        """
+        return ReActAgentVersionResponse(
+            id=version.id,
+            chat_agent_id=version.chat_agent_id,
+            version=version.version,
+            ai_model_ids=version.ai_model_ids or [],
+            system_prompt=version.system_prompt,
+            tool_ids=version.tool_ids or [],
+            security_prompt=version.security_prompt,
+            tool_use_prompt=version.tool_use_prompt,
+            response_prompt=version.response_prompt,
+            greeting_messages=version.greeting_messages or [],
+            config=version.config or {},
+            created_at=version.created_at,
+            updated_at=version.updated_at,
+            created_by=version.created_by,
+            updated_by=version.updated_by,
         )
 
     def _resolve_user_permission(

@@ -132,6 +132,11 @@ class OpenAPIDefinitionConfigValidator(BaseToolConfigValidator):
             )
 
         spec = config.get("spec")
+        if not spec and config.get("openapi") and config.get("info"):
+            spec = dict(config)
+            config.clear()
+            config["spec"] = spec
+
         if not spec:
             raise ToolConfigValidationError(
                 message="OpenAPI Definition config must contain a 'spec' field with the OpenAPI specification",
@@ -165,8 +170,14 @@ class OpenAPIDefinitionConfigValidator(BaseToolConfigValidator):
             from openapi_spec_validator import validate
 
             validate(spec)
+        except ToolConfigValidationError:
+            raise
         except Exception as e:
             error_msg = str(e)
+            logger.error(
+                "OpenAPI spec validation error",
+                extra={"error_type": type(e).__name__, "error_msg": error_msg[:500]},
+            )
             if len(error_msg) > 500:
                 error_msg = error_msg[:500] + "..."
             raise ToolConfigValidationError(message="OpenAPI specification validation failed", errors=[error_msg])

@@ -371,6 +371,9 @@ class ChatAgent(Base, IdNameDescriptionMixin, TenantScopedMixin):
     user_favorites: Mapped[list[ChatAgentUserFavorite]] = relationship(
         back_populates="chat_agent", cascade="all, delete-orphan"
     )
+    versions: Mapped[list[ReActAgentVersion]] = relationship(
+        back_populates="chat_agent", cascade="all, delete-orphan", order_by="ReActAgentVersion.version.desc()"
+    )
 
     __table_args__ = (Index("ix_chat_agents_tenant", "tenant_id"),)
 
@@ -641,7 +644,6 @@ class Tag(Base, AuditMixin):
     chat_widget_tags: Mapped[list[ChatWidgetTag]] = relationship(back_populates="tag", cascade="all, delete-orphan")
     credential_tags: Mapped[list[CredentialTag]] = relationship(back_populates="tag", cascade="all, delete-orphan")
     tool_tags: Mapped[list[ToolTag]] = relationship(back_populates="tag", cascade="all, delete-orphan")
-    re_act_agent_tags: Mapped[list[ReActAgentTag]] = relationship(back_populates="tag", cascade="all, delete-orphan")
 
     @validates("name")
     def convert_upper(self, key, value):
@@ -868,37 +870,6 @@ class ChatWidgetUserFavorite(Base, AuditMixin):
     )
 
 
-class ReActAgentUserFavorite(Base, AuditMixin):
-    """User favorites for ReACT agents."""
-
-    __tablename__ = "re_act_agent_user_favorites"
-
-    tenant_id: Mapped[str] = mapped_column(
-        String(36), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False, primary_key=True
-    )
-    user_id: Mapped[str] = mapped_column(String(50), nullable=False, primary_key=True)
-    re_act_agent_id: Mapped[str] = mapped_column(
-        String(36), ForeignKey("re_act_agents.id", ondelete="CASCADE"), nullable=False, primary_key=True
-    )
-
-    re_act_agent: Mapped[ReActAgent] = relationship(back_populates="user_favorites")
-    principal: Mapped[Principal] = relationship(
-        foreign_keys="[ReActAgentUserFavorite.tenant_id, ReActAgentUserFavorite.user_id]",
-        primaryjoin="and_(ReActAgentUserFavorite.tenant_id == Principal.tenant_id, ReActAgentUserFavorite.user_id == Principal.principal_id)",
-    )
-
-    __table_args__ = (
-        ForeignKeyConstraint(
-            ["tenant_id", "user_id"],
-            ["principals.tenant_id", "principals.principal_id"],
-            ondelete="CASCADE",
-            name="fk_re_act_agent_user_favorites_principal",
-        ),
-        Index("ix_rauf_user", "user_id"),
-        Index("ix_rauf_re_act_agent", "re_act_agent_id"),
-    )
-
-
 # ---------- Tools (ReACT Agent Tools) ----------
 class Tool(Base, IdNameDescriptionMixin, TenantScopedMixin):
     """Tool entity for ReACT agent tools (MCP servers, OpenAPI definitions)."""
@@ -991,37 +962,14 @@ class ToolTag(Base, AuditMixin):
     )
 
 
-# ---------- ReACT Agents ----------
-class ReActAgent(Base, IdNameDescriptionMixin, TenantScopedMixin):
-    """ReACT Agent entity — identity and metadata only. Config is versioned in ReActAgentVersion."""
-
-    __tablename__ = "re_act_agents"
-
-    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
-    published_chat_agent_id: Mapped[str | None] = mapped_column(
-        String(36), ForeignKey("chat_agents.id", ondelete="SET NULL"), nullable=True
-    )
-
-    published_chat_agent: Mapped[ChatAgent | None] = relationship(foreign_keys="[ReActAgent.published_chat_agent_id]")
-    versions: Mapped[list[ReActAgentVersion]] = relationship(
-        back_populates="re_act_agent", cascade="all, delete-orphan", order_by="ReActAgentVersion.version.desc()"
-    )
-    members: Mapped[list[ReActAgentMember]] = relationship(back_populates="re_act_agent", cascade="all, delete-orphan")
-    tags: Mapped[list[ReActAgentTag]] = relationship(back_populates="re_act_agent", cascade="all, delete-orphan")
-    user_favorites: Mapped[list[ReActAgentUserFavorite]] = relationship(
-        back_populates="re_act_agent", cascade="all, delete-orphan"
-    )
-
-    __table_args__ = (Index("ix_re_act_agents_tenant", "tenant_id"),)
-
-
+# ---------- ReACT Agent Versions (linked to ChatAgent) ----------
 class ReActAgentVersion(Base, IdMixin, AuditMixin):
-    """Versioned configuration for a ReACT Agent."""
+    """Versioned configuration for a ReACT Agent (chat_agent with type=REACT_AGENT)."""
 
     __tablename__ = "re_act_agent_versions"
 
-    re_act_agent_id: Mapped[str] = mapped_column(
-        String(36), ForeignKey("re_act_agents.id", ondelete="CASCADE"), nullable=False
+    chat_agent_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("chat_agents.id", ondelete="CASCADE"), nullable=False
     )
     version: Mapped[int] = mapped_column(Integer, nullable=False)
     ai_model_ids: Mapped[list] = mapped_column(PortableJSON, nullable=False, default=list)
@@ -1033,65 +981,12 @@ class ReActAgentVersion(Base, IdMixin, AuditMixin):
     greeting_messages: Mapped[list] = mapped_column(PortableJSON, nullable=False, default=list)
     config: Mapped[dict] = mapped_column(PortableJSON, nullable=False, default=dict)
 
-    re_act_agent: Mapped[ReActAgent] = relationship(back_populates="versions")
+    chat_agent: Mapped[ChatAgent] = relationship(back_populates="versions")
 
     __table_args__ = (
-        UniqueConstraint("re_act_agent_id", "version", name="uq_re_act_agent_version"),
-        Index("ix_re_act_agent_versions_agent", "re_act_agent_id"),
-        Index("ix_re_act_agent_versions_agent_version", "re_act_agent_id", "version"),
-    )
-
-
-class ReActAgentMember(Base, IdMixin, AuditMixin):
-    """ReACT Agent membership table."""
-
-    __tablename__ = "re_act_agent_members"
-
-    tenant_id: Mapped[str] = mapped_column(String(36), nullable=False)
-    re_act_agent_id: Mapped[str] = mapped_column(
-        String(36), ForeignKey("re_act_agents.id", ondelete="CASCADE"), nullable=False
-    )
-    principal_id: Mapped[str] = mapped_column(String(50), nullable=False)
-    role: Mapped[str] = mapped_column(PermissionActionSAEnum, nullable=False)
-
-    re_act_agent: Mapped[ReActAgent] = relationship(back_populates="members")
-    principal: Mapped[Principal] = relationship(
-        foreign_keys="[ReActAgentMember.tenant_id, ReActAgentMember.principal_id]",
-        primaryjoin="and_(ReActAgentMember.tenant_id == Principal.tenant_id, ReActAgentMember.principal_id == Principal.principal_id)",
-    )
-
-    __table_args__ = (
-        ForeignKeyConstraint(
-            ["tenant_id", "principal_id"],
-            ["principals.tenant_id", "principals.principal_id"],
-            ondelete="CASCADE",
-            name="fk_re_act_agent_members_principal",
-        ),
-        UniqueConstraint("re_act_agent_id", "principal_id", name="uq_re_act_agent_members"),
-        Index("ix_re_act_agent_members_agent", "re_act_agent_id"),
-        Index("ix_re_act_agent_members_principal", "principal_id"),
-    )
-
-
-class ReActAgentTag(Base, AuditMixin):
-    """Junction table for ReACT agent tags."""
-
-    __tablename__ = "re_act_agent_tags"
-
-    tenant_id: Mapped[str] = mapped_column(String(36), nullable=False, primary_key=True)
-    tag_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("tags.id", ondelete="CASCADE"), nullable=False, primary_key=True
-    )
-    re_act_agent_id: Mapped[str] = mapped_column(
-        String(36), ForeignKey("re_act_agents.id", ondelete="CASCADE"), nullable=False, primary_key=True
-    )
-
-    tag: Mapped[Tag] = relationship(back_populates="re_act_agent_tags")
-    re_act_agent: Mapped[ReActAgent] = relationship(back_populates="tags")
-
-    __table_args__ = (
-        Index("ix_rat_agent", "re_act_agent_id"),
-        Index("ix_rat_tag", "tag_id"),
+        UniqueConstraint("chat_agent_id", "version", name="uq_re_act_agent_version"),
+        Index("ix_re_act_agent_versions_agent", "chat_agent_id"),
+        Index("ix_re_act_agent_versions_agent_version", "chat_agent_id", "version"),
     )
 
 

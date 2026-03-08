@@ -15,7 +15,6 @@ from unifiedui.apis.v1 import (
     identity,
     organizations,
     principals,
-    re_act_agents,
     recent_visits,
     search,
     tags,
@@ -47,7 +46,6 @@ from unifiedui.exc.organizations import (
 )
 from unifiedui.exc.permissions import PermissionDeniedError
 from unifiedui.exc.principal import PrincipalNotFoundError
-from unifiedui.exc.re_act_agents import ReActAgentNotFoundError
 from unifiedui.exc.tags import TagDeleteNotAllowedError, TagNotFoundError
 from unifiedui.exc.tenant_ai_models import (
     InvalidAIModelCredentialError,
@@ -262,11 +260,6 @@ def create_app() -> FastAPI:
         """Handle invalid tool credential errors."""
         return JSONResponse(status_code=400, content={"detail": exc.message, "credential_id": exc.credential_id})
 
-    @app.exception_handler(ReActAgentNotFoundError)
-    async def re_act_agent_not_found_handler(request: Request, exc: ReActAgentNotFoundError):
-        """Handle ReACT agent not found errors."""
-        return JSONResponse(status_code=404, content={"detail": str(exc)})
-
     @app.exception_handler(TenantAIModelNotFoundError)
     async def tenant_ai_model_not_found_handler(request: Request, exc: TenantAIModelNotFoundError):
         """Handle tenant AI model not found errors."""
@@ -373,22 +366,6 @@ def create_app() -> FastAPI:
 
     # Tool-specific tag routes
     app.include_router(tags.tool_tags_router, prefix="/api/v1/platform-service/tenants/{tenant_id}", tags=["Tools"])
-
-    # ReACT Agent routes - tags list router MUST be before re_act_agents router to avoid path conflicts
-    app.include_router(
-        tags.re_act_agents_tags_list_router,
-        prefix="/api/v1/platform-service/tenants/{tenant_id}",
-        tags=["ReACT Agents"],
-    )
-
-    app.include_router(
-        re_act_agents.router, prefix="/api/v1/platform-service/tenants/{tenant_id}", tags=["ReACT Agents"]
-    )
-
-    # ReACT Agent-specific tag routes
-    app.include_router(
-        tags.re_act_agent_tags_router, prefix="/api/v1/platform-service/tenants/{tenant_id}", tags=["ReACT Agents"]
-    )
 
     # User Favorites routes
     app.include_router(

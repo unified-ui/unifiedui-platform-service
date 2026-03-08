@@ -16,9 +16,6 @@ from unifiedui.core.database.models import (
     ChatAgentTag,
     Conversation,
     ConversationMember,
-    ReActAgent,
-    ReActAgentMember,
-    ReActAgentTag,
     Tag,
 )
 
@@ -32,7 +29,7 @@ from unifiedui.schema.responses.search import SearchResponse, SearchResultItem
 
 logger = get_logger(__name__)
 
-VALID_SEARCH_TYPES = {"chat_agent", "autonomous_agent", "conversation", "re_act_agent"}
+VALID_SEARCH_TYPES = {"chat_agent", "autonomous_agent", "conversation"}
 
 SEARCH_TYPE_CONFIG = {
     "chat_agent": {
@@ -66,17 +63,6 @@ SEARCH_TYPE_CONFIG = {
         "admin_roles": [
             TenantRolesEnum.TENANT_GLOBAL_ADMIN,
             TenantRolesEnum.CONVERSATIONS_ADMIN,
-        ],
-    },
-    "re_act_agent": {
-        "entity_model": ReActAgent,
-        "member_model": ReActAgentMember,
-        "entity_id_field": "re_act_agent_id",
-        "tag_model": ReActAgentTag,
-        "tag_entity_id_field": "re_act_agent_id",
-        "admin_roles": [
-            TenantRolesEnum.TENANT_GLOBAL_ADMIN,
-            TenantRolesEnum.REACT_AGENT_ADMIN,
         ],
     },
 }

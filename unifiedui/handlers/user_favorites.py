@@ -11,7 +11,6 @@ from unifiedui.core.database.models import (
     ChatAgentUserFavorite,
     ChatWidgetUserFavorite,
     ConversationUserFavorite,
-    ReActAgentUserFavorite,
 )
 from unifiedui.logger import get_logger
 from unifiedui.schema.responses.user_favorites import UserFavoriteResponse, UserFavoritesListResponse
@@ -40,10 +39,6 @@ RESOURCE_FAVORITE_MAPPING = {
     "conversations": {
         "model": ConversationUserFavorite,
         "id_field": "conversation_id",
-    },
-    "re-act-agents": {
-        "model": ReActAgentUserFavorite,
-        "id_field": "re_act_agent_id",
     },
 }
 

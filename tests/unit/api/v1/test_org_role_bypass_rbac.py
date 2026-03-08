@@ -2,7 +2,7 @@
 
 Verifies that ORGANISATION_GLOBAL_ADMIN and ORGANISATION_TENANT_ADMIN
 bypass ALL tenant-level permission checks (tenant, chat_agent, credential,
-autonomous_agent, conversation, custom_group, chat_widget, re_act_agent, tool,
+autonomous_agent, conversation, custom_group, chat_widget, tool,
 tag, tenant_ai_model). Also verifies that ORGANISATION_TENANT_CREATOR does NOT
 get bypass.
 """
@@ -37,7 +37,6 @@ ENDPOINT_CUSTOM_GROUPS = "/api/v1/platform-service/tenants/{tenant_id}/custom-gr
 ENDPOINT_CUSTOM_GROUP_DETAIL = "/api/v1/platform-service/tenants/{tenant_id}/custom-groups/{entity_id}"
 ENDPOINT_CHAT_WIDGETS = "/api/v1/platform-service/tenants/{tenant_id}/chat-widgets"
 ENDPOINT_CHAT_WIDGET_DETAIL = "/api/v1/platform-service/tenants/{tenant_id}/chat-widgets/{entity_id}"
-ENDPOINT_RE_ACT_AGENTS = "/api/v1/platform-service/tenants/{tenant_id}/re-act-agents"
 ENDPOINT_TAGS = "/api/v1/platform-service/tenants/{tenant_id}/tags"
 ENDPOINT_TENANT_AI_MODELS = "/api/v1/platform-service/tenants/{tenant_id}/ai-models"
 

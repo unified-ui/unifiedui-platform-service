@@ -17,8 +17,6 @@ from unifiedui.core.database.models import (
     ChatWidgetMember,
     Credential,
     CredentialMember,
-    ReActAgent,
-    ReActAgentMember,
     Tool,
     ToolMember,
 )
@@ -33,7 +31,6 @@ ENDPOINT_AUTONOMOUS_AGENT_TAGS = (
 ENDPOINT_CHAT_WIDGET_TAGS = "/api/v1/platform-service/tenants/{tenant_id}/chat-widgets/{chat_widget_id}/tags"
 ENDPOINT_CREDENTIAL_TAGS = "/api/v1/platform-service/tenants/{tenant_id}/credentials/{credential_id}/tags"
 ENDPOINT_TOOL_TAGS = "/api/v1/platform-service/tenants/{tenant_id}/tools/{tool_id}/tags"
-ENDPOINT_RE_ACT_AGENT_TAGS = "/api/v1/platform-service/tenants/{tenant_id}/re-act-agents/{re_act_agent_id}/tags"
 
 # Resource endpoints for list with tags filter
 ENDPOINT_CHAT_AGENTS = "/api/v1/platform-service/tenants/{tenant_id}/chat-agents"
@@ -44,7 +41,6 @@ ENDPOINT_DEVELOPMENT_PLATFORMS = "/api/v1/platform-service/tenants/{tenant_id}/d
 
 # Resource-type tag list endpoints
 ENDPOINT_TOOLS_TAGS_LIST = "/api/v1/platform-service/tenants/{tenant_id}/tools/tags"
-ENDPOINT_RE_ACT_AGENTS_TAGS_LIST = "/api/v1/platform-service/tenants/{tenant_id}/re-act-agents/tags"
 ENDPOINT_CHAT_AGENTS_TAGS_LIST = "/api/v1/platform-service/tenants/{tenant_id}/chat-agents/tags"
 ENDPOINT_AUTONOMOUS_AGENTS_TAGS_LIST = "/api/v1/platform-service/tenants/{tenant_id}/autonomous-agents/tags"
 ENDPOINT_CHAT_WIDGETS_TAGS_LIST = "/api/v1/platform-service/tenants/{tenant_id}/chat-widgets/tags"
@@ -224,38 +220,6 @@ def create_tool_in_db(test_client: TestClient, tenant_id: str, user_id: str, nam
         session.add(member)
         session.commit()
     return tool_id
-
-
-def create_re_act_agent_in_db(
-    test_client: TestClient, tenant_id: str, user_id: str, name: str = "Test ReACT Agent"
-) -> str:
-    """Helper function to create a ReACT agent directly in DB and return its ID."""
-    agent_id = str(uuid.uuid4())
-    with test_client.db_client.get_session() as session:
-        agent = ReActAgent(
-            id=agent_id,
-            tenant_id=tenant_id,
-            name=name,
-            description="Test ReACT agent",
-            is_active=True,
-            created_by=user_id,
-            updated_by=user_id,
-        )
-        session.add(agent)
-        session.commit()
-
-        member = ReActAgentMember(
-            id=str(uuid.uuid4()),
-            tenant_id=tenant_id,
-            re_act_agent_id=agent_id,
-            principal_id=user_id,
-            role=PermissionActionEnum.ADMIN,
-            created_by=user_id,
-            updated_by=user_id,
-        )
-        session.add(member)
-        session.commit()
-    return agent_id
 
 
 class TestTagRoutes:
@@ -845,92 +809,6 @@ class TestToolTagRoutes:
         assert get_response.json() == []
 
 
-class TestReActAgentTagRoutes:
-    """Test suite for ReACT agent tag management."""
-
-    def test_get_re_act_agent_tags_empty(self, test_client: TestClient, test_user_token: Any) -> None:
-        """Test getting tags for a ReACT agent with no tags."""
-        tenant_id = create_tenant_for_user(test_client, test_user_token)
-        agent_id = create_re_act_agent_in_db(test_client, tenant_id, test_user_token.get_id())
-        headers = create_auth_headers(test_user_token, use_cache=False)
-
-        response = test_client.get(
-            ENDPOINT_RE_ACT_AGENT_TAGS.format(tenant_id=tenant_id, re_act_agent_id=agent_id), headers=headers
-        )
-
-        assert response.status_code == status.HTTP_200_OK
-        assert response.json() == []
-
-    def test_set_and_get_re_act_agent_tags(self, test_client: TestClient, test_user_token: Any) -> None:
-        """Test setting and getting tags on a ReACT agent."""
-        tenant_id = create_tenant_for_user(test_client, test_user_token)
-        agent_id = create_re_act_agent_in_db(test_client, tenant_id, test_user_token.get_id())
-        headers = create_auth_headers(test_user_token, use_cache=False)
-
-        response = test_client.put(
-            ENDPOINT_RE_ACT_AGENT_TAGS.format(tenant_id=tenant_id, re_act_agent_id=agent_id),
-            json={"tags": ["react", "production"]},
-            headers=headers,
-        )
-
-        assert response.status_code == status.HTTP_200_OK
-        data = response.json()
-        assert len(data) == 2
-
-        get_response = test_client.get(
-            ENDPOINT_RE_ACT_AGENT_TAGS.format(tenant_id=tenant_id, re_act_agent_id=agent_id), headers=headers
-        )
-        assert get_response.status_code == status.HTTP_200_OK
-        assert len(get_response.json()) == 2
-
-    def test_set_re_act_agent_tags_replaces_existing(self, test_client: TestClient, test_user_token: Any) -> None:
-        """Test that setting tags replaces existing tags."""
-        tenant_id = create_tenant_for_user(test_client, test_user_token)
-        agent_id = create_re_act_agent_in_db(test_client, tenant_id, test_user_token.get_id())
-        headers = create_auth_headers(test_user_token, use_cache=False)
-
-        test_client.put(
-            ENDPOINT_RE_ACT_AGENT_TAGS.format(tenant_id=tenant_id, re_act_agent_id=agent_id),
-            json={"tags": ["OLD"]},
-            headers=headers,
-        )
-
-        response = test_client.put(
-            ENDPOINT_RE_ACT_AGENT_TAGS.format(tenant_id=tenant_id, re_act_agent_id=agent_id),
-            json={"tags": ["NEW-X", "NEW-Y"]},
-            headers=headers,
-        )
-
-        assert response.status_code == status.HTTP_200_OK
-        tag_names = [t["name"] for t in response.json()]
-        assert "NEW-X" in tag_names
-        assert "NEW-Y" in tag_names
-        assert "OLD" not in tag_names
-
-    def test_delete_re_act_agent_tags(self, test_client: TestClient, test_user_token: Any) -> None:
-        """Test deleting all tags from a ReACT agent."""
-        tenant_id = create_tenant_for_user(test_client, test_user_token)
-        agent_id = create_re_act_agent_in_db(test_client, tenant_id, test_user_token.get_id())
-        headers = create_auth_headers(test_user_token, use_cache=False)
-
-        test_client.put(
-            ENDPOINT_RE_ACT_AGENT_TAGS.format(tenant_id=tenant_id, re_act_agent_id=agent_id),
-            json={"tags": ["TAG1", "TAG2"]},
-            headers=headers,
-        )
-
-        response = test_client.delete(
-            ENDPOINT_RE_ACT_AGENT_TAGS.format(tenant_id=tenant_id, re_act_agent_id=agent_id), headers=headers
-        )
-
-        assert response.status_code == status.HTTP_204_NO_CONTENT
-
-        get_response = test_client.get(
-            ENDPOINT_RE_ACT_AGENT_TAGS.format(tenant_id=tenant_id, re_act_agent_id=agent_id), headers=headers
-        )
-        assert get_response.json() == []
-
-
 class TestResourceTypeTagListEndpoints:
     """Test suite for resource-type tag list endpoints."""
 
@@ -954,26 +832,6 @@ class TestResourceTypeTagListEndpoints:
         tag_names = [t["name"] for t in data]
         assert "TOOL-TAG-1" in tag_names
         assert "TOOL-TAG-2" in tag_names
-
-    def test_list_re_act_agent_tags(self, test_client: TestClient, test_user_token: Any) -> None:
-        """Test listing tags filtered by ReACT agents resource type."""
-        tenant_id = create_tenant_for_user(test_client, test_user_token)
-        agent_id = create_re_act_agent_in_db(test_client, tenant_id, test_user_token.get_id())
-        headers = create_auth_headers(test_user_token, use_cache=False)
-
-        test_client.put(
-            ENDPOINT_RE_ACT_AGENT_TAGS.format(tenant_id=tenant_id, re_act_agent_id=agent_id),
-            json={"tags": ["REACT-TAG-1"]},
-            headers=headers,
-        )
-
-        response = test_client.get(ENDPOINT_RE_ACT_AGENTS_TAGS_LIST.format(tenant_id=tenant_id), headers=headers)
-
-        assert response.status_code == status.HTTP_200_OK
-        data = response.json()
-        assert len(data) >= 1
-        tag_names = [t["name"] for t in data]
-        assert "REACT-TAG-1" in tag_names
 
     def test_list_chat_agent_tags(self, test_client: TestClient, test_user_token: Any) -> None:
         """Test listing tags filtered by chat agents resource type."""
@@ -1053,7 +911,7 @@ class TestResourceTypeTagListEndpoints:
         headers = create_auth_headers(test_user_token, use_cache=False)
 
         tool_id = create_tool_in_db(test_client, tenant_id, test_user_token.get_id())
-        agent_id = create_re_act_agent_in_db(test_client, tenant_id, test_user_token.get_id())
+        chat_agent_id = create_chat_agent_in_db(test_client, tenant_id, test_user_token.get_id())
 
         test_client.put(
             ENDPOINT_TOOL_TAGS.format(tenant_id=tenant_id, tool_id=tool_id),
@@ -1061,19 +919,19 @@ class TestResourceTypeTagListEndpoints:
             headers=headers,
         )
         test_client.put(
-            ENDPOINT_RE_ACT_AGENT_TAGS.format(tenant_id=tenant_id, re_act_agent_id=agent_id),
-            json={"tags": ["ONLY-REACT"]},
+            ENDPOINT_CHAT_AGENT_TAGS.format(tenant_id=tenant_id, chat_agent_id=chat_agent_id),
+            json={"tags": ["ONLY-CHAT-AGENT"]},
             headers=headers,
         )
 
         tool_tags_response = test_client.get(ENDPOINT_TOOLS_TAGS_LIST.format(tenant_id=tenant_id), headers=headers)
         tool_tag_names = [t["name"] for t in tool_tags_response.json()]
         assert "ONLY-TOOL" in tool_tag_names
-        assert "ONLY-REACT" not in tool_tag_names
+        assert "ONLY-CHAT-AGENT" not in tool_tag_names
 
-        react_tags_response = test_client.get(
-            ENDPOINT_RE_ACT_AGENTS_TAGS_LIST.format(tenant_id=tenant_id), headers=headers
+        chat_agent_tags_response = test_client.get(
+            ENDPOINT_CHAT_AGENTS_TAGS_LIST.format(tenant_id=tenant_id), headers=headers
         )
-        react_tag_names = [t["name"] for t in react_tags_response.json()]
-        assert "ONLY-REACT" in react_tag_names
-        assert "ONLY-TOOL" not in react_tag_names
+        chat_agent_tag_names = [t["name"] for t in chat_agent_tags_response.json()]
+        assert "ONLY-CHAT-AGENT" in chat_agent_tag_names
+        assert "ONLY-TOOL" not in chat_agent_tag_names

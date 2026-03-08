@@ -35,8 +35,6 @@ from unifiedui.core.database.models import (
     CredentialMember,
     CustomGroupMember,
     Principal,
-    ReActAgent,
-    ReActAgentMember,
     Tool,
     ToolMember,
 )
@@ -102,13 +100,6 @@ RESOURCE_PERMISSION_CONFIG: dict[str, dict[str, Any]] = {
         "member_model": ToolMember,
         "id_field": "tool_id",
         "cache_prefix": "tools",
-        "tenant_admin_role": TenantRolesEnum.REACT_AGENT_ADMIN,
-    },
-    "re_act_agent": {
-        "resource_model": ReActAgent,
-        "member_model": ReActAgentMember,
-        "id_field": "re_act_agent_id",
-        "cache_prefix": "re_act_agents",
         "tenant_admin_role": TenantRolesEnum.REACT_AGENT_ADMIN,
     },
 }

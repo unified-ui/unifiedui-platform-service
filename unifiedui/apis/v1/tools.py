@@ -7,7 +7,7 @@ from fastapi.responses import Response
 
 from unifiedui.core.database.enums import ListViewEnum, OrderDirectionEnum, PermissionActionEnum, TenantRolesEnum
 from unifiedui.core.middleware.apis.v1.auth import authenticate, check_permissions
-from unifiedui.exc.tools import InvalidToolCredentialError, ToolNotFoundError
+from unifiedui.exc.tools import InvalidToolCredentialError, ToolConfigValidationError, ToolNotFoundError
 from unifiedui.handlers.dependencies import get_tool_handler
 from unifiedui.handlers.tools import ToolHandler
 from unifiedui.logger import get_logger
@@ -142,6 +142,12 @@ async def create_tool(
     except InvalidToolCredentialError as e:
         logger.warning(f"Invalid credential: {e}")
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except ToolConfigValidationError as e:
+        logger.warning(f"Tool config validation failed: {e.message}", extra={"errors": e.errors})
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Tool config validation failed: {e.message}. Errors: {'; '.join(e.errors)}",
+        )
     except Exception as e:
         logger.error(f"Failed to create tool: {e}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to create tool: {e!s}")
@@ -214,6 +220,12 @@ async def update_tool(
     except InvalidToolCredentialError as e:
         logger.warning(f"Invalid credential: {e}")
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except ToolConfigValidationError as e:
+        logger.warning(f"Tool config validation failed: {e.message}", extra={"errors": e.errors})
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Tool config validation failed: {e.message}. Errors: {'; '.join(e.errors)}",
+        )
     except Exception as e:
         logger.error(f"Failed to update tool: {e}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to update tool: {e!s}")

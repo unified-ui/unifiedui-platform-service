@@ -5,18 +5,30 @@ from typing import TYPE_CHECKING
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import Response
 
-from unifiedui.core.database.enums import ListViewEnum, OrderDirectionEnum, PermissionActionEnum, TenantRolesEnum
+from unifiedui.core.database.enums import (
+    ChatAgentTypeEnum,
+    ListViewEnum,
+    OrderDirectionEnum,
+    PermissionActionEnum,
+    TenantRolesEnum,
+)
 from unifiedui.core.middleware.apis.v1.auth import authenticate, check_permissions
 from unifiedui.exc.chat_agent_config import InvalidCredentialError
 from unifiedui.exc.chat_agents import ChatAgentNotFoundError
+from unifiedui.exc.re_act_agents import ReActAgentVersionNotFoundError
 from unifiedui.handlers.chat_agents import ChatAgentHandler
 from unifiedui.handlers.credentials import CredentialHandler
 from unifiedui.handlers.dependencies import get_chat_agent_handler, get_credential_handler
 from unifiedui.logger import get_logger
 from unifiedui.schema.requests.chat_agent_permissions import SetChatAgentPermissionRequest
-from unifiedui.schema.requests.chat_agents import CreateChatAgentRequest, UpdateChatAgentRequest
+from unifiedui.schema.requests.chat_agents import (
+    CreateChatAgentRequest,
+    UpdateChatAgentRequest,
+    UpdateReActAgentVersionRequest,
+)
 from unifiedui.schema.responses.chat_agents import ChatAgentConfigResponse, ChatAgentResponse
 from unifiedui.schema.responses.principals import PrincipalWithRolesResponse, ResourcePrincipalsResponse
+from unifiedui.schema.responses.re_act_agents import ReActAgentVersionResponse
 
 if TYPE_CHECKING:
     from unifiedui.core.identity.users import ContextIdentityUser
@@ -49,6 +61,7 @@ async def list_chat_agents(
     view: ListViewEnum | None = Query(
         None, description="View type: 'full' (default) or 'quick-list' (returns only id and name)"
     ),
+    type: ChatAgentTypeEnum | None = Query(None, description="Filter by chat agent type (e.g., 'REACT_AGENT', 'N8N')"),
     handler: ChatAgentHandler = Depends(get_chat_agent_handler),
 ):
     """
@@ -105,6 +118,7 @@ async def list_chat_agents(
             order_by=order_by,
             order_direction=order_direction.value if order_direction else None,
             view=view.value if view else None,
+            type_filter=type.value if type else None,
             user=user,
         )
     except HTTPException:
@@ -386,6 +400,227 @@ async def get_chat_agent_config(
         logger.error(f"Failed to get chat agent config: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to get chat agent config: {e!s}"
+        )
+
+
+# ========== Chat Agent Version Endpoints (REACT_AGENT) ==========
+
+
+@router.patch(
+    "/{chat_agent_id}/versions",
+    response_model=ChatAgentResponse,
+    summary="Create new chat agent version",
+    description="Create a new version of the chat agent config (REACT_AGENT only). Applies partial update to the latest version.",
+)
+@authenticate()
+@check_permissions(
+    entity="chat_agent",
+    required_permissions=[
+        TenantRolesEnum.TENANT_GLOBAL_ADMIN,
+        TenantRolesEnum.CHAT_AGENTS_ADMIN,
+        TenantRolesEnum.REACT_AGENT_ADMIN,
+        PermissionActionEnum.ADMIN,
+        PermissionActionEnum.WRITE,
+    ],
+)
+async def update_chat_agent_version(
+    request: Request,
+    tenant_id: str,
+    chat_agent_id: str,
+    body: UpdateReActAgentVersionRequest,
+    handler: ChatAgentHandler = Depends(get_chat_agent_handler),
+) -> ChatAgentResponse:
+    """Create a new version of a REACT_AGENT chat agent.
+
+    Args:
+        request: FastAPI request with user in state
+        tenant_id: Tenant ID from path
+        chat_agent_id: Chat agent ID from path
+        body: Version update data
+        handler: Chat agent handler dependency
+
+    Returns:
+        Updated ChatAgentResponse
+
+    Raises:
+        HTTPException: If chat agent not found or update fails
+    """
+    try:
+        user: ContextIdentityUser = request.state.user
+        return handler.update_chat_agent_version(
+            tenant_id=tenant_id,
+            chat_agent_id=chat_agent_id,
+            request=body,
+            user_id=user.identity.get_id(),
+        )
+    except ChatAgentNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except Exception as e:
+        logger.error(f"Failed to update chat agent version: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to update chat agent version"
+        )
+
+
+@router.get(
+    "/{chat_agent_id}/versions",
+    response_model=list[ReActAgentVersionResponse],
+    summary="List chat agent versions",
+    description="List all versions of a chat agent (REACT_AGENT only).",
+)
+@authenticate()
+@check_permissions(
+    entity="chat_agent",
+    required_permissions=[
+        TenantRolesEnum.TENANT_GLOBAL_ADMIN,
+        TenantRolesEnum.CHAT_AGENTS_ADMIN,
+        TenantRolesEnum.REACT_AGENT_ADMIN,
+        PermissionActionEnum.ADMIN,
+        PermissionActionEnum.WRITE,
+        PermissionActionEnum.READ,
+    ],
+)
+async def list_chat_agent_versions(
+    request: Request,
+    tenant_id: str,
+    chat_agent_id: str,
+    skip: int = Query(0, ge=0, description="Number of items to skip"),
+    limit: int = Query(50, ge=1, le=200, description="Maximum number of items to return"),
+    handler: ChatAgentHandler = Depends(get_chat_agent_handler),
+) -> list[ReActAgentVersionResponse]:
+    """List all versions of a chat agent.
+
+    Args:
+        request: FastAPI request with user in state
+        tenant_id: Tenant ID from path
+        chat_agent_id: Chat agent ID from path
+        skip: Number of items to skip
+        limit: Maximum number of items to return
+        handler: Chat agent handler dependency
+
+    Returns:
+        List of ReActAgentVersionResponse
+
+    Raises:
+        HTTPException: If chat agent not found
+    """
+    try:
+        return handler.list_chat_agent_versions(
+            tenant_id=tenant_id, chat_agent_id=chat_agent_id, skip=skip, limit=limit
+        )
+    except ChatAgentNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except Exception as e:
+        logger.error(f"Failed to list chat agent versions: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to list chat agent versions"
+        )
+
+
+@router.get(
+    "/{chat_agent_id}/versions/{version}",
+    response_model=ReActAgentVersionResponse,
+    summary="Get chat agent version",
+    description="Get a specific version of a chat agent (REACT_AGENT only).",
+)
+@authenticate()
+@check_permissions(
+    entity="chat_agent",
+    required_permissions=[
+        TenantRolesEnum.TENANT_GLOBAL_ADMIN,
+        TenantRolesEnum.CHAT_AGENTS_ADMIN,
+        TenantRolesEnum.REACT_AGENT_ADMIN,
+        PermissionActionEnum.ADMIN,
+        PermissionActionEnum.WRITE,
+        PermissionActionEnum.READ,
+    ],
+)
+async def get_chat_agent_version(
+    request: Request,
+    tenant_id: str,
+    chat_agent_id: str,
+    version: int,
+    handler: ChatAgentHandler = Depends(get_chat_agent_handler),
+) -> ReActAgentVersionResponse:
+    """Get a specific version of a chat agent.
+
+    Args:
+        request: FastAPI request with user in state
+        tenant_id: Tenant ID from path
+        chat_agent_id: Chat agent ID from path
+        version: Version number
+        handler: Chat agent handler dependency
+
+    Returns:
+        ReActAgentVersionResponse
+
+    Raises:
+        HTTPException: If version not found
+    """
+    try:
+        return handler.get_chat_agent_version(tenant_id=tenant_id, chat_agent_id=chat_agent_id, version=version)
+    except (ChatAgentNotFoundError, ReActAgentVersionNotFoundError) as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except Exception as e:
+        logger.error(f"Failed to get chat agent version: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to get chat agent version"
+        )
+
+
+@router.post(
+    "/{chat_agent_id}/versions/{version}/restore",
+    response_model=ChatAgentResponse,
+    summary="Restore chat agent version",
+    description="Restore a previous version by creating a new version with the same config.",
+)
+@authenticate()
+@check_permissions(
+    entity="chat_agent",
+    required_permissions=[
+        TenantRolesEnum.TENANT_GLOBAL_ADMIN,
+        TenantRolesEnum.CHAT_AGENTS_ADMIN,
+        TenantRolesEnum.REACT_AGENT_ADMIN,
+        PermissionActionEnum.ADMIN,
+        PermissionActionEnum.WRITE,
+    ],
+)
+async def restore_chat_agent_version(
+    request: Request,
+    tenant_id: str,
+    chat_agent_id: str,
+    version: int,
+    handler: ChatAgentHandler = Depends(get_chat_agent_handler),
+) -> ChatAgentResponse:
+    """Restore a previous version of a chat agent.
+
+    Args:
+        request: FastAPI request with user in state
+        tenant_id: Tenant ID from path
+        chat_agent_id: Chat agent ID from path
+        version: Version number to restore
+        handler: Chat agent handler dependency
+
+    Returns:
+        Updated ChatAgentResponse with restored version as latest
+
+    Raises:
+        HTTPException: If version not found
+    """
+    try:
+        user: ContextIdentityUser = request.state.user
+        return handler.restore_chat_agent_version(
+            tenant_id=tenant_id,
+            chat_agent_id=chat_agent_id,
+            version=version,
+            user_id=user.identity.get_id(),
+        )
+    except (ChatAgentNotFoundError, ReActAgentVersionNotFoundError) as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except Exception as e:
+        logger.error(f"Failed to restore chat agent version: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to restore chat agent version"
         )
 
 

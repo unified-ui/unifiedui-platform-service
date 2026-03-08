@@ -15,8 +15,6 @@ from unifiedui.core.database.models import (
     ChatWidgetTag,
     Credential,
     CredentialTag,
-    ReActAgent,
-    ReActAgentTag,
     Tag,
     Tool,
     ToolTag,
@@ -66,12 +64,6 @@ RESOURCE_TAG_MAPPING = {
         "tag_model": ToolTag,
         "id_field": "tool_id",
         "cache_key_pattern": "tools:detail:tenant:{tenant_id}:tool:{resource_id}",
-    },
-    "re_act_agent": {
-        "model": ReActAgent,
-        "tag_model": ReActAgentTag,
-        "id_field": "re_act_agent_id",
-        "cache_key_pattern": "re_act_agents:detail:tenant:{tenant_id}:agent:{resource_id}",
     },
 }
 
