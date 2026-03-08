@@ -24,6 +24,7 @@ Read the relevant instruction file **before** working in that area.
 | [database.instructions.md](./database.instructions.md) | Working with models, enums, migrations, or queries |
 | [auth-permissions.instructions.md](./auth-permissions.instructions.md) | Touching auth middleware, RBAC, permission checks, or tenant access |
 | [infrastructure.instructions.md](./infrastructure.instructions.md) | Working with caching, vault, identity providers, or document DB |
+| [security.instructions.md](./security.instructions.md) | **ALWAYS read** — SQL injection, SSRF, input validation, auth, secrets |
 | [testing.instructions.md](./testing.instructions.md) | Writing tests, running tests, or understanding test patterns |
 | [github-pipelines.instructions.md](./github-pipelines.instructions.md) | Working with CI/CD workflows, adding pipelines, coverage thresholds |
 | [instruction-management.instructions.md](./instruction-management.instructions.md) | After completing work — decides if/how to update docs |

@@ -72,11 +72,13 @@ class TestRedisCacheClient:
         mock_cache.set.assert_called_with("key2", "value2", 60)
 
         # Test inherited delete
-        assert client.delete("key1") is True
+        delete_result = client.delete("key1")
+        assert delete_result is True
         mock_cache.delete.assert_called_with("key1")
 
         # Test inherited delete_pattern
-        assert client.delete_pattern("user:*") == 5
+        pattern_result = client.delete_pattern("user:*")
+        assert pattern_result == 5
         mock_cache.delete_pattern.assert_called_with("user:*")
 
         # Test inherited ping

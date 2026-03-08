@@ -5,7 +5,6 @@ from unifiedui.core.database.client import SQLAlchemyClient
 from unifiedui.core.database.enums import PrincipalTypeEnum
 from unifiedui.core.database.models import CustomGroupMember, Principal
 from unifiedui.core.identity.factory import IdentityProviderFactory, IdentityTokenFactory
-from unifiedui.handlers.tenants import TenantHandler
 from unifiedui.logger import get_logger
 from unifiedui.schema.responses.identity import IdentityGroupResponse, IdentityUserResponse
 from unifiedui.schema.responses.organizations import OrganizationContextResponse
@@ -215,6 +214,9 @@ class ContextIdentityUser:
             from unifiedui.handlers.dependencies import get_db_client
 
             db_client = get_db_client()
+
+        from unifiedui.handlers.tenants import TenantHandler
+
         handler = TenantHandler(db_client, self._cache)
 
         self._tenants = handler.get_user_tenants_with_permissions(

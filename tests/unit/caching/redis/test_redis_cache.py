@@ -302,7 +302,8 @@ class TestRedisCache:
         assert result == {"data": "value"}
 
         # Delete
-        assert cache.delete("key1") is True
+        delete_result = cache.delete("key1")
+        assert delete_result is True
 
         # Close
         cache.close()

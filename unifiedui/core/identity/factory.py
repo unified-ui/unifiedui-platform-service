@@ -1,6 +1,7 @@
 """Factory classes for identity token deserialization and provider creation."""
 
 import time
+from urllib.parse import urlparse
 
 import jwt
 from jwt.exceptions import InvalidTokenError
@@ -29,6 +30,27 @@ from unifiedui.identity.saml.token import SAMLIdentityTokenSerializer
 from unifiedui.logger import get_logger
 
 logger = get_logger(__name__)
+
+
+def _is_google_issuer(iss: str) -> bool:
+    """Check if issuer is Google (exact match)."""
+    return iss.rstrip("/") == "https://accounts.google.com"
+
+
+def _is_aws_cognito_issuer(iss: str) -> bool:
+    """Check if issuer is AWS Cognito using hostname validation."""
+    parsed = urlparse(iss)
+    hostname = parsed.hostname or ""
+    return parsed.scheme == "https" and hostname.startswith("cognito-idp.") and hostname.endswith(".amazonaws.com")
+
+
+def _is_okta_issuer(iss: str) -> bool:
+    """Check if issuer is Okta using hostname validation."""
+    parsed = urlparse(iss)
+    hostname = parsed.hostname or ""
+    return parsed.scheme == "https" and (
+        hostname == "okta.com" or hostname.endswith(".okta.com") or hostname.endswith(".oktapreview.com")
+    )
 
 
 class IdentityTokenFactory:
@@ -71,12 +93,14 @@ class IdentityTokenFactory:
             return IdentityTokenFactory._create_entra_id_token(token)
 
         if iss.startswith("https://accounts.google.com"):
-            return IdentityTokenFactory._create_google_token(token)
+            if _is_google_issuer(iss):
+                return IdentityTokenFactory._create_google_token(token)
+            raise ValueError(f"Unsupported token issuer: {iss}")
 
-        if iss.startswith("https://cognito-idp.") and ".amazonaws.com/" in iss:
+        if _is_aws_cognito_issuer(iss):
             return IdentityTokenFactory._create_aws_cognito_token(token)
 
-        if "okta.com" in iss or ".oktapreview.com" in iss:
+        if _is_okta_issuer(iss):
             return IdentityTokenFactory._create_okta_token(token, iss)
 
         from unifiedui.core.config import settings

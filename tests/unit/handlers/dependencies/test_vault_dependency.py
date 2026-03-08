@@ -4,6 +4,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 
+import unifiedui.handlers.dependencies.vault as vault_module
 from unifiedui.handlers.dependencies.vault import get_vault_client
 
 
@@ -12,9 +13,7 @@ class TestGetVaultClient:
 
     def teardown_method(self):
         """Reset global vault client and clear cache."""
-        import unifiedui.handlers.dependencies.vault
-
-        unifiedui.handlers.dependencies.vault._vault_client = None
+        vault_module._vault_client = None
         # Clear lru_cache
         get_vault_client.cache_clear()
 
@@ -161,10 +160,8 @@ class TestGetVaultClient:
     @patch("unifiedui.handlers.dependencies.vault.AzureKeyVaultClient")
     def test_get_vault_client_test_vault_client_set(self, mock_vault_class, mock_settings):
         """Test that test vault client is returned when set."""
-        import unifiedui.handlers.dependencies.vault
-
         test_client = Mock()
-        unifiedui.handlers.dependencies.vault._vault_client = test_client
+        vault_module._vault_client = test_client
 
         result = get_vault_client()
 

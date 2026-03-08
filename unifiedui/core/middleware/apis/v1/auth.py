@@ -31,13 +31,13 @@ from unifiedui.logger import get_logger
 logger = get_logger(__name__)
 
 
-def _validate_service_key(request: Request, required_service_auth_key: str) -> bool:
+def _validate_service_key(request: Request, required_service_auth_config: str) -> bool:
     """
     Validate X-Service-Key header against the app vault or settings fallback.
 
     Args:
         request: FastAPI request object
-        required_service_auth_key: Key name mapping (e.g., "X_AGENT_SERVICE_KEY")
+        required_service_auth_config: Config name mapping (e.g., "X_AGENT_SERVICE_KEY")
 
     Returns:
         True if service key is valid
@@ -46,25 +46,25 @@ def _validate_service_key(request: Request, required_service_auth_key: str) -> b
         HTTPException: If service key is missing, invalid, or not configured
     """
 
-    service_key_header = request.headers.get("X-Service-Key")
+    service_header = request.headers.get("X-Service-Key")
 
-    if not service_key_header:
+    if not service_header:
         logger.warning("X-Service-Key header missing")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="X-Service-Key header missing for service authentication"
         )
 
-    expected_key = _resolve_service_key(required_service_auth_key)
+    expected = _resolve_service_credential(required_service_auth_config)
 
-    if not expected_key:
-        logger.error("Service key %s not configured", required_service_auth_key)
+    if not expected:
+        logger.error("Service auth config %s not configured", required_service_auth_config)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Service authentication not configured: {required_service_auth_key}",
+            detail=f"Service authentication not configured: {required_service_auth_config}",
         )
 
-    if service_key_header != expected_key:
-        logger.warning("Invalid service key provided for %s", required_service_auth_key)
+    if service_header != expected:
+        logger.warning("Invalid service credential provided for %s", required_service_auth_config)
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid service key")
 
     return True
@@ -75,35 +75,35 @@ _SERVICE_KEY_VAULT_MAP = {
 }
 
 
-def _resolve_service_key(required_service_auth_key: str) -> str | None:
+def _resolve_service_credential(required_service_auth_config: str) -> str | None:
     """
-    Resolve service key from app vault, falling back to settings.
+    Resolve service credential from app vault, falling back to settings.
 
     Args:
-        required_service_auth_key: Key name (e.g., "X_AGENT_SERVICE_KEY")
+        required_service_auth_config: Config name (e.g., "X_AGENT_SERVICE_KEY")
 
     Returns:
-        The resolved service key value or None
+        The resolved service credential value or None
     """
     from unifiedui.handlers.dependencies.vault import get_app_service_vault
 
-    key_lower = required_service_auth_key.lower()
-    vault_config_attr = _SERVICE_KEY_VAULT_MAP.get(key_lower)
+    config_name = required_service_auth_config.lower()
+    vault_config_attr = _SERVICE_KEY_VAULT_MAP.get(config_name)
 
     if vault_config_attr:
         app_vault = get_app_service_vault()
         if app_vault:
-            vault_key_name = getattr(settings, vault_config_attr, None)
-            if vault_key_name:
+            vault_secret_name = getattr(settings, vault_config_attr, None)
+            if vault_secret_name:
                 try:
-                    uri = app_vault.build_secret_uri(vault_key_name)
-                    secret = app_vault.get_secret(uri, use_cache=False)
-                    if secret:
-                        return secret
+                    uri = app_vault.build_secret_uri(vault_secret_name)
+                    result = app_vault.get_secret(uri, use_cache=False)
+                    if result:
+                        return result
                 except Exception:
-                    logger.warning("Failed to retrieve service key from app vault for %s", key_lower)
+                    logger.warning("Failed to retrieve service credential from vault for config %s", config_name)
 
-    return getattr(settings, key_lower, None)
+    return getattr(settings, config_name, None)
 
 
 def authenticate_autonomous_agent_api_key() -> Callable:

@@ -627,7 +627,7 @@ class TestTenantAIModelByPurposeS2S:
 
         create_ai_model(test_client, tenant_id, headers, "Purpose Model")
 
-        with patch("unifiedui.core.middleware.apis.v1.auth._resolve_service_key", return_value=TEST_SERVICE_KEY):
+        with patch("unifiedui.core.middleware.apis.v1.auth._resolve_service_credential", return_value=TEST_SERVICE_KEY):
             response = test_client.get(
                 ENDPOINT_AI_MODELS_BY_PURPOSE.format(
                     tenant_id=tenant_id, purpose_group="CONVERSATION_TITLE_GENERATION"
@@ -641,7 +641,7 @@ class TestTenantAIModelByPurposeS2S:
         """Test by-purpose endpoint returns empty list for unused purpose group."""
         tenant_id = create_tenant_for_user(test_client, test_user_token)
 
-        with patch("unifiedui.core.middleware.apis.v1.auth._resolve_service_key", return_value=TEST_SERVICE_KEY):
+        with patch("unifiedui.core.middleware.apis.v1.auth._resolve_service_credential", return_value=TEST_SERVICE_KEY):
             response = test_client.get(
                 ENDPOINT_AI_MODELS_BY_PURPOSE.format(tenant_id=tenant_id, purpose_group="NONEXISTENT_PURPOSE"),
                 headers={"X-Service-Key": TEST_SERVICE_KEY},
@@ -657,7 +657,7 @@ class TestTenantAIModelByPurposeS2S:
 
         create_ai_model(test_client, tenant_id, headers, "LLM Model", model_type="LLM_MODEL")
 
-        with patch("unifiedui.core.middleware.apis.v1.auth._resolve_service_key", return_value=TEST_SERVICE_KEY):
+        with patch("unifiedui.core.middleware.apis.v1.auth._resolve_service_credential", return_value=TEST_SERVICE_KEY):
             response = test_client.get(
                 ENDPOINT_AI_MODELS_BY_PURPOSE.format(tenant_id=tenant_id, purpose_group="CONVERSATION_TITLE_GENERATION")
                 + "?model_type=LLM_MODEL",

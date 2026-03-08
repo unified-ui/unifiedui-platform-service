@@ -207,7 +207,8 @@ class TestMockCacheClientImplementation:
         assert client.get("key3") == [1, 2, 3]
 
         # Delete one
-        assert client.delete("key2") is True
+        delete_result = client.delete("key2")
+        assert delete_result is True
         assert client.get("key2") is None
 
         # Others still exist

@@ -713,7 +713,7 @@ class TestChatAgentRouteExceptionHandling:
         test_client.app.dependency_overrides[get_chat_agent_handler] = lambda: mock_handler
 
         with patch(
-            "unifiedui.core.middleware.apis.v1.auth._resolve_service_key",
+            "unifiedui.core.middleware.apis.v1.auth._resolve_service_credential",
             return_value=TEST_SERVICE_KEY,
         ):
             response = test_client.get(

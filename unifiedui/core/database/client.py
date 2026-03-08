@@ -39,9 +39,8 @@ class SQLAlchemyClient:
         """
         self.config = config or DatabaseConfig.from_env()
 
-        logger.info(
-            "Initializing database engine", extra={"database_url": self._mask_password(self.config.database_url)}
-        )
+        db_info = self._extract_safe_db_info(self.config.database_url)
+        logger.info("Initializing database engine", extra=db_info)
 
         self.engine = create_engine(
             self.config.database_url,
@@ -59,17 +58,18 @@ class SQLAlchemyClient:
         logger.info("Database engine initialized successfully")
 
     @staticmethod
-    def _mask_password(url: str) -> str:
-        """Mask password in database URL for logging."""
-        if "@" in url and ":" in url:
-            parts = url.split("@")
-            if len(parts) == 2:
-                credentials = parts[0].split("://")
-                if len(credentials) == 2:
-                    user_pass = credentials[1].split(":")
-                    if len(user_pass) == 2:
-                        return f"{credentials[0]}://{user_pass[0]}:****@{parts[1]}"
-        return url
+    def _extract_safe_db_info(url: str) -> dict[str, str]:
+        """Extract non-sensitive database info from URL for logging."""
+        from urllib.parse import urlparse
+
+        try:
+            parsed = urlparse(url)
+            host = parsed.hostname or "unknown"
+            port = str(parsed.port) if parsed.port else "default"
+            database = parsed.path.lstrip("/") if parsed.path else "unknown"
+            return {"db_host": host, "db_port": port, "db_name": database}
+        except Exception:
+            return {"db_host": "unknown"}
 
     @contextmanager
     def get_session(self) -> Generator[Session]:

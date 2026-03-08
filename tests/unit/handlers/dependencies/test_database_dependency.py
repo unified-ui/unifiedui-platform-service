@@ -5,6 +5,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 
+import unifiedui.handlers.dependencies.database as db_module
 from unifiedui.handlers.dependencies.database import get_db_client
 
 
@@ -13,9 +14,7 @@ class TestGetDbClient:
 
     def teardown_method(self):
         """Reset global _db_client after each test."""
-        import unifiedui.handlers.dependencies.database
-
-        unifiedui.handlers.dependencies.database._db_client = None
+        db_module._db_client = None
 
     @patch("unifiedui.handlers.dependencies.database.SQLAlchemyClient")
     @patch("unifiedui.handlers.dependencies.database.DatabaseConfig.from_env")
