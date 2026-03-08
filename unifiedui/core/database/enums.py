@@ -1,13 +1,13 @@
-from enum import Enum
+from enum import StrEnum
 
 
-class TenantRolesEnum(str, Enum):
+class TenantRolesEnum(StrEnum):
     READER = "READER"
-    GLOBAL_ADMIN = "GLOBAL_ADMIN"
+    TENANT_GLOBAL_ADMIN = "TENANT_GLOBAL_ADMIN"
     CUSTOM_GROUPS_ADMIN = "CUSTOM_GROUPS_ADMIN"
     CUSTOM_GROUP_CREATOR = "CUSTOM_GROUP_CREATOR"
-    APPLICATIONS_ADMIN = "APPLICATIONS_ADMIN"
-    APPLICATIONS_CREATOR = "APPLICATIONS_CREATOR"
+    CHAT_AGENTS_ADMIN = "CHAT_AGENTS_ADMIN"
+    CHAT_AGENTS_CREATOR = "CHAT_AGENTS_CREATOR"
     CREDENTIALS_ADMIN = "CREDENTIALS_ADMIN"
     CREDENTIALS_CREATOR = "CREDENTIALS_CREATOR"
     CONVERSATIONS_ADMIN = "CONVERSATIONS_ADMIN"
@@ -20,99 +20,118 @@ class TenantRolesEnum(str, Enum):
     REACT_AGENT_CREATOR = "REACT_AGENT_CREATOR"
     TENANT_AI_MODELS_ADMIN = "TENANT_AI_MODELS_ADMIN"
 
-    def all() -> list[str]:
+    @classmethod
+    def all(cls) -> list[str]:
         return [permission.value for permission in TenantRolesEnum]
 
 
-class ToolTypeEnum(str, Enum):
+class ToolTypeEnum(StrEnum):
     """Supported tool types for ReACT agents."""
+
     MCP_SERVER = "MCP_SERVER"
     OPENAPI_DEFINITION = "OPENAPI_DEFINITION"
 
-    def all() -> list[str]:
+    @classmethod
+    def all(cls) -> list[str]:
         return [tool_type.value for tool_type in ToolTypeEnum]
 
 
-class ApplicationTypeEnum(str, Enum):
+class ChatAgentTypeEnum(StrEnum):
     N8N = "N8N"
     MICROSOFT_FOUNDRY = "MICROSOFT_FOUNDRY"
     REST_API = "REST_API"
+    REACT_AGENT = "REACT_AGENT"
 
-    def all() -> list[str]:
-        return [app_type.value for app_type in ApplicationTypeEnum]
+    @classmethod
+    def all(cls) -> list[str]:
+        return [agent_type.value for agent_type in ChatAgentTypeEnum]
 
 
-class AutonomousAgentTypeEnum(str, Enum):
+class AutonomousAgentTypeEnum(StrEnum):
     """Supported autonomous agent types."""
+
     N8N = "N8N"
 
-    def all() -> list[str]:
+    @classmethod
+    def all(cls) -> list[str]:
         return [agent_type.value for agent_type in AutonomousAgentTypeEnum]
 
 
-class ChatWidgetTypeEnum(str, Enum):
+class ChatWidgetTypeEnum(StrEnum):
     IFRAME = "IFRAME"
     FORM = "FORM"
 
-    def all() -> list[str]:
+    @classmethod
+    def all(cls) -> list[str]:
         return [widget_type.value for widget_type in ChatWidgetTypeEnum]
 
 
-class PermissionActionEnum(str, Enum):
+class PermissionActionEnum(StrEnum):
     READ = "READ"
     WRITE = "WRITE"
     ADMIN = "ADMIN"
 
-    def all() -> list[str]:
+    @classmethod
+    def all(cls) -> list[str]:
         return [action.value for action in PermissionActionEnum]
 
 
-class PrincipalTypeEnum(str, Enum):
+class PrincipalTypeEnum(StrEnum):
     IDENTITY_USER = "IDENTITY_USER"
     IDENTITY_GROUP = "IDENTITY_GROUP"
     CUSTOM_GROUP = "CUSTOM_GROUP"
 
-    def all() -> list[str]:
+    @classmethod
+    def all(cls) -> list[str]:
         return [principal_type.value for principal_type in PrincipalTypeEnum]
 
 
-class UserPermissionEnum(str, Enum):
+class UserPermissionEnum(StrEnum):
     """Special user-level permissions for resource access."""
+
     IS_CREATOR = "IS_CREATOR"
 
-    def all() -> list[str]:
+    @classmethod
+    def all(cls) -> list[str]:
         return [perm.value for perm in UserPermissionEnum]
 
 
-class OrderDirectionEnum(str, Enum):
+class OrderDirectionEnum(StrEnum):
     """Enum for sort order direction in list queries."""
+
     ASC = "asc"
     DESC = "desc"
 
-    def all() -> list[str]:
+    @classmethod
+    def all(cls) -> list[str]:
         return [direction.value for direction in OrderDirectionEnum]
 
 
-class ListViewEnum(str, Enum):
+class ListViewEnum(StrEnum):
     """Enum for list view types."""
+
     FULL = "full"
     QUICK_LIST = "quick-list"
 
-    def all() -> list[str]:
+    @classmethod
+    def all(cls) -> list[str]:
         return [view.value for view in ListViewEnum]
 
 
-class AIModelTypeEnum(str, Enum):
+class AIModelTypeEnum(StrEnum):
     """Supported AI model types."""
+
     LLM_MODEL = "LLM_MODEL"
     EMBEDDING_MODEL = "EMBEDDING_MODEL"
 
-    def all() -> list[str]:
+    @classmethod
+    def all(cls) -> list[str]:
         return [t.value for t in AIModelTypeEnum]
 
 
-class AIModelProviderEnum(str, Enum):
+class AIModelProviderEnum(StrEnum):
     """Supported AI model providers."""
+
     AZURE_OPENAI = "AZURE_OPENAI"
     OPENAI = "OPENAI"
     ANTHROPIC = "ANTHROPIC"
@@ -121,17 +140,44 @@ class AIModelProviderEnum(str, Enum):
     MISTRAL = "MISTRAL"
     GROQ = "GROQ"
 
-    def all() -> list[str]:
+    @classmethod
+    def all(cls) -> list[str]:
         return [p.value for p in AIModelProviderEnum]
 
 
-class AIModelPurposeGroupEnum(str, Enum):
+class OrganizationRoleEnum(StrEnum):
+    """Organization-level roles."""
+
+    ORGANISATION_GLOBAL_ADMIN = "ORGANISATION_GLOBAL_ADMIN"
+    ORGANISATION_TENANT_ADMIN = "ORGANISATION_TENANT_ADMIN"
+    ORGANISATION_TENANT_CREATOR = "ORGANISATION_TENANT_CREATOR"
+
+    @classmethod
+    def all(cls) -> list[str]:
+        return [role.value for role in OrganizationRoleEnum]
+
+
+class EnvironmentTypeEnum(StrEnum):
+    """Tenant environment types."""
+
+    SANDBOX = "SANDBOX"
+    PRODUCTION = "PRODUCTION"
+
+    @classmethod
+    def all(cls) -> list[str]:
+        return [env.value for env in EnvironmentTypeEnum]
+
+
+class AIModelPurposeGroupEnum(StrEnum):
     """Supported AI model purpose groups."""
+
     CONVERSATION_TITLE_GENERATION = "CONVERSATION_TITLE_GENERATION"
     CONVERSATION_SUMMARIZATION = "CONVERSATION_SUMMARIZATION"
     DESCRIPTION_GENERATION = "DESCRIPTION_GENERATION"
     TRACE_ANALYSIS = "TRACE_ANALYSIS"
     GENERAL = "GENERAL"
+    REACT_AGENT = "REACT_AGENT"
 
-    def all() -> list[str]:
+    @classmethod
+    def all(cls) -> list[str]:
         return [g.value for g in AIModelPurposeGroupEnum]

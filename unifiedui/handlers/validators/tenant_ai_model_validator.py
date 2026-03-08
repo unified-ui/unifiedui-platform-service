@@ -1,8 +1,9 @@
 """AI model configuration validators using factory pattern."""
+
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Dict, Any
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -25,8 +26,8 @@ class OpenAIConfig(BaseModel):
     """Validation model for OpenAI provider config."""
 
     model_name: str = Field(..., min_length=1)
-    organization: str = Field(None)
-    base_url: str = Field(None)
+    organization: str | None = Field(None)
+    base_url: str | None = Field(None)
 
 
 class AnthropicConfig(BaseModel):
@@ -64,7 +65,7 @@ class BaseAIModelConfigValidator(ABC):
     """Base class for AI model config validators."""
 
     @abstractmethod
-    def validate(self, config: Dict[str, Any]) -> Dict[str, Any]:
+    def validate(self, config: dict[str, Any]) -> dict[str, Any]:
         """Validate the provider-specific config.
 
         Args:
@@ -86,15 +87,14 @@ class BaseAIModelConfigValidator(ABC):
 class AzureOpenAIConfigValidator(BaseAIModelConfigValidator):
     """Validator for Azure OpenAI configuration."""
 
-    def validate(self, config: Dict[str, Any]) -> Dict[str, Any]:
+    def validate(self, config: dict[str, Any]) -> dict[str, Any]:
         """Validate Azure OpenAI config."""
         try:
             validated = AzureOpenAIConfig(**config)
             return validated.model_dump()
         except Exception as e:
             raise TenantAIModelConfigValidationError(
-                f"Azure OpenAI config validation failed: {str(e)}. "
-                f"Required fields: endpoint, api_version, deployment_name"
+                f"Azure OpenAI config validation failed: {e!s}. Required fields: endpoint, api_version, deployment_name"
             )
 
     def get_supported_provider(self) -> AIModelProviderEnum:
@@ -105,14 +105,14 @@ class AzureOpenAIConfigValidator(BaseAIModelConfigValidator):
 class OpenAIConfigValidator(BaseAIModelConfigValidator):
     """Validator for OpenAI configuration."""
 
-    def validate(self, config: Dict[str, Any]) -> Dict[str, Any]:
+    def validate(self, config: dict[str, Any]) -> dict[str, Any]:
         """Validate OpenAI config."""
         try:
             validated = OpenAIConfig(**config)
             return validated.model_dump()
         except Exception as e:
             raise TenantAIModelConfigValidationError(
-                f"OpenAI config validation failed: {str(e)}. Required field: model_name"
+                f"OpenAI config validation failed: {e!s}. Required field: model_name"
             )
 
     def get_supported_provider(self) -> AIModelProviderEnum:
@@ -123,14 +123,14 @@ class OpenAIConfigValidator(BaseAIModelConfigValidator):
 class AnthropicConfigValidator(BaseAIModelConfigValidator):
     """Validator for Anthropic configuration."""
 
-    def validate(self, config: Dict[str, Any]) -> Dict[str, Any]:
+    def validate(self, config: dict[str, Any]) -> dict[str, Any]:
         """Validate Anthropic config."""
         try:
             validated = AnthropicConfig(**config)
             return validated.model_dump()
         except Exception as e:
             raise TenantAIModelConfigValidationError(
-                f"Anthropic config validation failed: {str(e)}. Required field: model_name"
+                f"Anthropic config validation failed: {e!s}. Required field: model_name"
             )
 
     def get_supported_provider(self) -> AIModelProviderEnum:
@@ -141,14 +141,14 @@ class AnthropicConfigValidator(BaseAIModelConfigValidator):
 class GoogleGenAIConfigValidator(BaseAIModelConfigValidator):
     """Validator for Google GenAI configuration."""
 
-    def validate(self, config: Dict[str, Any]) -> Dict[str, Any]:
+    def validate(self, config: dict[str, Any]) -> dict[str, Any]:
         """Validate Google GenAI config."""
         try:
             validated = GoogleGenAIConfig(**config)
             return validated.model_dump()
         except Exception as e:
             raise TenantAIModelConfigValidationError(
-                f"Google GenAI config validation failed: {str(e)}. Required field: model_name"
+                f"Google GenAI config validation failed: {e!s}. Required field: model_name"
             )
 
     def get_supported_provider(self) -> AIModelProviderEnum:
@@ -159,14 +159,14 @@ class GoogleGenAIConfigValidator(BaseAIModelConfigValidator):
 class OllamaConfigValidator(BaseAIModelConfigValidator):
     """Validator for Ollama configuration."""
 
-    def validate(self, config: Dict[str, Any]) -> Dict[str, Any]:
+    def validate(self, config: dict[str, Any]) -> dict[str, Any]:
         """Validate Ollama config."""
         try:
             validated = OllamaConfig(**config)
             return validated.model_dump()
         except Exception as e:
             raise TenantAIModelConfigValidationError(
-                f"Ollama config validation failed: {str(e)}. Required field: model_name"
+                f"Ollama config validation failed: {e!s}. Required field: model_name"
             )
 
     def get_supported_provider(self) -> AIModelProviderEnum:
@@ -177,14 +177,14 @@ class OllamaConfigValidator(BaseAIModelConfigValidator):
 class MistralConfigValidator(BaseAIModelConfigValidator):
     """Validator for Mistral configuration."""
 
-    def validate(self, config: Dict[str, Any]) -> Dict[str, Any]:
+    def validate(self, config: dict[str, Any]) -> dict[str, Any]:
         """Validate Mistral config."""
         try:
             validated = MistralConfig(**config)
             return validated.model_dump()
         except Exception as e:
             raise TenantAIModelConfigValidationError(
-                f"Mistral config validation failed: {str(e)}. Required field: model_name"
+                f"Mistral config validation failed: {e!s}. Required field: model_name"
             )
 
     def get_supported_provider(self) -> AIModelProviderEnum:
@@ -195,14 +195,14 @@ class MistralConfigValidator(BaseAIModelConfigValidator):
 class GroqConfigValidator(BaseAIModelConfigValidator):
     """Validator for Groq configuration."""
 
-    def validate(self, config: Dict[str, Any]) -> Dict[str, Any]:
+    def validate(self, config: dict[str, Any]) -> dict[str, Any]:
         """Validate Groq config."""
         try:
             validated = GroqConfig(**config)
             return validated.model_dump()
         except Exception as e:
             raise TenantAIModelConfigValidationError(
-                f"Groq config validation failed: {str(e)}. Required field: model_name"
+                f"Groq config validation failed: {e!s}. Required field: model_name"
             )
 
     def get_supported_provider(self) -> AIModelProviderEnum:
@@ -213,7 +213,7 @@ class GroqConfigValidator(BaseAIModelConfigValidator):
 class AIModelConfigValidatorFactory:
     """Factory for creating AI model config validators."""
 
-    _validators: Dict[AIModelProviderEnum, BaseAIModelConfigValidator] = {
+    _validators: dict[AIModelProviderEnum, BaseAIModelConfigValidator] = {
         AIModelProviderEnum.AZURE_OPENAI: AzureOpenAIConfigValidator(),
         AIModelProviderEnum.OPENAI: OpenAIConfigValidator(),
         AIModelProviderEnum.ANTHROPIC: AnthropicConfigValidator(),
@@ -242,7 +242,7 @@ class AIModelConfigValidatorFactory:
         return validator
 
     @classmethod
-    def validate_config(cls, provider: AIModelProviderEnum, config: Dict[str, Any]) -> Dict[str, Any]:
+    def validate_config(cls, provider: AIModelProviderEnum, config: dict[str, Any]) -> dict[str, Any]:
         """Validate config for a given provider.
 
         Args:

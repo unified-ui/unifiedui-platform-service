@@ -34,74 +34,74 @@ def setup_logging() -> logging.Logger:
 def read_workflow_files(workflow_dir: Path, logger: logging.Logger) -> list[Path]:
     """
     Read all Python workflow files from the specified directory.
-    
+
     Args:
         workflow_dir: Directory containing workflow files
         logger: Logger instance
-        
+
     Returns:
         List of workflow file paths
     """
     if not workflow_dir.exists():
         logger.error(f"Workflow directory does not exist: {workflow_dir}")
         sys.exit(1)
-    
+
     if not workflow_dir.is_dir():
         logger.error(f"Workflow path is not a directory: {workflow_dir}")
         sys.exit(1)
-    
+
     # Find all Python files (excluding __pycache__ and private files)
     workflow_files = [
         f for f in workflow_dir.glob("*.py")
         if not f.name.startswith("_") and f.name != "__init__.py"
     ]
-    
+
     if not workflow_files:
         logger.warning(f"No workflow files found in: {workflow_dir}")
         return []
-    
+
     logger.info(f"Found {len(workflow_files)} workflow file(s):")
     for wf in workflow_files:
         logger.info(f"  - {wf.name}")
-    
+
     return workflow_files
 
 
 def load_workflow_module(workflow_file: Path, logger: logging.Logger) -> dict[str, Any]:
     """
     Dynamically load a workflow Python file and extract its module contents.
-    
+
     This reads the file content and executes it to get the workflow objects.
     In the future, this can be adapted to read files from cloud storage.
-    
+
     Args:
         workflow_file: Path to the workflow Python file
         logger: Logger instance
-        
+
     Returns:
         Dictionary containing the module's global namespace
     """
     logger.info(f"Loading workflow from: {workflow_file.name}")
-    
+
     try:
         # Read file content (this is where you could fetch from Azure Storage)
         with open(workflow_file, "r", encoding="utf-8") as f:
             workflow_code = f.read()
-        
+
         logger.debug(f"Read {len(workflow_code)} characters from {workflow_file.name}")
-        
+
         # Create a namespace for execution
         module_namespace: dict[str, Any] = {
             "__file__": str(workflow_file),
             "__name__": workflow_file.stem,
         }
-        
+
         # Execute the workflow code in the namespace
         exec(workflow_code, module_namespace)
-        
+
         logger.info(f"Successfully loaded workflow: {workflow_file.name}")
         return module_namespace
-        
+
     except Exception as e:
         logger.error(f"Failed to load workflow {workflow_file.name}: {e}")
         raise
@@ -110,24 +110,24 @@ def load_workflow_module(workflow_file: Path, logger: logging.Logger) -> dict[st
 def extract_workflows(module_namespace: dict[str, Any], logger: logging.Logger) -> list[Any]:
     """
     Extract workflow entities from a loaded module.
-    
+
     Args:
         module_namespace: Module's global namespace
         logger: Logger instance
-        
+
     Returns:
         List of workflow entities
     """
     from agent_framework import Workflow
-    
+
     workflows = []
-    
+
     # Look for workflow objects in the module
     for name, obj in module_namespace.items():
         if isinstance(obj, Workflow):
             workflows.append(obj)
             logger.info(f"  Found workflow entity: {name} ({obj.name})")
-    
+
     return workflows
 
 
@@ -139,7 +139,7 @@ def serve_workflows(
 ) -> None:
     """
     Start the DevUI server with the loaded workflows.
-    
+
     Args:
         workflows: List of workflow entities to serve
         port: Port number for the server
@@ -149,9 +149,9 @@ def serve_workflows(
     if not workflows:
         logger.error("No workflows to serve!")
         sys.exit(1)
-    
+
     from agent_framework.devui import serve
-    
+
     logger.info("\n" + "="*60)
     logger.info("Starting Microsoft Agent Framework DevUI")
     logger.info(f"Port: {port}")
@@ -160,7 +160,7 @@ def serve_workflows(
     for wf in workflows:
         logger.info(f"  - {wf.name}: {wf.description}")
     logger.info("="*60 + "\n")
-    
+
     try:
         serve(entities=workflows, port=port, auto_open=auto_open)
     except KeyboardInterrupt:
@@ -197,27 +197,27 @@ def main() -> None:
         action="store_true",
         help="Enable debug logging"
     )
-    
+
     args = parser.parse_args()
-    
+
     # Setup logging
     logger = setup_logging()
     if args.debug:
         logging.getLogger().setLevel(logging.DEBUG)
-    
+
     logger.info("Dynamic DevUI Starter - Microsoft Agent Framework")
-    
+
     # Resolve workflow directory
     workflow_dir = Path(args.workflow_dir).resolve()
     logger.info(f"Workflow directory: {workflow_dir}")
-    
+
     # Read workflow files from directory
     workflow_files = read_workflow_files(workflow_dir, logger)
-    
+
     if not workflow_files:
         logger.error("No workflow files found. Exiting.")
         sys.exit(1)
-    
+
     # Load all workflows
     all_workflows = []
     for workflow_file in workflow_files:
@@ -228,7 +228,7 @@ def main() -> None:
         except Exception as e:
             logger.warning(f"Skipping {workflow_file.name} due to error: {e}")
             continue
-    
+
     # Start the DevUI server
     serve_workflows(
         workflows=all_workflows,

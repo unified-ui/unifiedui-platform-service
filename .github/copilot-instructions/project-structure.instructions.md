@@ -7,6 +7,11 @@ unified-ui-platform-service/
 ├── alembic/                    # Database migrations
 │   ├── env.py
 │   └── versions/               # Migration files
+├── docs/                       # Project documentation
+│   ├── README.md               # Docs index
+│   ├── CONCEPT.md              # Platform concept document
+│   ├── MARKETING.md            # Marketing copy
+│   └── adr/                    # Architecture Decision Records
 ├── tests/                      # All tests → see testing.instructions.md
 │   ├── conftest.py             # Root conftest (imports all fixtures)
 │   ├── fixtures/               # Shared test fixtures
@@ -40,9 +45,9 @@ unified-ui-platform-service/
 │   │   ├── config.py           # Settings (pydantic-settings, env vars)
 │   │   ├── security.py         # Security utilities
 │   │   ├── database/           # DB models, enums, client interface
-│   │   │   ├── models.py       # SQLAlchemy models (~840 lines)
+│   │   │   ├── models.py       # SQLAlchemy models (~1009 lines)
 │   │   │   ├── enums.py        # All enums (roles, permissions, types)
-│   │   │   ├── client.py       # SQLAlchemyClient 
+│   │   │   ├── client.py       # SQLAlchemyClient
 │   │   │   └── config.py       # DatabaseConfig
 │   │   ├── caching/            # Cache interface
 │   │   ├── vault/              # Vault interface (BaseVault, BaseVaultClient)
@@ -59,7 +64,14 @@ unified-ui-platform-service/
 │   │   ├── hashicorp_vault/    # HashiCorp Vault
 │   │   └── dotenv/             # DotEnv vault (development)
 │   ├── identity/               # Identity provider implementations
-│   │   ├── extra_id/           # Azure AD via MSAL
+│   │   ├── extra_id/           # Azure AD / Entra ID via MSAL (OBO flow)
+│   │   ├── google/             # Google Identity Platform (OAuth2)
+│   │   ├── aws_cognito/        # AWS Cognito (User Pools)
+│   │   ├── ldap/               # LDAP / Active Directory
+│   │   ├── kerberos/           # Kerberos / SPNEGO
+│   │   ├── saml/               # SAML 2.0
+│   │   ├── okta/               # Okta (OIDC + Management API)
+│   │   ├── oidc/               # Generic OIDC (Keycloak, Auth0, etc.)
 │   │   └── mock/               # Mock identity for testing
 │   ├── docdatabase/            # Document DB implementations
 │   ├── exc/                    # Custom exception classes
@@ -68,7 +80,11 @@ unified-ui-platform-service/
 │   └── utils/                  # Utility functions
 ├── pyproject.toml              # Project config + pytest config
 ├── alembic.ini                 # Alembic config
-└── docker-compose.yml          # Local infrastructure
+├── docker-compose.yml          # Local infrastructure
+├── CONTRIBUTING.md             # Contribution guidelines
+├── SECURITY.md                 # Security policy
+├── SPONSORS.md                 # Sponsor information
+└── CHANGELOG.md                # Version history
 ```
 
 ---
@@ -83,7 +99,14 @@ unified-ui-platform-service/
 | `core/vault/vault.py` → `BaseVault` | `vault/azure_keyvault/` | Azure Key Vault |
 | `core/vault/vault.py` → `BaseVault` | `vault/dotenv/` | DotEnv (dev) |
 | `core/caching/` | `caching/redis/` | Redis cache |
-| `core/identity/` | `identity/extra_id/` | Azure AD |
+| `core/identity/` | `identity/extra_id/` | Azure AD / Entra ID |
+| `core/identity/` | `identity/google/` | Google Identity |
+| `core/identity/` | `identity/aws_cognito/` | AWS Cognito |
+| `core/identity/` | `identity/ldap/` | LDAP / AD |
+| `core/identity/` | `identity/kerberos/` | Kerberos / SPNEGO |
+| `core/identity/` | `identity/saml/` | SAML 2.0 |
+| `core/identity/` | `identity/okta/` | Okta |
+| `core/identity/` | `identity/oidc/` | Generic OIDC |
 | `core/identity/` | `identity/mock/` | Mock (testing) |
 | `core/database/client.py` | `core/database/client.py` | SQLAlchemy (single impl) |
 
@@ -98,8 +121,9 @@ All `Depends()` factories live in `handlers/dependencies/`:
 | `database.py` | `get_db_client()` |
 | `cache.py` | `get_cache_client()` |
 | `vault.py` | `get_vault_client()`, `get_secrets_vault()` |
-| `applications.py` | `get_application_handler()` |
+| `chat_agents.py` | `get_chat_agent_handler()` |
 | `autonomous_agents.py` | `get_autonomous_agent_handler()` |
+| `organizations.py` | `get_organization_handler()` |
 | `conversations.py` | `get_conversation_handler()` |
 | `credentials.py` | `get_credential_handler()` |
 | `custom_groups.py` | `get_custom_group_handler()` |

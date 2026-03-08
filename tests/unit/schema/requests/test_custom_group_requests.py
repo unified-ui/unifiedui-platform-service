@@ -1,14 +1,15 @@
 """Unit tests for unifiedui/schema/requests/custom_groups.py - Custom Groups Request Schemas."""
+
 import pytest
 from pydantic import ValidationError
 
 from unifiedui.schema.requests.custom_groups import (
     CreateCustomGroupRequest,
-    UpdateCustomGroupRequest,
-    SetPrincipalRoleRequest,
+    DeleteCustomGroupRoleRequest,
     DeletePrincipalRoleRequest,
     SetCustomGroupRoleRequest,
-    DeleteCustomGroupRoleRequest
+    SetPrincipalRoleRequest,
+    UpdateCustomGroupRequest,
 )
 
 
@@ -17,10 +18,7 @@ class TestCreateCustomGroupRequest:
 
     def test_valid_request(self):
         """Test creating a valid request."""
-        request = CreateCustomGroupRequest(
-            name="Test Group",
-            description="A test group"
-        )
+        request = CreateCustomGroupRequest(name="Test Group", description="A test group")
         assert request.name == "Test Group"
         assert request.description == "A test group"
 
@@ -58,11 +56,7 @@ class TestSetPrincipalRoleRequest:
 
     def test_valid_request(self):
         """Test creating a valid request."""
-        request = SetPrincipalRoleRequest(
-            principal_id="user-123",
-            principal_type="IDENTITY_USER",
-            role="READ"
-        )
+        request = SetPrincipalRoleRequest(principal_id="user-123", principal_type="IDENTITY_USER", role="READ")
         assert request.principal_id == "user-123"
         assert request.principal_type == "IDENTITY_USER"
         assert request.role == "READ"
@@ -70,11 +64,7 @@ class TestSetPrincipalRoleRequest:
     def test_invalid_principal_type(self):
         """Test validation error for invalid principal_type."""
         with pytest.raises(ValidationError) as exc_info:
-            SetPrincipalRoleRequest(
-                principal_id="user-123",
-                principal_type="INVALID_TYPE",
-                role="READ"
-            )
+            SetPrincipalRoleRequest(principal_id="user-123", principal_type="INVALID_TYPE", role="READ")
         error = exc_info.value.errors()[0]
         assert "principal_type" in str(error)
         assert "Invalid principal_type" in error["msg"]
@@ -82,11 +72,7 @@ class TestSetPrincipalRoleRequest:
     def test_invalid_role(self):
         """Test validation error for invalid role."""
         with pytest.raises(ValidationError) as exc_info:
-            SetPrincipalRoleRequest(
-                principal_id="user-123",
-                principal_type="IDENTITY_USER",
-                role="INVALID_ROLE"
-            )
+            SetPrincipalRoleRequest(principal_id="user-123", principal_type="IDENTITY_USER", role="INVALID_ROLE")
         error = exc_info.value.errors()[0]
         assert "role" in str(error)
         assert "Invalid role" in error["msg"]
@@ -94,21 +80,13 @@ class TestSetPrincipalRoleRequest:
     def test_all_principal_types(self):
         """Test all valid principal types."""
         for principal_type in ["IDENTITY_USER", "IDENTITY_GROUP", "CUSTOM_GROUP"]:
-            request = SetPrincipalRoleRequest(
-                principal_id="test-id",
-                principal_type=principal_type,
-                role="WRITE"
-            )
+            request = SetPrincipalRoleRequest(principal_id="test-id", principal_type=principal_type, role="WRITE")
             assert request.principal_type == principal_type
 
     def test_all_roles(self):
         """Test all valid roles."""
         for role in ["READ", "WRITE", "ADMIN"]:
-            request = SetPrincipalRoleRequest(
-                principal_id="test-id",
-                principal_type="IDENTITY_USER",
-                role=role
-            )
+            request = SetPrincipalRoleRequest(principal_id="test-id", principal_type="IDENTITY_USER", role=role)
             assert request.role == role
 
 
@@ -117,11 +95,7 @@ class TestDeletePrincipalRoleRequest:
 
     def test_valid_request(self):
         """Test creating a valid request."""
-        request = DeletePrincipalRoleRequest(
-            principal_id="user-123",
-            principal_type="IDENTITY_GROUP",
-            role="ADMIN"
-        )
+        request = DeletePrincipalRoleRequest(principal_id="user-123", principal_type="IDENTITY_GROUP", role="ADMIN")
         assert request.principal_id == "user-123"
         assert request.principal_type == "IDENTITY_GROUP"
         assert request.role == "ADMIN"
@@ -129,11 +103,7 @@ class TestDeletePrincipalRoleRequest:
     def test_invalid_principal_type(self):
         """Test validation error for invalid principal_type."""
         with pytest.raises(ValidationError) as exc_info:
-            DeletePrincipalRoleRequest(
-                principal_id="user-123",
-                principal_type="UNKNOWN_TYPE",
-                role="READ"
-            )
+            DeletePrincipalRoleRequest(principal_id="user-123", principal_type="UNKNOWN_TYPE", role="READ")
         error = exc_info.value.errors()[0]
         assert "principal_type" in str(error)
         assert "Invalid principal_type" in error["msg"]
@@ -141,11 +111,7 @@ class TestDeletePrincipalRoleRequest:
     def test_invalid_role(self):
         """Test validation error for invalid role."""
         with pytest.raises(ValidationError) as exc_info:
-            DeletePrincipalRoleRequest(
-                principal_id="user-123",
-                principal_type="CUSTOM_GROUP",
-                role="SUPERUSER"
-            )
+            DeletePrincipalRoleRequest(principal_id="user-123", principal_type="CUSTOM_GROUP", role="SUPERUSER")
         error = exc_info.value.errors()[0]
         assert "role" in str(error)
         assert "Invalid role" in error["msg"]
@@ -156,20 +122,14 @@ class TestSetCustomGroupRoleRequest:
 
     def test_valid_request(self):
         """Test creating a valid request."""
-        request = SetCustomGroupRoleRequest(
-            principal_id="principal-456",
-            role="WRITE"
-        )
+        request = SetCustomGroupRoleRequest(principal_id="principal-456", role="WRITE")
         assert request.principal_id == "principal-456"
         assert request.role == "WRITE"
 
     def test_invalid_role(self):
         """Test validation error for invalid role."""
         with pytest.raises(ValidationError) as exc_info:
-            SetCustomGroupRoleRequest(
-                principal_id="principal-456",
-                role="OWNER"
-            )
+            SetCustomGroupRoleRequest(principal_id="principal-456", role="OWNER")
         error = exc_info.value.errors()[0]
         assert "role" in str(error)
         assert "Invalid role" in error["msg"]
@@ -180,20 +140,14 @@ class TestDeleteCustomGroupRoleRequest:
 
     def test_valid_request(self):
         """Test creating a valid request."""
-        request = DeleteCustomGroupRoleRequest(
-            principal_id="principal-789",
-            role="ADMIN"
-        )
+        request = DeleteCustomGroupRoleRequest(principal_id="principal-789", role="ADMIN")
         assert request.principal_id == "principal-789"
         assert request.role == "ADMIN"
 
     def test_invalid_role(self):
         """Test validation error for invalid role."""
         with pytest.raises(ValidationError) as exc_info:
-            DeleteCustomGroupRoleRequest(
-                principal_id="principal-789",
-                role="MANAGER"
-            )
+            DeleteCustomGroupRoleRequest(principal_id="principal-789", role="MANAGER")
         error = exc_info.value.errors()[0]
         assert "role" in str(error)
         assert "Invalid role" in error["msg"]

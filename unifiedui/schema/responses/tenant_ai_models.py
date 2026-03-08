@@ -1,10 +1,10 @@
 """Response schemas for tenant AI models."""
+
 from datetime import datetime
-from typing import Optional, List
 
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
-from unifiedui.core.database.enums import AIModelTypeEnum, AIModelProviderEnum, AIModelPurposeGroupEnum
+from unifiedui.core.database.enums import AIModelProviderEnum, AIModelPurposeGroupEnum, AIModelTypeEnum
 
 
 class TenantAIModelResponse(BaseModel):
@@ -13,20 +13,18 @@ class TenantAIModelResponse(BaseModel):
     id: str = Field(..., description="AI model ID")
     tenant_id: str = Field(..., description="Tenant ID")
     name: str = Field(..., description="AI model display name")
-    description: Optional[str] = Field(None, description="AI model description")
+    description: str | None = Field(None, description="AI model description")
     type: AIModelTypeEnum = Field(..., description="Model type")
     provider: AIModelProviderEnum = Field(..., description="AI model provider")
-    purpose_groups: List[AIModelPurposeGroupEnum] = Field(
-        default_factory=list, description="Purpose groups"
-    )
+    purpose_groups: list[AIModelPurposeGroupEnum] = Field(default_factory=list, description="Purpose groups")
     config: dict = Field(default_factory=dict, description="Provider-specific configuration")
-    credential_id: Optional[str] = Field(None, description="Linked credential ID")
+    credential_id: str | None = Field(None, description="Linked credential ID")
     priority: int = Field(..., description="Priority for load-balancing")
     is_active: bool = Field(..., description="Whether the model is active")
     created_at: datetime = Field(..., description="Creation timestamp")
     updated_at: datetime = Field(..., description="Last update timestamp")
-    created_by: Optional[str] = Field(None, description="Creator user ID")
-    updated_by: Optional[str] = Field(None, description="Last updater user ID")
+    created_by: str | None = Field(None, description="Creator user ID")
+    updated_by: str | None = Field(None, description="Last updater user ID")
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -38,7 +36,7 @@ class AIModelWithSecretResponse(BaseModel):
     type: AIModelTypeEnum = Field(..., description="Model type")
     provider: AIModelProviderEnum = Field(..., description="AI model provider")
     config: dict = Field(default_factory=dict, description="Provider-specific configuration")
-    credential_secret: Optional[dict] = Field(None, description="Decrypted credential secret")
+    credential_secret: dict | None = Field(None, description="Decrypted credential secret")
     priority: int = Field(..., description="Priority for load-balancing")
 
     model_config = ConfigDict(from_attributes=True)

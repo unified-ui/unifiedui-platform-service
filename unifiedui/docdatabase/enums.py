@@ -1,6 +1,6 @@
-from enum import Enum
+from enum import StrEnum
 
 
-class DocumentDatabaseTypeEnum(str, Enum):
+class DocumentDatabaseTypeEnum(StrEnum):
     MONGO_DB = "MONGO_DB"
     COSMOS_DB = "COSMOS_DB"

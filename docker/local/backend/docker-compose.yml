@@ -25,12 +25,12 @@ services:
       - DB_NAME=unifiedui
       - DB_USER=unifiedui
       - DB_PASSWORD=unifiedui_password
-      
+
       # MongoDB Configuration
       - DOCUMENT_DATABASE=mongodb
       - MONGODB_CONNECTION_STRING=mongodb://admin:admin@unifiedui-docdatabase:27017/?authSource=admin
       - MONGODB_DATABASE_NAME=unifiedui
-      
+
       # Redis Cache Configuration
       - CACHE_ENABLED=true
       - CACHE_BACKEND=redis
@@ -38,25 +38,25 @@ services:
       - REDIS_PORT=6379
       - REDIS_DB=0
       - REDIS_PASSWORD=admin
-      
+
       # RabbitMQ Configuration
       - RABBITMQ_HOST=unifiedui-message-broker
       - RABBITMQ_PORT=5672
       - RABBITMQ_MANAGEMENT_PORT=15672
       - RABBITMQ_USER=admin
       - RABBITMQ_PASSWORD=admin
-      
+
       # HashiCorp Vault Configuration
       - VAULT_TYPE=HASHICORP_VAULT
       - VAULT_ADDR=http://unifiedui-vault:8200
       - VAULT_TOKEN=admin
-      
+
       # Secret Encryption Key (for caching secrets)
       - SECRETS_ENCRYPTION_KEY=local-dev-encryption-key-32chars!
-      
+
       # Logging
       - LOG_LEVEL=DEBUG
-      
+
       # CORS (allow frontend)
       # - CORS_ORIGINS=["http://localhost:5173","http://localhost:3000","http://localhost:8000"]
     networks:

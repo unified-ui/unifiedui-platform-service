@@ -1,49 +1,17 @@
 """Tests for tenant AI models RBAC (Role-Based Access Control)."""
-from typing import Any
+
 from fastapi import status
 from starlette.testclient import TestClient
 
-from unifiedui.core.database.enums import PrincipalTypeEnum
 from tests.conftest import create_auth_headers
-
+from tests.helpers.tenant import add_user_to_tenant, create_tenant_for_user
+from unifiedui.core.database.enums import PrincipalTypeEnum
 
 ENDPOINT_TENANTS = "/api/v1/platform-service/tenants"
 ENDPOINT_AI_MODELS = "/api/v1/platform-service/tenants/{tenant_id}/ai-models"
 ENDPOINT_AI_MODEL_DETAIL = "/api/v1/platform-service/tenants/{tenant_id}/ai-models/{model_id}"
 
 PRINCIPAL_TYPE_USER = PrincipalTypeEnum.IDENTITY_USER.value
-
-
-def create_tenant_for_user(test_client: TestClient, user_token: Any, tenant_name: str = "Test Tenant") -> str:
-    """Helper function to create a tenant and return its ID."""
-    headers = create_auth_headers(user_token, use_cache=False)
-    response = test_client.post(
-        ENDPOINT_TENANTS,
-        json={"name": tenant_name, "description": f"Tenant for {user_token.get_id()}"},
-        headers=headers,
-    )
-    assert response.status_code == status.HTTP_201_CREATED
-    return response.json()["id"]
-
-
-def add_user_to_tenant(
-    test_client: TestClient,
-    tenant_id: str,
-    admin_headers: dict,
-    user_id: str,
-    role: str = "READER",
-) -> None:
-    """Helper function to add a user to a tenant."""
-    response = test_client.put(
-        f"/api/v1/platform-service/tenants/{tenant_id}/principals",
-        json={
-            "principal_id": user_id,
-            "principal_type": PRINCIPAL_TYPE_USER,
-            "role": role,
-        },
-        headers=admin_headers,
-    )
-    assert response.status_code == status.HTTP_200_OK
 
 
 def create_ai_model(
@@ -79,7 +47,7 @@ class TestTenantAIModelRBAC:
     """Test suite for tenant AI model role-based access control."""
 
     def test_global_admin_can_create(self, test_client: TestClient) -> None:
-        """Test that GLOBAL_ADMIN (tenant creator) can create AI models."""
+        """Test that TENANT_GLOBAL_ADMIN (tenant creator) can create AI models."""
         user_token = test_client.create_test_user("rbac-admin-1", "Admin User")
         headers = create_auth_headers(user_token, use_cache=False)
         tenant_id = create_tenant_for_user(test_client, user_token)
@@ -105,8 +73,11 @@ class TestTenantAIModelRBAC:
 
         ai_admin_token = test_client.create_test_user("rbac-ai-admin", "AI Admin")
         add_user_to_tenant(
-            test_client, tenant_id, admin_headers,
-            "rbac-ai-admin", "TENANT_AI_MODELS_ADMIN",
+            test_client,
+            tenant_id,
+            admin_headers,
+            "rbac-ai-admin",
+            "TENANT_AI_MODELS_ADMIN",
         )
 
         ai_admin_headers = create_auth_headers(ai_admin_token, use_cache=False)
@@ -230,7 +201,7 @@ class TestTenantAIModelRBAC:
     def test_non_member_cannot_list(self, test_client: TestClient) -> None:
         """Test that non-members cannot list AI models."""
         admin_token = test_client.create_test_user("rbac-admin-8", "Tenant Admin")
-        admin_headers = create_auth_headers(admin_token, use_cache=False)
+        create_auth_headers(admin_token, use_cache=False)
         tenant_id = create_tenant_for_user(test_client, admin_token)
 
         outsider_token = test_client.create_test_user("rbac-outsider-1", "Outsider")
@@ -273,8 +244,11 @@ class TestTenantAIModelRBAC:
 
         ai_admin_token = test_client.create_test_user("rbac-ai-admin-2", "AI Admin 2")
         add_user_to_tenant(
-            test_client, tenant_id, admin_headers,
-            "rbac-ai-admin-2", "TENANT_AI_MODELS_ADMIN",
+            test_client,
+            tenant_id,
+            admin_headers,
+            "rbac-ai-admin-2",
+            "TENANT_AI_MODELS_ADMIN",
         )
 
         ai_admin_headers = create_auth_headers(ai_admin_token, use_cache=False)
@@ -298,8 +272,11 @@ class TestTenantAIModelRBAC:
 
         ai_admin_token = test_client.create_test_user("rbac-ai-admin-3", "AI Admin 3")
         add_user_to_tenant(
-            test_client, tenant_id, admin_headers,
-            "rbac-ai-admin-3", "TENANT_AI_MODELS_ADMIN",
+            test_client,
+            tenant_id,
+            admin_headers,
+            "rbac-ai-admin-3",
+            "TENANT_AI_MODELS_ADMIN",
         )
 
         ai_admin_headers = create_auth_headers(ai_admin_token, use_cache=False)

@@ -88,25 +88,25 @@ class {Resource}Handler:
 
 Every list handler:
 1. Checks if user is tenant admin → if yes, returns all (no member join)
-2. Otherwise collects all principal_ids (user + identity groups + custom groups) 
+2. Otherwise collects all principal_ids (user + identity groups + custom groups)
 3. Queries with subquery on `{Resource}Member` table
 4. Builds cache key with user-specific parameters
 
 ```python
 def list_{resources}(self, tenant_id: str, user: ContextIdentityUser, ...):
     user_id = user.identity.get_id()
-    
+
     # Check admin bypass
     is_admin = self._check_tenant_admin(user, tenant_id, [
-        TenantRolesEnum.GLOBAL_ADMIN, TenantRolesEnum.{RESOURCE}_ADMIN
+        TenantRolesEnum.TENANT_GLOBAL_ADMIN, TenantRolesEnum.{RESOURCE}_ADMIN
     ])
-    
+
     # Collect principal IDs for permission filtering
     if not is_admin:
         identity_group_ids = [g.id for g in user.groups]
         custom_group_ids = [g.id for g in user.custom_groups]
         principal_ids = [user_id] + identity_group_ids + custom_group_ids
-    
+
     # Build query
     query = select({Resource}).where({Resource}.tenant_id == tenant_id)
     if not is_admin:
@@ -118,7 +118,7 @@ def list_{resources}(self, tenant_id: str, user: ContextIdentityUser, ...):
             ).distinct()
         )
         query = query.where({Resource}.id.in_(member_subquery))
-    
+
     # ... apply filters, ordering, pagination
 ```
 
@@ -133,12 +133,12 @@ Generic handler for permission CRUD on any resource type. Uses `RESOURCE_PERMISS
 
 ```python
 RESOURCE_PERMISSION_CONFIG = {
-    "application": {
-        "model": Application,
-        "member_model": ApplicationMember,
-        "id_field": "application_id",
-        "cache_prefix": "app",
-        "tenant_admin_role": TenantRolesEnum.APPLICATIONS_ADMIN,
+    "chat_agent": {
+        "model": ChatAgent,
+        "member_model": ChatAgentMember,
+        "id_field": "chat_agent_id",
+        "cache_prefix": "chat_agent",
+        "tenant_admin_role": TenantRolesEnum.CHAT_AGENTS_ADMIN,
     },
     # ... one entry per resource
 }
@@ -146,12 +146,34 @@ RESOURCE_PERMISSION_CONFIG = {
 
 Provides: `list_permissions()`, `get_permission()`, `set_permission()`, `delete_permission()`, `add_creator_permission()`
 
+### PrincipalsHelper
+**Location**: `handlers/principals_helper.py`
+
+Shared helper for resolving principal IDs (user + identity groups + custom groups) used across handlers for permission-filtered queries.
+
 ### ResourceTagsHandler
 **Location**: `handlers/resource_tags.py`
 
 Generic handler for tag operations. Uses `RESOURCE_TAG_CONFIG` dict.
 
 Provides: `get_resource_tags()`, `set_resource_tags()`, `add_resource_tag()`, `remove_resource_tag()`
+
+### UserFavoritesHandler
+**Location**: `handlers/user_favorites.py`
+
+Generic handler for user favorite operations. Uses `RESOURCE_FAVORITE_MAPPING` dict.
+
+```python
+RESOURCE_FAVORITE_MAPPING = {
+    "chat-agents": {"model": ChatAgentUserFavorite, "id_field": "chat_agent_id"},
+    "autonomous-agents": {"model": AutonomousAgentUserFavorite, "id_field": "autonomous_agent_id"},
+    "chat-widgets": {"model": ChatWidgetUserFavorite, "id_field": "chat_widget_id"},
+    "conversations": {"model": ConversationUserFavorite, "id_field": "conversation_id"},
+    "re-act-agents": {"model": ReActAgentUserFavorite, "id_field": "re_act_agent_id"},
+}
+```
+
+Provides: `list_user_favorites()`, `add_user_favorite()`, `remove_user_favorite()`
 
 ---
 
@@ -188,11 +210,11 @@ Config validators live in `handlers/validators/`. Used to validate runtime confi
 
 | Validator | Purpose |
 |-----------|---------|
-| `ApplicationConfigValidatorFactory` | Validates N8N / Foundry / REST API configs |
-| `AutonomousAgentConfigValidator` | Validates autonomous agent configs |
-| `CredentialValidator` | Validates credential data |
-| `ToolValidator` | Validates tool (MCP / OpenAPI) configs |
-| `TenantAIModelValidator` | Validates AI model provider configs |
+| `ChatAgentConfigValidatorFactory` | Validates N8N / Foundry / REST API / ReACT Agent configs |
+| `AutonomousAgentConfigValidatorFactory` | Validates autonomous agent configs |
+| `CredentialValidator` | Validates credential data (Pydantic-based, no factory) |
+| `ToolConfigValidatorFactory` | Validates tool (MCP / OpenAPI) configs |
+| `AIModelConfigValidatorFactory` | Validates AI model provider configs |
 
 ---
 

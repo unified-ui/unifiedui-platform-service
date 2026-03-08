@@ -20,7 +20,7 @@ class DatabaseClient:
     def __init__(self, client: BaseDatabaseClient):
         """
         Initialize the database client wrapper.
-        
+
         Args:
             client: The underlying database-specific client
         """
@@ -30,7 +30,7 @@ class DatabaseClient:
     def tenants(self) -> TenantsCollection:
         """
         Get the tenants collection.
-        
+
         Returns:
             TenantsCollection: The tenants collection interface
         """
@@ -40,7 +40,7 @@ class DatabaseClient:
     def permissions(self) -> PermissionsCollection:
         """
         Get the permissions collection.
-        
+
         Returns:
             PermissionsCollection: The permissions collection interface
         """
@@ -50,7 +50,7 @@ class DatabaseClient:
     def custom_groups(self) -> CustomGroupsCollection:
         """
         Get the custom groups collection.
-        
+
         Returns:
             CustomGroupsCollection: The custom groups collection interface
         """
@@ -59,7 +59,7 @@ class DatabaseClient:
     def health_check(self) -> bool:
         """
         Check if database connection is healthy.
-        
+
         Returns:
             bool: True if healthy, False otherwise
         """
@@ -84,7 +84,7 @@ class DatabaseClientFactory:
     ) -> DatabaseClient:
         """
         Create a database client based on the specified type.
-        
+
         Args:
             db_type: Type of database (MONGO_DB or COSMOS_DB).
                      If not provided, reads from DOCUMENT_DATABASE env var.
@@ -92,10 +92,10 @@ class DatabaseClientFactory:
                                If not provided, reads from environment variables.
             database_name: Name of the database.
                            If not provided, reads from environment variables.
-        
+
         Returns:
             An instance of DatabaseClient wrapping the specific implementation.
-        
+
         Raises:
             ValueError: If db_type is invalid or not supported.
             RuntimeError: If required configuration is missing.
@@ -128,7 +128,7 @@ class DatabaseClientFactory:
             )
         else:
             raise ValueError(f"Unsupported database type: {db_type}")
-        
+
         # Wrap in DatabaseClient
         return DatabaseClient(underlying_client)
 
@@ -155,10 +155,10 @@ class DatabaseClientFactory:
             connection_string=connection_string,
             database_name=database_name
         )
-        
+
         # Establish connection
         client.connect()
-        
+
         return client
 
 
@@ -168,11 +168,11 @@ def get_database_client(
 ) -> DatabaseClient:
     """
     Convenience function to create and return a database client.
-    
+
     Usage:
         # Using environment variables
         db_client = get_database_client()
-        
+
         # Explicitly specifying type
         db_client = get_database_client(DocumentDatabaseTypeEnum.MONGO_DB)
     """

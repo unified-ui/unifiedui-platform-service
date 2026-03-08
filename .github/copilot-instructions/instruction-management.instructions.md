@@ -8,6 +8,7 @@
 - **New infrastructure component** → Update `infrastructure.instructions.md`
 - **New test pattern established** → Update `testing.instructions.md`
 - **Folder structure changed** → Update `project-structure.instructions.md`
+- **New security pattern or validation rule** → Update `security.instructions.md`
 - **New central handler** (like ResourcePermissionsHandler) → Update `handlers.instructions.md`
 - **New enum added to enums.py** → Update `database.instructions.md`
 
@@ -44,6 +45,7 @@ After completing work, ask:
 | `auth-permissions.instructions.md` | Three decorators, permission flow, role hierarchy, service keys |
 | `infrastructure.instructions.md` | Cache, vault, identity, document DB, config |
 | `testing.instructions.md` | Three-file pattern, fixtures, RBAC tests, caching tests, running tests |
+| `security.instructions.md` | SQL injection, SSRF, input validation, auth patterns, secret management |
 
 ---
 

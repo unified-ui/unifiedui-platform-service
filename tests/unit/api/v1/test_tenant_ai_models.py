@@ -1,27 +1,20 @@
 """Tests for tenant AI models API endpoints."""
+
 from typing import Any
+from unittest.mock import patch
+
 from fastapi import status
 from starlette.testclient import TestClient
 
 from tests.conftest import create_auth_headers
-
+from tests.helpers.tenant import create_tenant_for_user
 
 ENDPOINT_AI_MODELS = "/api/v1/platform-service/tenants/{tenant_id}/ai-models"
 ENDPOINT_AI_MODEL_DETAIL = "/api/v1/platform-service/tenants/{tenant_id}/ai-models/{model_id}"
+ENDPOINT_AI_MODELS_BY_PURPOSE = "/api/v1/platform-service/tenants/{tenant_id}/ai-models/by-purpose/{purpose_group}"
 
 NON_EXISTENT_ID = "non-existent-id"
-
-
-def create_tenant_for_user(test_client: TestClient, user_token: Any, tenant_name: str = "Test Tenant") -> str:
-    """Helper function to create a tenant and return its ID."""
-    headers = create_auth_headers(user_token, use_cache=False)
-    response = test_client.post(
-        "/api/v1/platform-service/tenants",
-        json={"name": tenant_name, "description": f"Tenant for {user_token.get_id()}"},
-        headers=headers
-    )
-    assert response.status_code == status.HTTP_201_CREATED
-    return response.json()["id"]
+TEST_SERVICE_KEY = "test-service-key-for-s2s-12345"
 
 
 def create_ai_model(
@@ -103,7 +96,7 @@ class TestTenantAIModelRoutes:
         assert data["description"] == model_data["description"]
         assert data["type"] == model_data["type"]
         assert data["provider"] == model_data["provider"]
-        assert data["is_active"] == False
+        assert not data["is_active"]
         assert data["priority"] == 0
         assert "id" in data
         assert data["tenant_id"] == tenant_id
@@ -141,7 +134,7 @@ class TestTenantAIModelRoutes:
         assert response.status_code == status.HTTP_201_CREATED
         data = response.json()
         assert data["provider"] == "OPENAI"
-        assert data["is_active"] == True
+        assert data["is_active"]
         assert data["priority"] == 1
 
     def test_create_ai_model_embedding_type(
@@ -409,8 +402,12 @@ class TestTenantAIModelRoutes:
 
         create_ai_model(test_client, tenant_id, headers, "LLM", model_type="LLM_MODEL")
         create_ai_model(
-            test_client, tenant_id, headers, "Embed",
-            model_type="EMBEDDING_MODEL", provider="OPENAI",
+            test_client,
+            tenant_id,
+            headers,
+            "Embed",
+            model_type="EMBEDDING_MODEL",
+            provider="OPENAI",
         )
 
         response = test_client.get(
@@ -466,7 +463,7 @@ class TestTenantAIModelRoutes:
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert data["name"] == "Updated Model Name"
-        assert data["is_active"] == True
+        assert data["is_active"]
 
     def test_update_ai_model_not_found(
         self,
@@ -593,3 +590,131 @@ class TestTenantAIModelRoutes:
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert len(data) == 2
+
+
+class TestTenantAIModelByPurposeS2S:
+    """Test suite for S2S by-purpose endpoint."""
+
+    def test_by_purpose_requires_service_key(self, test_client: TestClient, test_user_token: Any) -> None:
+        """Test that by-purpose endpoint requires X-Service-Key header."""
+        tenant_id = create_tenant_for_user(test_client, test_user_token)
+
+        response = test_client.get(
+            ENDPOINT_AI_MODELS_BY_PURPOSE.format(tenant_id=tenant_id, purpose_group="CONVERSATION_TITLE_GENERATION"),
+        )
+
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
+
+    def test_by_purpose_rejects_invalid_service_key(self, test_client: TestClient, test_user_token: Any) -> None:
+        """Test that by-purpose endpoint rejects invalid service key."""
+        tenant_id = create_tenant_for_user(test_client, test_user_token)
+
+        with patch("unifiedui.core.middleware.apis.v1.auth.settings") as mock_settings:
+            mock_settings.x_agent_service_key = TEST_SERVICE_KEY
+            response = test_client.get(
+                ENDPOINT_AI_MODELS_BY_PURPOSE.format(
+                    tenant_id=tenant_id, purpose_group="CONVERSATION_TITLE_GENERATION"
+                ),
+                headers={"X-Service-Key": "wrong-key"},
+            )
+
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_by_purpose_success_with_valid_key(self, test_client: TestClient, test_user_token: Any) -> None:
+        """Test by-purpose endpoint returns AI models with valid service key."""
+        tenant_id = create_tenant_for_user(test_client, test_user_token)
+        headers = create_auth_headers(test_user_token, use_cache=False)
+
+        create_ai_model(test_client, tenant_id, headers, "Purpose Model")
+
+        with patch("unifiedui.core.middleware.apis.v1.auth._resolve_service_credential", return_value=TEST_SERVICE_KEY):
+            response = test_client.get(
+                ENDPOINT_AI_MODELS_BY_PURPOSE.format(
+                    tenant_id=tenant_id, purpose_group="CONVERSATION_TITLE_GENERATION"
+                ),
+                headers={"X-Service-Key": TEST_SERVICE_KEY},
+            )
+
+        assert response.status_code == status.HTTP_200_OK
+
+    def test_by_purpose_empty_result(self, test_client: TestClient, test_user_token: Any) -> None:
+        """Test by-purpose endpoint returns empty list for unused purpose group."""
+        tenant_id = create_tenant_for_user(test_client, test_user_token)
+
+        with patch("unifiedui.core.middleware.apis.v1.auth._resolve_service_credential", return_value=TEST_SERVICE_KEY):
+            response = test_client.get(
+                ENDPOINT_AI_MODELS_BY_PURPOSE.format(tenant_id=tenant_id, purpose_group="NONEXISTENT_PURPOSE"),
+                headers={"X-Service-Key": TEST_SERVICE_KEY},
+            )
+
+        assert response.status_code == status.HTTP_200_OK
+        assert response.json() == []
+
+    def test_by_purpose_with_model_type_filter(self, test_client: TestClient, test_user_token: Any) -> None:
+        """Test by-purpose endpoint with model_type query param."""
+        tenant_id = create_tenant_for_user(test_client, test_user_token)
+        headers = create_auth_headers(test_user_token, use_cache=False)
+
+        create_ai_model(test_client, tenant_id, headers, "LLM Model", model_type="LLM_MODEL")
+
+        with patch("unifiedui.core.middleware.apis.v1.auth._resolve_service_credential", return_value=TEST_SERVICE_KEY):
+            response = test_client.get(
+                ENDPOINT_AI_MODELS_BY_PURPOSE.format(tenant_id=tenant_id, purpose_group="CONVERSATION_TITLE_GENERATION")
+                + "?model_type=LLM_MODEL",
+                headers={"X-Service-Key": TEST_SERVICE_KEY},
+            )
+
+        assert response.status_code == status.HTTP_200_OK
+
+    def test_list_ai_models_filter_by_name(self, test_client: TestClient, test_user_token: Any) -> None:
+        """Test listing AI models with name filter."""
+        tenant_id = create_tenant_for_user(test_client, test_user_token)
+        headers = create_auth_headers(test_user_token, use_cache=False)
+
+        create_ai_model(test_client, tenant_id, headers, "Alpha Model")
+        create_ai_model(test_client, tenant_id, headers, "Beta Model")
+
+        response = test_client.get(
+            ENDPOINT_AI_MODELS.format(tenant_id=tenant_id) + "?name=Alpha",
+            headers=headers,
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert len(data) == 1
+        assert data[0]["name"] == "Alpha Model"
+
+    def test_list_ai_models_filter_by_active_status(self, test_client: TestClient, test_user_token: Any) -> None:
+        """Test listing AI models with active status filter."""
+        tenant_id = create_tenant_for_user(test_client, test_user_token)
+        headers = create_auth_headers(test_user_token, use_cache=False)
+
+        create_ai_model(test_client, tenant_id, headers, "Inactive Model")
+
+        response = test_client.get(
+            ENDPOINT_AI_MODELS.format(tenant_id=tenant_id) + "?is_active=0",
+            headers=headers,
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        for item in data:
+            assert not item["is_active"]
+
+    def test_list_ai_models_ordering(self, test_client: TestClient, test_user_token: Any) -> None:
+        """Test listing AI models with ordering."""
+        tenant_id = create_tenant_for_user(test_client, test_user_token)
+        headers = create_auth_headers(test_user_token, use_cache=False)
+
+        create_ai_model(test_client, tenant_id, headers, "AAA Model")
+        create_ai_model(test_client, tenant_id, headers, "ZZZ Model")
+
+        response = test_client.get(
+            ENDPOINT_AI_MODELS.format(tenant_id=tenant_id) + "?order_by=name&order_direction=desc",
+            headers=headers,
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert len(data) >= 2
+        assert data[0]["name"] == "ZZZ Model"

@@ -66,7 +66,7 @@ async def list_{resource_name_plural}(
 @check_permissions(
     entity="tenant",
     required_permissions=[
-        TenantRolesEnum.GLOBAL_ADMIN,
+        TenantRolesEnum.TENANT_GLOBAL_ADMIN,
         TenantRolesEnum.{RESOURCE}_ADMIN,
         TenantRolesEnum.{RESOURCE}_CREATOR
     ]
@@ -143,7 +143,7 @@ except {Resource}NotFoundError:
     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="...")
 except {Resource}ConfigValidationError as e:
     raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
-except UnsupportedApplicationTypeError as e:
+except UnsupportedChatAgentTypeError as e:
     raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 except InvalidCredentialError as e:
     raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
@@ -211,3 +211,25 @@ async def get_models_by_purpose(request: Request, tenant_id: str, purpose_group:
 - No member table — scoped only by tenant
 - CRUD by tenant admin users via `@authenticate()`, lookup by purpose via `@authenticate_service_key()`
 - Routes registered at: `/api/v1/platform-service/tenants/{tenant_id}/ai-models`
+
+### ReACT Agent (ChatAgent Sub-Type)
+- ReACT Agent is a sub-type of ChatAgent (`ChatAgentTypeEnum.REACT_AGENT`), **not** a standalone resource
+- Uses `ChatAgentMember` for RBAC — no standalone `ReActAgentMember`
+- Has a `ReActAgentVersion` model linked via FK to `chat_agents.id` (stores versioned config: system_prompt, tool_ids, ai_model_ids, etc.)
+- Routes for version management registered at: `/api/v1/platform-service/tenants/{tenant_id}/re-act-agents`
+
+### Dashboard (Aggregation endpoint)
+- `GET /dashboard/stats` — returns aggregated counts (total + active) for chat_agents, autonomous_agents, conversations
+- RBAC-filtered: only counts entities the user has access to
+- Cached for 120s via Redis
+- Routes registered at: `/api/v1/platform-service/tenants/{tenant_id}/dashboard`
+
+### Global Search
+- `GET /search?q=...&types=...&limit=10` — searches across chat_agents, autonomous_agents, conversations, credentials by name (ILIKE)
+- RBAC-filtered: only returns entities the user has access to
+- Routes registered at: `/api/v1/platform-service/tenants/{tenant_id}/search`
+
+### Recent Visits
+- `GET /users/{user_id}/recent-visits` — list user's recent visits (up to 50)
+- `POST /users/{user_id}/recent-visits/sync` — sync visits from client (upsert + cleanup)
+- Routes registered at: `/api/v1/platform-service/tenants/{tenant_id}/recent-visits`

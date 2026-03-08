@@ -1,6 +1,7 @@
 """Abstract base class for cache client."""
+
 from abc import ABC, abstractmethod
-from typing import Any, Optional
+from typing import Any
 
 from unifiedui.core.caching.cache import BaseCache
 
@@ -15,16 +16,16 @@ class BaseCacheClient(ABC):
     def get_cache(self) -> BaseCache:
         """
         Get the underlying cache instance.
-        
+
         Returns:
             BaseCache instance
         """
         pass
 
-    def get(self, key: str) -> Optional[Any]:
+    def get(self, key: str) -> Any | None:
         """
         Get a value from the cache by key.
-        
+
         Args:
             key: Cache key
         Returns:
@@ -35,7 +36,7 @@ class BaseCacheClient(ABC):
     def set(self, key: str, value: Any, ttl: int | None = None) -> None:
         """
         Set a value in the cache with an optional TTL.
-        
+
         Args:
             key: Cache key
             value: Value to cache
@@ -46,7 +47,7 @@ class BaseCacheClient(ABC):
     def delete(self, key: str) -> bool:
         """
         Delete a key from the cache.
-        
+
         Args:
             key: Cache key
         Returns:
@@ -57,7 +58,7 @@ class BaseCacheClient(ABC):
     def delete_pattern(self, pattern: str) -> int:
         """
         Delete all keys matching a pattern.
-        
+
         Args:
             pattern: Key pattern (e.g., "tenant:*")
         Returns:
@@ -74,7 +75,7 @@ class BaseCacheClient(ABC):
     def ping(self) -> bool:
         """
         Check if cache connection is alive.
-        
+
         Returns:
             True if connected, False otherwise
         """
