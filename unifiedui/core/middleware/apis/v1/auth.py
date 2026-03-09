@@ -132,7 +132,7 @@ def authenticate_autonomous_agent_api_key() -> Callable:
         async def wrapper(*args: Any, **kwargs: Any) -> Any:
             from unifiedui.core.database.models import AutonomousAgent
             from unifiedui.handlers.dependencies.database import get_db_client
-            from unifiedui.handlers.dependencies.vault import get_vault_client
+            from unifiedui.handlers.dependencies.vault import get_secrets_vault
 
             # Extract request from args or kwargs
             request: Request | None = kwargs.get("request")
@@ -166,7 +166,7 @@ def authenticate_autonomous_agent_api_key() -> Callable:
                 )
 
             # Get vault client and db client
-            vault_client = get_vault_client()
+            vault_client = get_secrets_vault()
             db_client = get_db_client()
 
             if not vault_client:
