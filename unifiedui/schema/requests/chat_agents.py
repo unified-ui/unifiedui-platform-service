@@ -36,6 +36,7 @@ class UpdateChatAgentRequest(BaseModel):
     embed_allowed_origins: str | None = Field(
         None, max_length=2000, description="Semicolon-separated list of allowed origins for embed iframe"
     )
+    greeting_messages: list[str] | None = Field(None, description="Greeting messages for the agent")
 
 
 class UpdateReActAgentVersionRequest(BaseModel):

@@ -365,6 +365,7 @@ class ChatAgent(Base, IdNameDescriptionMixin, TenantScopedMixin):
     config: Mapped[dict] = mapped_column(PortableJSON, nullable=False, default=dict)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     embed_allowed_origins: Mapped[str | None] = mapped_column(String(2000), nullable=True, default=None)
+    greeting_messages: Mapped[list] = mapped_column(PortableJSON, nullable=False, default=list)
 
     members: Mapped[list[ChatAgentMember]] = relationship(back_populates="chat_agent", cascade="all, delete-orphan")
     tags: Mapped[list[ChatAgentTag]] = relationship(back_populates="chat_agent", cascade="all, delete-orphan")

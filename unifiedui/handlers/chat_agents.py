@@ -373,6 +373,7 @@ class ChatAgentHandler:
                 config=validated_config,
                 is_active=request.is_active,
                 embed_allowed_origins=request.embed_allowed_origins,
+                greeting_messages=request.greeting_messages or [],
                 created_by=user_id,
                 updated_by=user_id,
             )
@@ -474,6 +475,8 @@ class ChatAgentHandler:
                 chat_agent.is_active = request.is_active
             if request.embed_allowed_origins is not None:
                 chat_agent.embed_allowed_origins = request.embed_allowed_origins
+            if request.greeting_messages is not None:
+                chat_agent.greeting_messages = request.greeting_messages
 
             chat_agent.updated_by = user_id
 
@@ -1436,6 +1439,8 @@ class ChatAgentHandler:
                 "greeting_messages": latest.greeting_messages or [],
             }
 
+        greeting_messages = version_fields.pop("greeting_messages", None) or (chat_agent.greeting_messages or [])
+
         return ChatAgentResponse(
             id=chat_agent.id,
             tenant_id=chat_agent.tenant_id,
@@ -1450,6 +1455,7 @@ class ChatAgentHandler:
             updated_at=chat_agent.updated_at,
             created_by=chat_agent.created_by,
             updated_by=chat_agent.updated_by,
+            greeting_messages=greeting_messages,
             **version_fields,
         )
 
