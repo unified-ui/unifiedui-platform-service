@@ -47,6 +47,20 @@ class ChatAgentTypeEnum(StrEnum):
         return [agent_type.value for agent_type in ChatAgentTypeEnum]
 
 
+class RestApiAuthTypeEnum(StrEnum):
+    """Supported authentication types for REST API agents."""
+
+    ANONYMOUS = "ANONYMOUS"
+    BASIC_AUTH = "BASIC_AUTH"
+    API_KEY = "API_KEY"
+    ENTRA_ID_USER_TOKEN = "ENTRA_ID_USER_TOKEN"
+    ENTRA_ID_APP_REGISTRATION = "ENTRA_ID_APP_REGISTRATION"
+
+    @classmethod
+    def all(cls) -> list[str]:
+        return [auth_type.value for auth_type in RestApiAuthTypeEnum]
+
+
 class AutonomousAgentTypeEnum(StrEnum):
     """Supported autonomous agent types."""
 

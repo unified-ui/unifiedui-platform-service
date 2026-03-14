@@ -36,6 +36,7 @@ if TYPE_CHECKING:
     from unifiedui.schema.responses.chat_agents import (
         MicrosoftFoundryConfigSettingsResponse,
         N8NConfigSettingsResponse,
+        RestApiConfigSettingsResponse,
     )
     from unifiedui.schema.responses.re_act_agents import ReActAgentConfigSettingsResponse
 
@@ -640,6 +641,7 @@ class ChatAgentHandler:
                 settings: (
                     N8NConfigSettingsResponse
                     | MicrosoftFoundryConfigSettingsResponse
+                    | RestApiConfigSettingsResponse
                     | ReActAgentConfigSettingsResponse
                     | dict[Any, Any]
                 ) = N8NConfigSettingsResponse(
@@ -662,6 +664,66 @@ class ChatAgentHandler:
                     agent_type=config.get("agent_type", "AGENT"),
                     project_endpoint=config.get("project_endpoint", ""),
                     agent_name=config.get("agent_name", ""),
+                )
+            elif app_type == ChatAgentTypeEnum.REST_API:
+                from unifiedui.schema.responses.chat_agents import RestApiConfigSettingsResponse
+
+                credential_response = None
+                access_token = None
+                credential_id = config.get("credential_id")
+                auth_type = config.get("auth_type", "ANONYMOUS")
+
+                if credential_id and auth_type not in ("ANONYMOUS", "ENTRA_ID_USER_TOKEN"):
+                    try:
+                        credential = credential_handler.get_credential(tenant_id, credential_id)
+                        secret = credential_handler.get_credential_secret(tenant_id, credential_id)
+
+                        secret_value: str | dict = secret
+                        if credential.type in ("BASIC_AUTH", "ENTRA_ID_APP_REGISTRATION"):
+                            try:
+                                secret_value = json.loads(secret) if isinstance(secret, str) else secret
+                            except json.JSONDecodeError:
+                                secret_value = secret
+
+                        credential_response = CredentialSecretResponse(
+                            id=credential.id,
+                            credentials_uri=credential.credential_uri,
+                            name=credential.name,
+                            description=credential.description,
+                            type=credential.type,
+                            is_active=credential.is_active,
+                            secret=secret_value,
+                        )
+
+                        if auth_type == "ENTRA_ID_APP_REGISTRATION" and isinstance(secret_value, dict):
+                            from unifiedui.core.identity.client_credentials import ClientCredentialsTokenClient
+
+                            cc_client = ClientCredentialsTokenClient(
+                                tenant_id=secret_value["tenant_id"],
+                                client_id=secret_value["client_id"],
+                                client_secret=secret_value["client_secret"],
+                            )
+                            try:
+                                access_token = cc_client.acquire_token()
+                            except ValueError as e:
+                                logger.error("Failed to acquire client credentials token: %s", e)
+
+                    except Exception as e:
+                        logger.error("Failed to fetch REST API credential: %s", e)
+                        raise InvalidCredentialError(
+                            credential_id=credential_id,
+                            message=f"Invalid or inaccessible credential with ID '{credential_id}'",
+                        )
+
+                settings = RestApiConfigSettingsResponse(
+                    auth_type=auth_type,
+                    invoke_endpoint=config.get("invoke_endpoint", ""),
+                    credential=credential_response,
+                    api_key_header_name=config.get("api_key_header_name", "X-API-Key"),
+                    access_token=access_token,
+                    use_unified_chat_history=config.get("use_unified_chat_history", True),
+                    chat_history_count=config.get("chat_history_count", 30),
+                    create_conversation_endpoint=config.get("create_conversation_endpoint"),
                 )
             elif app_type == ChatAgentTypeEnum.REACT_AGENT:
                 from unifiedui.core.database.models import ReActAgentVersion, TenantAIModel, Tool

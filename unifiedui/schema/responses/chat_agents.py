@@ -95,6 +95,29 @@ class MicrosoftFoundryConfigSettingsResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class RestApiConfigSettingsResponse(BaseModel):
+    """Response model for REST API chat agent config settings."""
+
+    auth_type: str = Field(..., description="Authentication type")
+    invoke_endpoint: str = Field(..., description="URL for the agent invoke endpoint")
+    credential: CredentialSecretResponse | None = Field(
+        None, description="Resolved credential with secret (for BASIC_AUTH, API_KEY, ENTRA_ID_APP_REGISTRATION)"
+    )
+    api_key_header_name: str = Field(
+        default="X-API-Key", description="Header name for API key auth (default: X-API-Key)"
+    )
+    access_token: str | None = Field(
+        None, description="Pre-acquired access token (for ENTRA_ID_APP_REGISTRATION auth type)"
+    )
+    use_unified_chat_history: bool = Field(..., description="Whether to send chat history from unified-ui")
+    chat_history_count: int = Field(..., description="Number of chat history messages")
+    create_conversation_endpoint: str | None = Field(
+        None, description="Optional POST endpoint URL for conversation creation"
+    )
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class ChatAgentConfigResponse(BaseModel):
     """
     Response model for chat agent configuration (for agent service).
@@ -106,7 +129,11 @@ class ChatAgentConfigResponse(BaseModel):
     tenant_id: str = Field(..., description="Tenant ID")
     chat_agent_id: str = Field(..., description="Chat agent ID")
     settings: (
-        N8NConfigSettingsResponse | MicrosoftFoundryConfigSettingsResponse | ReActAgentConfigSettingsResponse | dict
+        N8NConfigSettingsResponse
+        | MicrosoftFoundryConfigSettingsResponse
+        | RestApiConfigSettingsResponse
+        | ReActAgentConfigSettingsResponse
+        | dict
     ) = Field(..., description="Chat agent settings with resolved credentials")
     user: UserInfoResponse = Field(..., description="User information")
 

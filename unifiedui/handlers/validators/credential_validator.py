@@ -17,6 +17,7 @@ class CredentialTypeEnum(StrEnum):
     BASIC_AUTH = "BASIC_AUTH"
     OPENAPI_CONNECTION = "OPENAPI_CONNECTION"
     AI_MODEL_PROVIDER = "AI_MODEL_PROVIDER"
+    ENTRA_ID_APP_REGISTRATION = "ENTRA_ID_APP_REGISTRATION"
 
     @classmethod
     def all(cls) -> list[str]:
@@ -42,6 +43,14 @@ class AIModelProviderCredential(BaseModel):
     """Pydantic model for AI_MODEL_PROVIDER credential validation."""
 
     api_key: str = Field(..., min_length=1, description="API key for the AI model provider")
+
+
+class EntraIdAppRegistrationCredential(BaseModel):
+    """Pydantic model for ENTRA_ID_APP_REGISTRATION credential validation."""
+
+    tenant_id: str = Field(..., min_length=1, description="Azure Entra ID tenant ID")
+    client_id: str = Field(..., min_length=1, description="Azure Entra ID client/application ID")
+    client_secret: str = Field(..., min_length=1, description="Azure Entra ID client secret")
 
 
 class CredentialValidationError(Exception):
@@ -156,6 +165,31 @@ def validate_credential_secret(credential_type: str, secret_value: str) -> str:
         except Exception as e:
             raise CredentialValidationError(
                 f"AI_MODEL_PROVIDER validation failed: {e!s}. 'api_key' field must be a non-empty string."
+            )
+
+        return secret_value
+
+    elif cred_type == CredentialTypeEnum.ENTRA_ID_APP_REGISTRATION.value:
+        try:
+            parsed = json.loads(secret_value)
+        except json.JSONDecodeError as e:
+            raise CredentialValidationError(
+                "ENTRA_ID_APP_REGISTRATION secret_value must be a valid JSON string with "
+                f"'tenant_id', 'client_id', and 'client_secret' fields. Error: {e!s}"
+            )
+
+        if not isinstance(parsed, dict):
+            raise CredentialValidationError(
+                "ENTRA_ID_APP_REGISTRATION secret_value must be a JSON object with "
+                "'tenant_id', 'client_id', and 'client_secret' fields"
+            )
+
+        try:
+            EntraIdAppRegistrationCredential(**parsed)
+        except Exception as e:
+            raise CredentialValidationError(
+                f"ENTRA_ID_APP_REGISTRATION validation failed: {e!s}. "
+                "'tenant_id', 'client_id', and 'client_secret' fields must be non-empty strings."
             )
 
         return secret_value
