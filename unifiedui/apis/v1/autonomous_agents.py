@@ -24,12 +24,19 @@ from unifiedui.handlers.autonomous_agents import AutonomousAgentHandler
 from unifiedui.handlers.credentials import CredentialHandler
 from unifiedui.handlers.dependencies import get_autonomous_agent_handler, get_credential_handler
 from unifiedui.logger import get_logger
-from unifiedui.schema.requests.autonomous_agents import CreateAutonomousAgentRequest, UpdateAutonomousAgentRequest
+from unifiedui.schema.requests.autonomous_agents import (
+    CreateAutonomousAgentRequest,
+    StartWorkflowRequest,
+    UpdateAutonomousAgentRequest,
+)
 from unifiedui.schema.requests.permissions import SetResourcePermissionRequest
 from unifiedui.schema.responses.autonomous_agents import (
     AutonomousAgentConfigResponse,
     AutonomousAgentKeyResponse,
     AutonomousAgentResponse,
+    WorkflowRunDetailResponse,
+    WorkflowRunRetryResponse,
+    WorkflowRunsListResponse,
 )
 from unifiedui.schema.responses.principals import PrincipalWithRolesResponse, ResourcePrincipalsResponse
 
@@ -858,3 +865,259 @@ async def get_autonomous_agent_config_bearer(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to get autonomous agent configuration"
         )
+
+
+@router.get(
+    "/{autonomous_agent_id}/workflow-runs",
+    response_model=WorkflowRunsListResponse,
+    summary="List workflow runs",
+    description="""
+    List workflow execution runs from the external workflow platform (e.g., N8N).
+    Fetches recent executions using the agent's stored configuration and credentials.
+
+    Requires WRITE or ADMIN permission on the autonomous agent.
+    """,
+)
+@authenticate()
+@check_permissions(
+    entity="autonomous_agent",
+    required_permissions=[
+        TenantRolesEnum.TENANT_GLOBAL_ADMIN,
+        TenantRolesEnum.AUTONOMOUS_AGENTS_ADMIN,
+        PermissionActionEnum.ADMIN,
+        PermissionActionEnum.WRITE,
+    ],
+)
+async def list_workflow_runs(
+    request: Request,
+    tenant_id: str,
+    autonomous_agent_id: str,
+    limit: int = Query(20, ge=1, le=100, description="Maximum number of runs to return"),
+    cursor: str | None = Query(None, description="Pagination cursor for next page"),
+    execution_status: str | None = Query(
+        None, alias="status", description="Filter by execution status (e.g., success, error, running)"
+    ),
+    handler: AutonomousAgentHandler = Depends(get_autonomous_agent_handler),
+    credential_handler: CredentialHandler = Depends(get_credential_handler),
+) -> WorkflowRunsListResponse:
+    """List workflow runs for an autonomous agent.
+
+    Args:
+        request: FastAPI request
+        tenant_id: Tenant ID from path
+        autonomous_agent_id: Autonomous agent ID from path
+        limit: Maximum number of runs to return
+        cursor: Pagination cursor for next page
+        execution_status: Filter by execution status
+        handler: Autonomous agent handler dependency
+        credential_handler: Credential handler for fetching secrets
+
+    Returns:
+        WorkflowRunsListResponse with list of execution runs
+    """
+    try:
+        return handler.get_workflow_runs(
+            tenant_id=tenant_id,
+            autonomous_agent_id=autonomous_agent_id,
+            credential_handler=credential_handler,
+            limit=limit,
+            cursor=cursor,
+            status=execution_status,
+        )
+    except AutonomousAgentNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except UnsupportedAutonomousAgentTypeError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Failed to list workflow runs: %s", e, exc_info=True)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to list workflow runs")
+
+
+@router.get(
+    "/{autonomous_agent_id}/workflow-runs/{execution_id}",
+    response_model=WorkflowRunDetailResponse,
+    summary="Get workflow run detail",
+    description="""
+    Get a single workflow execution with full data (input/output) from the external platform.
+    Uses includeData=true to fetch the complete execution data.
+
+    Requires WRITE or ADMIN permission on the autonomous agent.
+    """,
+)
+@authenticate()
+@check_permissions(
+    entity="autonomous_agent",
+    required_permissions=[
+        TenantRolesEnum.TENANT_GLOBAL_ADMIN,
+        TenantRolesEnum.AUTONOMOUS_AGENTS_ADMIN,
+        PermissionActionEnum.ADMIN,
+        PermissionActionEnum.WRITE,
+    ],
+)
+async def get_workflow_run_detail(
+    request: Request,
+    tenant_id: str,
+    autonomous_agent_id: str,
+    execution_id: str,
+    handler: AutonomousAgentHandler = Depends(get_autonomous_agent_handler),
+    credential_handler: CredentialHandler = Depends(get_credential_handler),
+) -> WorkflowRunDetailResponse:
+    """Get full details of a single workflow execution.
+
+    Args:
+        request: FastAPI request
+        tenant_id: Tenant ID from path
+        autonomous_agent_id: Autonomous agent ID from path
+        execution_id: Execution ID from path
+        handler: Autonomous agent handler dependency
+        credential_handler: Credential handler for fetching secrets
+
+    Returns:
+        WorkflowRunDetailResponse with full execution data
+    """
+    try:
+        return handler.get_workflow_run_detail(
+            tenant_id=tenant_id,
+            autonomous_agent_id=autonomous_agent_id,
+            execution_id=execution_id,
+            credential_handler=credential_handler,
+        )
+    except AutonomousAgentNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except UnsupportedAutonomousAgentTypeError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except AutonomousAgentConfigValidationError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Failed to get workflow run detail: %s", e, exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to get workflow run detail"
+        )
+
+
+@router.post(
+    "/{autonomous_agent_id}/workflow-runs/{execution_id}/retry",
+    response_model=WorkflowRunRetryResponse,
+    summary="Retry workflow execution",
+    description="""
+    Retry a failed workflow execution. Only executions with status 'error' can be retried.
+
+    Requires WRITE or ADMIN permission on the autonomous agent.
+    """,
+)
+@authenticate()
+@check_permissions(
+    entity="autonomous_agent",
+    required_permissions=[
+        TenantRolesEnum.TENANT_GLOBAL_ADMIN,
+        TenantRolesEnum.AUTONOMOUS_AGENTS_ADMIN,
+        PermissionActionEnum.ADMIN,
+        PermissionActionEnum.WRITE,
+    ],
+)
+async def retry_workflow_run(
+    request: Request,
+    tenant_id: str,
+    autonomous_agent_id: str,
+    execution_id: str,
+    handler: AutonomousAgentHandler = Depends(get_autonomous_agent_handler),
+    credential_handler: CredentialHandler = Depends(get_credential_handler),
+) -> WorkflowRunRetryResponse:
+    """Retry a failed workflow execution.
+
+    Args:
+        request: FastAPI request
+        tenant_id: Tenant ID from path
+        autonomous_agent_id: Autonomous agent ID from path
+        execution_id: Execution ID to retry
+        handler: Autonomous agent handler dependency
+        credential_handler: Credential handler for fetching secrets
+
+    Returns:
+        WorkflowRunRetryResponse with retry result
+    """
+    try:
+        return handler.retry_workflow_run(
+            tenant_id=tenant_id,
+            autonomous_agent_id=autonomous_agent_id,
+            execution_id=execution_id,
+            credential_handler=credential_handler,
+        )
+    except AutonomousAgentNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except UnsupportedAutonomousAgentTypeError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except AutonomousAgentConfigValidationError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Failed to retry workflow execution: %s", e, exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to retry workflow execution"
+        )
+
+
+@router.post(
+    "/{autonomous_agent_id}/workflow-start",
+    summary="Start workflow",
+    description="""
+    Trigger the workflow via its configured webhook URL.
+    The autonomous agent must have a webhook_url configured.
+
+    Requires WRITE or ADMIN permission on the autonomous agent.
+    """,
+)
+@authenticate()
+@check_permissions(
+    entity="autonomous_agent",
+    required_permissions=[
+        TenantRolesEnum.TENANT_GLOBAL_ADMIN,
+        TenantRolesEnum.AUTONOMOUS_AGENTS_ADMIN,
+        PermissionActionEnum.ADMIN,
+        PermissionActionEnum.WRITE,
+    ],
+)
+async def start_workflow(
+    request: Request,
+    tenant_id: str,
+    autonomous_agent_id: str,
+    body: StartWorkflowRequest | None = None,
+    handler: AutonomousAgentHandler = Depends(get_autonomous_agent_handler),
+) -> dict:
+    """
+    Trigger a workflow via webhook.
+
+    Args:
+        request: FastAPI request
+        tenant_id: Tenant ID from path
+        autonomous_agent_id: Autonomous agent ID from path
+        body: Optional request body with webhook payload
+        handler: Autonomous agent handler dependency
+
+    Returns:
+        Response from the webhook endpoint
+    """
+    try:
+        return handler.start_workflow(
+            tenant_id=tenant_id,
+            autonomous_agent_id=autonomous_agent_id,
+            body=body.body if body else None,
+            files=[f.model_dump(by_alias=True) for f in body.files] if body and body.files else None,
+            query_params=body.query_params if body else None,
+        )
+    except AutonomousAgentNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except UnsupportedAutonomousAgentTypeError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except AutonomousAgentConfigValidationError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Failed to start workflow: %s", e, exc_info=True)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to start workflow")

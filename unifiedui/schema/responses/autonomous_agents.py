@@ -84,3 +84,59 @@ class AutonomousAgentConfigResponse(BaseModel):
     )
 
     model_config = ConfigDict(from_attributes=True)
+
+
+# ========== Workflow Run Response Schemas ==========
+
+
+class WorkflowRunResponse(BaseModel):
+    """Response model for a single workflow execution run."""
+
+    id: str = Field(..., description="Execution ID")
+    finished: bool = Field(..., description="Whether execution has finished")
+    mode: str = Field(..., description="Execution mode (e.g., 'manual', 'trigger')")
+    started_at: datetime | None = Field(None, description="Execution start time", alias="startedAt")
+    stopped_at: datetime | None = Field(None, description="Execution stop time", alias="stoppedAt")
+    status: str = Field(..., description="Execution status (e.g., 'success', 'error', 'running')")
+    workflow_name: str | None = Field(None, description="Name of the workflow", alias="workflowName")
+    retry_of: str | None = Field(None, description="ID of execution this is a retry of", alias="retryOf")
+    retry_success_id: str | None = Field(
+        None, description="ID of the successful retry execution", alias="retrySuccessId"
+    )
+
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+
+class WorkflowRunDetailResponse(BaseModel):
+    """Response model for a single workflow execution with full data."""
+
+    id: str = Field(..., description="Execution ID")
+    finished: bool = Field(..., description="Whether execution has finished")
+    mode: str = Field(..., description="Execution mode")
+    started_at: datetime | None = Field(None, description="Execution start time", alias="startedAt")
+    stopped_at: datetime | None = Field(None, description="Execution stop time", alias="stoppedAt")
+    status: str = Field(..., description="Execution status")
+    workflow_name: str | None = Field(None, description="Name of the workflow", alias="workflowName")
+    retry_of: str | None = Field(None, description="ID of execution this is a retry of", alias="retryOf")
+    retry_success_id: str | None = Field(
+        None, description="ID of the successful retry execution", alias="retrySuccessId"
+    )
+    data: dict | None = Field(None, description="Full execution data (input/output)")
+    workflow_data: dict | None = Field(None, description="Workflow definition data", alias="workflowData")
+
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+
+class WorkflowRunsListResponse(BaseModel):
+    """Response model for a list of workflow execution runs."""
+
+    runs: list[WorkflowRunResponse] = Field(default_factory=list, description="List of workflow runs")
+    next_cursor: str | None = Field(None, description="Cursor for next page", alias="nextCursor")
+
+
+class WorkflowRunRetryResponse(BaseModel):
+    """Response model for retrying a workflow execution."""
+
+    id: str | None = Field(None, description="New execution ID")
+    retried: bool = Field(False, description="Whether the retry was triggered")
+    message: str | None = Field(None, description="Message from the workflow platform")

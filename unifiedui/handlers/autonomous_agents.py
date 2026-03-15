@@ -36,13 +36,20 @@ from datetime import UTC
 
 from unifiedui.exc.autonomous_agents import (
     AutonomousAgentApiKeysNotAllowedError,
+    AutonomousAgentConfigValidationError,
     AutonomousAgentKeyNotFoundError,
     AutonomousAgentNotFoundError,
     AutonomousAgentPermissionNotFoundError,
 )
 from unifiedui.handlers.validators.autonomous_agent_config import AutonomousAgentConfigValidatorFactory
 from unifiedui.logger import get_logger
-from unifiedui.schema.responses.autonomous_agents import AutonomousAgentKeyResponse, AutonomousAgentResponse
+from unifiedui.schema.responses.autonomous_agents import (
+    AutonomousAgentKeyResponse,
+    AutonomousAgentResponse,
+    WorkflowRunDetailResponse,
+    WorkflowRunRetryResponse,
+    WorkflowRunsListResponse,
+)
 from unifiedui.schema.responses.common import QuickListItemResponse
 from unifiedui.schema.responses.principals import PrincipalWithRolesResponse, ResourcePrincipalsResponse
 from unifiedui.schema.responses.tags import TagSummary
@@ -759,6 +766,370 @@ class AutonomousAgentHandler:
             autonomous_agent_id=autonomous_agent_id,
             settings=settings,
         )
+
+    # ========== Workflow Runs Methods ==========
+
+    def _get_n8n_connection_config(
+        self,
+        tenant_id: str,
+        autonomous_agent_id: str,
+        credential_handler,
+    ) -> tuple[str, str, str, str]:
+        """Extract n8n connection details from autonomous agent config.
+
+        Args:
+            tenant_id: The ID of the tenant
+            autonomous_agent_id: The ID of the autonomous agent
+            credential_handler: Credential handler for fetching API key secrets
+
+        Returns:
+            Tuple of (n8n_host, workflow_id, api_version, api_secret)
+
+        Raises:
+            AutonomousAgentNotFoundError: If autonomous agent not found
+            UnsupportedAutonomousAgentTypeError: If agent type doesn't support workflow runs
+            AutonomousAgentConfigValidationError: If required config is missing
+        """
+        from urllib.parse import urlparse
+
+        from unifiedui.exc.autonomous_agents import UnsupportedAutonomousAgentTypeError
+
+        with self.db_client.get_session() as session:
+            agent = session.execute(
+                select(AutonomousAgent).where(
+                    AutonomousAgent.id == autonomous_agent_id,
+                    AutonomousAgent.tenant_id == tenant_id,
+                )
+            ).scalar_one_or_none()
+
+            if not agent:
+                raise AutonomousAgentNotFoundError(autonomous_agent_id)
+
+            agent_type = AutonomousAgentTypeEnum(agent.type)
+            if agent_type != AutonomousAgentTypeEnum.N8N:
+                raise UnsupportedAutonomousAgentTypeError(agent.type)
+
+            config = agent.config or {}
+            workflow_endpoint = config.get("workflow_endpoint", "")
+            api_version = config.get("api_version", "v1")
+            api_credential_id = config.get("api_api_key_credential_id")
+
+            if not workflow_endpoint or not api_credential_id:
+                raise AutonomousAgentConfigValidationError(
+                    message="Autonomous agent missing required config for workflow runs",
+                    errors=["workflow_endpoint and api_api_key_credential_id are required"],
+                )
+
+            parsed = urlparse(workflow_endpoint)
+            n8n_host = f"{parsed.scheme}://{parsed.netloc}"
+            path_parts = parsed.path.split("/workflow/")
+            workflow_id = path_parts[1].strip("/") if len(path_parts) > 1 else ""
+
+            if not workflow_id:
+                raise AutonomousAgentConfigValidationError(
+                    message="Could not extract workflow ID from workflow_endpoint",
+                    errors=["workflow_endpoint must contain /workflow/{id}"],
+                )
+
+            api_secret = credential_handler.get_credential_secret(tenant_id, api_credential_id)
+            if not api_secret:
+                raise AutonomousAgentConfigValidationError(
+                    message="Failed to retrieve API key for workflow runs",
+                    errors=["Ensure the vault is running and the credential secret exists"],
+                )
+
+            return n8n_host, workflow_id, api_version, api_secret
+
+    def get_workflow_runs(
+        self,
+        tenant_id: str,
+        autonomous_agent_id: str,
+        credential_handler,
+        limit: int = 20,
+        cursor: str | None = None,
+        status: str | None = None,
+    ) -> WorkflowRunsListResponse:
+        """Fetch workflow execution runs from the external workflow platform.
+
+        Args:
+            tenant_id: The ID of the tenant
+            autonomous_agent_id: The ID of the autonomous agent
+            credential_handler: Credential handler for fetching API key secrets
+            limit: Maximum number of runs to return
+            cursor: Pagination cursor for next page
+            status: Filter by execution status
+
+        Returns:
+            WorkflowRunsListResponse with list of workflow runs
+
+        Raises:
+            AutonomousAgentNotFoundError: If autonomous agent not found
+            UnsupportedAutonomousAgentTypeError: If agent type doesn't support workflow runs
+            AutonomousAgentConfigValidationError: If config is missing or vault unavailable
+        """
+        import httpx
+
+        from unifiedui.schema.responses.autonomous_agents import WorkflowRunResponse, WorkflowRunsListResponse
+
+        n8n_host, workflow_id, api_version, api_secret = self._get_n8n_connection_config(
+            tenant_id, autonomous_agent_id, credential_handler
+        )
+
+        url = f"{n8n_host}/api/{api_version}/executions"
+        params: dict[str, str | int] = {
+            "workflowId": workflow_id,
+            "limit": min(limit, 100),
+        }
+        if cursor:
+            params["cursor"] = cursor
+        if status:
+            params["status"] = status
+
+        headers = {"X-N8N-API-KEY": api_secret}
+
+        try:
+            with httpx.Client(timeout=15) as client:
+                response = client.get(url, params=params, headers=headers)
+                response.raise_for_status()
+                data = response.json()
+        except httpx.HTTPError as e:
+            logger.error("Failed to fetch workflow runs from N8N: %s", e)
+            return WorkflowRunsListResponse(runs=[], next_cursor=None)
+
+        raw_runs = data.get("data", [])
+        runs = []
+        for run in raw_runs:
+            runs.append(
+                WorkflowRunResponse(
+                    id=str(run.get("id", "")),
+                    finished=run.get("finished", False),
+                    mode=run.get("mode", "unknown"),
+                    startedAt=run.get("startedAt"),
+                    stoppedAt=run.get("stoppedAt"),
+                    status=run.get("status", "unknown"),
+                    workflowName=run.get("workflowName"),
+                    retryOf=run.get("retryOf"),
+                    retrySuccessId=run.get("retrySuccessId"),
+                )
+            )
+
+        return WorkflowRunsListResponse(
+            runs=runs,
+            next_cursor=data.get("nextCursor"),
+        )
+
+    def get_workflow_run_detail(
+        self,
+        tenant_id: str,
+        autonomous_agent_id: str,
+        execution_id: str,
+        credential_handler,
+    ) -> WorkflowRunDetailResponse:
+        """Fetch a single workflow execution with full data from the external platform.
+
+        Args:
+            tenant_id: The ID of the tenant
+            autonomous_agent_id: The ID of the autonomous agent
+            execution_id: The execution ID to fetch
+            credential_handler: Credential handler for fetching API key secrets
+
+        Returns:
+            WorkflowRunDetailResponse with full execution data
+
+        Raises:
+            AutonomousAgentNotFoundError: If autonomous agent not found
+            UnsupportedAutonomousAgentTypeError: If agent type doesn't support workflow runs
+            AutonomousAgentConfigValidationError: If config is missing or execution not found
+        """
+        import httpx
+
+        from unifiedui.schema.responses.autonomous_agents import WorkflowRunDetailResponse
+
+        n8n_host, _workflow_id, api_version, api_secret = self._get_n8n_connection_config(
+            tenant_id, autonomous_agent_id, credential_handler
+        )
+
+        url = f"{n8n_host}/api/{api_version}/executions/{execution_id}"
+        headers = {"X-N8N-API-KEY": api_secret}
+
+        try:
+            with httpx.Client(timeout=15) as client:
+                response = client.get(url, params={"includeData": "true"}, headers=headers)
+                response.raise_for_status()
+                run = response.json()
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 404:
+                raise AutonomousAgentConfigValidationError(
+                    message=f"Execution {execution_id} not found",
+                    errors=[str(e)],
+                )
+            raise
+        except httpx.HTTPError as e:
+            logger.error("Failed to fetch workflow run detail from N8N: %s", e)
+            raise AutonomousAgentConfigValidationError(
+                message=f"Failed to fetch execution {execution_id}",
+                errors=[str(e)],
+            )
+
+        return WorkflowRunDetailResponse(
+            id=str(run.get("id", "")),
+            finished=run.get("finished", False),
+            mode=run.get("mode", "unknown"),
+            startedAt=run.get("startedAt"),
+            stoppedAt=run.get("stoppedAt"),
+            status=run.get("status", "unknown"),
+            workflowName=run.get("workflowName"),
+            retryOf=run.get("retryOf"),
+            retrySuccessId=run.get("retrySuccessId"),
+            data=run.get("data"),
+            workflowData=run.get("workflowData"),
+        )
+
+    def retry_workflow_run(
+        self,
+        tenant_id: str,
+        autonomous_agent_id: str,
+        execution_id: str,
+        credential_handler,
+    ) -> WorkflowRunRetryResponse:
+        """Retry a failed workflow execution.
+
+        Args:
+            tenant_id: The ID of the tenant
+            autonomous_agent_id: The ID of the autonomous agent
+            execution_id: The execution ID to retry
+            credential_handler: Credential handler for fetching API key secrets
+
+        Returns:
+            WorkflowRunRetryResponse with retry result
+
+        Raises:
+            AutonomousAgentNotFoundError: If autonomous agent not found
+            UnsupportedAutonomousAgentTypeError: If agent type doesn't support workflow runs
+            AutonomousAgentConfigValidationError: If retry fails
+        """
+        import httpx
+
+        from unifiedui.schema.responses.autonomous_agents import WorkflowRunRetryResponse
+
+        n8n_host, _workflow_id, api_version, api_secret = self._get_n8n_connection_config(
+            tenant_id, autonomous_agent_id, credential_handler
+        )
+
+        url = f"{n8n_host}/api/{api_version}/executions/{execution_id}/retry"
+        headers = {"X-N8N-API-KEY": api_secret}
+
+        try:
+            with httpx.Client(timeout=30) as client:
+                response = client.post(url, headers=headers)
+                response.raise_for_status()
+                data = response.json()
+        except httpx.HTTPError as e:
+            logger.error("Failed to retry workflow execution: %s", e)
+            raise AutonomousAgentConfigValidationError(
+                message=f"Failed to retry execution {execution_id}",
+                errors=[str(e)],
+            )
+
+        if "message" in data:
+            return WorkflowRunRetryResponse(message=data["message"])
+
+        retry_data = data.get("data", data)
+        return WorkflowRunRetryResponse(
+            id=str(retry_data.get("id", "")),
+            retried=retry_data.get("retried", True),
+        )
+
+    def start_workflow(
+        self,
+        tenant_id: str,
+        autonomous_agent_id: str,
+        body: dict | None = None,
+        files: list[dict] | None = None,
+        query_params: dict[str, str] | None = None,
+    ) -> dict:
+        """
+        Trigger a workflow via its configured webhook URL.
+
+        Args:
+            tenant_id: The ID of the tenant
+            autonomous_agent_id: The ID of the autonomous agent
+            body: Optional JSON body to send with the webhook request
+            files: Optional list of file dicts with name, mimeType, and base64 data
+            query_params: Optional query parameters to append to the webhook URL
+
+        Returns:
+            Response from the webhook endpoint
+
+        Raises:
+            AutonomousAgentNotFoundError: If autonomous agent not found
+            UnsupportedAutonomousAgentTypeError: If agent type doesn't support workflows
+            AutonomousAgentConfigValidationError: If webhook_url is not configured
+        """
+        import httpx
+
+        from unifiedui.exc.autonomous_agents import UnsupportedAutonomousAgentTypeError
+
+        with self.db_client.get_session() as session:
+            agent = session.execute(
+                select(AutonomousAgent).where(
+                    AutonomousAgent.id == autonomous_agent_id,
+                    AutonomousAgent.tenant_id == tenant_id,
+                )
+            ).scalar_one_or_none()
+
+            if not agent:
+                raise AutonomousAgentNotFoundError(autonomous_agent_id)
+
+            agent_type = AutonomousAgentTypeEnum(agent.type)
+            if agent_type != AutonomousAgentTypeEnum.N8N:
+                raise UnsupportedAutonomousAgentTypeError(agent.type)
+
+            config = agent.config or {}
+            webhook_url = config.get("webhook_url")
+
+            if not webhook_url:
+                from unifiedui.exc.autonomous_agents import AutonomousAgentConfigValidationError
+
+                raise AutonomousAgentConfigValidationError(
+                    message="No webhook_url configured for this autonomous agent",
+                    errors=["webhook_url is required to start a workflow"],
+                )
+
+            payload = body or {}
+            if files:
+                payload["files"] = files
+
+            target_url = webhook_url
+            if query_params:
+                from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
+
+                parsed = urlparse(webhook_url)
+                existing_params = parse_qs(parsed.query)
+                existing_params.update({k: [v] for k, v in query_params.items()})
+                new_query = urlencode({k: v[0] for k, v in existing_params.items()})
+                target_url = urlunparse(parsed._replace(query=new_query))
+
+            try:
+                with httpx.Client(timeout=30) as client:
+                    response = client.post(
+                        target_url,
+                        json=payload,
+                        headers={"Content-Type": "application/json"},
+                    )
+                    response.raise_for_status()
+                    try:
+                        return response.json()
+                    except Exception:
+                        return {"status": "ok", "statusCode": response.status_code}
+            except httpx.HTTPError as e:
+                logger.error("Failed to trigger workflow webhook: %s", e)
+                from unifiedui.exc.autonomous_agents import AutonomousAgentConfigValidationError
+
+                raise AutonomousAgentConfigValidationError(
+                    message=f"Failed to trigger workflow: {e!s}",
+                    errors=[str(e)],
+                )
 
     # ========== API Key Management Methods ==========
 

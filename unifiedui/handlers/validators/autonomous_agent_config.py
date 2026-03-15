@@ -25,6 +25,18 @@ class N8NAutonomousAgentConfig(BaseModel):
         description="N8N workflow endpoint URL (e.g., 'http://localhost:5678/workflow/01V4K8pjRhOVncdg')",
     )
     api_api_key_credential_id: str = Field(..., min_length=1, description="Credential ID for N8N API key")
+    webhook_url: str | None = Field(
+        None,
+        description="Optional webhook URL for triggering the workflow (e.g., 'http://localhost:5678/webhook/my-hook')",
+    )
+    default_body: dict[str, Any] | None = Field(
+        None,
+        description="Optional default JSON body pre-filled when starting the workflow via webhook",
+    )
+    default_query_params: dict[str, str] | None = Field(
+        None,
+        description="Optional default query parameters pre-filled when starting the workflow via webhook",
+    )
 
     @field_validator("api_version")
     @classmethod
@@ -43,6 +55,39 @@ class N8NAutonomousAgentConfig(BaseModel):
             raise ValueError("workflow_endpoint must start with http:// or https://")
         if "/workflow/" not in v:
             raise ValueError("workflow_endpoint must contain '/workflow/' path with workflow ID")
+        return v
+
+    @field_validator("webhook_url")
+    @classmethod
+    def validate_webhook_url(cls, v: str | None) -> str | None:
+        """Validate that webhook_url is a valid URL if provided."""
+        if v is None or v == "":
+            return None
+        if not v.startswith(("http://", "https://")):
+            raise ValueError("webhook_url must start with http:// or https://")
+        return v
+
+    @field_validator("default_body")
+    @classmethod
+    def validate_default_body(cls, v: dict[str, Any] | None) -> dict[str, Any] | None:
+        """Validate that default_body is a valid JSON object if provided."""
+        if v is None:
+            return None
+        if not isinstance(v, dict):
+            raise ValueError("default_body must be a JSON object")
+        return v
+
+    @field_validator("default_query_params")
+    @classmethod
+    def validate_default_query_params(cls, v: dict[str, str] | None) -> dict[str, str] | None:
+        """Validate that default_query_params contains only string values."""
+        if v is None:
+            return None
+        if not isinstance(v, dict):
+            raise ValueError("default_query_params must be a JSON object with string values")
+        for key, val in v.items():
+            if not isinstance(key, str) or not isinstance(val, str):
+                raise ValueError("default_query_params keys and values must be strings")
         return v
 
 
@@ -95,7 +140,7 @@ class N8NAutonomousAgentConfigValidator(BaseAutonomousAgentConfigValidator):
         """
         try:
             validated = N8NAutonomousAgentConfig(**config)
-            return validated.model_dump()
+            return validated.model_dump(exclude_none=True)
         except Exception as e:
             logger.error("N8N autonomous agent config validation failed: %s", e)
             raise AutonomousAgentConfigValidationError(
