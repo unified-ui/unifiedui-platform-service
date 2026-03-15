@@ -133,6 +133,8 @@ class WorkflowRunsListResponse(BaseModel):
     runs: list[WorkflowRunResponse] = Field(default_factory=list, description="List of workflow runs")
     next_cursor: str | None = Field(None, description="Cursor for next page", alias="nextCursor")
 
+    model_config = ConfigDict(populate_by_name=True)
+
 
 class WorkflowRunRetryResponse(BaseModel):
     """Response model for retrying a workflow execution."""
