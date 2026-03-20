@@ -40,7 +40,7 @@ PRINCIPAL_TYPE_GROUP = PrincipalTypeEnum.IDENTITY_GROUP.value
 
 
 def _create_org_data(
-    name: str = "RBAC Org",
+    name: str | None = None,
     slug: str = "rbac-org",
     identity_provider: str = "entra_id",
     identity_tenant_id: str = "rbac-idp-001",
@@ -48,7 +48,7 @@ def _create_org_data(
 ) -> dict[str, Any]:
     """Helper to create organization request data."""
     data: dict[str, Any] = {
-        "name": name,
+        "name": name if name is not None else f"Org {slug}",
         "slug": slug,
         "identity_provider": identity_provider,
         "identity_tenant_id": identity_tenant_id,

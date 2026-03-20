@@ -11,6 +11,7 @@ from unifiedui.apis.v1 import (
     credentials,
     custom_groups,
     dashboard,
+    external_apps,
     health,
     identity,
     organizations,
@@ -35,11 +36,13 @@ from unifiedui.exc.chat_widgets import ChatWidgetNotFoundError
 from unifiedui.exc.conversations import ConversationNotFoundError
 from unifiedui.exc.credentials import CredentialNotFoundError
 from unifiedui.exc.custom_groups import CustomGroupError, CustomGroupNotFoundError
+from unifiedui.exc.external_apps import ExternalAppNotFoundError
 from unifiedui.exc.organizations import (
     OrganizationAlreadyExistsError,
     OrganizationError,
     OrganizationMemberAlreadyExistsError,
     OrganizationMemberNotFoundError,
+    OrganizationNameAlreadyExistsError,
     OrganizationNotFoundError,
     OrganizationSlugAlreadyExistsError,
     TenantCannotBeDeletedError,
@@ -53,7 +56,7 @@ from unifiedui.exc.tenant_ai_models import (
     TenantAIModelNotFoundError,
     UnsupportedAIModelProviderError,
 )
-from unifiedui.exc.tenants import TenantError, TenantNotFoundError
+from unifiedui.exc.tenants import TenantAlreadyExistsError, TenantError, TenantNotFoundError
 from unifiedui.exc.tools import (
     InvalidToolCredentialError,
     ToolConfigValidationError,
@@ -105,6 +108,11 @@ def create_app() -> FastAPI:
         """Handle tenant not found errors."""
         return JSONResponse(status_code=404, content={"detail": str(exc)})
 
+    @app.exception_handler(TenantAlreadyExistsError)
+    async def tenant_already_exists_handler(request: Request, exc: TenantAlreadyExistsError):
+        """Handle tenant already exists errors."""
+        return JSONResponse(status_code=409, content={"detail": str(exc)})
+
     @app.exception_handler(TenantError)
     async def tenant_error_handler(request: Request, exc: TenantError):
         """Handle general tenant errors."""
@@ -125,6 +133,11 @@ def create_app() -> FastAPI:
     @app.exception_handler(OrganizationSlugAlreadyExistsError)
     async def organization_slug_exists_handler(request: Request, exc: OrganizationSlugAlreadyExistsError):
         """Handle organization slug already exists errors."""
+        return JSONResponse(status_code=409, content={"detail": str(exc)})
+
+    @app.exception_handler(OrganizationNameAlreadyExistsError)
+    async def organization_name_exists_handler(request: Request, exc: OrganizationNameAlreadyExistsError):
+        """Handle organization name already exists errors."""
         return JSONResponse(status_code=409, content={"detail": str(exc)})
 
     @app.exception_handler(OrganizationMemberNotFoundError)
@@ -219,6 +232,13 @@ def create_app() -> FastAPI:
     @app.exception_handler(ChatWidgetNotFoundError)
     async def chat_widget_not_found_handler(request: Request, exc: ChatWidgetNotFoundError):
         """Handle chat widget not found errors."""
+        return JSONResponse(status_code=404, content={"detail": str(exc)})
+
+    # External App exception handlers
+
+    @app.exception_handler(ExternalAppNotFoundError)
+    async def external_app_not_found_handler(request: Request, exc: ExternalAppNotFoundError):
+        """Handle external app not found errors."""
         return JSONResponse(status_code=404, content={"detail": str(exc)})
 
     # Tag exception handlers
@@ -375,6 +395,11 @@ def create_app() -> FastAPI:
     # Tenant AI Models routes
     app.include_router(
         tenant_ai_models.router, prefix="/api/v1/platform-service/tenants/{tenant_id}", tags=["Tenant AI Models"]
+    )
+
+    # External Apps routes
+    app.include_router(
+        external_apps.router, prefix="/api/v1/platform-service/tenants/{tenant_id}", tags=["External Apps"]
     )
 
     # Dashboard routes

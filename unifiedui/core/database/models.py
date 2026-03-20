@@ -187,6 +187,7 @@ class Organization(Base, IdMixin, AuditMixin):
     tenants: Mapped[list[Tenant]] = relationship(back_populates="organization", cascade="all, delete-orphan")
 
     __table_args__ = (
+        UniqueConstraint("name", name="uq_organization_name"),
         UniqueConstraint("identity_provider", "identity_tenant_id", name="uq_org_idp"),
         Index("ix_org_slug", "slug"),
         Index("ix_org_idp", "identity_provider", "identity_tenant_id"),
@@ -235,6 +236,11 @@ class Tenant(Base, IdNameDescriptionMixin):
     organization: Mapped[Organization] = relationship(back_populates="tenants")
     members: Mapped[list[TenantMember]] = relationship(back_populates="tenant", cascade="all, delete-orphan")
     principals: Mapped[list[Principal]] = relationship(back_populates="tenant", cascade="all, delete-orphan")
+
+    __table_args__ = (
+        UniqueConstraint("organization_id", "name", "environment_type", name="uq_tenant_org_name_env"),
+        Index("ix_tenant_org", "organization_id"),
+    )
 
 
 class TenantMember(Base, IdMixin, AuditMixin):
@@ -376,7 +382,10 @@ class ChatAgent(Base, IdNameDescriptionMixin, TenantScopedMixin):
         back_populates="chat_agent", cascade="all, delete-orphan", order_by="ReActAgentVersion.version.desc()"
     )
 
-    __table_args__ = (Index("ix_chat_agents_tenant", "tenant_id"),)
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "name", name="uq_chat_agent_tenant_name"),
+        Index("ix_chat_agents_tenant", "tenant_id"),
+    )
 
 
 class Conversation(Base, IdNameDescriptionMixin, TenantScopedMixin):
@@ -423,7 +432,10 @@ class AutonomousAgent(Base, IdNameDescriptionMixin, TenantScopedMixin):
         back_populates="autonomous_agent", cascade="all, delete-orphan"
     )
 
-    __table_args__ = (Index("ix_autonomous_agents_tenant", "tenant_id"),)
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "name", name="uq_autonomous_agent_tenant_name"),
+        Index("ix_autonomous_agents_tenant", "tenant_id"),
+    )
 
 
 class Credential(Base, IdNameDescriptionMixin, TenantScopedMixin):
@@ -437,7 +449,10 @@ class Credential(Base, IdNameDescriptionMixin, TenantScopedMixin):
     members: Mapped[list[CredentialMember]] = relationship(back_populates="credential", cascade="all, delete-orphan")
     tags: Mapped[list[CredentialTag]] = relationship(back_populates="credential", cascade="all, delete-orphan")
 
-    __table_args__ = (Index("ix_credentials_tenant", "tenant_id"),)
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "name", name="uq_credential_tenant_name"),
+        Index("ix_credentials_tenant", "tenant_id"),
+    )
 
 
 # ---------- Permission tables ----------
@@ -585,7 +600,10 @@ class ChatWidget(Base, IdNameDescriptionMixin, TenantScopedMixin):
         back_populates="chat_widget", cascade="all, delete-orphan"
     )
 
-    __table_args__ = (Index("ix_chat_widgets_tenant", "tenant_id"),)
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "name", name="uq_chat_widget_tenant_name"),
+        Index("ix_chat_widgets_tenant", "tenant_id"),
+    )
 
 
 class ChatWidgetMember(Base, IdMixin, AuditMixin):
@@ -888,7 +906,10 @@ class Tool(Base, IdNameDescriptionMixin, TenantScopedMixin):
     members: Mapped[list[ToolMember]] = relationship(back_populates="tool", cascade="all, delete-orphan")
     tags: Mapped[list[ToolTag]] = relationship(back_populates="tool", cascade="all, delete-orphan")
 
-    __table_args__ = (Index("ix_tools_tenant", "tenant_id"),)
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "name", name="uq_tool_tenant_name"),
+        Index("ix_tools_tenant", "tenant_id"),
+    )
 
 
 class TenantAIModel(Base, IdNameDescriptionMixin, TenantScopedMixin):
@@ -908,7 +929,24 @@ class TenantAIModel(Base, IdNameDescriptionMixin, TenantScopedMixin):
 
     credential: Mapped[Credential | None] = relationship(foreign_keys=[credential_id])
 
-    __table_args__ = (Index("ix_tenant_ai_models_tenant", "tenant_id"),)
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "name", name="uq_tenant_ai_model_tenant_name"),
+        Index("ix_tenant_ai_models_tenant", "tenant_id"),
+    )
+
+
+class ExternalApp(Base, IdNameDescriptionMixin, TenantScopedMixin):
+    """External app entity for iframe-embedded third-party applications."""
+
+    __tablename__ = "external_apps"
+
+    url: Mapped[str] = mapped_column(String(2000), nullable=False)
+    image_url: Mapped[str | None] = mapped_column(String(2000), nullable=True)
+
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "name", name="uq_external_app_tenant_name"),
+        Index("ix_external_apps_tenant", "tenant_id"),
+    )
 
 
 class ToolMember(Base, IdMixin, AuditMixin):
