@@ -36,7 +36,7 @@ from unifiedui.exc.chat_widgets import ChatWidgetNotFoundError
 from unifiedui.exc.conversations import ConversationNotFoundError
 from unifiedui.exc.credentials import CredentialNotFoundError
 from unifiedui.exc.custom_groups import CustomGroupError, CustomGroupNotFoundError
-from unifiedui.exc.external_apps import ExternalAppNotFoundError
+from unifiedui.exc.external_apps import ExternalAppAlreadyExistsError, ExternalAppNotFoundError
 from unifiedui.exc.organizations import (
     OrganizationAlreadyExistsError,
     OrganizationError,
@@ -241,6 +241,11 @@ def create_app() -> FastAPI:
         """Handle external app not found errors."""
         return JSONResponse(status_code=404, content={"detail": str(exc)})
 
+    @app.exception_handler(ExternalAppAlreadyExistsError)
+    async def external_app_already_exists_handler(request: Request, exc: ExternalAppAlreadyExistsError):
+        """Handle external app already exists errors."""
+        return JSONResponse(status_code=409, content={"detail": str(exc)})
+
     # Tag exception handlers
 
     @app.exception_handler(TagNotFoundError)
@@ -397,9 +402,31 @@ def create_app() -> FastAPI:
         tenant_ai_models.router, prefix="/api/v1/platform-service/tenants/{tenant_id}", tags=["Tenant AI Models"]
     )
 
-    # External Apps routes
+    # AI Model tag routes
+    app.include_router(
+        tags.ai_models_tags_list_router,
+        prefix="/api/v1/platform-service/tenants/{tenant_id}",
+        tags=["Tenant AI Models"],
+    )
+
+    app.include_router(
+        tags.ai_model_tags_router, prefix="/api/v1/platform-service/tenants/{tenant_id}", tags=["Tenant AI Models"]
+    )
+
+    # External Apps routes - tags list router MUST be before external apps router to avoid path conflicts
+    app.include_router(
+        tags.external_apps_tags_list_router,
+        prefix="/api/v1/platform-service/tenants/{tenant_id}",
+        tags=["External Apps"],
+    )
+
     app.include_router(
         external_apps.router, prefix="/api/v1/platform-service/tenants/{tenant_id}", tags=["External Apps"]
+    )
+
+    # External App tag routes
+    app.include_router(
+        tags.external_app_tags_router, prefix="/api/v1/platform-service/tenants/{tenant_id}", tags=["External Apps"]
     )
 
     # Dashboard routes

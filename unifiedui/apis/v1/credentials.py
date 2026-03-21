@@ -3,17 +3,27 @@
 from typing import TYPE_CHECKING
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
-from fastapi.responses import Response
+from fastapi.responses import JSONResponse, Response
 
 from unifiedui.core.database.enums import ListViewEnum, OrderDirectionEnum, PermissionActionEnum, TenantRolesEnum
 from unifiedui.core.middleware.apis.v1.auth import authenticate, check_permissions
 from unifiedui.exc.credentials import CredentialNotFoundError
 from unifiedui.handlers.credentials import CredentialHandler
 from unifiedui.handlers.dependencies import get_credential_handler
+from unifiedui.handlers.field_filter import filtered_response, parse_ids
+from unifiedui.handlers.validators.credential_validator import CredentialValidationError
 from unifiedui.logger import get_logger
-from unifiedui.schema.requests.credentials import CreateCredentialRequest, UpdateCredentialRequest
+from unifiedui.schema.requests.credentials import (
+    CreateCredentialRequest,
+    TestCredentialConnectionRequest,
+    UpdateCredentialRequest,
+)
 from unifiedui.schema.requests.permissions import SetResourcePermissionRequest
-from unifiedui.schema.responses.credentials import CredentialResponse, CredentialSecretResponse
+from unifiedui.schema.responses.credentials import (
+    CredentialResponse,
+    CredentialSecretResponse,
+    TestCredentialConnectionResponse,
+)
 from unifiedui.schema.responses.principals import PrincipalWithRolesResponse, ResourcePrincipalsResponse
 
 if TYPE_CHECKING:
@@ -47,6 +57,8 @@ async def list_credentials(
     view: ListViewEnum | None = Query(
         None, description="View type: 'full' (default) or 'quick-list' (returns only id and name)"
     ),
+    ids: str | None = Query(None, description="Comma-separated list of IDs to filter by"),
+    fields: str | None = Query(None, description="Comma-separated list of fields to include in the response"),
     handler: CredentialHandler = Depends(get_credential_handler),
 ):
     """
@@ -87,17 +99,21 @@ async def list_credentials(
             extra={"tenant_id": tenant_id, "user_id": user.identity.get_id(), "skip": skip, "limit": limit},
         )
 
-        return handler.list_credentials(
-            tenant_id=tenant_id,
-            skip=skip,
-            limit=limit,
-            name_filter=name,
-            is_active=is_active,
-            user=user,
-            tag_ids=tag_ids,
-            order_by=order_by,
-            order_direction=order_direction.value if order_direction else None,
-            view=view.value if view else None,
+        return filtered_response(
+            handler.list_credentials(
+                tenant_id=tenant_id,
+                skip=skip,
+                limit=limit,
+                name_filter=name,
+                is_active=is_active,
+                user=user,
+                tag_ids=tag_ids,
+                order_by=order_by,
+                order_direction=order_direction.value if order_direction else None,
+                view=view.value if view else None,
+                id_list=parse_ids(ids),
+            ),
+            fields,
         )
     except HTTPException:
         raise
@@ -168,8 +184,12 @@ async def create_credential(
 @authenticate()
 @check_permissions(entity="credential", required_permissions=[PermissionActionEnum.READ])
 async def get_credential(
-    request: Request, tenant_id: str, credential_id: str, handler: CredentialHandler = Depends(get_credential_handler)
-) -> CredentialResponse:
+    request: Request,
+    tenant_id: str,
+    credential_id: str,
+    fields: str | None = Query(None, description="Comma-separated list of fields to include in the response"),
+    handler: CredentialHandler = Depends(get_credential_handler),
+) -> CredentialResponse | JSONResponse:
     """
     Get a specific credential.
 
@@ -194,7 +214,10 @@ async def get_credential(
             "API: Get credential",
             extra={"tenant_id": tenant_id, "credential_id": credential_id, "user_id": user.identity.get_id()},
         )
-        return handler.get_credential(tenant_id=tenant_id, credential_id=credential_id, user=user)
+        return filtered_response(
+            handler.get_credential(tenant_id=tenant_id, credential_id=credential_id, user=user),
+            fields,
+        )
     except CredentialNotFoundError as e:
         logger.warning("Credential not found: %s", e)
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
@@ -359,6 +382,60 @@ async def delete_credential(
     except Exception as e:
         logger.error("Failed to delete credential: %s", e)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to delete credential")
+
+
+# ========== Credential Connection Test Endpoints ==========
+
+
+@router.post(
+    "/test-connection",
+    response_model=TestCredentialConnectionResponse,
+    summary="Test credential connection",
+    description="Test a credential by attempting to acquire a token (ENTRA_ID_APP_REGISTRATION only)",
+)
+@authenticate()
+@check_permissions(
+    entity="tenant",
+    required_permissions=[
+        TenantRolesEnum.TENANT_GLOBAL_ADMIN,
+        TenantRolesEnum.CREDENTIALS_ADMIN,
+        TenantRolesEnum.CREDENTIALS_CREATOR,
+    ],
+)
+async def test_credential_connection(
+    request: Request,
+    tenant_id: str,
+    test_request: TestCredentialConnectionRequest,
+    handler: CredentialHandler = Depends(get_credential_handler),
+) -> TestCredentialConnectionResponse:
+    """Test a credential connection by attempting to acquire a token.
+
+    Currently supports ENTRA_ID_APP_REGISTRATION credentials only.
+    Attempts to acquire an OAuth 2.0 token using the provided client credentials.
+
+    Args:
+        request: FastAPI request with user in state
+        tenant_id: Tenant ID from path
+        test_request: Test connection request with credential details
+        handler: Credential handler dependency
+
+    Returns:
+        Test connection result with success/failure and timing
+    """
+    try:
+        user: ContextIdentityUser = request.state.user
+        logger.info(
+            "API: Test credential connection",
+            extra={"tenant_id": tenant_id, "user_id": user.identity.get_id(), "type": test_request.credential_type},
+        )
+        return CredentialHandler.test_credential_connection(request=test_request)
+    except CredentialValidationError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=e.message)
+    except Exception as e:
+        logger.error("Failed to test credential connection: %s", e)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to test credential connection"
+        )
 
 
 # ========== Credential Permission Endpoints ==========

@@ -119,6 +119,7 @@ class AutonomousAgentHandler:
         order_direction: str | None = None,
         view: str | None = None,
         use_cache: bool = True,
+        id_list: list[str] | None = None,
     ) -> list[AutonomousAgentResponse] | list[QuickListItemResponse]:
         """
         Get a list of autonomous agents for a tenant (filtered by permissions).
@@ -172,7 +173,7 @@ class AutonomousAgentHandler:
         cache_key = f"autonomous_agents:list:tenant:{tenant_id}:user:{user_id}:skip:{skip}:limit:{limit}:view:{view_key}:order:{order_key}:active:{is_active_key}"
 
         # Check if any filters are applied (name_filter and tag_ids disable caching)
-        has_filters = name_filter is not None or tag_ids is not None
+        has_filters = name_filter is not None or tag_ids is not None or id_list is not None
 
         # Check cache (disable caching when any filters are applied)
         if use_cache and self.cache_client and not has_filters:
@@ -194,6 +195,8 @@ class AutonomousAgentHandler:
                     .options(selectinload(AutonomousAgent.tags).selectinload(AutonomousAgentTag.tag))
                     .where(AutonomousAgent.tenant_id == tenant_id)
                 )
+                if id_list:
+                    query = query.where(AutonomousAgent.id.in_(id_list))
                 if name_filter:
                     query = query.where(AutonomousAgent.name.ilike(f"%{name_filter}%"))
                 # Filter by is_active status
@@ -236,6 +239,9 @@ class AutonomousAgentHandler:
                     permission_filters.append(AutonomousAgentMember.principal_id.in_(custom_group_ids))
 
                 query = query.where(or_(*permission_filters))
+
+                if id_list:
+                    query = query.where(AutonomousAgent.id.in_(id_list))
 
                 if name_filter:
                     query = query.where(AutonomousAgent.name.ilike(f"%{name_filter}%"))

@@ -41,7 +41,9 @@ class TestResourceTagsHandlerConfig:
 
         assert "chat_agent" in types
         assert "credential" in types
-        assert len(types) == 4  # 4 resource types support tags
+        assert "external_app" in types
+        assert "tenant_ai_model" in types
+        assert len(types) == 6  # 6 resource types support tags
 
 
 class TestResourceTagsHandlerOperations:

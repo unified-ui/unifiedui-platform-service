@@ -3,13 +3,14 @@
 from typing import TYPE_CHECKING
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
-from fastapi.responses import Response
+from fastapi.responses import JSONResponse, Response
 
 from unifiedui.core.database.enums import ListViewEnum, OrderDirectionEnum, PermissionActionEnum, TenantRolesEnum
 from unifiedui.core.middleware.apis.v1.auth import authenticate, check_permissions
 from unifiedui.exc.chat_widgets import ChatWidgetNotFoundError
 from unifiedui.handlers.chat_widgets import ChatWidgetHandler
 from unifiedui.handlers.dependencies import get_chat_widget_handler
+from unifiedui.handlers.field_filter import filtered_response, parse_ids
 from unifiedui.logger import get_logger
 from unifiedui.schema.requests.chat_widgets import CreateChatWidgetRequest, UpdateChatWidgetRequest
 from unifiedui.schema.requests.permissions import SetResourcePermissionRequest
@@ -47,6 +48,8 @@ async def list_chat_widgets(
     view: ListViewEnum | None = Query(
         None, description="View type: 'full' (default) or 'quick-list' (returns only id and name)"
     ),
+    ids: str | None = Query(None, description="Comma-separated list of IDs to filter by"),
+    fields: str | None = Query(None, description="Comma-separated list of fields to include in the response"),
     handler: ChatWidgetHandler = Depends(get_chat_widget_handler),
 ):
     """
@@ -87,17 +90,21 @@ async def list_chat_widgets(
             extra={"tenant_id": tenant_id, "user_id": user.identity.get_id(), "skip": skip, "limit": limit},
         )
 
-        return handler.list_chat_widgets(
-            tenant_id=tenant_id,
-            skip=skip,
-            limit=limit,
-            name_filter=name,
-            is_active=is_active,
-            user=user,
-            tag_ids=tag_ids,
-            order_by=order_by,
-            order_direction=order_direction.value if order_direction else None,
-            view=view.value if view else None,
+        return filtered_response(
+            handler.list_chat_widgets(
+                tenant_id=tenant_id,
+                skip=skip,
+                limit=limit,
+                name_filter=name,
+                is_active=is_active,
+                user=user,
+                tag_ids=tag_ids,
+                order_by=order_by,
+                order_direction=order_direction.value if order_direction else None,
+                view=view.value if view else None,
+                id_list=parse_ids(ids),
+            ),
+            fields,
         )
     except HTTPException:
         raise
@@ -174,8 +181,12 @@ async def create_chat_widget(
     ],
 )
 async def get_chat_widget(
-    request: Request, tenant_id: str, chat_widget_id: str, handler: ChatWidgetHandler = Depends(get_chat_widget_handler)
-) -> ChatWidgetResponse:
+    request: Request,
+    tenant_id: str,
+    chat_widget_id: str,
+    fields: str | None = Query(None, description="Comma-separated list of fields to include in the response"),
+    handler: ChatWidgetHandler = Depends(get_chat_widget_handler),
+) -> ChatWidgetResponse | JSONResponse:
     """
     Get a specific chat widget.
 
@@ -197,7 +208,10 @@ async def get_chat_widget(
             "API: Get chat widget",
             extra={"tenant_id": tenant_id, "chat_widget_id": chat_widget_id, "user_id": user.identity.get_id()},
         )
-        return handler.get_chat_widget(tenant_id=tenant_id, chat_widget_id=chat_widget_id, user=user)
+        return filtered_response(
+            handler.get_chat_widget(tenant_id=tenant_id, chat_widget_id=chat_widget_id, user=user),
+            fields,
+        )
     except ChatWidgetNotFoundError as e:
         logger.warning("Chat widget not found: %s", e)
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))

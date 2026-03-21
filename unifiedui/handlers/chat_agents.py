@@ -116,6 +116,7 @@ class ChatAgentHandler:
         view: str | None = None,
         type_filter: str | None = None,
         use_cache: bool = True,
+        id_list: list[str] | None = None,
     ) -> list[ChatAgentResponse] | list[QuickListItemResponse]:
         """
         Get a list of chat agents for a tenant (filtered by permissions).
@@ -165,7 +166,7 @@ class ChatAgentHandler:
         cache_key = f"chat_agents:list:tenant:{tenant_id}:user:{user_id}:skip:{skip}:limit:{limit}:view:{view_key}:order:{order_key}:active:{is_active_key}:type:{type_key}"
 
         # Check if any filters are applied (name_filter and tag_ids disable caching)
-        has_filters = name_filter is not None or tag_ids is not None or type_filter is not None
+        has_filters = name_filter is not None or tag_ids is not None or type_filter is not None or id_list is not None
 
         # Check cache (disable caching when any filters are applied)
         if use_cache and self.cache_client and not has_filters:
@@ -206,6 +207,9 @@ class ChatAgentHandler:
                 )
 
                 query = query.where(ChatAgent.id.in_(member_subquery))
+
+            if id_list:
+                query = query.where(ChatAgent.id.in_(id_list))
 
             if type_filter:
                 query = query.where(ChatAgent.type == type_filter)

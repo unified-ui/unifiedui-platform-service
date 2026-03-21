@@ -21,6 +21,7 @@ from unifiedui.core.database.models import (
     ConversationMember,
     CredentialMember,
     CustomGroupMember,
+    ExternalAppMember,
     Tag,
     ToolMember,
 )
@@ -482,7 +483,7 @@ def check_permissions(
     Args:
         entity: The entity type to check permissions for
                Options: "tenant", "organization", "chat_agent", "credential", "autonomous_agent",
-                        "custom_group", "conversation", "tag"
+                        "custom_group", "conversation", "tag", "chat_widget", "tool", "external_app"
         required_permissions: List of required permission enums
                             - For tenant: [TenantPermissionEnum.TENANT_GLOBAL_ADMIN, TenantPermissionEnum.READER, etc.]
                             - For resources: [PermissionActionEnum.READ, PermissionActionEnum.WRITE, PermissionActionEnum.ADMIN]
@@ -712,6 +713,7 @@ def check_permissions(
                     "conversation": (ConversationMember, "conversation_id"),
                     "chat_widget": (ChatWidgetMember, "chat_widget_id"),
                     "tool": (ToolMember, "tool_id"),
+                    "external_app": (ExternalAppMember, "external_app_id"),
                 }
 
                 if entity not in entity_config:
@@ -758,6 +760,7 @@ def check_permissions(
                         "conversation": TenantRolesEnum.CONVERSATIONS_ADMIN.value,
                         "chat_widget": TenantRolesEnum.CHAT_WIDGETS_ADMIN.value,
                         "tool": TenantRolesEnum.REACT_AGENT_ADMIN.value,
+                        "external_app": TenantRolesEnum.EXTERNAL_APPS_ADMIN.value,
                     }
 
                     entity_admin = entity_admin_map.get(entity)

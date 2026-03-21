@@ -28,7 +28,11 @@ from unifiedui.core.database.models import (
     ChatWidgetTag,
     Credential,
     CredentialTag,
+    ExternalApp,
+    ExternalAppTag,
     Tag,
+    TenantAIModel,
+    TenantAIModelTag,
 )
 from unifiedui.logger import get_logger
 
@@ -67,6 +71,18 @@ RESOURCE_TAG_CONFIG: dict[str, dict[str, Any]] = {
         "tag_model": CredentialTag,
         "id_field": "credential_id",
         "cache_prefix": "credentials",
+    },
+    "external_app": {
+        "resource_model": ExternalApp,
+        "tag_model": ExternalAppTag,
+        "id_field": "external_app_id",
+        "cache_prefix": "external_apps",
+    },
+    "tenant_ai_model": {
+        "resource_model": TenantAIModel,
+        "tag_model": TenantAIModelTag,
+        "id_field": "tenant_ai_model_id",
+        "cache_prefix": "tenant_ai_models",
     },
 }
 

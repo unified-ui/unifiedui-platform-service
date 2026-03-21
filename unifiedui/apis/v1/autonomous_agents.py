@@ -3,7 +3,7 @@
 from typing import TYPE_CHECKING
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
-from fastapi.responses import Response
+from fastapi.responses import JSONResponse, Response
 
 from unifiedui.core.database.enums import ListViewEnum, OrderDirectionEnum, PermissionActionEnum, TenantRolesEnum
 from unifiedui.core.middleware.apis.v1.auth import (
@@ -23,6 +23,7 @@ from unifiedui.exc.chat_agent_config import InvalidCredentialError
 from unifiedui.handlers.autonomous_agents import AutonomousAgentHandler
 from unifiedui.handlers.credentials import CredentialHandler
 from unifiedui.handlers.dependencies import get_autonomous_agent_handler, get_credential_handler
+from unifiedui.handlers.field_filter import filtered_response, parse_ids
 from unifiedui.logger import get_logger
 from unifiedui.schema.requests.autonomous_agents import (
     CreateAutonomousAgentRequest,
@@ -71,6 +72,8 @@ async def list_autonomous_agents(
     view: ListViewEnum | None = Query(
         None, description="View type: 'full' (default) or 'quick-list' (returns only id and name)"
     ),
+    ids: str | None = Query(None, description="Comma-separated list of IDs to filter by"),
+    fields: str | None = Query(None, description="Comma-separated list of fields to include in the response"),
     handler: AutonomousAgentHandler = Depends(get_autonomous_agent_handler),
 ):
     """
@@ -105,17 +108,21 @@ async def list_autonomous_agents(
                 )
 
         user: ContextIdentityUser = request.state.user
-        return handler.list_autonomous_agents(
-            tenant_id=tenant_id,
-            user=user,
-            skip=skip,
-            limit=limit,
-            name_filter=name,
-            is_active=is_active,
-            tag_ids=tag_ids,
-            order_by=order_by,
-            order_direction=order_direction.value if order_direction else None,
-            view=view.value if view else None,
+        return filtered_response(
+            handler.list_autonomous_agents(
+                tenant_id=tenant_id,
+                user=user,
+                skip=skip,
+                limit=limit,
+                name_filter=name,
+                is_active=is_active,
+                tag_ids=tag_ids,
+                order_by=order_by,
+                order_direction=order_direction.value if order_direction else None,
+                view=view.value if view else None,
+                id_list=parse_ids(ids),
+            ),
+            fields,
         )
     except HTTPException:
         raise
@@ -200,8 +207,9 @@ async def get_autonomous_agent(
     request: Request,
     tenant_id: str,
     autonomous_agent_id: str,
+    fields: str | None = Query(None, description="Comma-separated list of fields to include in the response"),
     handler: AutonomousAgentHandler = Depends(get_autonomous_agent_handler),
-) -> AutonomousAgentResponse:
+) -> AutonomousAgentResponse | JSONResponse:
     """
     Get a specific autonomous agent by ID.
 
@@ -218,7 +226,10 @@ async def get_autonomous_agent(
     """
     try:
         user: ContextIdentityUser = request.state.user
-        return handler.get_autonomous_agent(tenant_id=tenant_id, autonomous_agent_id=autonomous_agent_id, user=user)
+        return filtered_response(
+            handler.get_autonomous_agent(tenant_id=tenant_id, autonomous_agent_id=autonomous_agent_id, user=user),
+            fields,
+        )
     except AutonomousAgentNotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:

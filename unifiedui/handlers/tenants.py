@@ -47,6 +47,7 @@ class TenantHandler:
         order_by: str | None = None,
         order_direction: str | None = None,
         use_cache: bool = True,
+        id_list: list[str] | None = None,
     ) -> list[TenantResponse]:
         """
         Get a list of tenants.
@@ -58,6 +59,7 @@ class TenantHandler:
             order_by: Optional column name to order by
             order_direction: Optional sort direction ('asc' or 'desc')
             use_cache: Whether to use caching (default: True)
+            id_list: Optional list of IDs to filter by
 
         Returns:
             List of tenant responses
@@ -68,7 +70,7 @@ class TenantHandler:
         cache_key = f"tenants:list:skip:{skip}:limit:{limit}"
 
         # Check if any filters are applied
-        has_filters = name_filter is not None or order_by is not None
+        has_filters = name_filter is not None or order_by is not None or id_list is not None
 
         # Check cache (disable caching when any filters are applied)
         cached_data = self._get_from_cache(cache_key, use_cache and not has_filters)
@@ -77,6 +79,9 @@ class TenantHandler:
 
         with self.db_client.get_session() as session:
             query = select(Tenant)
+
+            if id_list:
+                query = query.where(Tenant.id.in_(id_list))
 
             # Apply name filter if provided
             if name_filter:

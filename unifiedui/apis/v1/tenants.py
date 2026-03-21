@@ -3,10 +3,12 @@
 from typing import TYPE_CHECKING
 
 from fastapi import APIRouter, Depends, Query, Request, status
+from fastapi.responses import JSONResponse
 
 from unifiedui.core.database.enums import OrderDirectionEnum, TenantRolesEnum
 from unifiedui.core.middleware.apis.v1.auth import authenticate, check_permissions
 from unifiedui.handlers.dependencies import get_tenant_handler
+from unifiedui.handlers.field_filter import filtered_response, parse_ids
 from unifiedui.handlers.tenants import TenantHandler
 from unifiedui.schema.requests.tenants import CreateTenantRequest, UpdateTenantRequest
 from unifiedui.schema.responses.tenants import TenantResponse
@@ -30,12 +32,14 @@ async def list_tenants(
     skip: int = Query(0, ge=0, description="Number of items to skip"),
     limit: int = Query(100, ge=1, le=1000, description="Maximum number of items to return"),
     name: str | None = Query(None, description="Filter by tenant name"),
+    ids: str | None = Query(None, description="Comma-separated list of IDs to filter by"),
+    fields: str | None = Query(None, description="Comma-separated list of fields to include in the response"),
     order_by: str | None = Query(
         None, description="Column name to order by (e.g., 'name', 'created_at', 'updated_at')"
     ),
     order_direction: OrderDirectionEnum | None = Query(None, description="Sort direction: 'asc' or 'desc'"),
     handler: TenantHandler = Depends(get_tenant_handler),
-) -> list[TenantResponse]:
+) -> list[TenantResponse] | JSONResponse:
     """
     Get a paginated list of tenants.
 
@@ -49,12 +53,16 @@ async def list_tenants(
     Returns:
         list[TenantResponse]: List of tenants
     """
-    return handler.list_tenants(
-        skip=skip,
-        limit=limit,
-        name_filter=name,
-        order_by=order_by,
-        order_direction=order_direction.value if order_direction else None,
+    return filtered_response(
+        handler.list_tenants(
+            skip=skip,
+            limit=limit,
+            name_filter=name,
+            order_by=order_by,
+            order_direction=order_direction.value if order_direction else None,
+            id_list=parse_ids(ids),
+        ),
+        fields,
     )
 
 
@@ -67,8 +75,11 @@ async def list_tenants(
 )
 @authenticate()
 async def get_tenant(
-    request: Request, tenant_id: str, handler: TenantHandler = Depends(get_tenant_handler)
-) -> TenantResponse:
+    request: Request,
+    tenant_id: str,
+    fields: str | None = Query(None, description="Comma-separated list of fields to include in the response"),
+    handler: TenantHandler = Depends(get_tenant_handler),
+) -> TenantResponse | JSONResponse:
     """
     Get a specific tenant by ID.
 
@@ -83,7 +94,10 @@ async def get_tenant(
     Raises:
         TenantNotFoundError: If tenant not found (handled by global exception handler)
     """
-    return handler.get_tenant(tenant_id)
+    return filtered_response(
+        handler.get_tenant(tenant_id),
+        fields,
+    )
 
 
 @router.post(

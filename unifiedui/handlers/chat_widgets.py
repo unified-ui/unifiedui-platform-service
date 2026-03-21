@@ -95,6 +95,7 @@ class ChatWidgetHandler:
         order_direction: str | None = None,
         view: str | None = None,
         use_cache: bool = True,
+        id_list: list[str] | None = None,
     ) -> list[ChatWidgetResponse] | list[QuickListItemResponse]:
         """
         Get a list of chat widgets for a tenant (filtered by permissions).
@@ -146,7 +147,7 @@ class ChatWidgetHandler:
         cache_key = f"chat_widgets:list:tenant:{tenant_id}:user:{user_id}:skip:{skip}:limit:{limit}:view:{view_key}:order:{order_key}:active:{is_active_key}"
 
         # Check if any filters are applied (name_filter and tag_ids disable caching)
-        has_filters = name_filter is not None or tag_ids is not None
+        has_filters = name_filter is not None or tag_ids is not None or id_list is not None
 
         # Check cache (disable caching when any filters are applied)
         if use_cache and self.cache_client and not has_filters:
@@ -184,6 +185,9 @@ class ChatWidgetHandler:
                 )
 
                 query = query.where(ChatWidget.id.in_(member_subquery))
+
+            if id_list:
+                query = query.where(ChatWidget.id.in_(id_list))
 
             if name_filter:
                 query = query.where(ChatWidget.name.ilike(f"%{name_filter}%"))

@@ -3,7 +3,7 @@
 from typing import TYPE_CHECKING
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
-from fastapi.responses import Response
+from fastapi.responses import JSONResponse, Response
 
 from unifiedui.core.database.enums import (
     ChatAgentTypeEnum,
@@ -19,6 +19,7 @@ from unifiedui.exc.re_act_agents import ReActAgentVersionNotFoundError
 from unifiedui.handlers.chat_agents import ChatAgentHandler
 from unifiedui.handlers.credentials import CredentialHandler
 from unifiedui.handlers.dependencies import get_chat_agent_handler, get_credential_handler
+from unifiedui.handlers.field_filter import filtered_response, parse_ids
 from unifiedui.logger import get_logger
 from unifiedui.schema.requests.chat_agents import (
     CreateChatAgentRequest,
@@ -62,6 +63,8 @@ async def list_chat_agents(
         None, description="View type: 'full' (default) or 'quick-list' (returns only id and name)"
     ),
     type: ChatAgentTypeEnum | None = Query(None, description="Filter by chat agent type (e.g., 'REACT_AGENT', 'N8N')"),
+    ids: str | None = Query(None, description="Comma-separated list of IDs to filter by"),
+    fields: str | None = Query(None, description="Comma-separated list of fields to include in the response"),
     handler: ChatAgentHandler = Depends(get_chat_agent_handler),
 ):
     """
@@ -108,18 +111,22 @@ async def list_chat_agents(
             },
         )
 
-        return handler.list_chat_agents(
-            tenant_id=tenant_id,
-            skip=skip,
-            limit=limit,
-            name_filter=name,
-            is_active=is_active,
-            tag_ids=tag_ids,
-            order_by=order_by,
-            order_direction=order_direction.value if order_direction else None,
-            view=view.value if view else None,
-            type_filter=type.value if type else None,
-            user=user,
+        return filtered_response(
+            handler.list_chat_agents(
+                tenant_id=tenant_id,
+                skip=skip,
+                limit=limit,
+                name_filter=name,
+                is_active=is_active,
+                tag_ids=tag_ids,
+                order_by=order_by,
+                order_direction=order_direction.value if order_direction else None,
+                view=view.value if view else None,
+                type_filter=type.value if type else None,
+                user=user,
+                id_list=parse_ids(ids),
+            ),
+            fields,
         )
     except HTTPException:
         raise
@@ -196,8 +203,12 @@ async def create_chat_agent(
     ],
 )
 async def get_chat_agent(
-    request: Request, tenant_id: str, chat_agent_id: str, handler: ChatAgentHandler = Depends(get_chat_agent_handler)
-) -> ChatAgentResponse:
+    request: Request,
+    tenant_id: str,
+    chat_agent_id: str,
+    fields: str | None = Query(None, description="Comma-separated list of fields to include in the response"),
+    handler: ChatAgentHandler = Depends(get_chat_agent_handler),
+) -> ChatAgentResponse | JSONResponse:
     """
     Get a specific chat agent.
 
@@ -219,7 +230,10 @@ async def get_chat_agent(
             "API: Get chat agent",
             extra={"tenant_id": tenant_id, "chat_agent_id": chat_agent_id, "user_id": user.identity.get_id()},
         )
-        return handler.get_chat_agent(tenant_id=tenant_id, chat_agent_id=chat_agent_id, user=user)
+        return filtered_response(
+            handler.get_chat_agent(tenant_id=tenant_id, chat_agent_id=chat_agent_id, user=user),
+            fields,
+        )
     except ChatAgentNotFoundError as e:
         logger.warning("Chat agent not found: %s", e)
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))

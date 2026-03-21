@@ -3,11 +3,13 @@
 from typing import TYPE_CHECKING
 
 from fastapi import APIRouter, Depends, Query, Request, status
+from fastapi.responses import JSONResponse
 
 from unifiedui.core.database.enums import OrderDirectionEnum, PermissionActionEnum, TenantRolesEnum
 from unifiedui.core.middleware.apis.v1.auth import authenticate, check_permissions
 from unifiedui.handlers.custom_groups import CustomGroupHandler
 from unifiedui.handlers.dependencies import get_custom_group_handler
+from unifiedui.handlers.field_filter import filtered_response, parse_ids
 from unifiedui.schema.requests.custom_groups import (
     CreateCustomGroupRequest,
     DeletePrincipalRoleRequest,
@@ -37,12 +39,14 @@ async def list_custom_groups(
     skip: int = Query(0, ge=0, description="Number of items to skip"),
     limit: int = Query(100, ge=1, le=1000, description="Maximum number of items to return"),
     name: str | None = Query(None, description="Filter by group name"),
+    ids: str | None = Query(None, description="Comma-separated list of IDs to filter by"),
+    fields: str | None = Query(None, description="Comma-separated list of fields to include in the response"),
     order_by: str | None = Query(
         None, description="Column name to order by (e.g., 'name', 'created_at', 'updated_at')"
     ),
     order_direction: OrderDirectionEnum | None = Query(None, description="Sort direction: 'asc' or 'desc'"),
     handler: CustomGroupHandler = Depends(get_custom_group_handler),
-) -> list[CustomGroupResponse]:
+) -> list[CustomGroupResponse] | JSONResponse:
     """
     Get a paginated list of custom groups.
     Accessible by all authenticated tenant members.
@@ -58,13 +62,17 @@ async def list_custom_groups(
     Returns:
         list[CustomGroupResponse]: List of custom groups
     """
-    return handler.list_custom_groups(
-        tenant_id=tenant_id,
-        skip=skip,
-        limit=limit,
-        name_filter=name,
-        order_by=order_by,
-        order_direction=order_direction.value if order_direction else None,
+    return filtered_response(
+        handler.list_custom_groups(
+            tenant_id=tenant_id,
+            skip=skip,
+            limit=limit,
+            name_filter=name,
+            order_by=order_by,
+            order_direction=order_direction.value if order_direction else None,
+            id_list=parse_ids(ids),
+        ),
+        fields,
     )
 
 
@@ -80,8 +88,9 @@ async def get_custom_group(
     request: Request,
     tenant_id: str,
     custom_group_id: str,
+    fields: str | None = Query(None, description="Comma-separated list of fields to include in the response"),
     handler: CustomGroupHandler = Depends(get_custom_group_handler),
-) -> CustomGroupResponse:
+) -> CustomGroupResponse | JSONResponse:
     """
     Get a specific custom group by ID.
     Accessible by all authenticated tenant members.
@@ -95,7 +104,10 @@ async def get_custom_group(
     Returns:
         CustomGroupResponse: The custom group information
     """
-    return handler.get_custom_group(tenant_id, custom_group_id)
+    return filtered_response(
+        handler.get_custom_group(tenant_id, custom_group_id),
+        fields,
+    )
 
 
 @router.post(

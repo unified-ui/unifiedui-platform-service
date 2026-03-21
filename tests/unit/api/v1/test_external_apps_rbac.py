@@ -5,10 +5,13 @@ from starlette.testclient import TestClient
 
 from tests.conftest import create_auth_headers
 from tests.helpers.tenant import add_user_to_tenant, create_tenant_for_user
-from unifiedui.core.database.enums import TenantRolesEnum
+from unifiedui.core.database.enums import PermissionActionEnum, TenantRolesEnum
 
 ENDPOINT_EXTERNAL_APPS = "/api/v1/platform-service/tenants/{tenant_id}/external-apps"
 ENDPOINT_EXTERNAL_APP_DETAIL = "/api/v1/platform-service/tenants/{tenant_id}/external-apps/{external_app_id}"
+ENDPOINT_EXTERNAL_APP_PRINCIPALS = (
+    "/api/v1/platform-service/tenants/{tenant_id}/external-apps/{external_app_id}/principals"
+)
 
 
 def create_external_app(test_client: TestClient, tenant_id: str, headers: dict, name: str = "Test App") -> str:
@@ -94,23 +97,33 @@ class TestExternalAppRBAC:
         assert response.status_code == status.HTTP_403_FORBIDDEN
 
     def test_reader_can_list(self, test_client: TestClient) -> None:
-        """Test that READER can list external apps."""
+        """Test that READER with entity permission can list external apps."""
         owner_token = test_client.create_test_user("ea-owner-4", "EA Owner 4")
         owner_headers = create_auth_headers(owner_token, use_cache=False)
         tenant_id = create_tenant_for_user(test_client, owner_token)
 
-        create_external_app(test_client, tenant_id, owner_headers)
+        app_id = create_external_app(test_client, tenant_id, owner_headers)
 
         reader_token = test_client.create_test_user("ea-reader-2", "EA Reader 2")
         reader_headers = create_auth_headers(reader_token, use_cache=False)
         add_user_to_tenant(test_client, tenant_id, owner_headers, "ea-reader-2", TenantRolesEnum.READER.value)
+
+        test_client.put(
+            ENDPOINT_EXTERNAL_APP_PRINCIPALS.format(tenant_id=tenant_id, external_app_id=app_id),
+            json={
+                "principal_id": "ea-reader-2",
+                "principal_type": "IDENTITY_USER",
+                "role": PermissionActionEnum.READ.value,
+            },
+            headers=owner_headers,
+        )
 
         response = test_client.get(ENDPOINT_EXTERNAL_APPS.format(tenant_id=tenant_id), headers=reader_headers)
         assert response.status_code == status.HTTP_200_OK
         assert len(response.json()) == 1
 
     def test_reader_can_get(self, test_client: TestClient) -> None:
-        """Test that READER can get an external app."""
+        """Test that READER with entity permission can get an external app."""
         owner_token = test_client.create_test_user("ea-owner-5", "EA Owner 5")
         owner_headers = create_auth_headers(owner_token, use_cache=False)
         tenant_id = create_tenant_for_user(test_client, owner_token)
@@ -120,6 +133,16 @@ class TestExternalAppRBAC:
         reader_token = test_client.create_test_user("ea-reader-3", "EA Reader 3")
         reader_headers = create_auth_headers(reader_token, use_cache=False)
         add_user_to_tenant(test_client, tenant_id, owner_headers, "ea-reader-3", TenantRolesEnum.READER.value)
+
+        test_client.put(
+            ENDPOINT_EXTERNAL_APP_PRINCIPALS.format(tenant_id=tenant_id, external_app_id=app_id),
+            json={
+                "principal_id": "ea-reader-3",
+                "principal_type": "IDENTITY_USER",
+                "role": PermissionActionEnum.READ.value,
+            },
+            headers=owner_headers,
+        )
 
         response = test_client.get(
             ENDPOINT_EXTERNAL_APP_DETAIL.format(tenant_id=tenant_id, external_app_id=app_id), headers=reader_headers

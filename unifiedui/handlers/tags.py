@@ -15,7 +15,11 @@ from unifiedui.core.database.models import (
     ChatWidgetTag,
     Credential,
     CredentialTag,
+    ExternalApp,
+    ExternalAppTag,
     Tag,
+    TenantAIModel,
+    TenantAIModelTag,
     Tool,
     ToolTag,
 )
@@ -64,6 +68,18 @@ RESOURCE_TAG_MAPPING = {
         "tag_model": ToolTag,
         "id_field": "tool_id",
         "cache_key_pattern": "tools:detail:tenant:{tenant_id}:tool:{resource_id}",
+    },
+    "external_app": {
+        "model": ExternalApp,
+        "tag_model": ExternalAppTag,
+        "id_field": "external_app_id",
+        "cache_key_pattern": "external_apps:detail:tenant:{tenant_id}:ea:{resource_id}",
+    },
+    "tenant_ai_model": {
+        "model": TenantAIModel,
+        "tag_model": TenantAIModelTag,
+        "id_field": "tenant_ai_model_id",
+        "cache_key_pattern": "tenant_ai_models:detail:tenant:{tenant_id}:aim:{resource_id}",
     },
 }
 

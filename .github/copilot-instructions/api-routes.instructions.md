@@ -233,3 +233,14 @@ async def get_models_by_purpose(request: Request, tenant_id: str, purpose_group:
 - `GET /users/{user_id}/recent-visits` — list user's recent visits (up to 50)
 - `POST /users/{user_id}/recent-visits/sync` — sync visits from client (upsert + cleanup)
 - Routes registered at: `/api/v1/platform-service/tenants/{tenant_id}/recent-visits`
+
+---
+
+## Selective Field Fetching — Mandatory on All GET Endpoints
+
+All GET list endpoints MUST support `fields` and `ids` query params. All GET-by-ID endpoints MUST support `fields`.
+
+- `fields: str | None = Query(None, description="Comma-separated list of fields to include in the response")` — filters the response to only include specified fields (plus `id` and `my_permission` always)
+- `ids: str | None = Query(None, description="Comma-separated list of IDs to filter by")` — filters the list to only include items with matching IDs (list endpoints only)
+- Use `filtered_response()` and `parse_ids()` from `unifiedui.handlers.field_filter`
+- See `handlers.instructions.md` → "Selective Field Fetching" section for handler-level pattern

@@ -51,6 +51,7 @@ class EntraIdAppRegistrationCredential(BaseModel):
     tenant_id: str = Field(..., min_length=1, description="Azure Entra ID tenant ID")
     client_id: str = Field(..., min_length=1, description="Azure Entra ID client/application ID")
     client_secret: str = Field(..., min_length=1, description="Azure Entra ID client secret")
+    scopes: list[str] | None = Field(None, description="Optional OAuth 2.0 scopes for token acquisition")
 
 
 class CredentialValidationError(Exception):

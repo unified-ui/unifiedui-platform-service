@@ -3,12 +3,13 @@
 from typing import TYPE_CHECKING
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
-from fastapi.responses import Response
+from fastapi.responses import JSONResponse, Response
 
 from unifiedui.core.database.enums import ListViewEnum, OrderDirectionEnum, PermissionActionEnum, TenantRolesEnum
 from unifiedui.core.middleware.apis.v1.auth import authenticate, check_permissions
 from unifiedui.exc.tools import InvalidToolCredentialError, ToolConfigValidationError, ToolNotFoundError
 from unifiedui.handlers.dependencies import get_tool_handler
+from unifiedui.handlers.field_filter import filtered_response, parse_ids
 from unifiedui.handlers.tools import ToolHandler
 from unifiedui.logger import get_logger
 from unifiedui.schema.requests.permissions import SetResourcePermissionRequest
@@ -46,6 +47,8 @@ async def list_tools(
     ),
     order_direction: OrderDirectionEnum | None = Query(None, description="Sort direction: 'asc' or 'desc'"),
     view: ListViewEnum | None = Query(None, description="View type: 'full' (default) or 'quick-list'"),
+    ids: str | None = Query(None, description="Comma-separated list of IDs to filter by"),
+    fields: str | None = Query(None, description="Comma-separated list of fields to include in the response"),
     handler: ToolHandler = Depends(get_tool_handler),
 ):
     """
@@ -85,18 +88,22 @@ async def list_tools(
             },
         )
 
-        return handler.list_tools(
-            tenant_id=tenant_id,
-            skip=skip,
-            limit=limit,
-            name_filter=name,
-            type_filter=types,
-            is_active=is_active,
-            tag_ids=tag_ids,
-            order_by=order_by,
-            order_direction=order_direction.value if order_direction else None,
-            view=view.value if view else None,
-            user=user,
+        return filtered_response(
+            handler.list_tools(
+                tenant_id=tenant_id,
+                skip=skip,
+                limit=limit,
+                name_filter=name,
+                type_filter=types,
+                is_active=is_active,
+                tag_ids=tag_ids,
+                order_by=order_by,
+                order_direction=order_direction.value if order_direction else None,
+                view=view.value if view else None,
+                user=user,
+                id_list=parse_ids(ids),
+            ),
+            fields,
         )
     except HTTPException:
         raise
@@ -166,8 +173,12 @@ async def create_tool(
     ],
 )
 async def get_tool(
-    request: Request, tenant_id: str, tool_id: str, handler: ToolHandler = Depends(get_tool_handler)
-) -> ToolResponse:
+    request: Request,
+    tenant_id: str,
+    tool_id: str,
+    fields: str | None = Query(None, description="Comma-separated list of fields to include in the response"),
+    handler: ToolHandler = Depends(get_tool_handler),
+) -> ToolResponse | JSONResponse:
     """
     Get a specific tool.
     """
@@ -176,7 +187,10 @@ async def get_tool(
         logger.info(
             "API: Get tool", extra={"tenant_id": tenant_id, "tool_id": tool_id, "user_id": user.identity.get_id()}
         )
-        return handler.get_tool(tenant_id=tenant_id, tool_id=tool_id, user=user)
+        return filtered_response(
+            handler.get_tool(tenant_id=tenant_id, tool_id=tool_id, user=user),
+            fields,
+        )
     except ToolNotFoundError as e:
         logger.warning("Tool not found: %s", e)
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))

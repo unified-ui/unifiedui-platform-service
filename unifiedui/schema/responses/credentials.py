@@ -32,3 +32,11 @@ class CredentialSecretResponse(BaseModel):
 
     credential_id: str = Field(..., description="Credential ID")
     secret_value: str = Field(..., description="The actual secret value from vault")
+
+
+class TestCredentialConnectionResponse(BaseModel):
+    """Response model for credential connection test result."""
+
+    success: bool = Field(..., description="Whether the connection test succeeded")
+    message: str = Field(..., description="Result message")
+    response_time_ms: int = Field(..., description="Response time in milliseconds")
