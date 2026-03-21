@@ -3,7 +3,6 @@
 from typing import TYPE_CHECKING
 
 from fastapi import APIRouter, Depends, Query, Request, status
-from fastapi.responses import JSONResponse
 
 from unifiedui.core.database.enums import OrderDirectionEnum, PermissionActionEnum, TenantRolesEnum
 from unifiedui.core.middleware.apis.v1.auth import authenticate, check_permissions
@@ -27,7 +26,6 @@ router = APIRouter()
 
 @router.get(
     "",
-    response_model=list[CustomGroupResponse],
     status_code=status.HTTP_200_OK,
     summary="List Custom Groups",
     description="Get a paginated list of custom groups in a tenant",
@@ -46,7 +44,7 @@ async def list_custom_groups(
     ),
     order_direction: OrderDirectionEnum | None = Query(None, description="Sort direction: 'asc' or 'desc'"),
     handler: CustomGroupHandler = Depends(get_custom_group_handler),
-) -> list[CustomGroupResponse] | JSONResponse:
+):
     """
     Get a paginated list of custom groups.
     Accessible by all authenticated tenant members.
@@ -90,7 +88,7 @@ async def get_custom_group(
     custom_group_id: str,
     fields: str | None = Query(None, description="Comma-separated list of fields to include in the response"),
     handler: CustomGroupHandler = Depends(get_custom_group_handler),
-) -> CustomGroupResponse | JSONResponse:
+):
     """
     Get a specific custom group by ID.
     Accessible by all authenticated tenant members.

@@ -3,7 +3,7 @@
 from typing import TYPE_CHECKING
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import Response
 
 from unifiedui.core.database.enums import PermissionActionEnum, TenantRolesEnum, UserPermissionEnum
 from unifiedui.core.middleware.apis.v1.auth import authenticate, check_permissions
@@ -26,9 +26,7 @@ router = APIRouter(prefix="/tags")
 # ========== Tenant Tag Endpoints ==========
 
 
-@router.get(
-    "", response_model=list[TagSummary], summary="List tags", description="Get a list of tags for the current tenant"
-)
+@router.get("", summary="List tags", description="Get a list of tags for the current tenant")
 @authenticate()
 async def list_tags(
     request: Request,
@@ -38,7 +36,7 @@ async def list_tags(
     limit: int = Query(100, ge=1, le=1000, description="Maximum number of tags to return"),
     fields: str | None = Query(None, description="Comma-separated list of fields to include in the response"),
     handler: TagHandler = Depends(get_tag_handler),
-) -> list[TagSummary] | JSONResponse:
+):
     """
     List tags for a tenant.
 

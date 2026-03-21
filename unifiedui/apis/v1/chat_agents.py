@@ -3,7 +3,7 @@
 from typing import TYPE_CHECKING
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import Response
 
 from unifiedui.core.database.enums import (
     ChatAgentTypeEnum,
@@ -208,7 +208,7 @@ async def get_chat_agent(
     chat_agent_id: str,
     fields: str | None = Query(None, description="Comma-separated list of fields to include in the response"),
     handler: ChatAgentHandler = Depends(get_chat_agent_handler),
-) -> ChatAgentResponse | JSONResponse:
+):
     """
     Get a specific chat agent.
 

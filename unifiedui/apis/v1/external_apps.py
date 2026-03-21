@@ -3,7 +3,7 @@
 from typing import TYPE_CHECKING
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import Response
 
 from unifiedui.core.database.enums import OrderDirectionEnum, PermissionActionEnum, TenantRolesEnum
 from unifiedui.core.middleware.apis.v1.auth import authenticate, check_permissions
@@ -44,7 +44,7 @@ async def list_external_apps(
     ids: str | None = Query(None, description="Comma-separated list of IDs to filter by"),
     fields: str | None = Query(None, description="Comma-separated list of fields to include in the response"),
     handler: ExternalAppHandler = Depends(get_external_app_handler),
-) -> list[ExternalAppResponse] | JSONResponse:
+):
     """List external apps for a tenant."""
     try:
         user: ContextIdentityUser = request.state.user
@@ -97,7 +97,7 @@ async def get_external_app(
     external_app_id: str,
     fields: str | None = Query(None, description="Comma-separated list of fields to include in the response"),
     handler: ExternalAppHandler = Depends(get_external_app_handler),
-) -> ExternalAppResponse | JSONResponse:
+):
     """Get a specific external app."""
     user: ContextIdentityUser = request.state.user
     logger.info(

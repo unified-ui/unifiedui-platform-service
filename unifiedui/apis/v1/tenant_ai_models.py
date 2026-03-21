@@ -3,7 +3,7 @@
 from typing import TYPE_CHECKING
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import Response
 
 from unifiedui.core.database.enums import OrderDirectionEnum, TenantRolesEnum
 from unifiedui.core.middleware.apis.v1.auth import authenticate, authenticate_service_key, check_permissions
@@ -171,7 +171,7 @@ async def get_tenant_ai_model(
     model_id: str,
     fields: str | None = Query(None, description="Comma-separated list of fields to include in the response"),
     handler: TenantAIModelHandler = Depends(get_tenant_ai_model_handler),
-) -> TenantAIModelResponse | JSONResponse:
+):
     """Get a specific tenant AI model."""
     try:
         user: ContextIdentityUser = request.state.user

@@ -3,7 +3,7 @@
 from typing import TYPE_CHECKING
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import Response
 
 from unifiedui.core.database.enums import ListViewEnum, OrderDirectionEnum, PermissionActionEnum, TenantRolesEnum
 from unifiedui.core.middleware.apis.v1.auth import (
@@ -209,7 +209,7 @@ async def get_autonomous_agent(
     autonomous_agent_id: str,
     fields: str | None = Query(None, description="Comma-separated list of fields to include in the response"),
     handler: AutonomousAgentHandler = Depends(get_autonomous_agent_handler),
-) -> AutonomousAgentResponse | JSONResponse:
+):
     """
     Get a specific autonomous agent by ID.
 

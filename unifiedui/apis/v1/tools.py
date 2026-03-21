@@ -3,7 +3,7 @@
 from typing import TYPE_CHECKING
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import Response
 
 from unifiedui.core.database.enums import ListViewEnum, OrderDirectionEnum, PermissionActionEnum, TenantRolesEnum
 from unifiedui.core.middleware.apis.v1.auth import authenticate, check_permissions
@@ -178,7 +178,7 @@ async def get_tool(
     tool_id: str,
     fields: str | None = Query(None, description="Comma-separated list of fields to include in the response"),
     handler: ToolHandler = Depends(get_tool_handler),
-) -> ToolResponse | JSONResponse:
+):
     """
     Get a specific tool.
     """

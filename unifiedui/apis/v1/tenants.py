@@ -3,7 +3,6 @@
 from typing import TYPE_CHECKING
 
 from fastapi import APIRouter, Depends, Query, Request, status
-from fastapi.responses import JSONResponse
 
 from unifiedui.core.database.enums import OrderDirectionEnum, TenantRolesEnum
 from unifiedui.core.middleware.apis.v1.auth import authenticate, check_permissions
@@ -39,7 +38,7 @@ async def list_tenants(
     ),
     order_direction: OrderDirectionEnum | None = Query(None, description="Sort direction: 'asc' or 'desc'"),
     handler: TenantHandler = Depends(get_tenant_handler),
-) -> list[TenantResponse] | JSONResponse:
+):
     """
     Get a paginated list of tenants.
 
@@ -79,7 +78,7 @@ async def get_tenant(
     tenant_id: str,
     fields: str | None = Query(None, description="Comma-separated list of fields to include in the response"),
     handler: TenantHandler = Depends(get_tenant_handler),
-) -> TenantResponse | JSONResponse:
+):
     """
     Get a specific tenant by ID.
 
