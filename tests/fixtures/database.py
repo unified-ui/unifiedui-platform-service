@@ -53,6 +53,7 @@ def test_db_engine() -> Generator[Engine]:
         TEST_DATABASE_URL,
         connect_args={"check_same_thread": False},  # Needed for SQLite
         echo=False,
+        execution_options={"schema_translate_map": {"unifiedui": None}},
     )
 
     # Create all tables

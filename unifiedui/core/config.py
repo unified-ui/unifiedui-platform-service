@@ -80,6 +80,7 @@ class Settings(BaseSettings):
         "X-Service-Key",
         "X-Request-ID",
         "X-Correlation-ID",
+        "X-Microsoft-Foundry-API-Key",
         "X-Unified-UI-Autonomous-Agent-API-Key",
         "X-Use-Cache",
         "Cache-Control",

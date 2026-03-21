@@ -9,6 +9,7 @@ from sqlalchemy import (
     ForeignKeyConstraint,
     Index,
     Integer,
+    MetaData,
     Sequence,
     String,
     UniqueConstraint,
@@ -54,7 +55,7 @@ class HighPrecisionDateTime(TypeDecorator):
 
 # ---------- Base ----------
 class Base(DeclarativeBase):
-    pass
+    metadata = MetaData(schema="unifiedui")
 
 
 # ---------- Portable JSON ----------
