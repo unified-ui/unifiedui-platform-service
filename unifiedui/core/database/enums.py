@@ -197,3 +197,14 @@ class AIModelPurposeGroupEnum(StrEnum):
     @classmethod
     def all(cls) -> list[str]:
         return [g.value for g in AIModelPurposeGroupEnum]
+
+
+class FileContextTypeEnum(StrEnum):
+    """Context types for uploaded files."""
+
+    CHAT_ATTACHMENT = "CHAT_ATTACHMENT"
+    APP_IMAGE = "APP_IMAGE"
+
+    @classmethod
+    def all(cls) -> list[str]:
+        return [t.value for t in FileContextTypeEnum]

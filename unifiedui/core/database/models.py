@@ -26,6 +26,7 @@ from unifiedui.core.database.enums import (
     AutonomousAgentTypeEnum,
     ChatAgentTypeEnum,
     EnvironmentTypeEnum,
+    FileContextTypeEnum,
     OrganizationRoleEnum,
     PermissionActionEnum,
     PrincipalTypeEnum,
@@ -131,6 +132,14 @@ OrganizationRoleSAEnum = SAEnum(
 EnvironmentTypeSAEnum = SAEnum(
     *EnvironmentTypeEnum.all(),
     name="environment_type",
+    native_enum=False,
+    create_constraint=True,
+    validate_strings=True,
+)
+
+FileContextTypeSAEnum = SAEnum(
+    *FileContextTypeEnum.all(),
+    name="file_context_type",
     native_enum=False,
     create_constraint=True,
     validate_strings=True,
@@ -948,6 +957,7 @@ class ExternalApp(Base, IdNameDescriptionMixin, TenantScopedMixin):
 
     url: Mapped[str] = mapped_column(String(2000), nullable=False)
     image_url: Mapped[str | None] = mapped_column(String(2000), nullable=True)
+    image_file_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
 
     members: Mapped[list[ExternalAppMember]] = relationship(back_populates="external_app", cascade="all, delete-orphan")
     tags: Mapped[list[ExternalAppTag]] = relationship(back_populates="external_app", cascade="all, delete-orphan")
@@ -1127,4 +1137,24 @@ class RecentVisit(Base, IdMixin, TenantScopedMixin):
     __table_args__ = (
         UniqueConstraint("tenant_id", "user_id", "resource_type", "resource_id", name="uq_recent_visits"),
         Index("ix_recent_visits_user_time", "tenant_id", "user_id", "visited_at"),
+    )
+
+
+# ---------- Files ----------
+class File(Base, IdMixin, AuditMixin, TenantScopedMixin):
+    """Uploaded file metadata."""
+
+    __tablename__ = "files"
+
+    file_name: Mapped[str] = mapped_column(String(500), nullable=False)
+    file_size: Mapped[int] = mapped_column(Integer, nullable=False)
+    content_type: Mapped[str] = mapped_column(String(255), nullable=False)
+    storage_path: Mapped[str] = mapped_column(String(1000), nullable=False, unique=True)
+    context_type: Mapped[str] = mapped_column(FileContextTypeSAEnum, nullable=False)
+    context_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+
+    __table_args__ = (
+        Index("ix_files_tenant", "tenant_id"),
+        Index("ix_files_context", "tenant_id", "context_type", "context_id"),
+        Index("ix_files_storage_path", "storage_path", unique=True),
     )

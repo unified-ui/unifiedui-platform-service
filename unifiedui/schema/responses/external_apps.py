@@ -16,6 +16,7 @@ class ExternalAppResponse(BaseModel):
     description: str | None = Field(None, description="External app description")
     url: str = Field(..., description="External app URL for iframe embedding")
     image_url: str | None = Field(None, description="External app image URL")
+    image_file_id: str | None = Field(None, description="File ID of uploaded app image")
     tags: list[TagSummary] = Field(default_factory=list, description="Tags on the external app")
     created_at: datetime = Field(..., description="Creation timestamp")
     updated_at: datetime = Field(..., description="Last update timestamp")

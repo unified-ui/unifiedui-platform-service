@@ -294,6 +294,7 @@ class ExternalAppHandler:
                 description=request.description,
                 url=request.url,
                 image_url=request.image_url,
+                image_file_id=request.image_file_id,
                 created_by=user_id,
                 updated_by=user_id,
             )
@@ -363,6 +364,8 @@ class ExternalAppHandler:
                 external_app.url = request.url
             if request.image_url is not None:
                 external_app.image_url = request.image_url
+            if request.image_file_id is not None:
+                external_app.image_file_id = request.image_file_id
 
             external_app.updated_by = user_id
 
@@ -661,6 +664,7 @@ class ExternalAppHandler:
             description=external_app.description,
             url=external_app.url,
             image_url=external_app.image_url,
+            image_file_id=external_app.image_file_id,
             tags=tags,
             created_at=external_app.created_at,
             updated_at=external_app.updated_at,

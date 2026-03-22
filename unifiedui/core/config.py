@@ -155,6 +155,13 @@ class Settings(BaseSettings):
     oidc_zitadel_management_api_url: str | None = None
     oidc_zitadel_service_token: str | None = None
 
+    # File Storage Configuration
+    file_storage_type: str | None = None  # "local" or "azureblob"
+    file_storage_local_base_path: str | None = None
+    file_storage_azure_blob_account_url: str | None = None
+    file_storage_azure_blob_container: str | None = None
+    file_storage_max_file_size_bytes: int = 26214400  # 25 MB
+
     # Deployment Mode
     deployment_mode: str = "self-hosted"
     msal_system_admin_email: str | None = None

@@ -13,6 +13,7 @@ from unifiedui.apis.v1 import (
     custom_groups,
     dashboard,
     external_apps,
+    files,
     health,
     identity,
     organizations,
@@ -39,6 +40,7 @@ from unifiedui.exc.conversations import ConversationNotFoundError
 from unifiedui.exc.credentials import CredentialNotFoundError
 from unifiedui.exc.custom_groups import CustomGroupError, CustomGroupNotFoundError
 from unifiedui.exc.external_apps import ExternalAppAlreadyExistsError, ExternalAppNotFoundError
+from unifiedui.exc.files import FileNotFoundByIdError, FileStorageNotConfiguredError, FileTooLargeError
 from unifiedui.exc.organizations import (
     OrganizationAlreadyExistsError,
     OrganizationError,
@@ -247,6 +249,23 @@ def create_app() -> FastAPI:
     async def external_app_already_exists_handler(request: Request, exc: ExternalAppAlreadyExistsError):
         """Handle external app already exists errors."""
         return JSONResponse(status_code=409, content={"detail": str(exc)})
+
+    # File exception handlers
+
+    @app.exception_handler(FileNotFoundByIdError)
+    async def file_not_found_handler(request: Request, exc: FileNotFoundByIdError):
+        """Handle file not found errors."""
+        return JSONResponse(status_code=404, content={"detail": str(exc)})
+
+    @app.exception_handler(FileTooLargeError)
+    async def file_too_large_handler(request: Request, exc: FileTooLargeError):
+        """Handle file too large errors."""
+        return JSONResponse(status_code=413, content={"detail": str(exc)})
+
+    @app.exception_handler(FileStorageNotConfiguredError)
+    async def file_storage_not_configured_handler(request: Request, exc: FileStorageNotConfiguredError):
+        """Handle file storage not configured errors."""
+        return JSONResponse(status_code=503, content={"detail": str(exc)})
 
     # Tag exception handlers
 
@@ -465,6 +484,9 @@ def create_app() -> FastAPI:
     app.include_router(
         recent_visits.router, prefix="/api/v1/platform-service/tenants/{tenant_id}", tags=["Recent Visits"]
     )
+
+    # Files routes
+    app.include_router(files.router, prefix="/api/v1/platform-service/tenants/{tenant_id}", tags=["Files"])
 
     return app
 

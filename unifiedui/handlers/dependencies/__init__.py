@@ -21,6 +21,7 @@ from unifiedui.handlers.dependencies.credentials import get_credential_handler
 from unifiedui.handlers.dependencies.custom_groups import get_custom_group_handler
 from unifiedui.handlers.dependencies.database import get_db_client
 from unifiedui.handlers.dependencies.external_apps import get_external_app_handler
+from unifiedui.handlers.dependencies.files import get_file_handler
 from unifiedui.handlers.dependencies.organizations import get_organization_handler
 from unifiedui.handlers.dependencies.principals import get_principal_handler
 from unifiedui.handlers.dependencies.resource_permissions import get_resource_permissions_handler
@@ -47,6 +48,7 @@ __all__ = [
     # Database
     "get_db_client",
     "get_external_app_handler",
+    "get_file_handler",
     "get_organization_handler",
     "get_principal_handler",
     # Central Handlers
