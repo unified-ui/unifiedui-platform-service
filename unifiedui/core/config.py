@@ -113,6 +113,7 @@ class Settings(BaseSettings):
     ldap_user_search_filter: str = "(objectClass=person)"
     ldap_group_search_filter: str = "(objectClass=groupOfNames)"
     ldap_use_ssl: bool = True
+    ldap_jwt_secret: str | None = None
 
     # Kerberos Identity Configuration
     kerberos_realm: str | None = None
@@ -150,6 +151,7 @@ class Settings(BaseSettings):
     # Deployment Mode
     deployment_mode: str = "self-hosted"
     system_admin_email: str | None = None
+    system_admin_username: str | None = None
 
     # Logging Configuration
     log_level: str = "INFO"

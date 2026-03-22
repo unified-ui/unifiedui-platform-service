@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from unifiedui.apis.v1 import (
+    auth,
     autonomous_agents,
     chat_agents,
     chat_widgets,
@@ -25,6 +26,7 @@ from unifiedui.apis.v1 import (
     user_favorites,
 )
 from unifiedui.core.config import settings
+from unifiedui.exc.auth import AuthError, InvalidCredentialsError, LDAPConnectionError
 from unifiedui.exc.autonomous_agents import AutonomousAgentNotFoundError
 from unifiedui.exc.chat_agent_config import (
     ChatAgentConfigValidationError,
@@ -305,7 +307,26 @@ def create_app() -> FastAPI:
         """Handle invalid AI model credential errors."""
         return JSONResponse(status_code=400, content={"detail": str(exc), "credential_id": exc.credential_id})
 
+    # Auth exception handlers
+
+    @app.exception_handler(InvalidCredentialsError)
+    async def invalid_credentials_handler(request: Request, exc: InvalidCredentialsError):
+        """Handle invalid credentials errors."""
+        return JSONResponse(status_code=401, content={"detail": str(exc)})
+
+    @app.exception_handler(LDAPConnectionError)
+    async def ldap_connection_handler(request: Request, exc: LDAPConnectionError):
+        """Handle LDAP connection errors."""
+        return JSONResponse(status_code=503, content={"detail": str(exc)})
+
+    @app.exception_handler(AuthError)
+    async def auth_error_handler(request: Request, exc: AuthError):
+        """Handle general auth errors."""
+        return JSONResponse(status_code=400, content={"detail": str(exc)})
+
     # Include routers
+    app.include_router(auth.router, prefix="/api/v1/platform-service/auth", tags=["Authentication"])
+
     app.include_router(health.router, prefix="/api/v1/platform-service", tags=["Health"])
 
     app.include_router(identity.router, prefix="/api/v1/platform-service/identity", tags=["Identity"])

@@ -261,18 +261,33 @@ class ContextIdentityUser:
         return self._organization_context
 
     def get_me(self) -> IdentityUserResponse:
-        """Get the current user's identity information."""
+        """Get the current user's identity information.
+
+        If the user is a system admin with an organization but no roles,
+        they are automatically enrolled as ORGANISATION_GLOBAL_ADMIN.
+        """
         from unifiedui.core.config import settings
 
         org_context = self.organization_context
         tenants_with_permissions = self.tenants
 
         user_mail = self.identity.get_mail()
-        is_system_admin = bool(
+        user_principal = self.identity.get_principal_name()
+
+        email_match = bool(
             settings.system_admin_email
             and user_mail
             and user_mail.lower().strip() == settings.system_admin_email.lower().strip()
         )
+        username_match = bool(
+            settings.system_admin_username
+            and user_principal
+            and user_principal.lower().strip() == settings.system_admin_username.lower().strip()
+        )
+        is_system_admin = email_match or username_match
+
+        if is_system_admin and org_context and not org_context.roles:
+            org_context = self._auto_enroll_system_admin(org_context)
 
         return IdentityUserResponse(
             id=self.identity.get_id(),
@@ -287,4 +302,53 @@ class ContextIdentityUser:
             organization=org_context,
             tenants=tenants_with_permissions,
             groups=self.groups,
+        )
+
+    def _auto_enroll_system_admin(
+        self,
+        org_context: OrganizationContextResponse,
+    ) -> OrganizationContextResponse:
+        """Auto-enroll a system admin as ORGANISATION_GLOBAL_ADMIN.
+
+        When a system admin sees an organization (via IDP match) but has
+        no roles, they are automatically added as a member so they can
+        manage the organization.
+
+        Args:
+            org_context: The matched organization context with empty roles.
+
+        Returns:
+            Updated organization context with the admin role assigned.
+        """
+        import uuid
+
+        from unifiedui.core.database.enums import OrganizationRoleEnum
+        from unifiedui.core.database.models import OrganizationMember
+
+        if not self._database_client:
+            return org_context
+
+        user_id = self.identity.get_id()
+        role = OrganizationRoleEnum.ORGANISATION_GLOBAL_ADMIN.value
+
+        with self._database_client.get_session() as session:
+            member = OrganizationMember(
+                id=str(uuid.uuid4()),
+                organization_id=org_context.id,
+                principal_id=user_id,
+                principal_type=PrincipalTypeEnum.IDENTITY_USER.value,
+                role=role,
+                created_by=user_id,
+                updated_by=user_id,
+            )
+            session.add(member)
+            session.commit()
+
+        logger.info("Auto-enrolled system admin %s as %s in org %s", user_id, role, org_context.id)
+
+        return OrganizationContextResponse(
+            id=org_context.id,
+            name=org_context.name,
+            slug=org_context.slug,
+            roles=[role],
         )

@@ -230,7 +230,10 @@ class IdentityTokenFactory:
 
     @staticmethod
     def _create_ldap_token(token: str, unverified_claims: dict) -> LDAPIdentityTokenSerializer:
-        """Create an LDAP identity token (no JWKS verification, gateway-trusted).
+        """Create an LDAP identity token with HS256 signature verification.
+
+        Verifies tokens signed by the platform's own LDAP JWT secret.
+        Falls back to expiry-only check if no secret is configured.
 
         Args:
             token: Raw JWT token string.
@@ -239,6 +242,19 @@ class IdentityTokenFactory:
         Returns:
             LDAPIdentityTokenSerializer instance.
         """
+        from unifiedui.core.config import settings
+
+        if settings.ldap_jwt_secret:
+            try:
+                verified_claims: dict = jwt.decode(
+                    token,
+                    settings.ldap_jwt_secret,
+                    algorithms=["HS256"],
+                )
+                return LDAPIdentityTokenSerializer(token, verified_claims)
+            except InvalidTokenError as e:
+                raise ValueError(f"Invalid LDAP token: {e!s}")
+
         exp = unverified_claims.get("exp")
         if exp and int(time.time()) >= exp:
             raise ValueError("Token has expired")
