@@ -245,22 +245,18 @@ class IdentityTokenFactory:
         """
         from unifiedui.core.config import settings
 
-        if settings.ldap_jwt_secret:
-            try:
-                verified_claims: dict = jwt.decode(
-                    token,
-                    settings.ldap_jwt_secret,
-                    algorithms=["HS256"],
-                )
-                return LDAPIdentityTokenSerializer(token, verified_claims)
-            except InvalidTokenError as e:
-                raise ValueError(f"Invalid LDAP token: {e!s}")
+        if not settings.ldap_jwt_secret:
+            raise ValueError("LDAP_JWT_SECRET is not configured — cannot verify LDAP tokens")
 
-        exp = unverified_claims.get("exp")
-        if exp and int(time.time()) >= exp:
-            raise ValueError("Token has expired")
-
-        return LDAPIdentityTokenSerializer(token, unverified_claims)
+        try:
+            verified_claims: dict = jwt.decode(
+                token,
+                settings.ldap_jwt_secret,
+                algorithms=["HS256"],
+            )
+            return LDAPIdentityTokenSerializer(token, verified_claims)
+        except InvalidTokenError as e:
+            raise ValueError(f"Invalid LDAP token: {e!s}")
 
     @staticmethod
     def _create_kerberos_token(token: str, unverified_claims: dict) -> KerberosIdentityTokenSerializer:

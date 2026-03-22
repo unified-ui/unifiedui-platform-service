@@ -114,6 +114,9 @@ class Settings(BaseSettings):
     ldap_group_search_filter: str = "(objectClass=groupOfNames)"
     ldap_use_ssl: bool = True
     ldap_jwt_secret: str | None = None
+    ldap_jwt_refresh_secret: str | None = None
+    ldap_access_token_expiry_seconds: int = 900
+    ldap_refresh_token_expiry_seconds: int = 604800
 
     # Kerberos Identity Configuration
     kerberos_realm: str | None = None

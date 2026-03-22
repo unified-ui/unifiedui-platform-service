@@ -26,7 +26,7 @@ from unifiedui.apis.v1 import (
     user_favorites,
 )
 from unifiedui.core.config import settings
-from unifiedui.exc.auth import AuthError, InvalidCredentialsError, LDAPConnectionError
+from unifiedui.exc.auth import AuthError, InvalidCredentialsError, InvalidRefreshTokenError, LDAPConnectionError
 from unifiedui.exc.autonomous_agents import AutonomousAgentNotFoundError
 from unifiedui.exc.chat_agent_config import (
     ChatAgentConfigValidationError,
@@ -312,6 +312,11 @@ def create_app() -> FastAPI:
     @app.exception_handler(InvalidCredentialsError)
     async def invalid_credentials_handler(request: Request, exc: InvalidCredentialsError):
         """Handle invalid credentials errors."""
+        return JSONResponse(status_code=401, content={"detail": str(exc)})
+
+    @app.exception_handler(InvalidRefreshTokenError)
+    async def invalid_refresh_token_handler(request: Request, exc: InvalidRefreshTokenError):
+        """Handle invalid refresh token errors."""
         return JSONResponse(status_code=401, content={"detail": str(exc)})
 
     @app.exception_handler(LDAPConnectionError)
