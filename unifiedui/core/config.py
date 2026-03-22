@@ -148,10 +148,15 @@ class Settings(BaseSettings):
     oidc_userinfo_url: str | None = None
     oidc_scopes: str = "openid profile email"
 
+    # Zitadel Management API (for user/group search)
+    oidc_zitadel_management_api_url: str | None = None
+    oidc_zitadel_service_token: str | None = None
+
     # Deployment Mode
     deployment_mode: str = "self-hosted"
-    system_admin_email: str | None = None
-    system_admin_username: str | None = None
+    msal_system_admin_email: str | None = None
+    ldap_system_admin_username: str | None = None
+    oidc_zitadel_system_admin_username: str | None = None
 
     # Logging Configuration
     log_level: str = "INFO"
