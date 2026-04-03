@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Any, cast
 
-from sqlalchemy import or_, select
+from sqlalchemy import func, literal, or_, select, union_all
 
 from unifiedui.core.database.enums import PrincipalTypeEnum, TenantRolesEnum
 from unifiedui.core.database.models import (
@@ -14,9 +14,24 @@ from unifiedui.core.database.models import (
     ChatAgent,
     ChatAgentMember,
     ChatAgentTag,
+    ChatWidget,
+    ChatWidgetMember,
+    ChatWidgetTag,
     Conversation,
     ConversationMember,
+    Credential,
+    CredentialMember,
+    CredentialTag,
+    ExternalApp,
+    ExternalAppMember,
+    ExternalAppTag,
+    Principal,
     Tag,
+    TenantAIModel,
+    TenantAIModelTag,
+    Tool,
+    ToolMember,
+    ToolTag,
 )
 
 if TYPE_CHECKING:
@@ -29,9 +44,20 @@ from unifiedui.schema.responses.search import SearchResponse, SearchResultItem
 
 logger = get_logger(__name__)
 
-VALID_SEARCH_TYPES = {"chat_agent", "autonomous_agent", "conversation"}
+VALID_SEARCH_TYPES = {
+    "chat_agent",
+    "autonomous_agent",
+    "conversation",
+    "chat_widget",
+    "external_app",
+    "credential",
+    "tool",
+    "tenant_ai_model",
+    "principal",
+    "custom_group",
+}
 
-SEARCH_TYPE_CONFIG = {
+MEMBER_SEARCH_TYPE_CONFIG = {
     "chat_agent": {
         "entity_model": ChatAgent,
         "member_model": ChatAgentMember,
@@ -63,6 +89,62 @@ SEARCH_TYPE_CONFIG = {
         "admin_roles": [
             TenantRolesEnum.TENANT_GLOBAL_ADMIN,
             TenantRolesEnum.CONVERSATIONS_ADMIN,
+        ],
+    },
+    "chat_widget": {
+        "entity_model": ChatWidget,
+        "member_model": ChatWidgetMember,
+        "entity_id_field": "chat_widget_id",
+        "tag_model": ChatWidgetTag,
+        "tag_entity_id_field": "chat_widget_id",
+        "admin_roles": [
+            TenantRolesEnum.TENANT_GLOBAL_ADMIN,
+            TenantRolesEnum.CHAT_WIDGETS_ADMIN,
+        ],
+    },
+    "external_app": {
+        "entity_model": ExternalApp,
+        "member_model": ExternalAppMember,
+        "entity_id_field": "external_app_id",
+        "tag_model": ExternalAppTag,
+        "tag_entity_id_field": "external_app_id",
+        "admin_roles": [
+            TenantRolesEnum.TENANT_GLOBAL_ADMIN,
+            TenantRolesEnum.EXTERNAL_APPS_ADMIN,
+        ],
+    },
+    "credential": {
+        "entity_model": Credential,
+        "member_model": CredentialMember,
+        "entity_id_field": "credential_id",
+        "tag_model": CredentialTag,
+        "tag_entity_id_field": "credential_id",
+        "admin_roles": [
+            TenantRolesEnum.TENANT_GLOBAL_ADMIN,
+            TenantRolesEnum.CREDENTIALS_ADMIN,
+        ],
+    },
+    "tool": {
+        "entity_model": Tool,
+        "member_model": ToolMember,
+        "entity_id_field": "tool_id",
+        "tag_model": ToolTag,
+        "tag_entity_id_field": "tool_id",
+        "admin_roles": [
+            TenantRolesEnum.TENANT_GLOBAL_ADMIN,
+            TenantRolesEnum.REACT_AGENT_ADMIN,
+        ],
+    },
+}
+
+TENANT_SCOPED_SEARCH_TYPE_CONFIG = {
+    "tenant_ai_model": {
+        "entity_model": TenantAIModel,
+        "tag_model": TenantAIModelTag,
+        "tag_entity_id_field": "tenant_ai_model_id",
+        "admin_roles": [
+            TenantRolesEnum.TENANT_GLOBAL_ADMIN,
+            TenantRolesEnum.TENANT_AI_MODELS_ADMIN,
         ],
     },
 }
@@ -165,40 +247,41 @@ class SearchHandler:
             tags_map.setdefault(entity_id, []).append(tag_name)
         return tags_map
 
-    def _search_entity_type(
+    def _build_member_subquery(
         self,
-        session,
-        tenant_id: str,
-        query: str,
+        search_type: str,
         config: dict,
+        tenant_id: str,
+        like_pattern: str,
         principal_ids: list[str],
         is_admin: bool,
-        limit: int,
-    ) -> list[SearchResultItem]:
-        """Search a single entity type with RBAC filtering.
+    ):
+        """Build a SELECT subquery for a member-based entity type.
 
         Args:
-            session: Database session.
-            tenant_id: Tenant scope.
-            query: Search query string.
+            search_type: Entity type key.
             config: Search type configuration dict.
+            tenant_id: Tenant scope.
+            like_pattern: LIKE pattern for search.
             principal_ids: User principal IDs for filtering.
             is_admin: Whether user is admin for this type.
-            limit: Maximum results.
 
         Returns:
-            List of search result items.
+            SQLAlchemy SELECT statement or None if no access.
         """
         entity_model = config["entity_model"]
         member_model = config["member_model"]
         entity_id_field = config["entity_id_field"]
 
-        like_pattern = f"%{query}%"
+        has_type_col = search_type in ("chat_agent", "chat_widget")
 
-        name_match = entity_model.name.ilike(like_pattern)
-        desc_match = entity_model.description.ilike(like_pattern)
-
-        base_filters = [entity_model.tenant_id == tenant_id]
+        base_filters = [
+            entity_model.tenant_id == tenant_id,
+            or_(
+                entity_model.name.ilike(like_pattern),
+                entity_model.description.ilike(like_pattern),
+            ),
+        ]
 
         if not is_admin:
             member_subquery = (
@@ -211,40 +294,83 @@ class SearchHandler:
             )
             base_filters.append(entity_model.id.in_(member_subquery))
 
-        base_filters.append(or_(name_match, desc_match))
+        sub_type_col = entity_model.type if has_type_col else literal(None)
 
-        search_query = (
-            select(entity_model.id, entity_model.name, entity_model.description).where(*base_filters).limit(limit)
+        return select(
+            literal(search_type).label("entity_type"),
+            entity_model.id.label("entity_id"),
+            entity_model.name.label("entity_name"),
+            entity_model.description.label("entity_description"),
+            sub_type_col.label("sub_type"),
+        ).where(*base_filters)
+
+    def _build_tenant_scoped_subquery(
+        self,
+        search_type: str,
+        config: dict,
+        tenant_id: str,
+        like_pattern: str,
+    ):
+        """Build a SELECT subquery for a tenant-scoped entity type.
+
+        Args:
+            search_type: Entity type key.
+            config: Search type configuration dict.
+            tenant_id: Tenant scope.
+            like_pattern: LIKE pattern for search.
+
+        Returns:
+            SQLAlchemy SELECT statement.
+        """
+        entity_model = config["entity_model"]
+
+        return select(
+            literal(search_type).label("entity_type"),
+            entity_model.id.label("entity_id"),
+            entity_model.name.label("entity_name"),
+            entity_model.description.label("entity_description"),
+            literal(None).label("sub_type"),
+        ).where(
+            entity_model.tenant_id == tenant_id,
+            or_(
+                entity_model.name.ilike(like_pattern),
+                entity_model.description.ilike(like_pattern),
+            ),
         )
 
-        rows = session.execute(search_query).all()
+    def _build_principal_subquery(
+        self,
+        search_type: str,
+        principal_type: PrincipalTypeEnum,
+        tenant_id: str,
+        like_pattern: str,
+    ):
+        """Build a SELECT subquery for principals.
 
-        entity_ids = [r[0] for r in rows]
-        tags_map = self._load_tags_for_entities(
-            session,
-            tenant_id,
-            config["tag_model"],
-            config["tag_entity_id_field"],
-            entity_ids,
+        Args:
+            search_type: Entity type key.
+            principal_type: Principal type filter.
+            tenant_id: Tenant scope.
+            like_pattern: LIKE pattern for search.
+
+        Returns:
+            SQLAlchemy SELECT statement.
+        """
+        return select(
+            literal(search_type).label("entity_type"),
+            Principal.principal_id.label("entity_id"),
+            Principal.display_name.label("entity_name"),
+            Principal.description.label("entity_description"),
+            literal(None).label("sub_type"),
+        ).where(
+            Principal.tenant_id == tenant_id,
+            Principal.principal_type == principal_type.value,
+            or_(
+                Principal.display_name.ilike(like_pattern),
+                Principal.description.ilike(like_pattern),
+                Principal.mail.ilike(like_pattern),
+            ),
         )
-
-        entity_type = next(k for k, v in SEARCH_TYPE_CONFIG.items() if v is config)
-        results: list[SearchResultItem] = []
-        for entity_id, name, description in rows:
-            match_field = "name" if query.lower() in (name or "").lower() else "description"
-            results.append(
-                SearchResultItem(
-                    type=entity_type,
-                    id=entity_id,
-                    name=name,
-                    description=description,
-                    match_field=match_field,
-                    is_active=None,
-                    tags=tags_map.get(entity_id, []),
-                )
-            )
-
-        return results
 
     def search(
         self,
@@ -253,15 +379,17 @@ class SearchHandler:
         query: str,
         types: list[str] | None = None,
         limit: int = 10,
+        offset: int = 0,
     ) -> SearchResponse:
-        """Execute global search across entity types.
+        """Execute global search across entity types using a single UNION ALL query.
 
         Args:
             tenant_id: Tenant ID for scoping.
             user: Authenticated user context.
             query: Search query string.
             types: Entity types to search (None = all).
-            limit: Maximum results per type.
+            limit: Maximum results.
+            offset: Number of results to skip.
 
         Returns:
             Search response with results.
@@ -270,6 +398,7 @@ class SearchHandler:
             return SearchResponse(results=[], total=0, query=query or "")
 
         query = query.strip()
+        like_pattern = f"%{query}%"
 
         search_types = VALID_SEARCH_TYPES
         if types:
@@ -279,27 +408,128 @@ class SearchHandler:
             return SearchResponse(results=[], total=0, query=query)
 
         principal_ids = self._get_principal_ids(user)
-        all_results: list[SearchResultItem] = []
 
-        with self.db_client.get_session() as session:
-            for search_type in search_types:
-                config = SEARCH_TYPE_CONFIG[search_type]
+        principal_search_types = {"principal", "custom_group"}
+        principal_type_map = {
+            "principal": PrincipalTypeEnum.IDENTITY_USER,
+            "custom_group": PrincipalTypeEnum.CUSTOM_GROUP,
+        }
+        principal_admin_roles: dict[str, list[TenantRolesEnum]] = {
+            "principal": [TenantRolesEnum.TENANT_GLOBAL_ADMIN],
+            "custom_group": [
+                TenantRolesEnum.TENANT_GLOBAL_ADMIN,
+                TenantRolesEnum.CUSTOM_GROUPS_ADMIN,
+            ],
+        }
+
+        subqueries: list[Any] = []
+        active_type_configs: dict[str, dict[str, Any]] = {}
+
+        for search_type in search_types:
+            if search_type in MEMBER_SEARCH_TYPE_CONFIG:
+                config = MEMBER_SEARCH_TYPE_CONFIG[search_type]
                 is_admin = self._check_admin_for_type(
                     user, tenant_id, cast("list[TenantRolesEnum]", config["admin_roles"])
                 )
-                type_results = self._search_entity_type(
-                    session=session,
-                    tenant_id=tenant_id,
-                    query=query,
+                subq = self._build_member_subquery(
+                    search_type=search_type,
                     config=config,
+                    tenant_id=tenant_id,
+                    like_pattern=like_pattern,
                     principal_ids=principal_ids,
                     is_admin=is_admin,
-                    limit=limit,
                 )
-                all_results.extend(type_results)
+                subqueries.append(subq)
+                active_type_configs[search_type] = config
+
+            elif search_type in TENANT_SCOPED_SEARCH_TYPE_CONFIG:
+                config = TENANT_SCOPED_SEARCH_TYPE_CONFIG[search_type]
+                is_admin = self._check_admin_for_type(
+                    user, tenant_id, cast("list[TenantRolesEnum]", config["admin_roles"])
+                )
+                if not is_admin:
+                    continue
+                subq = self._build_tenant_scoped_subquery(
+                    search_type=search_type,
+                    config=config,
+                    tenant_id=tenant_id,
+                    like_pattern=like_pattern,
+                )
+                subqueries.append(subq)
+                active_type_configs[search_type] = config
+
+            elif search_type in principal_search_types:
+                admin_roles = principal_admin_roles[search_type]
+                is_admin = self._check_admin_for_type(user, tenant_id, admin_roles)
+                if not is_admin:
+                    continue
+                subq = self._build_principal_subquery(
+                    search_type=search_type,
+                    principal_type=principal_type_map[search_type],
+                    tenant_id=tenant_id,
+                    like_pattern=like_pattern,
+                )
+                subqueries.append(subq)
+
+        if not subqueries:
+            return SearchResponse(results=[], total=0, query=query)
+
+        combined_query = union_all(*subqueries).subquery()
+
+        count_query = select(func.count()).select_from(combined_query)
+
+        paginated_query = select(combined_query).order_by(combined_query.c.entity_name).offset(offset).limit(limit)
+
+        with self.db_client.get_session() as session:
+            total = session.execute(count_query).scalar() or 0
+            rows = session.execute(paginated_query).all()
+
+            entity_ids_by_type: dict[str, list[str]] = {}
+            for row in rows:
+                entity_type = row.entity_type
+                entity_ids_by_type.setdefault(entity_type, []).append(row.entity_id)
+
+            tags_map: dict[str, dict[str, list[str]]] = {}
+            for entity_type, entity_ids in entity_ids_by_type.items():
+                type_config = active_type_configs.get(entity_type)
+                if not type_config or not type_config.get("tag_model"):
+                    continue
+                tag_entity_id_field = cast("str", type_config["tag_entity_id_field"])
+                type_tags = self._load_tags_for_entities(
+                    session,
+                    tenant_id,
+                    type_config["tag_model"],
+                    tag_entity_id_field,
+                    entity_ids,
+                )
+                tags_map[entity_type] = type_tags
+
+            results: list[SearchResultItem] = []
+            for row in rows:
+                entity_type = row.entity_type
+                entity_id = row.entity_id
+                name = row.entity_name
+                description = row.entity_description
+                sub_type = row.sub_type
+
+                match_field = "name" if query.lower() in (name or "").lower() else "description"
+                entity_tags = tags_map.get(entity_type, {}).get(entity_id, [])
+
+                results.append(
+                    SearchResultItem(
+                        type=entity_type,
+                        id=entity_id,
+                        name=name,
+                        description=description,
+                        match_field=match_field,
+                        is_active=None,
+                        tags=entity_tags,
+                        sub_type=sub_type,
+                    )
+                )
 
         return SearchResponse(
-            results=all_results,
-            total=len(all_results),
+            results=results,
+            total=total,
             query=query,
         )

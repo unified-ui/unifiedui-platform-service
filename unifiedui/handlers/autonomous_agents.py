@@ -642,6 +642,132 @@ class AutonomousAgentHandler:
                             extra={"autonomous_agent_id": autonomous_agent_id},
                         )
 
+    def duplicate_autonomous_agent(
+        self, tenant_id: str, autonomous_agent_id: str, user_id: str, user: ContextIdentityUser
+    ) -> AutonomousAgentResponse:
+        """
+        Duplicate an existing autonomous agent.
+
+        Creates an exact copy with name + " Copy" (or " Copy(n)" if exists).
+        New API keys are generated for the duplicate. Tags are NOT copied.
+
+        Args:
+            tenant_id: The ID of the tenant
+            autonomous_agent_id: The ID of the autonomous agent to duplicate
+            user_id: The ID of the user performing the duplication
+            user: The authenticated user context
+
+        Returns:
+            The newly created autonomous agent response
+
+        Raises:
+            AutonomousAgentNotFoundError: If source agent not found
+        """
+        logger.info(
+            "Duplicating autonomous agent", extra={"tenant_id": tenant_id, "autonomous_agent_id": autonomous_agent_id}
+        )
+
+        with self.db_client.get_session() as session:
+            query = select(AutonomousAgent).where(
+                AutonomousAgent.id == autonomous_agent_id, AutonomousAgent.tenant_id == tenant_id
+            )
+            source_agent = session.execute(query).scalar_one_or_none()
+            if not source_agent:
+                raise AutonomousAgentNotFoundError(autonomous_agent_id)
+
+            new_name = self._generate_copy_name(session, tenant_id, source_agent.name)
+            new_agent_id = str(uuid.uuid4())
+
+            primary_key = self._generate_api_key()
+            secondary_key = self._generate_api_key()
+            primary_key_vault_uri = None
+            secondary_key_vault_uri = None
+
+            if self.vault_client:
+                try:
+                    primary_key_vault_uri = self.vault_client.store_secret(
+                        key=f"{tenant_id}/autonomous-agents/{new_agent_id}/primary-key",
+                        value=primary_key,
+                        metadata={
+                            "tenant_id": tenant_id,
+                            "autonomous_agent_id": new_agent_id,
+                            "key_type": "primary",
+                        },
+                    )
+                    secondary_key_vault_uri = self.vault_client.store_secret(
+                        key=f"{tenant_id}/autonomous-agents/{new_agent_id}/secondary-key",
+                        value=secondary_key,
+                        metadata={
+                            "tenant_id": tenant_id,
+                            "autonomous_agent_id": new_agent_id,
+                            "key_type": "secondary",
+                        },
+                    )
+                except Exception as e:
+                    logger.error("Failed to store API keys in vault for duplicated agent: %s", e)
+                    raise
+
+            new_agent = AutonomousAgent(
+                id=new_agent_id,
+                tenant_id=tenant_id,
+                name=new_name,
+                description=source_agent.description,
+                type=source_agent.type,
+                config=source_agent.config.copy() if source_agent.config else {},
+                is_active=source_agent.is_active,
+                allow_api_keys=source_agent.allow_api_keys,
+                primary_key_vault_uri=primary_key_vault_uri,
+                secondary_key_vault_uri=secondary_key_vault_uri,
+                created_by=user_id,
+                updated_by=user_id,
+            )
+            session.add(new_agent)
+
+            self.permissions_handler.add_creator_permission(
+                session=session,
+                resource_type="autonomous_agent",
+                tenant_id=tenant_id,
+                resource_id=new_agent_id,
+                user_id=user_id,
+                user=user,
+            )
+
+            session.commit()
+            session.refresh(new_agent)
+
+            logger.info(
+                "Autonomous agent duplicated",
+                extra={"source_id": autonomous_agent_id, "new_id": new_agent_id, "new_name": new_name},
+            )
+            self._invalidate_list_cache(tenant_id)
+            return self._model_to_response(new_agent)
+
+    def _generate_copy_name(self, session: Session, tenant_id: str, original_name: str) -> str:
+        """
+        Generate a unique copy name for duplicated resources.
+
+        Args:
+            session: SQLAlchemy session
+            tenant_id: The tenant ID
+            original_name: The original resource name
+
+        Returns:
+            A unique name like "Original Copy" or "Original Copy(2)"
+        """
+        from sqlalchemy import func
+
+        base_name = f"{original_name} Copy"
+        query = (
+            select(func.count())
+            .select_from(AutonomousAgent)
+            .where(AutonomousAgent.tenant_id == tenant_id, AutonomousAgent.name.like(f"{original_name} Copy%"))
+        )
+        count = session.execute(query).scalar() or 0
+
+        if count == 0:
+            return base_name
+        return f"{base_name}({count + 1})"
+
     def _invalidate_list_cache(self, tenant_id: str) -> None:
         """Invalidate all list caches for a tenant."""
         self._cache.invalidate_list(tenant_id)

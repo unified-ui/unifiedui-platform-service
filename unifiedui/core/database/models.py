@@ -903,6 +903,37 @@ class ChatWidgetUserFavorite(Base, AuditMixin):
     )
 
 
+class ExternalAppUserFavorite(Base, AuditMixin):
+    """User favorites for external apps."""
+
+    __tablename__ = "external_app_user_favorites"
+
+    tenant_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False, primary_key=True
+    )
+    user_id: Mapped[str] = mapped_column(String(50), nullable=False, primary_key=True)
+    external_app_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("external_apps.id", ondelete="CASCADE"), nullable=False, primary_key=True
+    )
+
+    external_app: Mapped[ExternalApp] = relationship(back_populates="user_favorites")
+    principal: Mapped[Principal] = relationship(
+        foreign_keys="[ExternalAppUserFavorite.tenant_id, ExternalAppUserFavorite.user_id]",
+        primaryjoin="and_(ExternalAppUserFavorite.tenant_id == Principal.tenant_id, ExternalAppUserFavorite.user_id == Principal.principal_id)",
+    )
+
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["tenant_id", "user_id"],
+            ["principals.tenant_id", "principals.principal_id"],
+            ondelete="CASCADE",
+            name="fk_external_app_user_favorites_principal",
+        ),
+        Index("ix_eauf_user", "user_id"),
+        Index("ix_eauf_external_app", "external_app_id"),
+    )
+
+
 # ---------- Tools (ReACT Agent Tools) ----------
 class Tool(Base, IdNameDescriptionMixin, TenantScopedMixin):
     """Tool entity for ReACT agent tools (MCP servers, OpenAPI definitions)."""
@@ -961,6 +992,9 @@ class ExternalApp(Base, IdNameDescriptionMixin, TenantScopedMixin):
 
     members: Mapped[list[ExternalAppMember]] = relationship(back_populates="external_app", cascade="all, delete-orphan")
     tags: Mapped[list[ExternalAppTag]] = relationship(back_populates="external_app", cascade="all, delete-orphan")
+    user_favorites: Mapped[list[ExternalAppUserFavorite]] = relationship(
+        back_populates="external_app", cascade="all, delete-orphan"
+    )
 
     __table_args__ = (
         UniqueConstraint("tenant_id", "name", name="uq_external_app_tenant_name"),

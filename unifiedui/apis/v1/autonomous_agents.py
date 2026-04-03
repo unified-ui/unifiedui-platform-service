@@ -340,6 +340,67 @@ async def delete_autonomous_agent(
         )
 
 
+@router.post(
+    "/{autonomous_agent_id}/duplicate",
+    response_model=AutonomousAgentResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Duplicate autonomous agent",
+    description="Create an exact copy of an autonomous agent with name + ' Copy'",
+)
+@authenticate()
+@check_permissions(
+    entity="autonomous_agent",
+    required_permissions=[
+        TenantRolesEnum.TENANT_GLOBAL_ADMIN,
+        TenantRolesEnum.AUTONOMOUS_AGENTS_ADMIN,
+        TenantRolesEnum.AUTONOMOUS_AGENTS_CREATOR,
+        PermissionActionEnum.ADMIN,
+        PermissionActionEnum.WRITE,
+    ],
+)
+async def duplicate_autonomous_agent(
+    request: Request,
+    tenant_id: str,
+    autonomous_agent_id: str,
+    handler: AutonomousAgentHandler = Depends(get_autonomous_agent_handler),
+) -> AutonomousAgentResponse:
+    """
+    Duplicate an autonomous agent.
+
+    Creates an exact copy of the autonomous agent with name + " Copy".
+    New API keys are generated for the duplicate.
+    Requires WRITE permission or higher, or AUTONOMOUS_AGENTS_CREATOR on tenant.
+
+    Args:
+        request: FastAPI request with user in state
+        tenant_id: Tenant ID from path
+        autonomous_agent_id: Autonomous agent ID to duplicate
+
+    Returns:
+        The newly created autonomous agent
+    """
+    try:
+        user: ContextIdentityUser = request.state.user
+        logger.info(
+            "API: Duplicate autonomous agent",
+            extra={
+                "tenant_id": tenant_id,
+                "autonomous_agent_id": autonomous_agent_id,
+                "user_id": user.identity.get_id(),
+            },
+        )
+        return handler.duplicate_autonomous_agent(
+            tenant_id=tenant_id, autonomous_agent_id=autonomous_agent_id, user_id=user.identity.get_id(), user=user
+        )
+    except AutonomousAgentNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except Exception as e:
+        logger.error("Failed to duplicate autonomous agent: %s", e, exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to duplicate autonomous agent: {e!s}"
+        )
+
+
 # ========== Autonomous Agent Permission Endpoints ==========
 
 

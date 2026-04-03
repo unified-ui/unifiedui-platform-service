@@ -455,6 +455,97 @@ class ChatWidgetHandler:
             self._invalidate_detail_cache(tenant_id, chat_widget_id)
             self._invalidate_permissions_cache(tenant_id, chat_widget_id)
 
+    def duplicate_chat_widget(
+        self, tenant_id: str, chat_widget_id: str, user_id: str, user: ContextIdentityUser
+    ) -> ChatWidgetResponse:
+        """
+        Duplicate an existing chat widget.
+
+        Creates an exact copy with name + " Copy" (or " Copy(n)" if exists).
+        Tags are NOT copied.
+
+        Args:
+            tenant_id: The ID of the tenant
+            chat_widget_id: The ID of the chat widget to duplicate
+            user_id: The ID of the user performing the duplication
+            user: The authenticated user context
+
+        Returns:
+            The newly created chat widget response
+
+        Raises:
+            ChatWidgetNotFoundError: If source widget not found
+        """
+
+        logger.info("Duplicating chat widget", extra={"tenant_id": tenant_id, "chat_widget_id": chat_widget_id})
+
+        with self.db_client.get_session() as session:
+            query = select(ChatWidget).where(ChatWidget.id == chat_widget_id, ChatWidget.tenant_id == tenant_id)
+            source_widget = session.execute(query).scalar_one_or_none()
+            if not source_widget:
+                raise ChatWidgetNotFoundError(chat_widget_id)
+
+            new_name = self._generate_copy_name(session, tenant_id, source_widget.name)
+            new_widget_id = str(uuid.uuid4())
+
+            new_widget = ChatWidget(
+                id=new_widget_id,
+                tenant_id=tenant_id,
+                name=new_name,
+                description=source_widget.description,
+                type=source_widget.type,
+                config=source_widget.config.copy() if source_widget.config else {},
+                is_active=source_widget.is_active,
+                created_by=user_id,
+                updated_by=user_id,
+            )
+            session.add(new_widget)
+
+            self.permissions_handler.add_creator_permission(
+                session=session,
+                resource_type="chat_widget",
+                tenant_id=tenant_id,
+                resource_id=new_widget_id,
+                user_id=user_id,
+                user=user,
+            )
+
+            session.commit()
+            session.refresh(new_widget)
+
+            logger.info(
+                "Chat widget duplicated",
+                extra={"source_id": chat_widget_id, "new_id": new_widget_id, "new_name": new_name},
+            )
+            self._invalidate_list_cache(tenant_id)
+            return self._model_to_response(new_widget)
+
+    def _generate_copy_name(self, session: Session, tenant_id: str, original_name: str) -> str:
+        """
+        Generate a unique copy name for duplicated resources.
+
+        Args:
+            session: SQLAlchemy session
+            tenant_id: The tenant ID
+            original_name: The original resource name
+
+        Returns:
+            A unique name like "Original Copy" or "Original Copy(2)"
+        """
+        from sqlalchemy import func
+
+        base_name = f"{original_name} Copy"
+        query = (
+            select(func.count())
+            .select_from(ChatWidget)
+            .where(ChatWidget.tenant_id == tenant_id, ChatWidget.name.like(f"{original_name} Copy%"))
+        )
+        count = session.execute(query).scalar() or 0
+
+        if count == 0:
+            return base_name
+        return f"{base_name}({count + 1})"
+
     def _invalidate_list_cache(self, tenant_id: str) -> None:
         """Invalidate list cache for a tenant."""
         self._cache.invalidate_list(tenant_id)

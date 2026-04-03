@@ -169,20 +169,14 @@ async def create_chat_agent(
     Returns:
         Created chat agent
     """
-    try:
-        user: ContextIdentityUser = request.state.user
-        logger.info(
-            "API: Create chat agent",
-            extra={"tenant_id": tenant_id, "user_id": user.identity.get_id(), "app_name": create_request.name},
-        )
-        return handler.create_chat_agent(
-            tenant_id=tenant_id, request=create_request, user_id=user.identity.get_id(), user=user
-        )
-    except Exception as e:
-        logger.error("Failed to create chat agent: %s", e)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to create chat agent: {e!s}"
-        )
+    user: ContextIdentityUser = request.state.user
+    logger.info(
+        "API: Create chat agent",
+        extra={"tenant_id": tenant_id, "user_id": user.identity.get_id(), "app_name": create_request.name},
+    )
+    return handler.create_chat_agent(
+        tenant_id=tenant_id, request=create_request, user_id=user.identity.get_id(), user=user
+    )
 
 
 @router.get(
@@ -277,27 +271,15 @@ async def update_chat_agent(
 
     Returns:
         Updated chat agent
-
-    Raises:
-        HTTPException: If chat agent not found or update fails
     """
-    try:
-        user: ContextIdentityUser = request.state.user
-        logger.info(
-            "API: Update chat agent",
-            extra={"tenant_id": tenant_id, "chat_agent_id": chat_agent_id, "user_id": user.identity.get_id()},
-        )
-        return handler.update_chat_agent(
-            tenant_id=tenant_id, chat_agent_id=chat_agent_id, request=update_request, user_id=user.identity.get_id()
-        )
-    except ChatAgentNotFoundError as e:
-        logger.warning("Chat agent not found: %s", e)
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
-    except Exception as e:
-        logger.error("Failed to update chat agent: %s", e)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to update chat agent: {e!s}"
-        )
+    user: ContextIdentityUser = request.state.user
+    logger.info(
+        "API: Update chat agent",
+        extra={"tenant_id": tenant_id, "chat_agent_id": chat_agent_id, "user_id": user.identity.get_id()},
+    )
+    return handler.update_chat_agent(
+        tenant_id=tenant_id, chat_agent_id=chat_agent_id, request=update_request, user_id=user.identity.get_id()
+    )
 
 
 @router.delete(
@@ -347,6 +329,60 @@ async def delete_chat_agent(
     except Exception as e:
         logger.error("Failed to delete chat agent: %s", e)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to delete chat agent")
+
+
+@router.post(
+    "/{chat_agent_id}/duplicate",
+    response_model=ChatAgentResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Duplicate chat agent",
+    description="Create an exact copy of a chat agent with name + ' Copy'",
+)
+@authenticate()
+@check_permissions(
+    entity="chat_agent",
+    required_permissions=[
+        TenantRolesEnum.TENANT_GLOBAL_ADMIN,
+        TenantRolesEnum.CHAT_AGENTS_ADMIN,
+        TenantRolesEnum.CHAT_AGENTS_CREATOR,
+        PermissionActionEnum.ADMIN,
+        PermissionActionEnum.WRITE,
+    ],
+)
+async def duplicate_chat_agent(
+    request: Request, tenant_id: str, chat_agent_id: str, handler: ChatAgentHandler = Depends(get_chat_agent_handler)
+) -> ChatAgentResponse:
+    """
+    Duplicate a chat agent.
+
+    Creates an exact copy of the chat agent with name + " Copy".
+    Requires WRITE permission or higher on the chat agent, or CHAT_AGENTS_CREATOR on tenant.
+
+    Args:
+        request: FastAPI request with user in state
+        tenant_id: Tenant ID from path
+        chat_agent_id: Chat agent ID to duplicate
+
+    Returns:
+        The newly created chat agent
+    """
+    try:
+        user: ContextIdentityUser = request.state.user
+        logger.info(
+            "API: Duplicate chat agent",
+            extra={"tenant_id": tenant_id, "chat_agent_id": chat_agent_id, "user_id": user.identity.get_id()},
+        )
+        return handler.duplicate_chat_agent(
+            tenant_id=tenant_id, chat_agent_id=chat_agent_id, user_id=user.identity.get_id(), user=user
+        )
+    except ChatAgentNotFoundError as e:
+        logger.warning("Chat agent not found: %s", e)
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except Exception as e:
+        logger.error("Failed to duplicate chat agent: %s", e)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to duplicate chat agent: {e!s}"
+        )
 
 
 # ========== Chat Agent Config Endpoint (for Agent Service) ==========

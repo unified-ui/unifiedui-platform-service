@@ -533,6 +533,129 @@ class ChatAgentHandler:
             self._invalidate_detail_cache(tenant_id, chat_agent_id)
             self._invalidate_permissions_cache(tenant_id, chat_agent_id)
 
+    def duplicate_chat_agent(
+        self, tenant_id: str, chat_agent_id: str, user_id: str, user: ContextIdentityUser
+    ) -> ChatAgentResponse:
+        """
+        Duplicate an existing chat agent.
+
+        Creates an exact copy of the chat agent with name + " Copy" (or " Copy(n)" if exists).
+        Tags and ReACT agent versions are NOT copied.
+
+        Args:
+            tenant_id: The ID of the tenant
+            chat_agent_id: The ID of the chat agent to duplicate
+            user_id: The ID of the user performing the duplication
+            user: The authenticated user context
+
+        Returns:
+            The newly created chat agent response
+
+        Raises:
+            ChatAgentNotFoundError: If the source chat agent is not found
+        """
+        logger.info("Duplicating chat agent", extra={"tenant_id": tenant_id, "chat_agent_id": chat_agent_id})
+
+        with self.db_client.get_session() as session:
+            query = (
+                select(ChatAgent)
+                .options(selectinload(ChatAgent.versions))
+                .where(ChatAgent.id == chat_agent_id, ChatAgent.tenant_id == tenant_id)
+            )
+            source_agent = session.execute(query).scalar_one_or_none()
+            if not source_agent:
+                raise ChatAgentNotFoundError(chat_agent_id)
+
+            new_name = self._generate_copy_name(session, tenant_id, source_agent.name)
+            new_agent_id = str(uuid.uuid4())
+            new_agent = ChatAgent(
+                id=new_agent_id,
+                tenant_id=tenant_id,
+                name=new_name,
+                description=source_agent.description,
+                type=source_agent.type,
+                config=source_agent.config.copy() if source_agent.config else {},
+                is_active=source_agent.is_active,
+                embed_allowed_origins=source_agent.embed_allowed_origins,
+                greeting_messages=source_agent.greeting_messages.copy() if source_agent.greeting_messages else [],
+                created_by=user_id,
+                updated_by=user_id,
+            )
+            session.add(new_agent)
+
+            if source_agent.type == ChatAgentTypeEnum.REACT_AGENT.value and source_agent.versions:
+                latest_version = max(source_agent.versions, key=lambda v: v.version)
+                new_version = ReActAgentVersion(
+                    id=str(uuid.uuid4()),
+                    chat_agent_id=new_agent_id,
+                    version=1,
+                    ai_model_ids=latest_version.ai_model_ids.copy() if latest_version.ai_model_ids else [],
+                    system_prompt=latest_version.system_prompt,
+                    tool_ids=latest_version.tool_ids.copy() if latest_version.tool_ids else [],
+                    security_prompt=latest_version.security_prompt,
+                    tool_use_prompt=latest_version.tool_use_prompt,
+                    response_prompt=latest_version.response_prompt,
+                    greeting_messages=latest_version.greeting_messages.copy()
+                    if latest_version.greeting_messages
+                    else [],
+                    config=latest_version.config.copy() if latest_version.config else {},
+                    created_by=user_id,
+                    updated_by=user_id,
+                )
+                session.add(new_version)
+
+            self.permissions_handler.add_creator_permission(
+                session=session,
+                resource_type="chat_agent",
+                tenant_id=tenant_id,
+                resource_id=new_agent_id,
+                user_id=user_id,
+                user=user,
+            )
+
+            session.commit()
+
+            query = (
+                select(ChatAgent)
+                .options(
+                    selectinload(ChatAgent.tags).selectinload(ChatAgentTag.tag),
+                    selectinload(ChatAgent.versions),
+                )
+                .where(ChatAgent.id == new_agent_id)
+            )
+            new_agent = session.execute(query).scalar_one()
+
+            logger.info(
+                "Chat agent duplicated",
+                extra={"source_id": chat_agent_id, "new_id": new_agent_id, "new_name": new_name},
+            )
+            self._invalidate_list_cache(tenant_id)
+            return self._model_to_response(new_agent)
+
+    def _generate_copy_name(self, session: Session, tenant_id: str, original_name: str) -> str:
+        """
+        Generate a unique copy name for duplicated resources.
+
+        Args:
+            session: SQLAlchemy session
+            tenant_id: The tenant ID
+            original_name: The original resource name
+
+        Returns:
+            A unique name like "Original Copy" or "Original Copy(2)"
+        """
+        base_name = f"{original_name} Copy"
+        query = (
+            select(func.count())
+            .select_from(ChatAgent)
+            .where(ChatAgent.tenant_id == tenant_id, ChatAgent.name.like(f"{original_name} Copy%"))
+        )
+        count = session.execute(query).scalar() or 0
+
+        if count == 0:
+            return base_name
+        return f"{base_name}({count + 1})"
+
     def get_chat_agent_config(
         self, tenant_id: str, chat_agent_id: str, user: ContextIdentityUser, credential_handler
     ) -> ChatAgentConfigResponse:

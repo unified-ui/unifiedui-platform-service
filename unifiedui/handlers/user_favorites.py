@@ -5,15 +5,27 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, cast
 
 from sqlalchemy import delete, select
+from sqlalchemy.orm import joinedload
 
 from unifiedui.core.database.models import (
+    AutonomousAgent,
     AutonomousAgentUserFavorite,
+    ChatAgent,
     ChatAgentUserFavorite,
+    ChatWidget,
     ChatWidgetUserFavorite,
+    Conversation,
     ConversationUserFavorite,
+    ExternalApp,
+    ExternalAppUserFavorite,
 )
 from unifiedui.logger import get_logger
-from unifiedui.schema.responses.user_favorites import UserFavoriteResponse, UserFavoritesListResponse
+from unifiedui.schema.responses.user_favorites import (
+    UserFavoriteResponse,
+    UserFavoritesListResponse,
+    UserFavoritesUnifiedResponse,
+    UserFavoriteWithNameResponse,
+)
 
 if TYPE_CHECKING:
     from unifiedui.caching.client import CacheClient
@@ -23,22 +35,36 @@ logger = get_logger(__name__)
 
 
 # Mapping of resource types to their models and ID fields
-RESOURCE_FAVORITE_MAPPING = {
+RESOURCE_FAVORITE_MAPPING: dict[str, dict[str, Any]] = {
     "chat-agents": {
         "model": ChatAgentUserFavorite,
         "id_field": "chat_agent_id",
+        "relationship": "chat_agent",
+        "resource_model": ChatAgent,
     },
     "autonomous-agents": {
         "model": AutonomousAgentUserFavorite,
         "id_field": "autonomous_agent_id",
+        "relationship": "autonomous_agent",
+        "resource_model": AutonomousAgent,
     },
     "chat-widgets": {
         "model": ChatWidgetUserFavorite,
         "id_field": "chat_widget_id",
+        "relationship": "chat_widget",
+        "resource_model": ChatWidget,
     },
     "conversations": {
         "model": ConversationUserFavorite,
         "id_field": "conversation_id",
+        "relationship": "conversation",
+        "resource_model": Conversation,
+    },
+    "external-apps": {
+        "model": ExternalAppUserFavorite,
+        "id_field": "external_app_id",
+        "relationship": "external_app",
+        "resource_model": ExternalApp,
     },
 }
 
@@ -130,6 +156,86 @@ class UserFavoritesHandler:
                     logger.warning("Failed to cache user favorites: %s", e)
 
             return result
+
+    def list_all_favorites_with_names(
+        self, tenant_id: str, user_id: str, use_cache: bool = True
+    ) -> UserFavoritesUnifiedResponse:
+        """
+        Get all user favorites across all resource types with resource names.
+
+        Args:
+            tenant_id: The ID of the tenant
+            user_id: The ID of the user
+            use_cache: Whether to use caching
+
+        Returns:
+            Unified list of all user favorites with resource names
+        """
+        logger.info(
+            "Listing all user favorites with names",
+            extra={"tenant_id": tenant_id, "user_id": user_id},
+        )
+
+        cache_key = f"user_favorites:all:tenant:{tenant_id}:user:{user_id}"
+
+        # Check cache
+        if use_cache and self.cache_client:
+            try:
+                cached_data = self.cache_client.client.get(cache_key)
+                if cached_data is not None:
+                    logger.debug("Returning cached unified user favorites")
+                    return UserFavoritesUnifiedResponse(
+                        favorites=[UserFavoriteWithNameResponse(**item) for item in cached_data["favorites"]]
+                    )
+            except Exception as e:
+                logger.warning("Failed to get cached unified user favorites: %s", e)
+
+        all_favorites: list[UserFavoriteWithNameResponse] = []
+
+        with self.db_client.get_session() as session:
+            for resource_type, mapping in RESOURCE_FAVORITE_MAPPING.items():
+                model: type[Any] = cast("type[Any]", mapping["model"])
+                id_field: str = cast("str", mapping["id_field"])
+                relationship: str = cast("str", mapping["relationship"])
+
+                # Query with eager loading of the relationship
+                query = (
+                    select(model)
+                    .options(joinedload(getattr(model, relationship)))
+                    .where(model.tenant_id == tenant_id, model.user_id == user_id)
+                )
+                favorites = session.execute(query).scalars().all()
+
+                for fav in favorites:
+                    resource = getattr(fav, relationship)
+                    resource_name = getattr(resource, "name", None) if resource else None
+
+                    # Handle Conversation which uses 'title' instead of 'name'
+                    if resource_name is None and resource is not None:
+                        resource_name = getattr(resource, "title", None)
+
+                    all_favorites.append(
+                        UserFavoriteWithNameResponse(
+                            resource_id=getattr(fav, id_field),
+                            resource_type=resource_type,
+                            resource_name=resource_name or "Unknown",
+                        )
+                    )
+
+        logger.info("Retrieved all user favorites with names", extra={"count": len(all_favorites)})
+
+        result = UserFavoritesUnifiedResponse(favorites=all_favorites)
+
+        # Cache the result
+        if use_cache and self.cache_client:
+            try:
+                data = {"favorites": [f.model_dump() for f in all_favorites]}
+                self.cache_client.client.set(cache_key, data, ttl=300)
+                logger.debug("Cached unified user favorites")
+            except Exception as e:
+                logger.warning("Failed to cache unified user favorites: %s", e)
+
+        return result
 
     def add_user_favorite(
         self, tenant_id: str, user_id: str, resource_type: str, resource_id: str
@@ -249,11 +355,13 @@ class UserFavoritesHandler:
             self._invalidate_cache(tenant_id, user_id, resource_type)
 
     def _invalidate_cache(self, tenant_id: str, user_id: str, resource_type: str) -> None:
-        """Invalidate the user favorites cache."""
+        """Invalidate the user favorites cache for both specific and unified views."""
         if self.cache_client:
             cache_key = f"user_favorites:{resource_type}:tenant:{tenant_id}:user:{user_id}"
+            unified_cache_key = f"user_favorites:all:tenant:{tenant_id}:user:{user_id}"
             try:
                 self.cache_client.client.delete(cache_key)
+                self.cache_client.client.delete(unified_cache_key)
                 logger.debug("Invalidated user favorites cache")
             except Exception as e:
                 logger.warning("Failed to invalidate user favorites cache: %s", e)

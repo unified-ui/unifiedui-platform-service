@@ -327,6 +327,60 @@ async def delete_chat_widget(
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to delete chat widget")
 
 
+@router.post(
+    "/{chat_widget_id}/duplicate",
+    response_model=ChatWidgetResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Duplicate chat widget",
+    description="Create an exact copy of a chat widget with name + ' Copy'",
+)
+@authenticate()
+@check_permissions(
+    entity="chat_widget",
+    required_permissions=[
+        TenantRolesEnum.TENANT_GLOBAL_ADMIN,
+        TenantRolesEnum.CHAT_WIDGETS_ADMIN,
+        TenantRolesEnum.CHAT_WIDGETS_CREATOR,
+        PermissionActionEnum.ADMIN,
+        PermissionActionEnum.WRITE,
+    ],
+)
+async def duplicate_chat_widget(
+    request: Request, tenant_id: str, chat_widget_id: str, handler: ChatWidgetHandler = Depends(get_chat_widget_handler)
+) -> ChatWidgetResponse:
+    """
+    Duplicate a chat widget.
+
+    Creates an exact copy of the chat widget with name + " Copy".
+    Requires WRITE permission or higher, or CHAT_WIDGETS_CREATOR on tenant.
+
+    Args:
+        request: FastAPI request with user in state
+        tenant_id: Tenant ID from path
+        chat_widget_id: Chat widget ID to duplicate
+
+    Returns:
+        The newly created chat widget
+    """
+    try:
+        user: ContextIdentityUser = request.state.user
+        logger.info(
+            "API: Duplicate chat widget",
+            extra={"tenant_id": tenant_id, "chat_widget_id": chat_widget_id, "user_id": user.identity.get_id()},
+        )
+        return handler.duplicate_chat_widget(
+            tenant_id=tenant_id, chat_widget_id=chat_widget_id, user_id=user.identity.get_id(), user=user
+        )
+    except ChatWidgetNotFoundError as e:
+        logger.warning("Chat widget not found: %s", e)
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except Exception as e:
+        logger.error("Failed to duplicate chat widget: %s", e)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to duplicate chat widget: {e!s}"
+        )
+
+
 # ========== Chat Widget Permission Endpoints ==========
 
 
