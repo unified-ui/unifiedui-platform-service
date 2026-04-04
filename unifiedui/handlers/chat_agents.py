@@ -5,11 +5,17 @@ from __future__ import annotations
 import uuid
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import selectinload
 
 from unifiedui.core.database.enums import ChatAgentTypeEnum, PermissionActionEnum
-from unifiedui.core.database.models import ChatAgent, ChatAgentMember, ChatAgentTag, ReActAgentVersion
+from unifiedui.core.database.models import (
+    ChatAgent,
+    ChatAgentMember,
+    ChatAgentTag,
+    ReActAgentVersion,
+    RecentVisit,
+)
 from unifiedui.handlers.cache_utils import ResourceCacheInvalidator
 from unifiedui.handlers.permission_resolver import (
     check_is_admin,
@@ -524,6 +530,16 @@ class ChatAgentHandler:
                 raise ChatAgentNotFoundError(chat_agent_id)
 
             session.delete(chat_agent)
+
+            # Clean up recent visits for this resource
+            session.execute(
+                delete(RecentVisit).where(
+                    RecentVisit.tenant_id == tenant_id,
+                    RecentVisit.resource_type == "chat_agent",
+                    RecentVisit.resource_id == chat_agent_id,
+                )
+            )
+
             session.commit()
 
             logger.info("Chat agent deleted", extra={"chat_agent_id": chat_agent_id})

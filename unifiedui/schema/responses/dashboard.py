@@ -17,3 +17,4 @@ class DashboardStatsResponse(BaseModel):
     chat_agents: EntityStatsResponse
     workflows: EntityStatsResponse
     conversations: EntityStatsResponse
+    external_apps: EntityStatsResponse

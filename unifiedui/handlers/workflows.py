@@ -6,11 +6,11 @@ import secrets
 import uuid
 from typing import TYPE_CHECKING
 
-from sqlalchemy import or_, select
+from sqlalchemy import delete, or_, select
 from sqlalchemy.orm import selectinload
 
 from unifiedui.core.database.enums import PermissionActionEnum, PrincipalTypeEnum, WorkflowTypeEnum
-from unifiedui.core.database.models import Workflow, WorkflowMember, WorkflowTag
+from unifiedui.core.database.models import RecentVisit, Workflow, WorkflowMember, WorkflowTag
 from unifiedui.handlers.cache_utils import ResourceCacheInvalidator
 from unifiedui.handlers.permission_resolver import (
     check_is_admin,
@@ -597,6 +597,16 @@ class WorkflowHandler:
             self._cascade_delete_workflow_data(tenant_id, workflow_id, workflow)
 
             session.delete(workflow)
+
+            # Clean up recent visits for this resource
+            session.execute(
+                delete(RecentVisit).where(
+                    RecentVisit.tenant_id == tenant_id,
+                    RecentVisit.resource_type == "workflow",
+                    RecentVisit.resource_id == workflow_id,
+                )
+            )
+
             session.commit()
 
             # Invalidate caches

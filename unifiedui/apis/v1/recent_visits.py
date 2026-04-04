@@ -26,6 +26,10 @@ async def list_recent_visits(
     tenant_id: str,
     user_id: str,
     limit: int = Query(20, ge=1, le=50, description="Max results"),
+    resource_type: str | None = Query(
+        None,
+        description="Filter by resource type(s), comma-separated (e.g. chat_agent,workflow)",
+    ),
     handler: RecentVisitsHandler = Depends(get_recent_visits_handler),
 ):
     """List recent visits for a user."""
@@ -34,10 +38,16 @@ async def list_recent_visits(
         actual_user_id = user.identity.get_id()
         if user_id != actual_user_id:
             raise HTTPException(status_code=403, detail="Cannot access other user's visits")
+
+        resource_types = None
+        if resource_type:
+            resource_types = [rt.strip() for rt in resource_type.split(",") if rt.strip()]
+
         return handler.list_recent_visits(
             tenant_id=tenant_id,
             user_id=actual_user_id,
             limit=limit,
+            resource_types=resource_types,
         )
     except HTTPException:
         raise

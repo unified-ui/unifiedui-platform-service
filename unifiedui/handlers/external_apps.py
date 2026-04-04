@@ -5,12 +5,12 @@ from __future__ import annotations
 import uuid
 from typing import TYPE_CHECKING
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import selectinload
 
 from unifiedui.core.database.enums import PermissionActionEnum, PrincipalTypeEnum
-from unifiedui.core.database.models import ExternalApp, ExternalAppMember, ExternalAppTag
+from unifiedui.core.database.models import ExternalApp, ExternalAppMember, ExternalAppTag, RecentVisit
 from unifiedui.handlers.cache_utils import ResourceCacheInvalidator
 from unifiedui.handlers.permission_resolver import (
     check_is_admin,
@@ -414,6 +414,16 @@ class ExternalAppHandler:
                 raise ExternalAppNotFoundError(external_app_id)
 
             session.delete(external_app)
+
+            # Clean up recent visits for this resource
+            session.execute(
+                delete(RecentVisit).where(
+                    RecentVisit.tenant_id == tenant_id,
+                    RecentVisit.resource_type == "external_app",
+                    RecentVisit.resource_id == external_app_id,
+                )
+            )
+
             session.commit()
 
             logger.info("External app deleted", extra={"external_app_id": external_app_id})

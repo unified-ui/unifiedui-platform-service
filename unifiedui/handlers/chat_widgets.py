@@ -5,11 +5,11 @@ from __future__ import annotations
 import uuid
 from typing import TYPE_CHECKING
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import selectinload
 
 from unifiedui.core.database.enums import PermissionActionEnum, PrincipalTypeEnum
-from unifiedui.core.database.models import ChatWidget, ChatWidgetMember, ChatWidgetTag
+from unifiedui.core.database.models import ChatWidget, ChatWidgetMember, ChatWidgetTag, RecentVisit
 from unifiedui.handlers.cache_utils import ResourceCacheInvalidator
 from unifiedui.handlers.permission_resolver import (
     check_is_admin,
@@ -446,6 +446,16 @@ class ChatWidgetHandler:
                 raise ChatWidgetNotFoundError(chat_widget_id)
 
             session.delete(chat_widget)
+
+            # Clean up recent visits for this resource
+            session.execute(
+                delete(RecentVisit).where(
+                    RecentVisit.tenant_id == tenant_id,
+                    RecentVisit.resource_type == "chat_widget",
+                    RecentVisit.resource_id == chat_widget_id,
+                )
+            )
+
             session.commit()
 
             logger.info("Chat widget deleted", extra={"chat_widget_id": chat_widget_id})

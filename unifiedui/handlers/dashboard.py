@@ -12,6 +12,8 @@ from unifiedui.core.database.models import (
     ChatAgentMember,
     Conversation,
     ConversationMember,
+    ExternalApp,
+    ExternalAppMember,
     Workflow,
     WorkflowMember,
 )
@@ -187,10 +189,21 @@ class DashboardHandler:
             has_active_field=False,
         )
 
+        external_apps = self._count_entity_with_permissions(
+            tenant_id=tenant_id,
+            user=user,
+            entity_model=ExternalApp,
+            member_model=ExternalAppMember,
+            entity_id_field="external_app_id",
+            is_admin=is_admin,
+            has_active_field=False,
+        )
+
         result = DashboardStatsResponse(
             chat_agents=chat_agents,
             workflows=workflows,
             conversations=conversations,
+            external_apps=external_apps,
         )
 
         if self.cache_client:
