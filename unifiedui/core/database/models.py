@@ -23,7 +23,6 @@ from sqlalchemy.types import JSON, TypeDecorator
 from unifiedui.core.database.enums import (
     AIModelProviderEnum,
     AIModelTypeEnum,
-    AutonomousAgentTypeEnum,
     ChatAgentTypeEnum,
     EnvironmentTypeEnum,
     FileContextTypeEnum,
@@ -31,6 +30,7 @@ from unifiedui.core.database.enums import (
     PermissionActionEnum,
     PrincipalTypeEnum,
     TenantRolesEnum,
+    WorkflowTypeEnum,
 )
 
 
@@ -97,9 +97,9 @@ ChatAgentTypeSAEnum = SAEnum(
     validate_strings=True,
 )
 
-AutonomousAgentTypeSAEnum = SAEnum(
-    *AutonomousAgentTypeEnum.all(),
-    name="autonomous_agent_type",
+WorkflowTypeSAEnum = SAEnum(
+    *WorkflowTypeEnum.all(),
+    name="workflow_type",
     native_enum=False,
     create_constraint=True,
     validate_strings=True,
@@ -421,10 +421,12 @@ class Conversation(Base, IdNameDescriptionMixin, TenantScopedMixin):
     )
 
 
-class AutonomousAgent(Base, IdNameDescriptionMixin, TenantScopedMixin):
-    __tablename__ = "autonomous_agents"
+class Workflow(Base, IdNameDescriptionMixin, TenantScopedMixin):
+    """Workflow entity for automated workflows (e.g., N8N)."""
 
-    type: Mapped[str] = mapped_column(AutonomousAgentTypeSAEnum, nullable=False)
+    __tablename__ = "workflows"
+
+    type: Mapped[str] = mapped_column(WorkflowTypeSAEnum, nullable=False)
     config: Mapped[dict] = mapped_column(PortableJSON, nullable=False, default=dict)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     allow_api_keys: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
@@ -432,19 +434,15 @@ class AutonomousAgent(Base, IdNameDescriptionMixin, TenantScopedMixin):
     secondary_key_vault_uri: Mapped[str | None] = mapped_column(String(2000), nullable=True)
     last_full_import: Mapped[datetime | None] = mapped_column(HighPrecisionDateTime(), nullable=True, default=None)
 
-    members: Mapped[list[AutonomousAgentMember]] = relationship(
-        back_populates="autonomous_agent", cascade="all, delete-orphan"
-    )
-    tags: Mapped[list[AutonomousAgentTag]] = relationship(
-        back_populates="autonomous_agent", cascade="all, delete-orphan"
-    )
-    user_favorites: Mapped[list[AutonomousAgentUserFavorite]] = relationship(
-        back_populates="autonomous_agent", cascade="all, delete-orphan"
+    members: Mapped[list[WorkflowMember]] = relationship(back_populates="workflow", cascade="all, delete-orphan")
+    tags: Mapped[list[WorkflowTag]] = relationship(back_populates="workflow", cascade="all, delete-orphan")
+    user_favorites: Mapped[list[WorkflowUserFavorite]] = relationship(
+        back_populates="workflow", cascade="all, delete-orphan"
     )
 
     __table_args__ = (
-        UniqueConstraint("tenant_id", "name", name="uq_autonomous_agent_tenant_name"),
-        Index("ix_autonomous_agents_tenant", "tenant_id"),
+        UniqueConstraint("tenant_id", "name", name="uq_workflow_tenant_name"),
+        Index("ix_workflows_tenant", "tenant_id"),
     )
 
 
@@ -530,23 +528,21 @@ class ConversationMember(Base, IdMixin, AuditMixin):
     )
 
 
-class AutonomousAgentMember(Base, IdMixin, AuditMixin):
-    """Autonomous agent membership table."""
+class WorkflowMember(Base, IdMixin, AuditMixin):
+    """Workflow membership table."""
 
-    __tablename__ = "autonomous_agent_members"
+    __tablename__ = "workflow_members"
 
     tenant_id: Mapped[str] = mapped_column(String(36), nullable=False)
-    autonomous_agent_id: Mapped[str] = mapped_column(
-        String(36), ForeignKey("autonomous_agents.id", ondelete="CASCADE"), nullable=False
-    )
+    workflow_id: Mapped[str] = mapped_column(String(36), ForeignKey("workflows.id", ondelete="CASCADE"), nullable=False)
     principal_id: Mapped[str] = mapped_column(String(50), nullable=False)
 
     role: Mapped[str] = mapped_column(PermissionActionSAEnum, nullable=False)
 
-    autonomous_agent: Mapped[AutonomousAgent] = relationship(back_populates="members")
+    workflow: Mapped[Workflow] = relationship(back_populates="members")
     principal: Mapped[Principal] = relationship(
-        foreign_keys="[AutonomousAgentMember.tenant_id, AutonomousAgentMember.principal_id]",
-        primaryjoin="and_(AutonomousAgentMember.tenant_id == Principal.tenant_id, AutonomousAgentMember.principal_id == Principal.principal_id)",
+        foreign_keys="[WorkflowMember.tenant_id, WorkflowMember.principal_id]",
+        primaryjoin="and_(WorkflowMember.tenant_id == Principal.tenant_id, WorkflowMember.principal_id == Principal.principal_id)",
     )
 
     __table_args__ = (
@@ -554,11 +550,11 @@ class AutonomousAgentMember(Base, IdMixin, AuditMixin):
             ["tenant_id", "principal_id"],
             ["principals.tenant_id", "principals.principal_id"],
             ondelete="CASCADE",
-            name="fk_autonomous_agent_members_principal",
+            name="fk_workflow_members_principal",
         ),
-        UniqueConstraint("autonomous_agent_id", "principal_id", name="uq_autonomous_agent_members"),
-        Index("ix_aam_autonomous_agent", "autonomous_agent_id"),
-        Index("ix_aam_principal", "principal_id"),
+        UniqueConstraint("workflow_id", "principal_id", name="uq_workflow_members"),
+        Index("ix_wm_workflow", "workflow_id"),
+        Index("ix_wm_principal", "principal_id"),
     )
 
 
@@ -667,9 +663,7 @@ class Tag(Base, AuditMixin):
 
     # Relationships to junction tables
     chat_agent_tags: Mapped[list[ChatAgentTag]] = relationship(back_populates="tag", cascade="all, delete-orphan")
-    autonomous_agent_tags: Mapped[list[AutonomousAgentTag]] = relationship(
-        back_populates="tag", cascade="all, delete-orphan"
-    )
+    workflow_tags: Mapped[list[WorkflowTag]] = relationship(back_populates="tag", cascade="all, delete-orphan")
     chat_widget_tags: Mapped[list[ChatWidgetTag]] = relationship(back_populates="tag", cascade="all, delete-orphan")
     credential_tags: Mapped[list[CredentialTag]] = relationship(back_populates="tag", cascade="all, delete-orphan")
     tool_tags: Mapped[list[ToolTag]] = relationship(back_populates="tag", cascade="all, delete-orphan")
@@ -712,25 +706,25 @@ class ChatAgentTag(Base, AuditMixin):
     )
 
 
-class AutonomousAgentTag(Base, AuditMixin):
-    """Junction table for autonomous agent tags."""
+class WorkflowTag(Base, AuditMixin):
+    """Junction table for workflow tags."""
 
-    __tablename__ = "autonomous_agent_tags"
+    __tablename__ = "workflow_tags"
 
     tenant_id: Mapped[str] = mapped_column(String(36), nullable=False, primary_key=True)
     tag_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("tags.id", ondelete="CASCADE"), nullable=False, primary_key=True
     )
-    autonomous_agent_id: Mapped[str] = mapped_column(
-        String(36), ForeignKey("autonomous_agents.id", ondelete="CASCADE"), nullable=False, primary_key=True
+    workflow_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("workflows.id", ondelete="CASCADE"), nullable=False, primary_key=True
     )
 
-    tag: Mapped[Tag] = relationship(back_populates="autonomous_agent_tags")
-    autonomous_agent: Mapped[AutonomousAgent] = relationship(back_populates="tags")
+    tag: Mapped[Tag] = relationship(back_populates="workflow_tags")
+    workflow: Mapped[Workflow] = relationship(back_populates="tags")
 
     __table_args__ = (
-        Index("ix_aat_autonomous_agent", "autonomous_agent_id"),
-        Index("ix_aat_tag", "tag_id"),
+        Index("ix_wt_workflow", "workflow_id"),
+        Index("ix_wt_tag", "tag_id"),
     )
 
 
@@ -810,23 +804,23 @@ class ChatAgentUserFavorite(Base, AuditMixin):
     )
 
 
-class AutonomousAgentUserFavorite(Base, AuditMixin):
-    """User favorites for autonomous agents."""
+class WorkflowUserFavorite(Base, AuditMixin):
+    """User favorites for workflows."""
 
-    __tablename__ = "autonomous_agent_user_favorites"
+    __tablename__ = "workflow_user_favorites"
 
     tenant_id: Mapped[str] = mapped_column(
         String(36), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False, primary_key=True
     )
     user_id: Mapped[str] = mapped_column(String(50), nullable=False, primary_key=True)
-    autonomous_agent_id: Mapped[str] = mapped_column(
-        String(36), ForeignKey("autonomous_agents.id", ondelete="CASCADE"), nullable=False, primary_key=True
+    workflow_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("workflows.id", ondelete="CASCADE"), nullable=False, primary_key=True
     )
 
-    autonomous_agent: Mapped[AutonomousAgent] = relationship(back_populates="user_favorites")
+    workflow: Mapped[Workflow] = relationship(back_populates="user_favorites")
     principal: Mapped[Principal] = relationship(
-        foreign_keys="[AutonomousAgentUserFavorite.tenant_id, AutonomousAgentUserFavorite.user_id]",
-        primaryjoin="and_(AutonomousAgentUserFavorite.tenant_id == Principal.tenant_id, AutonomousAgentUserFavorite.user_id == Principal.principal_id)",
+        foreign_keys="[WorkflowUserFavorite.tenant_id, WorkflowUserFavorite.user_id]",
+        primaryjoin="and_(WorkflowUserFavorite.tenant_id == Principal.tenant_id, WorkflowUserFavorite.user_id == Principal.principal_id)",
     )
 
     __table_args__ = (
@@ -834,10 +828,10 @@ class AutonomousAgentUserFavorite(Base, AuditMixin):
             ["tenant_id", "user_id"],
             ["principals.tenant_id", "principals.principal_id"],
             ondelete="CASCADE",
-            name="fk_autonomous_agent_user_favorites_principal",
+            name="fk_workflow_user_favorites_principal",
         ),
-        Index("ix_aauf_user", "user_id"),
-        Index("ix_aauf_autonomous_agent", "autonomous_agent_id"),
+        Index("ix_wuf_user", "user_id"),
+        Index("ix_wuf_workflow", "workflow_id"),
     )
 
 

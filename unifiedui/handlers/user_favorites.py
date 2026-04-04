@@ -8,8 +8,6 @@ from sqlalchemy import delete, select
 from sqlalchemy.orm import joinedload
 
 from unifiedui.core.database.models import (
-    AutonomousAgent,
-    AutonomousAgentUserFavorite,
     ChatAgent,
     ChatAgentUserFavorite,
     ChatWidget,
@@ -18,6 +16,8 @@ from unifiedui.core.database.models import (
     ConversationUserFavorite,
     ExternalApp,
     ExternalAppUserFavorite,
+    Workflow,
+    WorkflowUserFavorite,
 )
 from unifiedui.logger import get_logger
 from unifiedui.schema.responses.user_favorites import (
@@ -42,11 +42,11 @@ RESOURCE_FAVORITE_MAPPING: dict[str, dict[str, Any]] = {
         "relationship": "chat_agent",
         "resource_model": ChatAgent,
     },
-    "autonomous-agents": {
-        "model": AutonomousAgentUserFavorite,
-        "id_field": "autonomous_agent_id",
-        "relationship": "autonomous_agent",
-        "resource_model": AutonomousAgent,
+    "workflows": {
+        "model": WorkflowUserFavorite,
+        "id_field": "workflow_id",
+        "relationship": "workflow",
+        "resource_model": Workflow,
     },
     "chat-widgets": {
         "model": ChatWidgetUserFavorite,
@@ -92,7 +92,7 @@ class UserFavoritesHandler:
         Args:
             tenant_id: The ID of the tenant
             user_id: The ID of the user
-            resource_type: Type of resource (chat-agents, autonomous-agents, etc.)
+            resource_type: Type of resource (chat-agents, workflows, etc.)
             use_cache: Whether to use caching
 
         Returns:
@@ -246,7 +246,7 @@ class UserFavoritesHandler:
         Args:
             tenant_id: The ID of the tenant
             user_id: The ID of the user
-            resource_type: Type of resource (chat-agents, autonomous-agents, etc.)
+            resource_type: Type of resource (chat-agents, workflows, etc.)
             resource_id: The ID of the resource to favorite
 
         Returns:
@@ -322,7 +322,7 @@ class UserFavoritesHandler:
         Args:
             tenant_id: The ID of the tenant
             user_id: The ID of the user
-            resource_type: Type of resource (chat-agents, autonomous-agents, etc.)
+            resource_type: Type of resource (chat-agents, workflows, etc.)
             resource_id: The ID of the resource to unfavorite
         """
         logger.info(

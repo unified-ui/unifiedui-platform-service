@@ -1,4 +1,4 @@
-"""API routes for autonomous agent management."""
+"""API routes for workflow management."""
 
 from typing import TYPE_CHECKING
 
@@ -8,59 +8,59 @@ from fastapi.responses import Response
 from unifiedui.core.database.enums import ListViewEnum, OrderDirectionEnum, PermissionActionEnum, TenantRolesEnum
 from unifiedui.core.middleware.apis.v1.auth import (
     authenticate,
-    authenticate_autonomous_agent_api_key,
+    authenticate_workflow_api_key,
     check_permissions,
 )
-from unifiedui.exc.autonomous_agents import (
-    AutonomousAgentApiKeysNotAllowedError,
-    AutonomousAgentConfigValidationError,
-    AutonomousAgentKeyNotFoundError,
-    AutonomousAgentNotFoundError,
-    AutonomousAgentPermissionNotFoundError,
-    UnsupportedAutonomousAgentTypeError,
-)
 from unifiedui.exc.chat_agent_config import InvalidCredentialError
-from unifiedui.handlers.autonomous_agents import AutonomousAgentHandler
-from unifiedui.handlers.credentials import CredentialHandler
-from unifiedui.handlers.dependencies import get_autonomous_agent_handler, get_credential_handler
-from unifiedui.handlers.field_filter import filtered_response, parse_ids
-from unifiedui.logger import get_logger
-from unifiedui.schema.requests.autonomous_agents import (
-    CreateAutonomousAgentRequest,
-    StartWorkflowRequest,
-    UpdateAutonomousAgentRequest,
+from unifiedui.exc.workflows import (
+    UnsupportedWorkflowTypeError,
+    WorkflowApiKeysNotAllowedError,
+    WorkflowConfigValidationError,
+    WorkflowKeyNotFoundError,
+    WorkflowNotFoundError,
+    WorkflowPermissionNotFoundError,
 )
+from unifiedui.handlers.credentials import CredentialHandler
+from unifiedui.handlers.dependencies import get_credential_handler, get_workflow_handler
+from unifiedui.handlers.field_filter import filtered_response, parse_ids
+from unifiedui.handlers.workflows import WorkflowHandler
+from unifiedui.logger import get_logger
 from unifiedui.schema.requests.permissions import SetResourcePermissionRequest
-from unifiedui.schema.responses.autonomous_agents import (
-    AutonomousAgentConfigResponse,
-    AutonomousAgentKeyResponse,
-    AutonomousAgentResponse,
+from unifiedui.schema.requests.workflows import (
+    CreateWorkflowRequest,
+    StartWorkflowRequest,
+    UpdateWorkflowRequest,
+)
+from unifiedui.schema.responses.principals import PrincipalWithRolesResponse, ResourcePrincipalsResponse
+from unifiedui.schema.responses.workflows import (
+    WorkflowConfigResponse,
+    WorkflowKeyResponse,
+    WorkflowResponse,
     WorkflowRunDetailResponse,
     WorkflowRunRetryResponse,
     WorkflowRunsListResponse,
 )
-from unifiedui.schema.responses.principals import PrincipalWithRolesResponse, ResourcePrincipalsResponse
 
 if TYPE_CHECKING:
     from unifiedui.core.identity.users import ContextIdentityUser
 
 logger = get_logger(__name__)
 
-router = APIRouter(prefix="/autonomous-agents")
+router = APIRouter(prefix="/workflows")
 
 
 @router.get(
     "",
-    summary="List autonomous agents",
-    description="Get a paginated list of autonomous agents for the current tenant. Use view=quick-list to get only id and name.",
+    summary="List workflows",
+    description="Get a paginated list of workflows for the current tenant. Use view=quick-list to get only id and name.",
 )
 @authenticate()
-async def list_autonomous_agents(
+async def list_workflows(
     request: Request,
     tenant_id: str,
     skip: int = Query(0, ge=0, description="Number of items to skip"),
     limit: int = Query(100, ge=1, le=1000, description="Maximum number of items to return"),
-    name: str | None = Query(None, description="Filter by autonomous agent name"),
+    name: str | None = Query(None, description="Filter by workflow name"),
     is_active: int | None = Query(None, ge=0, le=1, description="Filter by active status (1=active, 0=inactive)"),
     tags: str | None = Query(
         None, description="Comma-separated list of tag IDs to filter by (e.g., '10001,10002,10003')"
@@ -74,26 +74,26 @@ async def list_autonomous_agents(
     ),
     ids: str | None = Query(None, description="Comma-separated list of IDs to filter by"),
     fields: str | None = Query(None, description="Comma-separated list of fields to include in the response"),
-    handler: AutonomousAgentHandler = Depends(get_autonomous_agent_handler),
+    handler: WorkflowHandler = Depends(get_workflow_handler),
 ):
     """
-    List autonomous agents for a tenant.
+    List workflows for a tenant.
 
-    Users see only autonomous agents they have permissions for, unless they have
-    TENANT_GLOBAL_ADMIN or AUTONOMOUS_AGENTS_ADMIN on tenant level.
+    Users see only workflows they have permissions for, unless they have
+    TENANT_GLOBAL_ADMIN or WORKFLOWS_ADMIN on tenant level.
 
     Args:
         request: FastAPI request with user in state
         tenant_id: Tenant ID from path
         skip: Number of items to skip
         limit: Maximum number of items to return
-        name: Optional filter by autonomous agent name
+        name: Optional filter by workflow name
         is_active: Optional filter by active status (None=all, 1=active, 0=inactive)
         tags: Optional comma-separated tag IDs to filter by
-        handler: Autonomous agent handler dependency
+        handler: Workflow handler dependency
 
     Returns:
-        List of autonomous agents
+        List of workflows
     """
     try:
         # Parse tag IDs from comma-separated string
@@ -109,7 +109,7 @@ async def list_autonomous_agents(
 
         user: ContextIdentityUser = request.state.user
         return filtered_response(
-            handler.list_autonomous_agents(
+            handler.list_workflows(
                 tenant_id=tenant_id,
                 user=user,
                 skip=skip,
@@ -127,304 +127,296 @@ async def list_autonomous_agents(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error("Failed to list autonomous agents: %s", e, exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to list autonomous agents"
-        )
+        logger.error("Failed to list workflows: %s", e, exc_info=True)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to list workflows")
 
 
 @router.post(
     "",
-    response_model=AutonomousAgentResponse,
+    response_model=WorkflowResponse,
     status_code=status.HTTP_201_CREATED,
-    summary="Create autonomous agent",
-    description="Create a new autonomous agent",
+    summary="Create workflow",
+    description="Create a new workflow",
 )
 @authenticate()
 @check_permissions(
     entity="tenant",
     required_permissions=[
         TenantRolesEnum.TENANT_GLOBAL_ADMIN,
-        TenantRolesEnum.AUTONOMOUS_AGENTS_ADMIN,
-        TenantRolesEnum.AUTONOMOUS_AGENTS_CREATOR,
+        TenantRolesEnum.WORKFLOWS_ADMIN,
+        TenantRolesEnum.WORKFLOWS_CREATOR,
     ],
 )
-async def create_autonomous_agent(
+async def create_workflow(
     request: Request,
     tenant_id: str,
-    create_request: CreateAutonomousAgentRequest,
-    handler: AutonomousAgentHandler = Depends(get_autonomous_agent_handler),
-) -> AutonomousAgentResponse:
+    create_request: CreateWorkflowRequest,
+    handler: WorkflowHandler = Depends(get_workflow_handler),
+) -> WorkflowResponse:
     """
-    Create a new autonomous agent.
+    Create a new workflow.
 
-    Requires TENANT_GLOBAL_ADMIN, AUTONOMOUS_AGENTS_ADMIN, or AUTONOMOUS_AGENTS_CREATOR permission on tenant level.
-    Creator is automatically assigned ADMIN permission on the autonomous agent.
+    Requires TENANT_GLOBAL_ADMIN, WORKFLOWS_ADMIN, or WORKFLOWS_CREATOR permission on tenant level.
+    Creator is automatically assigned ADMIN permission on the workflow.
 
     Args:
         request: FastAPI request with user in state
         tenant_id: Tenant ID from path
-        create_request: Autonomous agent creation data
-        handler: Autonomous agent handler dependency
+        create_request: Workflow creation data
+        handler: Workflow handler dependency
 
     Returns:
-        Created autonomous agent
+        Created workflow
     """
     try:
         user: ContextIdentityUser = request.state.user
         user_id = user.identity.get_id()
 
-        return handler.create_autonomous_agent(tenant_id=tenant_id, request=create_request, user_id=user_id, user=user)
-    except AutonomousAgentConfigValidationError as e:
+        return handler.create_workflow(tenant_id=tenant_id, request=create_request, user_id=user_id, user=user)
+    except WorkflowConfigValidationError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
-    except UnsupportedAutonomousAgentTypeError as e:
+    except UnsupportedWorkflowTypeError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except Exception as e:
-        logger.error("Failed to create autonomous agent: %s", e, exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to create autonomous agent"
-        )
+        logger.error("Failed to create workflow: %s", e, exc_info=True)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to create workflow")
 
 
 @router.get(
-    "/{autonomous_agent_id}",
-    response_model=AutonomousAgentResponse,
-    summary="Get autonomous agent",
-    description="Get a specific autonomous agent by ID",
+    "/{workflow_id}",
+    response_model=WorkflowResponse,
+    summary="Get workflow",
+    description="Get a specific workflow by ID",
 )
 @authenticate()
 @check_permissions(
-    entity="autonomous_agent",
+    entity="workflow",
     required_permissions=[
         TenantRolesEnum.TENANT_GLOBAL_ADMIN,
-        TenantRolesEnum.AUTONOMOUS_AGENTS_ADMIN,
+        TenantRolesEnum.WORKFLOWS_ADMIN,
         PermissionActionEnum.ADMIN,
         PermissionActionEnum.WRITE,
         PermissionActionEnum.READ,
     ],
 )
-async def get_autonomous_agent(
+async def get_workflow(
     request: Request,
     tenant_id: str,
-    autonomous_agent_id: str,
+    workflow_id: str,
     fields: str | None = Query(None, description="Comma-separated list of fields to include in the response"),
-    handler: AutonomousAgentHandler = Depends(get_autonomous_agent_handler),
+    handler: WorkflowHandler = Depends(get_workflow_handler),
 ):
     """
-    Get a specific autonomous agent by ID.
+    Get a specific workflow by ID.
 
-    Requires READ permission or higher on the autonomous agent, or TENANT_GLOBAL_ADMIN/AUTONOMOUS_AGENTS_ADMIN on tenant.
+    Requires READ permission or higher on the workflow, or TENANT_GLOBAL_ADMIN/WORKFLOWS_ADMIN on tenant.
 
     Args:
         request: FastAPI request with user in state
         tenant_id: Tenant ID from path
-        autonomous_agent_id: Autonomous agent ID from path
-        handler: Autonomous agent handler dependency
+        workflow_id: Workflow ID from path
+        handler: Workflow handler dependency
 
     Returns:
-        Autonomous agent details
+        Workflow details
     """
     try:
         user: ContextIdentityUser = request.state.user
         return filtered_response(
-            handler.get_autonomous_agent(tenant_id=tenant_id, autonomous_agent_id=autonomous_agent_id, user=user),
+            handler.get_workflow(tenant_id=tenant_id, workflow_id=workflow_id, user=user),
             fields,
         )
-    except AutonomousAgentNotFoundError as e:
+    except WorkflowNotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
-        logger.error("Failed to get autonomous agent: %s", e, exc_info=True)
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to get autonomous agent")
+        logger.error("Failed to get workflow: %s", e, exc_info=True)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to get workflow")
 
 
 @router.patch(
-    "/{autonomous_agent_id}",
-    response_model=AutonomousAgentResponse,
-    summary="Update autonomous agent",
-    description="Update an existing autonomous agent",
+    "/{workflow_id}",
+    response_model=WorkflowResponse,
+    summary="Update workflow",
+    description="Update an existing workflow",
 )
 @authenticate()
 @check_permissions(
-    entity="autonomous_agent",
+    entity="workflow",
     required_permissions=[
         TenantRolesEnum.TENANT_GLOBAL_ADMIN,
-        TenantRolesEnum.AUTONOMOUS_AGENTS_ADMIN,
+        TenantRolesEnum.WORKFLOWS_ADMIN,
         PermissionActionEnum.ADMIN,
         PermissionActionEnum.WRITE,
     ],
 )
-async def update_autonomous_agent(
+async def update_workflow(
     request: Request,
     tenant_id: str,
-    autonomous_agent_id: str,
-    update_request: UpdateAutonomousAgentRequest,
-    handler: AutonomousAgentHandler = Depends(get_autonomous_agent_handler),
-) -> AutonomousAgentResponse:
+    workflow_id: str,
+    update_request: UpdateWorkflowRequest,
+    handler: WorkflowHandler = Depends(get_workflow_handler),
+) -> WorkflowResponse:
     """
-    Update an existing autonomous agent.
+    Update an existing workflow.
 
-    Requires WRITE permission or higher on the autonomous agent, or TENANT_GLOBAL_ADMIN/AUTONOMOUS_AGENTS_ADMIN on tenant.
+    Requires WRITE permission or higher on the workflow, or TENANT_GLOBAL_ADMIN/WORKFLOWS_ADMIN on tenant.
 
     Args:
         request: FastAPI request with user in state
         tenant_id: Tenant ID from path
-        autonomous_agent_id: Autonomous agent ID from path
-        update_request: Autonomous agent update data
-        handler: Autonomous agent handler dependency
+        workflow_id: Workflow ID from path
+        update_request: Workflow update data
+        handler: Workflow handler dependency
 
     Returns:
-        Updated autonomous agent
+        Updated workflow
     """
     try:
         user: ContextIdentityUser = request.state.user
         user_id = user.identity.get_id()
 
-        return handler.update_autonomous_agent(
-            tenant_id=tenant_id, autonomous_agent_id=autonomous_agent_id, request=update_request, user_id=user_id
+        return handler.update_workflow(
+            tenant_id=tenant_id, workflow_id=workflow_id, request=update_request, user_id=user_id
         )
-    except AutonomousAgentNotFoundError as e:
+    except WorkflowNotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
-    except AutonomousAgentConfigValidationError as e:
+    except WorkflowConfigValidationError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except Exception as e:
-        logger.error("Failed to update autonomous agent: %s", e, exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to update autonomous agent"
-        )
+        logger.error("Failed to update workflow: %s", e, exc_info=True)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to update workflow")
 
 
 @router.delete(
-    "/{autonomous_agent_id}",
+    "/{workflow_id}",
     status_code=status.HTTP_204_NO_CONTENT,
-    summary="Delete autonomous agent",
-    description="Delete an autonomous agent",
+    summary="Delete workflow",
+    description="Delete an workflow",
 )
 @authenticate()
 @check_permissions(
-    entity="autonomous_agent",
+    entity="workflow",
     required_permissions=[
         TenantRolesEnum.TENANT_GLOBAL_ADMIN,
-        TenantRolesEnum.AUTONOMOUS_AGENTS_ADMIN,
+        TenantRolesEnum.WORKFLOWS_ADMIN,
         PermissionActionEnum.ADMIN,
     ],
 )
-async def delete_autonomous_agent(
+async def delete_workflow(
     request: Request,
     tenant_id: str,
-    autonomous_agent_id: str,
-    handler: AutonomousAgentHandler = Depends(get_autonomous_agent_handler),
+    workflow_id: str,
+    handler: WorkflowHandler = Depends(get_workflow_handler),
 ) -> Response:
     """
-    Delete an autonomous agent.
+    Delete an workflow.
 
-    Requires WRITE permission or higher on the autonomous agent, or TENANT_GLOBAL_ADMIN/AUTONOMOUS_AGENTS_ADMIN on tenant.
+    Requires WRITE permission or higher on the workflow, or TENANT_GLOBAL_ADMIN/WORKFLOWS_ADMIN on tenant.
 
     Args:
         request: FastAPI request with user in state
         tenant_id: Tenant ID from path
-        autonomous_agent_id: Autonomous agent ID from path
-        handler: Autonomous agent handler dependency
+        workflow_id: Workflow ID from path
+        handler: Workflow handler dependency
 
     Returns:
         204 No Content on success
     """
     try:
-        handler.delete_autonomous_agent(tenant_id=tenant_id, autonomous_agent_id=autonomous_agent_id)
+        handler.delete_workflow(tenant_id=tenant_id, workflow_id=workflow_id)
         return Response(status_code=status.HTTP_204_NO_CONTENT)
-    except AutonomousAgentNotFoundError as e:
+    except WorkflowNotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
-        logger.error("Failed to delete autonomous agent: %s", e, exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to delete autonomous agent"
-        )
+        logger.error("Failed to delete workflow: %s", e, exc_info=True)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to delete workflow")
 
 
 @router.post(
-    "/{autonomous_agent_id}/duplicate",
-    response_model=AutonomousAgentResponse,
+    "/{workflow_id}/duplicate",
+    response_model=WorkflowResponse,
     status_code=status.HTTP_201_CREATED,
-    summary="Duplicate autonomous agent",
-    description="Create an exact copy of an autonomous agent with name + ' Copy'",
+    summary="Duplicate workflow",
+    description="Create an exact copy of an workflow with name + ' Copy'",
 )
 @authenticate()
 @check_permissions(
-    entity="autonomous_agent",
+    entity="workflow",
     required_permissions=[
         TenantRolesEnum.TENANT_GLOBAL_ADMIN,
-        TenantRolesEnum.AUTONOMOUS_AGENTS_ADMIN,
-        TenantRolesEnum.AUTONOMOUS_AGENTS_CREATOR,
+        TenantRolesEnum.WORKFLOWS_ADMIN,
+        TenantRolesEnum.WORKFLOWS_CREATOR,
         PermissionActionEnum.ADMIN,
         PermissionActionEnum.WRITE,
     ],
 )
-async def duplicate_autonomous_agent(
+async def duplicate_workflow(
     request: Request,
     tenant_id: str,
-    autonomous_agent_id: str,
-    handler: AutonomousAgentHandler = Depends(get_autonomous_agent_handler),
-) -> AutonomousAgentResponse:
+    workflow_id: str,
+    handler: WorkflowHandler = Depends(get_workflow_handler),
+) -> WorkflowResponse:
     """
-    Duplicate an autonomous agent.
+    Duplicate an workflow.
 
-    Creates an exact copy of the autonomous agent with name + " Copy".
+    Creates an exact copy of the workflow with name + " Copy".
     New API keys are generated for the duplicate.
-    Requires WRITE permission or higher, or AUTONOMOUS_AGENTS_CREATOR on tenant.
+    Requires WRITE permission or higher, or WORKFLOWS_CREATOR on tenant.
 
     Args:
         request: FastAPI request with user in state
         tenant_id: Tenant ID from path
-        autonomous_agent_id: Autonomous agent ID to duplicate
+        workflow_id: Workflow ID to duplicate
 
     Returns:
-        The newly created autonomous agent
+        The newly created workflow
     """
     try:
         user: ContextIdentityUser = request.state.user
         logger.info(
-            "API: Duplicate autonomous agent",
+            "API: Duplicate workflow",
             extra={
                 "tenant_id": tenant_id,
-                "autonomous_agent_id": autonomous_agent_id,
+                "workflow_id": workflow_id,
                 "user_id": user.identity.get_id(),
             },
         )
-        return handler.duplicate_autonomous_agent(
-            tenant_id=tenant_id, autonomous_agent_id=autonomous_agent_id, user_id=user.identity.get_id(), user=user
+        return handler.duplicate_workflow(
+            tenant_id=tenant_id, workflow_id=workflow_id, user_id=user.identity.get_id(), user=user
         )
-    except AutonomousAgentNotFoundError as e:
+    except WorkflowNotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
-        logger.error("Failed to duplicate autonomous agent: %s", e, exc_info=True)
+        logger.error("Failed to duplicate workflow: %s", e, exc_info=True)
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to duplicate autonomous agent: {e!s}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to duplicate workflow: {e!s}"
         )
 
 
-# ========== Autonomous Agent Permission Endpoints ==========
+# ========== Workflow Permission Endpoints ==========
 
 
 @router.get(
-    "/{autonomous_agent_id}/principals",
+    "/{workflow_id}/principals",
     response_model=ResourcePrincipalsResponse,
-    summary="List autonomous agent permissions",
-    description="Get all principals with permissions for an autonomous agent",
+    summary="List workflow permissions",
+    description="Get all principals with permissions for an workflow",
 )
 @authenticate()
 @check_permissions(
-    entity="autonomous_agent",
+    entity="workflow",
     required_permissions=[
         TenantRolesEnum.TENANT_GLOBAL_ADMIN,
-        TenantRolesEnum.AUTONOMOUS_AGENTS_ADMIN,
+        TenantRolesEnum.WORKFLOWS_ADMIN,
         PermissionActionEnum.ADMIN,
         PermissionActionEnum.WRITE,
         PermissionActionEnum.READ,
     ],
 )
-async def list_autonomous_agent_permissions(
+async def list_workflow_permissions(
     request: Request,
     tenant_id: str,
-    autonomous_agent_id: str,
+    workflow_id: str,
     skip: int = Query(0, ge=0, description="Number of principals to skip"),
     limit: int = Query(100, ge=1, le=500, description="Maximum number of principals to return"),
     search: str | None = Query(None, description="Search term for display_name, principal_name, or mail"),
@@ -432,17 +424,17 @@ async def list_autonomous_agent_permissions(
     is_active: bool | None = Query(None, description="Filter by is_active status"),
     order_by: str | None = Query(None, enum=["display_name"], description="Column to order by"),
     order_direction: str | None = Query("asc", enum=["asc", "desc"], description="Sort direction"),
-    handler: AutonomousAgentHandler = Depends(get_autonomous_agent_handler),
+    handler: WorkflowHandler = Depends(get_workflow_handler),
 ) -> ResourcePrincipalsResponse:
     """
-    Get all principals with permissions for an autonomous agent.
+    Get all principals with permissions for an workflow.
 
-    Requires READ permission or higher on the autonomous agent, or TENANT_GLOBAL_ADMIN/AUTONOMOUS_AGENTS_ADMIN on tenant.
+    Requires READ permission or higher on the workflow, or TENANT_GLOBAL_ADMIN/WORKFLOWS_ADMIN on tenant.
 
     Args:
         request: FastAPI request with user in state
         tenant_id: Tenant ID from path
-        autonomous_agent_id: Autonomous agent ID from path
+        workflow_id: Workflow ID from path
         skip: Number of principals to skip
         limit: Maximum number of principals to return
         search: Search term for display_name, principal_name, or mail
@@ -450,7 +442,7 @@ async def list_autonomous_agent_permissions(
         is_active: Filter by is_active status
         order_by: Column to order by
         order_direction: Sort direction
-        handler: Autonomous agent handler dependency
+        handler: Workflow handler dependency
 
     Returns:
         List of principals with their permissions
@@ -459,9 +451,9 @@ async def list_autonomous_agent_permissions(
         # Parse comma-separated roles
         roles_list = [r.strip() for r in roles.split(",")] if roles else None
 
-        return handler.list_autonomous_agent_permissions(
+        return handler.list_workflow_permissions(
             tenant_id=tenant_id,
-            autonomous_agent_id=autonomous_agent_id,
+            workflow_id=workflow_id,
             skip=skip,
             limit=limit,
             search=search,
@@ -470,100 +462,98 @@ async def list_autonomous_agent_permissions(
             order_by=order_by,
             order_direction=order_direction,
         )
-    except AutonomousAgentNotFoundError as e:
+    except WorkflowNotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
-        logger.error("Failed to list autonomous agent permissions: %s", e, exc_info=True)
+        logger.error("Failed to list workflow permissions: %s", e, exc_info=True)
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to list autonomous agent permissions"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to list workflow permissions"
         )
 
 
 @router.get(
-    "/{autonomous_agent_id}/principals/{principal_id}",
+    "/{workflow_id}/principals/{principal_id}",
     response_model=PrincipalWithRolesResponse,
-    summary="Get autonomous agent permissions for principal",
-    description="Get all permissions for a specific principal on an autonomous agent",
+    summary="Get workflow permissions for principal",
+    description="Get all permissions for a specific principal on an workflow",
 )
 @authenticate()
 @check_permissions(
-    entity="autonomous_agent",
+    entity="workflow",
     required_permissions=[
         TenantRolesEnum.TENANT_GLOBAL_ADMIN,
-        TenantRolesEnum.AUTONOMOUS_AGENTS_ADMIN,
+        TenantRolesEnum.WORKFLOWS_ADMIN,
         PermissionActionEnum.ADMIN,
         PermissionActionEnum.WRITE,
         PermissionActionEnum.READ,
     ],
 )
-async def get_autonomous_agent_permission(
+async def get_workflow_permission(
     request: Request,
     tenant_id: str,
-    autonomous_agent_id: str,
+    workflow_id: str,
     principal_id: str,
-    handler: AutonomousAgentHandler = Depends(get_autonomous_agent_handler),
+    handler: WorkflowHandler = Depends(get_workflow_handler),
 ) -> PrincipalWithRolesResponse:
     """
-    Get all permissions for a specific principal on an autonomous agent.
+    Get all permissions for a specific principal on an workflow.
 
-    Requires READ permission or higher on the autonomous agent, or TENANT_GLOBAL_ADMIN/AUTONOMOUS_AGENTS_ADMIN on tenant.
+    Requires READ permission or higher on the workflow, or TENANT_GLOBAL_ADMIN/WORKFLOWS_ADMIN on tenant.
 
     Args:
         request: FastAPI request with user in state
         tenant_id: Tenant ID from path
-        autonomous_agent_id: Autonomous agent ID from path
+        workflow_id: Workflow ID from path
         principal_id: Principal ID from path
-        handler: Autonomous agent handler dependency
+        handler: Workflow handler dependency
 
     Returns:
-        Principal's permissions on the autonomous agent
+        Principal's permissions on the workflow
     """
     try:
-        return handler.get_autonomous_agent_permission(
-            tenant_id=tenant_id, autonomous_agent_id=autonomous_agent_id, principal_id=principal_id
-        )
-    except AutonomousAgentNotFoundError as e:
+        return handler.get_workflow_permission(tenant_id=tenant_id, workflow_id=workflow_id, principal_id=principal_id)
+    except WorkflowNotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
-        logger.error("Failed to get autonomous agent permission: %s", e, exc_info=True)
+        logger.error("Failed to get workflow permission: %s", e, exc_info=True)
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to get autonomous agent permission"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to get workflow permission"
         )
 
 
 @router.put(
-    "/{autonomous_agent_id}/principals",
+    "/{workflow_id}/principals",
     response_model=PrincipalWithRolesResponse,
-    summary="Set autonomous agent permission",
-    description="Set or update a principal's permission for an autonomous agent",
+    summary="Set workflow permission",
+    description="Set or update a principal's permission for an workflow",
 )
 @authenticate()
 @check_permissions(
-    entity="autonomous_agent",
+    entity="workflow",
     required_permissions=[
         TenantRolesEnum.TENANT_GLOBAL_ADMIN,
-        TenantRolesEnum.AUTONOMOUS_AGENTS_ADMIN,
+        TenantRolesEnum.WORKFLOWS_ADMIN,
         PermissionActionEnum.ADMIN,
     ],
 )
-async def set_autonomous_agent_permission(
+async def set_workflow_permission(
     request: Request,
     tenant_id: str,
-    autonomous_agent_id: str,
+    workflow_id: str,
     permission_request: SetResourcePermissionRequest,
-    handler: AutonomousAgentHandler = Depends(get_autonomous_agent_handler),
+    handler: WorkflowHandler = Depends(get_workflow_handler),
 ) -> PrincipalWithRolesResponse:
     """
-    Set or update a principal's permission for an autonomous agent.
+    Set or update a principal's permission for an workflow.
 
-    Requires ADMIN permission on the autonomous agent, or TENANT_GLOBAL_ADMIN/AUTONOMOUS_AGENTS_ADMIN on tenant.
+    Requires ADMIN permission on the workflow, or TENANT_GLOBAL_ADMIN/WORKFLOWS_ADMIN on tenant.
 
     Args:
         request: FastAPI request with user in state
         tenant_id: Tenant ID from path
-        autonomous_agent_id: Autonomous agent ID from path
+        workflow_id: Workflow ID from path
         permission_request: Permission data
-        handler: Autonomous agent handler dependency
+        handler: Workflow handler dependency
 
     Returns:
         Created or updated permission
@@ -572,76 +562,76 @@ async def set_autonomous_agent_permission(
         user: ContextIdentityUser = request.state.user
         user_id = user.identity.get_id()
 
-        return handler.set_autonomous_agent_permission(
+        return handler.set_workflow_permission(
             tenant_id=tenant_id,
-            autonomous_agent_id=autonomous_agent_id,
+            workflow_id=workflow_id,
             request=permission_request,
             user_id=user_id,
             user=user,
         )
-    except AutonomousAgentNotFoundError as e:
+    except WorkflowNotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
-        logger.error("Failed to set autonomous agent permission: %s", e, exc_info=True)
+        logger.error("Failed to set workflow permission: %s", e, exc_info=True)
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to set autonomous agent permission"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to set workflow permission"
         )
 
 
 @router.delete(
-    "/{autonomous_agent_id}/principals",
+    "/{workflow_id}/principals",
     status_code=status.HTTP_204_NO_CONTENT,
-    summary="Delete autonomous agent permission",
-    description="Remove a principal's permission for an autonomous agent",
+    summary="Delete workflow permission",
+    description="Remove a principal's permission for an workflow",
 )
 @authenticate()
 @check_permissions(
-    entity="autonomous_agent",
+    entity="workflow",
     required_permissions=[
         TenantRolesEnum.TENANT_GLOBAL_ADMIN,
-        TenantRolesEnum.AUTONOMOUS_AGENTS_ADMIN,
+        TenantRolesEnum.WORKFLOWS_ADMIN,
         PermissionActionEnum.ADMIN,
     ],
 )
-async def delete_autonomous_agent_permission(
+async def delete_workflow_permission(
     request: Request,
     tenant_id: str,
-    autonomous_agent_id: str,
+    workflow_id: str,
     delete_request: SetResourcePermissionRequest,
-    handler: AutonomousAgentHandler = Depends(get_autonomous_agent_handler),
+    handler: WorkflowHandler = Depends(get_workflow_handler),
 ) -> Response:
     """
-    Remove a principal's permission for an autonomous agent.
+    Remove a principal's permission for an workflow.
 
-    Requires ADMIN permission on the autonomous agent, or TENANT_GLOBAL_ADMIN/AUTONOMOUS_AGENTS_ADMIN on tenant.
+    Requires ADMIN permission on the workflow, or TENANT_GLOBAL_ADMIN/WORKFLOWS_ADMIN on tenant.
 
     Args:
         request: FastAPI request with user in state
         tenant_id: Tenant ID from path
-        autonomous_agent_id: Autonomous agent ID from path
+        workflow_id: Workflow ID from path
         delete_request: Permission data (principal_id, principal_type, permission)
-        handler: Autonomous agent handler dependency
+        handler: Workflow handler dependency
 
     Returns:
         204 No Content on success
     """
     try:
-        handler.delete_autonomous_agent_permission(
+        handler.delete_workflow_permission(
             tenant_id=tenant_id,
-            autonomous_agent_id=autonomous_agent_id,
+            workflow_id=workflow_id,
             principal_id=delete_request.principal_id,
             principal_type=delete_request.principal_type,
             role=delete_request.role,
         )
         return Response(status_code=status.HTTP_204_NO_CONTENT)
-    except AutonomousAgentNotFoundError as e:
+    except WorkflowNotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
-    except AutonomousAgentPermissionNotFoundError as e:
+    except WorkflowPermissionNotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
-        logger.error("Failed to delete autonomous agent permission: %s", e, exc_info=True)
+        logger.error("Failed to delete workflow permission: %s", e, exc_info=True)
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to delete autonomous agent permission"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to delete workflow permission"
         )
 
 
@@ -649,39 +639,39 @@ async def delete_autonomous_agent_permission(
 
 
 @router.get(
-    "/{autonomous_agent_id}/keys/{key_number}",
-    response_model=AutonomousAgentKeyResponse,
-    summary="Get autonomous agent API key",
-    description="Get an API key for an autonomous agent (1 = primary, 2 = secondary)",
+    "/{workflow_id}/keys/{key_number}",
+    response_model=WorkflowKeyResponse,
+    summary="Get workflow API key",
+    description="Get an API key for an workflow (1 = primary, 2 = secondary)",
 )
 @authenticate()
 @check_permissions(
-    entity="autonomous_agent",
+    entity="workflow",
     required_permissions=[
         TenantRolesEnum.TENANT_GLOBAL_ADMIN,
-        TenantRolesEnum.AUTONOMOUS_AGENTS_ADMIN,
+        TenantRolesEnum.WORKFLOWS_ADMIN,
         PermissionActionEnum.ADMIN,
         PermissionActionEnum.WRITE,
     ],
 )
-async def get_autonomous_agent_key(
+async def get_workflow_key(
     request: Request,
     tenant_id: str,
-    autonomous_agent_id: str,
+    workflow_id: str,
     key_number: int,
-    handler: AutonomousAgentHandler = Depends(get_autonomous_agent_handler),
-) -> AutonomousAgentKeyResponse:
+    handler: WorkflowHandler = Depends(get_workflow_handler),
+) -> WorkflowKeyResponse:
     """
-    Get an API key for an autonomous agent.
+    Get an API key for an workflow.
 
-    Requires WRITE or ADMIN permission on the autonomous agent, or TENANT_GLOBAL_ADMIN/AUTONOMOUS_AGENTS_ADMIN on tenant.
+    Requires WRITE or ADMIN permission on the workflow, or TENANT_GLOBAL_ADMIN/WORKFLOWS_ADMIN on tenant.
 
     Args:
         request: FastAPI request with user in state
         tenant_id: Tenant ID from path
-        autonomous_agent_id: Autonomous agent ID from path
+        workflow_id: Workflow ID from path
         key_number: Key number (1 for primary, 2 for secondary)
-        handler: Autonomous agent handler dependency
+        handler: Workflow handler dependency
 
     Returns:
         The API key
@@ -690,59 +680,57 @@ async def get_autonomous_agent_key(
         if key_number not in [1, 2]:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="key_number must be 1 or 2")
 
-        return handler.get_api_key(tenant_id=tenant_id, autonomous_agent_id=autonomous_agent_id, key_number=key_number)
-    except AutonomousAgentNotFoundError as e:
+        return handler.get_api_key(tenant_id=tenant_id, workflow_id=workflow_id, key_number=key_number)
+    except WorkflowNotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
-    except AutonomousAgentApiKeysNotAllowedError as e:
+    except WorkflowApiKeysNotAllowedError as e:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
-    except AutonomousAgentKeyNotFoundError as e:
+    except WorkflowKeyNotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except HTTPException:
         raise
     except Exception as e:
-        logger.error("Failed to get autonomous agent key: %s", e, exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to get autonomous agent key"
-        )
+        logger.error("Failed to get workflow key: %s", e, exc_info=True)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to get workflow key")
 
 
 @router.put(
-    "/{autonomous_agent_id}/keys/{key_number}/rotate",
-    response_model=AutonomousAgentKeyResponse,
-    summary="Rotate autonomous agent API key",
-    description="Rotate an API key for an autonomous agent (1 = primary, 2 = secondary)",
+    "/{workflow_id}/keys/{key_number}/rotate",
+    response_model=WorkflowKeyResponse,
+    summary="Rotate workflow API key",
+    description="Rotate an API key for an workflow (1 = primary, 2 = secondary)",
 )
 @authenticate()
 @check_permissions(
-    entity="autonomous_agent",
+    entity="workflow",
     required_permissions=[
         TenantRolesEnum.TENANT_GLOBAL_ADMIN,
-        TenantRolesEnum.AUTONOMOUS_AGENTS_ADMIN,
+        TenantRolesEnum.WORKFLOWS_ADMIN,
         PermissionActionEnum.ADMIN,
         PermissionActionEnum.WRITE,
     ],
 )
-async def rotate_autonomous_agent_key(
+async def rotate_workflow_key(
     request: Request,
     tenant_id: str,
-    autonomous_agent_id: str,
+    workflow_id: str,
     key_number: int,
-    handler: AutonomousAgentHandler = Depends(get_autonomous_agent_handler),
-) -> AutonomousAgentKeyResponse:
+    handler: WorkflowHandler = Depends(get_workflow_handler),
+) -> WorkflowKeyResponse:
     """
-    Rotate an API key for an autonomous agent.
+    Rotate an API key for an workflow.
 
     This generates a new random API key and replaces the existing one.
-    Requires WRITE or ADMIN permission on the autonomous agent, or TENANT_GLOBAL_ADMIN/AUTONOMOUS_AGENTS_ADMIN on tenant.
+    Requires WRITE or ADMIN permission on the workflow, or TENANT_GLOBAL_ADMIN/WORKFLOWS_ADMIN on tenant.
 
     Args:
         request: FastAPI request with user in state
         tenant_id: Tenant ID from path
-        autonomous_agent_id: Autonomous agent ID from path
+        workflow_id: Workflow ID from path
         key_number: Key number (1 for primary, 2 for secondary)
-        handler: Autonomous agent handler dependency
+        handler: Workflow handler dependency
 
     Returns:
         The new API key
@@ -755,53 +743,51 @@ async def rotate_autonomous_agent_key(
         user_id = user.identity.get_id()
 
         return handler.rotate_api_key(
-            tenant_id=tenant_id, autonomous_agent_id=autonomous_agent_id, key_number=key_number, user_id=user_id
+            tenant_id=tenant_id, workflow_id=workflow_id, key_number=key_number, user_id=user_id
         )
-    except AutonomousAgentNotFoundError as e:
+    except WorkflowNotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
-    except AutonomousAgentApiKeysNotAllowedError as e:
+    except WorkflowApiKeysNotAllowedError as e:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
-    except AutonomousAgentKeyNotFoundError as e:
+    except WorkflowKeyNotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except HTTPException:
         raise
     except Exception as e:
-        logger.error("Failed to rotate autonomous agent key: %s", e, exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to rotate autonomous agent key"
-        )
+        logger.error("Failed to rotate workflow key: %s", e, exc_info=True)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to rotate workflow key")
 
 
 # ========== API Key Validation Endpoint (Agent Service) ==========
 
 
 @router.post(
-    "/{autonomous_agent_id}/validate-api-key",
-    summary="Validate autonomous agent API key",
+    "/{workflow_id}/validate-api-key",
+    summary="Validate workflow API key",
     description="""
-    Lightweight endpoint to validate an autonomous agent API key without loading
+    Lightweight endpoint to validate an workflow API key without loading
     the full configuration or credential secrets.
 
     **Authentication**: This endpoint uses API key authentication via the
-    `X-Unified-UI-Autonomous-Agent-API-Key` header (NOT Bearer token).
+    `X-Unified-UI-Workflow-API-Key` header (NOT Bearer token).
 
-    Returns the autonomous agent ID and tenant ID if the API key is valid.
+    Returns the workflow ID and tenant ID if the API key is valid.
     This is used by the agent-service to validate API keys for trace ingestion
     without triggering credential secret resolution.
     """,
 )
-@authenticate_autonomous_agent_api_key()
-async def validate_autonomous_agent_api_key(
+@authenticate_workflow_api_key()
+async def validate_workflow_api_key(
     request: Request,
     tenant_id: str,
-    autonomous_agent_id: str,
+    workflow_id: str,
 ) -> dict:
-    autonomous_agent = request.state.autonomous_agent
+    workflow = request.state.workflow
     return {
         "valid": True,
-        "autonomous_agent_id": str(autonomous_agent.id),
+        "workflow_id": str(workflow.id),
         "tenant_id": tenant_id,
     }
 
@@ -810,76 +796,76 @@ async def validate_autonomous_agent_api_key(
 
 
 @router.get(
-    "/{autonomous_agent_id}/config",
-    response_model=AutonomousAgentConfigResponse,
-    summary="Get autonomous agent configuration (API Key)",
+    "/{workflow_id}/config",
+    response_model=WorkflowConfigResponse,
+    summary="Get workflow configuration (API Key)",
     description="""
-    Get the full autonomous agent configuration including credential secrets.
+    Get the full workflow configuration including credential secrets.
 
     **Authentication**: This endpoint uses API key authentication via the
-    `X-Unified-UI-Autonomous-Agent-API-Key` header (NOT Bearer token).
+    `X-Unified-UI-Workflow-API-Key` header (NOT Bearer token).
 
-    The API key must match either the primary or secondary key of the autonomous agent.
+    The API key must match either the primary or secondary key of the workflow.
 
     This endpoint is designed for external systems (like N8N) to fetch configuration
-    and credentials needed to perform autonomous agent operations.
+    and credentials needed to perform workflow operations.
 
     **IMPORTANT**: No caching is used for this endpoint to ensure key rotation
     takes effect immediately.
     """,
 )
-@authenticate_autonomous_agent_api_key()
-async def get_autonomous_agent_config(
+@authenticate_workflow_api_key()
+async def get_workflow_config(
     request: Request,
     tenant_id: str,
-    autonomous_agent_id: str,
-    handler: AutonomousAgentHandler = Depends(get_autonomous_agent_handler),
+    workflow_id: str,
+    handler: WorkflowHandler = Depends(get_workflow_handler),
     credential_handler: CredentialHandler = Depends(get_credential_handler),
-) -> AutonomousAgentConfigResponse:
+) -> WorkflowConfigResponse:
     """
-    Get autonomous agent configuration with resolved credentials via API Key auth.
+    Get workflow configuration with resolved credentials via API Key auth.
 
     Args:
-        request: FastAPI request with autonomous_agent in state
+        request: FastAPI request with workflow in state
         tenant_id: Tenant ID from path
-        autonomous_agent_id: Autonomous agent ID from path
-        handler: Autonomous agent handler dependency
+        workflow_id: Workflow ID from path
+        handler: Workflow handler dependency
         credential_handler: Credential handler for fetching secrets
 
     Returns:
-        AutonomousAgentConfigResponse with full config including secrets
+        WorkflowConfigResponse with full config including secrets
     """
     try:
-        autonomous_agent = request.state.autonomous_agent
+        workflow = request.state.workflow
 
-        return handler.get_autonomous_agent_config(
+        return handler.get_workflow_config(
             tenant_id=tenant_id,
-            autonomous_agent_id=autonomous_agent_id,
-            autonomous_agent=autonomous_agent,
+            workflow_id=workflow_id,
+            workflow=workflow,
             credential_handler=credential_handler,
         )
     except InvalidCredentialError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
-    except AutonomousAgentNotFoundError as e:
+    except WorkflowNotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except HTTPException:
         raise
     except Exception as e:
-        logger.error("Failed to get autonomous agent config: %s", e, exc_info=True)
+        logger.error("Failed to get workflow config: %s", e, exc_info=True)
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to get autonomous agent configuration"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to get workflow configuration"
         )
 
 
 @router.get(
-    "/{autonomous_agent_id}/config/bearer",
-    response_model=AutonomousAgentConfigResponse,
-    summary="Get autonomous agent configuration (Bearer)",
+    "/{workflow_id}/config/bearer",
+    response_model=WorkflowConfigResponse,
+    summary="Get workflow configuration (Bearer)",
     description="""
-    Get the full autonomous agent configuration including credential secrets.
+    Get the full workflow configuration including credential secrets.
 
     **Authentication**: This endpoint uses Bearer token authentication.
-    Requires WRITE or ADMIN permission on the autonomous agent (direct or via group).
+    Requires WRITE or ADMIN permission on the workflow (direct or via group).
 
     This enables users and service principals to fetch agent configuration
     for trace import operations without needing the agent's API key.
@@ -887,75 +873,73 @@ async def get_autonomous_agent_config(
 )
 @authenticate("X_AGENT_SERVICE_KEY")
 @check_permissions(
-    entity="autonomous_agent",
+    entity="workflow",
     required_permissions=[
         TenantRolesEnum.TENANT_GLOBAL_ADMIN,
-        TenantRolesEnum.AUTONOMOUS_AGENTS_ADMIN,
+        TenantRolesEnum.WORKFLOWS_ADMIN,
         PermissionActionEnum.ADMIN,
         PermissionActionEnum.WRITE,
     ],
 )
-async def get_autonomous_agent_config_bearer(
+async def get_workflow_config_bearer(
     request: Request,
     tenant_id: str,
-    autonomous_agent_id: str,
-    handler: AutonomousAgentHandler = Depends(get_autonomous_agent_handler),
+    workflow_id: str,
+    handler: WorkflowHandler = Depends(get_workflow_handler),
     credential_handler: CredentialHandler = Depends(get_credential_handler),
-) -> AutonomousAgentConfigResponse:
+) -> WorkflowConfigResponse:
     """
-    Get autonomous agent configuration with resolved credentials via Bearer auth.
+    Get workflow configuration with resolved credentials via Bearer auth.
 
     Args:
         request: FastAPI request with user in state
         tenant_id: Tenant ID from path
-        autonomous_agent_id: Autonomous agent ID from path
-        handler: Autonomous agent handler dependency
+        workflow_id: Workflow ID from path
+        handler: Workflow handler dependency
         credential_handler: Credential handler for fetching secrets
 
     Returns:
-        AutonomousAgentConfigResponse with full config including secrets
+        WorkflowConfigResponse with full config including secrets
     """
     try:
-        autonomous_agent = handler.get_autonomous_agent_model(
-            tenant_id=tenant_id, autonomous_agent_id=autonomous_agent_id
-        )
+        workflow = handler.get_workflow_model(tenant_id=tenant_id, workflow_id=workflow_id)
 
-        return handler.get_autonomous_agent_config(
+        return handler.get_workflow_config(
             tenant_id=tenant_id,
-            autonomous_agent_id=autonomous_agent_id,
-            autonomous_agent=autonomous_agent,
+            workflow_id=workflow_id,
+            workflow=workflow,
             credential_handler=credential_handler,
         )
     except InvalidCredentialError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
-    except AutonomousAgentNotFoundError as e:
+    except WorkflowNotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except HTTPException:
         raise
     except Exception as e:
-        logger.error("Failed to get autonomous agent config: %s", e, exc_info=True)
+        logger.error("Failed to get workflow config: %s", e, exc_info=True)
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to get autonomous agent configuration"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to get workflow configuration"
         )
 
 
 @router.get(
-    "/{autonomous_agent_id}/workflow-runs",
+    "/{workflow_id}/workflow-runs",
     response_model=WorkflowRunsListResponse,
     summary="List workflow runs",
     description="""
     List workflow execution runs from the external workflow platform (e.g., N8N).
     Fetches recent executions using the agent's stored configuration and credentials.
 
-    Requires WRITE or ADMIN permission on the autonomous agent.
+    Requires WRITE or ADMIN permission on the workflow.
     """,
 )
 @authenticate()
 @check_permissions(
-    entity="autonomous_agent",
+    entity="workflow",
     required_permissions=[
         TenantRolesEnum.TENANT_GLOBAL_ADMIN,
-        TenantRolesEnum.AUTONOMOUS_AGENTS_ADMIN,
+        TenantRolesEnum.WORKFLOWS_ADMIN,
         PermissionActionEnum.ADMIN,
         PermissionActionEnum.WRITE,
     ],
@@ -963,25 +947,25 @@ async def get_autonomous_agent_config_bearer(
 async def list_workflow_runs(
     request: Request,
     tenant_id: str,
-    autonomous_agent_id: str,
+    workflow_id: str,
     limit: int = Query(20, ge=1, le=100, description="Maximum number of runs to return"),
     cursor: str | None = Query(None, description="Pagination cursor for next page"),
     execution_status: str | None = Query(
         None, alias="status", description="Filter by execution status (e.g., success, error, running)"
     ),
-    handler: AutonomousAgentHandler = Depends(get_autonomous_agent_handler),
+    handler: WorkflowHandler = Depends(get_workflow_handler),
     credential_handler: CredentialHandler = Depends(get_credential_handler),
 ) -> WorkflowRunsListResponse:
-    """List workflow runs for an autonomous agent.
+    """List workflow runs for an workflow.
 
     Args:
         request: FastAPI request
         tenant_id: Tenant ID from path
-        autonomous_agent_id: Autonomous agent ID from path
+        workflow_id: Workflow ID from path
         limit: Maximum number of runs to return
         cursor: Pagination cursor for next page
         execution_status: Filter by execution status
-        handler: Autonomous agent handler dependency
+        handler: Workflow handler dependency
         credential_handler: Credential handler for fetching secrets
 
     Returns:
@@ -990,15 +974,15 @@ async def list_workflow_runs(
     try:
         return handler.get_workflow_runs(
             tenant_id=tenant_id,
-            autonomous_agent_id=autonomous_agent_id,
+            workflow_id=workflow_id,
             credential_handler=credential_handler,
             limit=limit,
             cursor=cursor,
             status=execution_status,
         )
-    except AutonomousAgentNotFoundError as e:
+    except WorkflowNotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
-    except UnsupportedAutonomousAgentTypeError as e:
+    except UnsupportedWorkflowTypeError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except HTTPException:
         raise
@@ -1008,22 +992,22 @@ async def list_workflow_runs(
 
 
 @router.get(
-    "/{autonomous_agent_id}/workflow-runs/{execution_id}",
+    "/{workflow_id}/workflow-runs/{execution_id}",
     response_model=WorkflowRunDetailResponse,
     summary="Get workflow run detail",
     description="""
     Get a single workflow execution with full data (input/output) from the external platform.
     Uses includeData=true to fetch the complete execution data.
 
-    Requires WRITE or ADMIN permission on the autonomous agent.
+    Requires WRITE or ADMIN permission on the workflow.
     """,
 )
 @authenticate()
 @check_permissions(
-    entity="autonomous_agent",
+    entity="workflow",
     required_permissions=[
         TenantRolesEnum.TENANT_GLOBAL_ADMIN,
-        TenantRolesEnum.AUTONOMOUS_AGENTS_ADMIN,
+        TenantRolesEnum.WORKFLOWS_ADMIN,
         PermissionActionEnum.ADMIN,
         PermissionActionEnum.WRITE,
     ],
@@ -1031,9 +1015,9 @@ async def list_workflow_runs(
 async def get_workflow_run_detail(
     request: Request,
     tenant_id: str,
-    autonomous_agent_id: str,
+    workflow_id: str,
     execution_id: str,
-    handler: AutonomousAgentHandler = Depends(get_autonomous_agent_handler),
+    handler: WorkflowHandler = Depends(get_workflow_handler),
     credential_handler: CredentialHandler = Depends(get_credential_handler),
 ) -> WorkflowRunDetailResponse:
     """Get full details of a single workflow execution.
@@ -1041,9 +1025,9 @@ async def get_workflow_run_detail(
     Args:
         request: FastAPI request
         tenant_id: Tenant ID from path
-        autonomous_agent_id: Autonomous agent ID from path
+        workflow_id: Workflow ID from path
         execution_id: Execution ID from path
-        handler: Autonomous agent handler dependency
+        handler: Workflow handler dependency
         credential_handler: Credential handler for fetching secrets
 
     Returns:
@@ -1052,15 +1036,15 @@ async def get_workflow_run_detail(
     try:
         return handler.get_workflow_run_detail(
             tenant_id=tenant_id,
-            autonomous_agent_id=autonomous_agent_id,
+            workflow_id=workflow_id,
             execution_id=execution_id,
             credential_handler=credential_handler,
         )
-    except AutonomousAgentNotFoundError as e:
+    except WorkflowNotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
-    except UnsupportedAutonomousAgentTypeError as e:
+    except UnsupportedWorkflowTypeError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
-    except AutonomousAgentConfigValidationError as e:
+    except WorkflowConfigValidationError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except HTTPException:
         raise
@@ -1072,21 +1056,21 @@ async def get_workflow_run_detail(
 
 
 @router.post(
-    "/{autonomous_agent_id}/workflow-runs/{execution_id}/retry",
+    "/{workflow_id}/workflow-runs/{execution_id}/retry",
     response_model=WorkflowRunRetryResponse,
     summary="Retry workflow execution",
     description="""
     Retry a failed workflow execution. Only executions with status 'error' can be retried.
 
-    Requires WRITE or ADMIN permission on the autonomous agent.
+    Requires WRITE or ADMIN permission on the workflow.
     """,
 )
 @authenticate()
 @check_permissions(
-    entity="autonomous_agent",
+    entity="workflow",
     required_permissions=[
         TenantRolesEnum.TENANT_GLOBAL_ADMIN,
-        TenantRolesEnum.AUTONOMOUS_AGENTS_ADMIN,
+        TenantRolesEnum.WORKFLOWS_ADMIN,
         PermissionActionEnum.ADMIN,
         PermissionActionEnum.WRITE,
     ],
@@ -1094,9 +1078,9 @@ async def get_workflow_run_detail(
 async def retry_workflow_run(
     request: Request,
     tenant_id: str,
-    autonomous_agent_id: str,
+    workflow_id: str,
     execution_id: str,
-    handler: AutonomousAgentHandler = Depends(get_autonomous_agent_handler),
+    handler: WorkflowHandler = Depends(get_workflow_handler),
     credential_handler: CredentialHandler = Depends(get_credential_handler),
 ) -> WorkflowRunRetryResponse:
     """Retry a failed workflow execution.
@@ -1104,9 +1088,9 @@ async def retry_workflow_run(
     Args:
         request: FastAPI request
         tenant_id: Tenant ID from path
-        autonomous_agent_id: Autonomous agent ID from path
+        workflow_id: Workflow ID from path
         execution_id: Execution ID to retry
-        handler: Autonomous agent handler dependency
+        handler: Workflow handler dependency
         credential_handler: Credential handler for fetching secrets
 
     Returns:
@@ -1115,15 +1099,15 @@ async def retry_workflow_run(
     try:
         return handler.retry_workflow_run(
             tenant_id=tenant_id,
-            autonomous_agent_id=autonomous_agent_id,
+            workflow_id=workflow_id,
             execution_id=execution_id,
             credential_handler=credential_handler,
         )
-    except AutonomousAgentNotFoundError as e:
+    except WorkflowNotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
-    except UnsupportedAutonomousAgentTypeError as e:
+    except UnsupportedWorkflowTypeError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
-    except AutonomousAgentConfigValidationError as e:
+    except WorkflowConfigValidationError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except HTTPException:
         raise
@@ -1135,21 +1119,21 @@ async def retry_workflow_run(
 
 
 @router.post(
-    "/{autonomous_agent_id}/workflow-start",
+    "/{workflow_id}/workflow-start",
     summary="Start workflow",
     description="""
     Trigger the workflow via its configured webhook URL.
-    The autonomous agent must have a webhook_url configured.
+    The workflow must have a webhook_url configured.
 
-    Requires WRITE or ADMIN permission on the autonomous agent.
+    Requires WRITE or ADMIN permission on the workflow.
     """,
 )
 @authenticate()
 @check_permissions(
-    entity="autonomous_agent",
+    entity="workflow",
     required_permissions=[
         TenantRolesEnum.TENANT_GLOBAL_ADMIN,
-        TenantRolesEnum.AUTONOMOUS_AGENTS_ADMIN,
+        TenantRolesEnum.WORKFLOWS_ADMIN,
         PermissionActionEnum.ADMIN,
         PermissionActionEnum.WRITE,
     ],
@@ -1157,9 +1141,9 @@ async def retry_workflow_run(
 async def start_workflow(
     request: Request,
     tenant_id: str,
-    autonomous_agent_id: str,
+    workflow_id: str,
     body: StartWorkflowRequest | None = None,
-    handler: AutonomousAgentHandler = Depends(get_autonomous_agent_handler),
+    handler: WorkflowHandler = Depends(get_workflow_handler),
 ) -> dict:
     """
     Trigger a workflow via webhook.
@@ -1167,9 +1151,9 @@ async def start_workflow(
     Args:
         request: FastAPI request
         tenant_id: Tenant ID from path
-        autonomous_agent_id: Autonomous agent ID from path
+        workflow_id: Workflow ID from path
         body: Optional request body with webhook payload
-        handler: Autonomous agent handler dependency
+        handler: Workflow handler dependency
 
     Returns:
         Response from the webhook endpoint
@@ -1177,16 +1161,16 @@ async def start_workflow(
     try:
         return handler.start_workflow(
             tenant_id=tenant_id,
-            autonomous_agent_id=autonomous_agent_id,
+            workflow_id=workflow_id,
             body=body.body if body else None,
             files=[f.model_dump(by_alias=True) for f in body.files] if body and body.files else None,
             query_params=body.query_params if body else None,
         )
-    except AutonomousAgentNotFoundError as e:
+    except WorkflowNotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
-    except UnsupportedAutonomousAgentTypeError as e:
+    except UnsupportedWorkflowTypeError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
-    except AutonomousAgentConfigValidationError as e:
+    except WorkflowConfigValidationError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except HTTPException:
         raise

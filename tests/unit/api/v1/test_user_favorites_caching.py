@@ -224,9 +224,9 @@ class TestUserFavoritesCaching:
         )
         assert response1.json()["total"] == 1
 
-        # List autonomous-agents favorites - should be separate cache
+        # List workflows favorites - should be separate cache
         response2 = test_client.get(
-            ENDPOINT_USER_FAVORITES.format(tenant_id=tenant_id, user_id=user_id, resource_type="autonomous-agents"),
+            ENDPOINT_USER_FAVORITES.format(tenant_id=tenant_id, user_id=user_id, resource_type="workflows"),
             headers=headers_cache,
         )
         assert response2.json()["total"] == 0

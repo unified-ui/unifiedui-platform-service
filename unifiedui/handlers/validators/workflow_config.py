@@ -1,12 +1,12 @@
-"""Autonomous agent configuration validators using factory pattern."""
+"""Workflow configuration validators using factory pattern."""
 
 from abc import ABC, abstractmethod
 from typing import Any
 
 from pydantic import BaseModel, Field, field_validator
 
-from unifiedui.core.database.enums import AutonomousAgentTypeEnum
-from unifiedui.exc.autonomous_agents import AutonomousAgentConfigValidationError, UnsupportedAutonomousAgentTypeError
+from unifiedui.core.database.enums import WorkflowTypeEnum
+from unifiedui.exc.workflows import UnsupportedWorkflowTypeError, WorkflowConfigValidationError
 from unifiedui.logger import get_logger
 
 logger = get_logger(__name__)
@@ -15,10 +15,10 @@ logger = get_logger(__name__)
 # ========== N8N Config Schema ==========
 
 
-class N8NAutonomousAgentConfig(BaseModel):
-    """Pydantic model for N8N autonomous agent configuration validation."""
+class N8NWorkflowConfig(BaseModel):
+    """Pydantic model for N8N workflow configuration validation."""
 
-    api_version: str = Field(..., description="API version for the autonomous agent (currently only 'v1' is supported)")
+    api_version: str = Field(..., description="API version for the workflow (currently only 'v1' is supported)")
     workflow_endpoint: str = Field(
         ...,
         min_length=1,
@@ -94,8 +94,8 @@ class N8NAutonomousAgentConfig(BaseModel):
 # ========== Base Validator Interface ==========
 
 
-class BaseAutonomousAgentConfigValidator(ABC):
-    """Abstract base class for autonomous agent config validators."""
+class BaseWorkflowConfigValidator(ABC):
+    """Abstract base class for workflow config validators."""
 
     @abstractmethod
     def validate(self, config: dict[str, Any]) -> dict[str, Any]:
@@ -109,21 +109,21 @@ class BaseAutonomousAgentConfigValidator(ABC):
             Validated configuration dictionary
 
         Raises:
-            AutonomousAgentConfigValidationError: If validation fails
+            WorkflowConfigValidationError: If validation fails
         """
         pass
 
     @abstractmethod
-    def get_supported_type(self) -> AutonomousAgentTypeEnum:
-        """Get the autonomous agent type this validator supports."""
+    def get_supported_type(self) -> WorkflowTypeEnum:
+        """Get the workflow type this validator supports."""
         pass
 
 
 # ========== N8N Validator ==========
 
 
-class N8NAutonomousAgentConfigValidator(BaseAutonomousAgentConfigValidator):
-    """Validator for N8N autonomous agent configuration."""
+class N8NWorkflowConfigValidator(BaseWorkflowConfigValidator):
+    """Validator for N8N workflow configuration."""
 
     def validate(self, config: dict[str, Any]) -> dict[str, Any]:
         """
@@ -136,81 +136,79 @@ class N8NAutonomousAgentConfigValidator(BaseAutonomousAgentConfigValidator):
             Validated configuration dictionary with defaults applied
 
         Raises:
-            AutonomousAgentConfigValidationError: If validation fails
+            WorkflowConfigValidationError: If validation fails
         """
         try:
-            validated = N8NAutonomousAgentConfig(**config)
+            validated = N8NWorkflowConfig(**config)
             return validated.model_dump(exclude_none=True)
         except Exception as e:
-            logger.error("N8N autonomous agent config validation failed: %s", e)
-            raise AutonomousAgentConfigValidationError(
-                message=f"N8N configuration validation failed: {e!s}", errors=[str(e)]
-            )
+            logger.error("N8N workflow config validation failed: %s", e)
+            raise WorkflowConfigValidationError(message=f"N8N configuration validation failed: {e!s}", errors=[str(e)])
 
-    def get_supported_type(self) -> AutonomousAgentTypeEnum:
-        return AutonomousAgentTypeEnum.N8N
+    def get_supported_type(self) -> WorkflowTypeEnum:
+        return WorkflowTypeEnum.N8N
 
 
 # ========== Config Validator Factory ==========
 
 
-class AutonomousAgentConfigValidatorFactory:
-    """Factory for creating autonomous agent config validators based on type."""
+class WorkflowConfigValidatorFactory:
+    """Factory for creating workflow config validators based on type."""
 
-    _validators: dict[AutonomousAgentTypeEnum, BaseAutonomousAgentConfigValidator] = {
-        AutonomousAgentTypeEnum.N8N: N8NAutonomousAgentConfigValidator(),
+    _validators: dict[WorkflowTypeEnum, BaseWorkflowConfigValidator] = {
+        WorkflowTypeEnum.N8N: N8NWorkflowConfigValidator(),
     }
 
     @classmethod
-    def get_validator(cls, agent_type: AutonomousAgentTypeEnum) -> BaseAutonomousAgentConfigValidator:
+    def get_validator(cls, agent_type: WorkflowTypeEnum) -> BaseWorkflowConfigValidator:
         """
-        Get the validator for the specified autonomous agent type.
+        Get the validator for the specified workflow type.
 
         Args:
-            agent_type: The type of autonomous agent
+            agent_type: The type of workflow
 
         Returns:
             The appropriate config validator
 
         Raises:
-            UnsupportedAutonomousAgentTypeError: If the agent type is not supported
+            UnsupportedWorkflowTypeError: If the agent type is not supported
         """
         validator = cls._validators.get(agent_type)
         if validator is None:
-            raise UnsupportedAutonomousAgentTypeError(agent_type.value)
+            raise UnsupportedWorkflowTypeError(agent_type.value)
         return validator
 
     @classmethod
-    def validate_config(cls, agent_type: AutonomousAgentTypeEnum, config: dict[str, Any] | None) -> dict[str, Any]:
+    def validate_config(cls, agent_type: WorkflowTypeEnum, config: dict[str, Any] | None) -> dict[str, Any]:
         """
-        Validate configuration for the specified autonomous agent type.
+        Validate configuration for the specified workflow type.
 
         Args:
-            agent_type: The type of autonomous agent
+            agent_type: The type of workflow
             config: Configuration dictionary to validate (can be None or empty)
 
         Returns:
             Validated configuration dictionary
 
         Raises:
-            UnsupportedAutonomousAgentTypeError: If the agent type is not supported
-            AutonomousAgentConfigValidationError: If validation fails
+            UnsupportedWorkflowTypeError: If the agent type is not supported
+            WorkflowConfigValidationError: If validation fails
         """
-        # Config is REQUIRED for autonomous agents - validate even if empty
+        # Config is REQUIRED for workflows - validate even if empty
         if not config:
-            raise AutonomousAgentConfigValidationError(
-                message="Configuration is required for autonomous agents", errors=["config cannot be empty"]
+            raise WorkflowConfigValidationError(
+                message="Configuration is required for workflows", errors=["config cannot be empty"]
             )
 
         validator = cls.get_validator(agent_type)
         return validator.validate(config)
 
     @classmethod
-    def is_supported(cls, agent_type: AutonomousAgentTypeEnum) -> bool:
-        """Check if an autonomous agent type has a validator."""
+    def is_supported(cls, agent_type: WorkflowTypeEnum) -> bool:
+        """Check if a workflow type has a validator."""
         return agent_type in cls._validators
 
     @classmethod
-    def get_supported_types(cls) -> list[AutonomousAgentTypeEnum]:
-        """Get list of supported autonomous agent types."""
+    def get_supported_types(cls) -> list[WorkflowTypeEnum]:
+        """Get list of supported workflow types."""
         return list(cls._validators.keys())

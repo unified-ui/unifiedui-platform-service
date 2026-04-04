@@ -5,7 +5,6 @@ from fastapi.responses import JSONResponse
 
 from unifiedui.apis.v1 import (
     auth,
-    autonomous_agents,
     chat_agents,
     chat_widgets,
     conversations,
@@ -25,10 +24,10 @@ from unifiedui.apis.v1 import (
     tenants,
     tools,
     user_favorites,
+    workflows,
 )
 from unifiedui.core.config import settings
 from unifiedui.exc.auth import AuthError, InvalidCredentialsError, InvalidRefreshTokenError, LDAPConnectionError
-from unifiedui.exc.autonomous_agents import AutonomousAgentNotFoundError
 from unifiedui.exc.chat_agent_config import (
     ChatAgentConfigValidationError,
     InvalidCredentialError,
@@ -67,6 +66,7 @@ from unifiedui.exc.tools import (
     ToolNotFoundError,
     UnsupportedToolTypeError,
 )
+from unifiedui.exc.workflows import WorkflowNotFoundError
 from unifiedui.handlers.validators.credential_validator import (
     CredentialValidationError,
     UnsupportedCredentialTypeError,
@@ -224,11 +224,11 @@ def create_app() -> FastAPI:
         """Handle conversation not found errors."""
         return JSONResponse(status_code=404, content={"detail": str(exc)})
 
-    # Autonomous Agent exception handlers
+    # Workflow exception handlers
 
-    @app.exception_handler(AutonomousAgentNotFoundError)
-    async def autonomous_agent_not_found_handler(request: Request, exc: AutonomousAgentNotFoundError):
-        """Handle autonomous agent not found errors."""
+    @app.exception_handler(WorkflowNotFoundError)
+    async def workflow_not_found_handler(request: Request, exc: WorkflowNotFoundError):
+        """Handle workflow not found errors."""
         return JSONResponse(status_code=404, content={"detail": str(exc)})
 
     # Chat Widget exception handlers
@@ -388,14 +388,12 @@ def create_app() -> FastAPI:
     )
 
     app.include_router(
-        tags.autonomous_agents_tags_list_router,
+        tags.workflows_tags_list_router,
         prefix="/api/v1/platform-service/tenants/{tenant_id}",
-        tags=["Autonomous Agents"],
+        tags=["Workflows"],
     )
 
-    app.include_router(
-        autonomous_agents.router, prefix="/api/v1/platform-service/tenants/{tenant_id}", tags=["Autonomous Agents"]
-    )
+    app.include_router(workflows.router, prefix="/api/v1/platform-service/tenants/{tenant_id}", tags=["Workflows"])
 
     app.include_router(
         tags.chat_widgets_tags_list_router, prefix="/api/v1/platform-service/tenants/{tenant_id}", tags=["Chat Widgets"]
@@ -414,9 +412,9 @@ def create_app() -> FastAPI:
     )
 
     app.include_router(
-        tags.autonomous_agent_tags_router,
+        tags.workflow_tags_router,
         prefix="/api/v1/platform-service/tenants/{tenant_id}",
-        tags=["Autonomous Agents"],
+        tags=["Workflows"],
     )
 
     app.include_router(

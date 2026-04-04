@@ -9,9 +9,6 @@ from sqlalchemy import cast as sql_cast
 
 from unifiedui.core.database.enums import PrincipalTypeEnum, TenantRolesEnum
 from unifiedui.core.database.models import (
-    AutonomousAgent,
-    AutonomousAgentMember,
-    AutonomousAgentTag,
     ChatAgent,
     ChatAgentMember,
     ChatAgentTag,
@@ -33,6 +30,9 @@ from unifiedui.core.database.models import (
     Tool,
     ToolMember,
     ToolTag,
+    Workflow,
+    WorkflowMember,
+    WorkflowTag,
 )
 
 if TYPE_CHECKING:
@@ -47,7 +47,7 @@ logger = get_logger(__name__)
 
 VALID_SEARCH_TYPES = {
     "chat_agent",
-    "autonomous_agent",
+    "workflow",
     "conversation",
     "chat_widget",
     "external_app",
@@ -70,15 +70,15 @@ MEMBER_SEARCH_TYPE_CONFIG = {
             TenantRolesEnum.CHAT_AGENTS_ADMIN,
         ],
     },
-    "autonomous_agent": {
-        "entity_model": AutonomousAgent,
-        "member_model": AutonomousAgentMember,
-        "entity_id_field": "autonomous_agent_id",
-        "tag_model": AutonomousAgentTag,
-        "tag_entity_id_field": "autonomous_agent_id",
+    "workflow": {
+        "entity_model": Workflow,
+        "member_model": WorkflowMember,
+        "entity_id_field": "workflow_id",
+        "tag_model": WorkflowTag,
+        "tag_entity_id_field": "workflow_id",
         "admin_roles": [
             TenantRolesEnum.TENANT_GLOBAL_ADMIN,
-            TenantRolesEnum.AUTONOMOUS_AGENTS_ADMIN,
+            TenantRolesEnum.WORKFLOWS_ADMIN,
         ],
     },
     "conversation": {

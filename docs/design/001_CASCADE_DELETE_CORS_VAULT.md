@@ -298,7 +298,7 @@ cors_allow_headers: list[str] = [
     "X-Service-Key",
     "X-Request-ID",
     "X-Correlation-ID",
-    "X-Unified-UI-Autonomous-Agent-API-Key",
+    "X-Unified-UI-Workflow-API-Key",
     "Cache-Control",
 ]
 ```

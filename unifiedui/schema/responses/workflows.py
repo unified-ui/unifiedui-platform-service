@@ -1,26 +1,26 @@
-"""Response schemas for autonomous agents."""
+"""Response schemas for workflows."""
 
 from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from unifiedui.core.database.enums import AutonomousAgentTypeEnum
+from unifiedui.core.database.enums import WorkflowTypeEnum
 from unifiedui.schema.responses.tags import TagSummary
 
 
-class AutonomousAgentResponse(BaseModel):
-    """Response model for an autonomous agent."""
+class WorkflowResponse(BaseModel):
+    """Response model for a workflow."""
 
-    id: str = Field(..., description="Autonomous agent ID")
+    id: str = Field(..., description="Workflow ID")
     tenant_id: str = Field(..., description="Tenant ID")
-    name: str = Field(..., description="Autonomous agent name")
-    description: str | None = Field(None, description="Autonomous agent description")
-    type: AutonomousAgentTypeEnum = Field(..., description="Type of autonomous agent")
-    config: dict = Field(default_factory=dict, description="Autonomous agent configuration")
-    is_active: bool = Field(..., description="Whether the autonomous agent is active")
-    allow_api_keys: bool = Field(..., description="Whether API key authentication is allowed for this agent")
+    name: str = Field(..., description="Workflow name")
+    description: str | None = Field(None, description="Workflow description")
+    type: WorkflowTypeEnum = Field(..., description="Type of workflow")
+    config: dict = Field(default_factory=dict, description="Workflow configuration")
+    is_active: bool = Field(..., description="Whether the workflow is active")
+    allow_api_keys: bool = Field(..., description="Whether API key authentication is allowed for this workflow")
     last_full_import: datetime | None = Field(None, description="Timestamp of last full import (system managed)")
-    tags: list[TagSummary] = Field(default_factory=list, description="Tags on the autonomous agent")
+    tags: list[TagSummary] = Field(default_factory=list, description="Tags on the workflow")
     created_at: datetime = Field(..., description="Creation timestamp")
     updated_at: datetime = Field(..., description="Last update timestamp")
     created_by: str | None = Field(None, description="Creator user ID")
@@ -30,8 +30,8 @@ class AutonomousAgentResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-class AutonomousAgentKeyResponse(BaseModel):
-    """Response model for an autonomous agent API key."""
+class WorkflowKeyResponse(BaseModel):
+    """Response model for a workflow API key."""
 
     key: str = Field(..., description="The API key value")
     key_number: int = Field(..., description="Key number (1 or 2)")
@@ -56,8 +56,8 @@ class CredentialSecretResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-class N8NAutonomousAgentConfigSettingsResponse(BaseModel):
-    """Response model for N8N autonomous agent config settings."""
+class N8NWorkflowConfigSettingsResponse(BaseModel):
+    """Response model for N8N workflow config settings."""
 
     api_version: str = Field(..., description="API version")
     n8n_host: str = Field(..., description="N8N host URL")
@@ -68,19 +68,19 @@ class N8NAutonomousAgentConfigSettingsResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-class AutonomousAgentConfigResponse(BaseModel):
-    """
-    Response model for autonomous agent configuration (for agent service).
+class WorkflowConfigResponse(BaseModel):
+    """Response model for workflow configuration (for agent service).
+
     Returns full config with credential secrets.
-    No user info is included since autonomous agents run on their own schedule.
+    No user info is included since workflows run on their own schedule.
     """
 
     docversion: str = Field(default="v1", description="Document version")
-    type: AutonomousAgentTypeEnum = Field(..., description="Autonomous agent type")
+    type: WorkflowTypeEnum = Field(..., description="Workflow type")
     tenant_id: str = Field(..., description="Tenant ID")
-    autonomous_agent_id: str = Field(..., description="Autonomous agent ID")
-    settings: N8NAutonomousAgentConfigSettingsResponse | dict = Field(
-        ..., description="Agent settings with resolved credentials"
+    workflow_id: str = Field(..., description="Workflow ID")
+    settings: N8NWorkflowConfigSettingsResponse | dict = Field(
+        ..., description="Workflow settings with resolved credentials"
     )
 
     model_config = ConfigDict(from_attributes=True)

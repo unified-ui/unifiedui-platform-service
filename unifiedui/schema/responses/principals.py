@@ -26,7 +26,7 @@ class PrincipalWithRolesResponse(BaseModel):
     """Response model for a principal with roles on a resource.
 
     This is the unified response schema for all resource principal endpoints
-    (chat_agents, autonomous_agents, chat_widgets, conversations, credentials,
+    (chat_agents, workflows, chat_widgets, conversations, credentials,
     custom_groups).
     """
 
@@ -49,6 +49,6 @@ class ResourcePrincipalsResponse(BaseModel):
     """
 
     resource_id: str = Field(..., description="The resource ID")
-    resource_type: str = Field(..., description="The resource type (chat_agent, autonomous_agent, etc.)")
+    resource_type: str = Field(..., description="The resource type (chat_agent, workflow, etc.)")
     tenant_id: str = Field(..., description="The tenant ID")
     principals: list[PrincipalWithRolesResponse] = Field(..., description="List of principals with their roles")

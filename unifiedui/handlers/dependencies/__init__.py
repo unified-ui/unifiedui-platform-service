@@ -9,9 +9,6 @@ This package provides dependency injection functions for:
 All dependencies are initialized lazily and cached globally.
 """
 
-# Database dependencies
-from unifiedui.handlers.dependencies.autonomous_agents import get_autonomous_agent_handler
-
 # Cache dependencies
 from unifiedui.handlers.dependencies.cache import get_cache_client
 from unifiedui.handlers.dependencies.chat_agents import get_chat_agent_handler
@@ -36,8 +33,10 @@ from unifiedui.handlers.dependencies.user_favorites import get_user_favorites_ha
 # Vault dependencies
 from unifiedui.handlers.dependencies.vault import get_vault_client
 
+# Workflow dependencies
+from unifiedui.handlers.dependencies.workflows import get_workflow_handler
+
 __all__ = [
-    "get_autonomous_agent_handler",
     # Cache
     "get_cache_client",
     "get_chat_agent_handler",
@@ -61,4 +60,6 @@ __all__ = [
     "get_user_favorites_handler",
     # Vault
     "get_vault_client",
+    # Workflows
+    "get_workflow_handler",
 ]

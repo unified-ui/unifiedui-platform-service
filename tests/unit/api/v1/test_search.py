@@ -9,12 +9,12 @@ from tests.conftest import create_auth_headers
 from tests.helpers.tenant import add_user_to_tenant, create_tenant_for_user
 from unifiedui.core.database.enums import PermissionActionEnum, PrincipalTypeEnum
 from unifiedui.core.database.models import (
-    AutonomousAgent,
-    AutonomousAgentMember,
     ChatAgent,
     ChatAgentMember,
     Conversation,
     ConversationMember,
+    Workflow,
+    WorkflowMember,
 )
 
 ENDPOINT_SEARCH = "/api/v1/platform-service/tenants/{tenant_id}/search"
@@ -59,7 +59,7 @@ def create_chat_agent_in_db(
     return app_id
 
 
-def create_autonomous_agent_in_db(
+def create_workflow_in_db(
     test_client: TestClient,
     tenant_id: str,
     user_id: str,
@@ -70,7 +70,7 @@ def create_autonomous_agent_in_db(
     """Create an autonomous agent directly in DB and return its ID."""
     agent_id = str(uuid.uuid4())
     with test_client.db_client.get_session() as session:
-        agent = AutonomousAgent(
+        agent = Workflow(
             id=agent_id,
             tenant_id=tenant_id,
             name=name,
@@ -83,10 +83,10 @@ def create_autonomous_agent_in_db(
         )
         session.add(agent)
         session.commit()
-        member = AutonomousAgentMember(
+        member = WorkflowMember(
             id=str(uuid.uuid4()),
             tenant_id=tenant_id,
-            autonomous_agent_id=agent_id,
+            workflow_id=agent_id,
             principal_id=user_id,
             role=PermissionActionEnum.ADMIN,
             created_by=user_id,
@@ -158,7 +158,7 @@ def test_search_by_name(test_client: TestClient):
 
     create_chat_agent_in_db(test_client, tenant_id, user_id, "Support Bot", "Handles support")
     create_chat_agent_in_db(test_client, tenant_id, user_id, "Invoice Agent", "Processes invoices")
-    create_autonomous_agent_in_db(test_client, tenant_id, user_id, "Support Monitor", "Monitors support")
+    create_workflow_in_db(test_client, tenant_id, user_id, "Support Monitor", "Monitors support")
 
     response = test_client.get(
         ENDPOINT_SEARCH.format(tenant_id=tenant_id),
@@ -206,7 +206,7 @@ def test_search_with_type_filter(test_client: TestClient):
     user_id = user.get_id()
 
     create_chat_agent_in_db(test_client, tenant_id, user_id, "Support App")
-    create_autonomous_agent_in_db(test_client, tenant_id, user_id, "Support Agent")
+    create_workflow_in_db(test_client, tenant_id, user_id, "Support Agent")
 
     response = test_client.get(
         ENDPOINT_SEARCH.format(tenant_id=tenant_id),
@@ -310,7 +310,7 @@ def test_search_across_multiple_types(test_client: TestClient):
     user_id = user.get_id()
 
     create_chat_agent_in_db(test_client, tenant_id, user_id, "Invoice Bot")
-    create_autonomous_agent_in_db(test_client, tenant_id, user_id, "Invoice Monitor")
+    create_workflow_in_db(test_client, tenant_id, user_id, "Invoice Monitor")
     app_id = create_chat_agent_in_db(test_client, tenant_id, user_id, "Helper App")
     create_conversation_in_db(test_client, tenant_id, user_id, app_id, "Invoice Discussion")
 
@@ -325,7 +325,7 @@ def test_search_across_multiple_types(test_client: TestClient):
     assert data["total"] == 3
     result_types = {r["type"] for r in data["results"]}
     assert "chat_agent" in result_types
-    assert "autonomous_agent" in result_types
+    assert "workflow" in result_types
     assert "conversation" in result_types
 
 

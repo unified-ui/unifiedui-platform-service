@@ -8,12 +8,12 @@ from sqlalchemy import func, select
 
 from unifiedui.core.database.enums import TenantRolesEnum
 from unifiedui.core.database.models import (
-    AutonomousAgent,
-    AutonomousAgentMember,
     ChatAgent,
     ChatAgentMember,
     Conversation,
     ConversationMember,
+    Workflow,
+    WorkflowMember,
 )
 
 if TYPE_CHECKING:
@@ -167,12 +167,12 @@ class DashboardHandler:
             has_active_field=True,
         )
 
-        autonomous_agents = self._count_entity_with_permissions(
+        workflows = self._count_entity_with_permissions(
             tenant_id=tenant_id,
             user=user,
-            entity_model=AutonomousAgent,
-            member_model=AutonomousAgentMember,
-            entity_id_field="autonomous_agent_id",
+            entity_model=Workflow,
+            member_model=WorkflowMember,
+            entity_id_field="workflow_id",
             is_admin=is_admin,
             has_active_field=True,
         )
@@ -189,7 +189,7 @@ class DashboardHandler:
 
         result = DashboardStatsResponse(
             chat_agents=chat_agents,
-            autonomous_agents=autonomous_agents,
+            workflows=workflows,
             conversations=conversations,
         )
 

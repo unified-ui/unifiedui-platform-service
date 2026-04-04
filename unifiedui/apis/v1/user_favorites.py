@@ -84,7 +84,7 @@ async def list_user_favorites(
         request: FastAPI request with user in state
         tenant_id: Tenant ID from path
         user_id: User ID from path
-        resource_type: Type of resource (chat-agents, autonomous-agents, development-platforms, conversations)
+        resource_type: Type of resource (chat-agents, workflows, development-platforms, conversations)
         handler: User favorites handler dependency
 
     Returns:
@@ -131,7 +131,7 @@ async def add_user_favorite(
         request: FastAPI request with user in state
         tenant_id: Tenant ID from path
         user_id: User ID from path
-        resource_type: Type of resource (chat-agents, autonomous-agents, development-platforms, conversations)
+        resource_type: Type of resource (chat-agents, workflows, development-platforms, conversations)
         resource_id: ID of the resource to favorite
         handler: User favorites handler dependency
 
@@ -182,7 +182,7 @@ async def remove_user_favorite(
         request: FastAPI request with user in state
         tenant_id: Tenant ID from path
         user_id: User ID from path
-        resource_type: Type of resource (chat-agents, autonomous-agents, development-platforms, conversations)
+        resource_type: Type of resource (chat-agents, workflows, development-platforms, conversations)
         resource_id: ID of the resource to unfavorite
         handler: User favorites handler dependency
 

@@ -169,18 +169,18 @@ async def list_chat_agent_tags(
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to list chat agent tags")
 
 
-# Autonomous Agents Tags Router
-autonomous_agents_tags_list_router = APIRouter(prefix="/autonomous-agents/tags")
+# Workflows Tags Router
+workflows_tags_list_router = APIRouter(prefix="/workflows/tags")
 
 
-@autonomous_agents_tags_list_router.get(
+@workflows_tags_list_router.get(
     "",
     response_model=list[TagSummary],
-    summary="List tags for autonomous agents",
-    description="Get all tags that are applied to autonomous agents",
+    summary="List tags for workflows",
+    description="Get all tags that are applied to workflows",
 )
 @authenticate()
-async def list_autonomous_agent_tags(
+async def list_workflow_tags(
     request: Request,
     tenant_id: str,
     name: str | None = Query(None, description="Filter by tag name"),
@@ -188,13 +188,13 @@ async def list_autonomous_agent_tags(
     limit: int = Query(100, ge=1, le=1000, description="Maximum number of tags to return"),
     handler: TagHandler = Depends(get_tag_handler),
 ) -> list[TagSummary]:
-    """List all tags that are applied to autonomous agents."""
+    """List all tags that are applied to workflows."""
     try:
         user: ContextIdentityUser = request.state.user
         use_cache = request.headers.get("X-Use-Cache", "true").lower() == "true"
 
         logger.info(
-            "API: List tags for autonomous agents",
+            "API: List tags for workflows",
             extra={
                 "tenant_id": tenant_id,
                 "user_id": user.identity.get_id(),
@@ -206,7 +206,7 @@ async def list_autonomous_agent_tags(
 
         return handler.list_tags_for_resource(
             tenant_id=tenant_id,
-            resource_type="autonomous_agent",
+            resource_type="workflow",
             name_filter=name,
             skip=skip,
             limit=limit,
@@ -217,10 +217,8 @@ async def list_autonomous_agent_tags(
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except Exception as e:
-        logger.error("Failed to list autonomous agent tags: %s", e, exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to list autonomous agent tags"
-        )
+        logger.error("Failed to list workflow tags: %s", e, exc_info=True)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to list workflow tags")
 
 
 # Chat Widgets Tags Router
@@ -496,87 +494,85 @@ async def delete_chat_agent_tags(
         )
 
 
-# ========== Autonomous Agent Tag Endpoints ==========
+# ========== Workflow Tag Endpoints ==========
 
-autonomous_agent_tags_router = APIRouter(prefix="/autonomous-agents/{autonomous_agent_id}/tags")
+workflow_tags_router = APIRouter(prefix="/workflows/{workflow_id}/tags")
 
 
-@autonomous_agent_tags_router.get(
+@workflow_tags_router.get(
     "",
     response_model=list[TagResponse],
-    summary="Get autonomous agent tags",
-    description="Get tags for an autonomous agent",
+    summary="Get workflow tags",
+    description="Get tags for a workflow",
 )
 @authenticate()
 @check_permissions(
-    entity="autonomous_agent",
+    entity="workflow",
     required_permissions=[
         TenantRolesEnum.TENANT_GLOBAL_ADMIN,
-        TenantRolesEnum.AUTONOMOUS_AGENTS_ADMIN,
+        TenantRolesEnum.WORKFLOWS_ADMIN,
         PermissionActionEnum.ADMIN,
         PermissionActionEnum.WRITE,
         PermissionActionEnum.READ,
     ],
 )
-async def get_autonomous_agent_tags(
-    request: Request, tenant_id: str, autonomous_agent_id: str, handler: TagHandler = Depends(get_tag_handler)
+async def get_workflow_tags(
+    request: Request, tenant_id: str, workflow_id: str, handler: TagHandler = Depends(get_tag_handler)
 ) -> list[TagResponse]:
-    """Get tags for an autonomous agent."""
+    """Get tags for a workflow."""
     try:
         user: ContextIdentityUser = request.state.user
         use_cache = request.headers.get("X-Use-Cache", "true").lower() == "true"
 
         logger.info(
-            "API: Get autonomous agent tags",
+            "API: Get workflow tags",
             extra={
                 "tenant_id": tenant_id,
-                "autonomous_agent_id": autonomous_agent_id,
+                "workflow_id": workflow_id,
                 "user_id": user.identity.get_id(),
             },
         )
 
         return handler.get_resource_tags(
-            tenant_id=tenant_id, resource_type="autonomous_agent", resource_id=autonomous_agent_id, use_cache=use_cache
+            tenant_id=tenant_id, resource_type="workflow", resource_id=workflow_id, use_cache=use_cache
         )
     except Exception as e:
-        logger.error("Failed to get autonomous agent tags: %s", e, exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to get autonomous agent tags"
-        )
+        logger.error("Failed to get workflow tags: %s", e, exc_info=True)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to get workflow tags")
 
 
-@autonomous_agent_tags_router.put(
+@workflow_tags_router.put(
     "",
     response_model=list[TagResponse],
-    summary="Set autonomous agent tags",
-    description="Set tags for an autonomous agent (replaces existing tags)",
+    summary="Set workflow tags",
+    description="Set tags for a workflow (replaces existing tags)",
 )
 @authenticate()
 @check_permissions(
-    entity="autonomous_agent",
+    entity="workflow",
     required_permissions=[
         TenantRolesEnum.TENANT_GLOBAL_ADMIN,
-        TenantRolesEnum.AUTONOMOUS_AGENTS_ADMIN,
+        TenantRolesEnum.WORKFLOWS_ADMIN,
         PermissionActionEnum.ADMIN,
         PermissionActionEnum.WRITE,
     ],
 )
-async def set_autonomous_agent_tags(
+async def set_workflow_tags(
     request: Request,
     tenant_id: str,
-    autonomous_agent_id: str,
+    workflow_id: str,
     tags_request: SetResourceTagsRequest,
     handler: TagHandler = Depends(get_tag_handler),
 ) -> list[TagResponse]:
-    """Set tags for an autonomous agent."""
+    """Set tags for a workflow."""
     try:
         user: ContextIdentityUser = request.state.user
 
         logger.info(
-            "API: Set autonomous agent tags",
+            "API: Set workflow tags",
             extra={
                 "tenant_id": tenant_id,
-                "autonomous_agent_id": autonomous_agent_id,
+                "workflow_id": workflow_id,
                 "user_id": user.identity.get_id(),
                 "tags": tags_request.tags,
             },
@@ -584,59 +580,53 @@ async def set_autonomous_agent_tags(
 
         return handler.set_resource_tags(
             tenant_id=tenant_id,
-            resource_type="autonomous_agent",
-            resource_id=autonomous_agent_id,
+            resource_type="workflow",
+            resource_id=workflow_id,
             tag_names=tags_request.tags,
             user=user,
         )
     except Exception as e:
-        logger.error("Failed to set autonomous agent tags: %s", e, exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to set autonomous agent tags"
-        )
+        logger.error("Failed to set workflow tags: %s", e, exc_info=True)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to set workflow tags")
 
 
-@autonomous_agent_tags_router.delete(
+@workflow_tags_router.delete(
     "",
     status_code=status.HTTP_204_NO_CONTENT,
-    summary="Delete autonomous agent tags",
-    description="Remove all tags from an autonomous agent",
+    summary="Delete workflow tags",
+    description="Remove all tags from a workflow",
 )
 @authenticate()
 @check_permissions(
-    entity="autonomous_agent",
+    entity="workflow",
     required_permissions=[
         TenantRolesEnum.TENANT_GLOBAL_ADMIN,
-        TenantRolesEnum.AUTONOMOUS_AGENTS_ADMIN,
+        TenantRolesEnum.WORKFLOWS_ADMIN,
         PermissionActionEnum.ADMIN,
         PermissionActionEnum.WRITE,
     ],
 )
-async def delete_autonomous_agent_tags(
-    request: Request, tenant_id: str, autonomous_agent_id: str, handler: TagHandler = Depends(get_tag_handler)
+async def delete_workflow_tags(
+    request: Request, tenant_id: str, workflow_id: str, handler: TagHandler = Depends(get_tag_handler)
 ) -> Response:
-    """Remove all tags from an autonomous agent."""
+    """Remove all tags from a workflow."""
     try:
         user: ContextIdentityUser = request.state.user
 
         logger.info(
-            "API: Delete autonomous agent tags",
+            "API: Delete workflow tags",
             extra={
                 "tenant_id": tenant_id,
-                "autonomous_agent_id": autonomous_agent_id,
+                "workflow_id": workflow_id,
                 "user_id": user.identity.get_id(),
             },
         )
 
-        handler.delete_resource_tags(
-            tenant_id=tenant_id, resource_type="autonomous_agent", resource_id=autonomous_agent_id
-        )
+        handler.delete_resource_tags(tenant_id=tenant_id, resource_type="workflow", resource_id=workflow_id)
         return Response(status_code=status.HTTP_204_NO_CONTENT)
     except Exception as e:
-        logger.error("Failed to delete autonomous agent tags: %s", e, exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to delete autonomous agent tags"
-        )
+        logger.error("Failed to delete workflow tags: %s", e, exc_info=True)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to delete workflow tags")
 
 
 # ========== Chat Widget Tag Endpoints ==========

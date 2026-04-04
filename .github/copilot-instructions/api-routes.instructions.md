@@ -178,7 +178,7 @@ app.include_router(
 @router.post("/{autonomous_agent_id}/validate-api-key")
 @authenticate_autonomous_agent_api_key()
 async def validate_api_key(request: Request, tenant_id: str, autonomous_agent_id: str):
-    # No Bearer token — uses X-Unified-UI-Autonomous-Agent-API-Key header
+    # No Bearer token — uses X-Unified-UI-Workflow-API-Key header
     ...
 ```
 

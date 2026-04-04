@@ -10,13 +10,9 @@ from tests.helpers.tenant import add_user_to_tenant_with_token, create_tenant_fo
 from unifiedui.core.database.enums import PermissionActionEnum, PrincipalTypeEnum
 
 # API Endpoints
-ENDPOINT_AUTONOMOUS_AGENTS = "/api/v1/platform-service/tenants/{tenant_id}/autonomous-agents"
-ENDPOINT_AUTONOMOUS_AGENT_DETAIL = (
-    "/api/v1/platform-service/tenants/{tenant_id}/autonomous-agents/{autonomous_agent_id}"
-)
-ENDPOINT_AUTONOMOUS_AGENT_PRINCIPALS = (
-    "/api/v1/platform-service/tenants/{tenant_id}/autonomous-agents/{autonomous_agent_id}/principals"
-)
+ENDPOINT_WORKFLOWS = "/api/v1/platform-service/tenants/{tenant_id}/workflows"
+ENDPOINT_AUTONOMOUS_AGENT_DETAIL = "/api/v1/platform-service/tenants/{tenant_id}/workflows/{workflow_id}"
+ENDPOINT_AUTONOMOUS_AGENT_PRINCIPALS = "/api/v1/platform-service/tenants/{tenant_id}/workflows/{workflow_id}/principals"
 
 # Roles
 ROLE_READ = PermissionActionEnum.READ.value
@@ -35,7 +31,7 @@ VALID_N8N_CONFIG = {
 }
 
 
-class TestAutonomousAgentRBAC:
+class TestWorkflowRBAC:
     """Test suite for autonomous agent role-based access control."""
 
     def test_creator_has_admin_permissions(self, test_client: TestClient, test_user_token: Any) -> None:
@@ -46,13 +42,13 @@ class TestAutonomousAgentRBAC:
         # Create autonomous agent
         agent_data = {"name": "Test Agent", "description": "Test", "type": AGENT_TYPE_N8N, "config": VALID_N8N_CONFIG}
         create_response = test_client.post(
-            ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id), json=agent_data, headers=headers
+            ENDPOINT_WORKFLOWS.format(tenant_id=tenant_id), json=agent_data, headers=headers
         )
         agent_id = create_response.json()["id"]
 
         # Check principals
         principals_response = test_client.get(
-            ENDPOINT_AUTONOMOUS_AGENT_PRINCIPALS.format(tenant_id=tenant_id, autonomous_agent_id=agent_id),
+            ENDPOINT_AUTONOMOUS_AGENT_PRINCIPALS.format(tenant_id=tenant_id, workflow_id=agent_id),
             headers=headers,
         )
 
@@ -73,7 +69,7 @@ class TestAutonomousAgentRBAC:
 
         agent_data = {"name": "Test Agent", "description": "Test", "type": AGENT_TYPE_N8N, "config": VALID_N8N_CONFIG}
         create_response = test_client.post(
-            ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id), json=agent_data, headers=headers1
+            ENDPOINT_WORKFLOWS.format(tenant_id=tenant_id), json=agent_data, headers=headers1
         )
         agent_id = create_response.json()["id"]
 
@@ -85,14 +81,14 @@ class TestAutonomousAgentRBAC:
 
         # Grant READ permission to user2
         test_client.put(
-            ENDPOINT_AUTONOMOUS_AGENT_PRINCIPALS.format(tenant_id=tenant_id, autonomous_agent_id=agent_id),
+            ENDPOINT_AUTONOMOUS_AGENT_PRINCIPALS.format(tenant_id=tenant_id, workflow_id=agent_id),
             json={"principal_id": user2_id, "principal_type": PRINCIPAL_TYPE_USER, "role": ROLE_READ},
             headers=headers1,
         )
 
         # User2 should be able to get the agent
         get_response = test_client.get(
-            ENDPOINT_AUTONOMOUS_AGENT_DETAIL.format(tenant_id=tenant_id, autonomous_agent_id=agent_id), headers=headers2
+            ENDPOINT_AUTONOMOUS_AGENT_DETAIL.format(tenant_id=tenant_id, workflow_id=agent_id), headers=headers2
         )
 
         assert get_response.status_code == status.HTTP_200_OK
@@ -106,7 +102,7 @@ class TestAutonomousAgentRBAC:
 
         agent_data = {"name": "Test Agent", "description": "Test", "type": AGENT_TYPE_N8N, "config": VALID_N8N_CONFIG}
         create_response = test_client.post(
-            ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id), json=agent_data, headers=headers1
+            ENDPOINT_WORKFLOWS.format(tenant_id=tenant_id), json=agent_data, headers=headers1
         )
         agent_id = create_response.json()["id"]
 
@@ -118,14 +114,14 @@ class TestAutonomousAgentRBAC:
 
         # Grant READ permission to user2
         test_client.put(
-            ENDPOINT_AUTONOMOUS_AGENT_PRINCIPALS.format(tenant_id=tenant_id, autonomous_agent_id=agent_id),
+            ENDPOINT_AUTONOMOUS_AGENT_PRINCIPALS.format(tenant_id=tenant_id, workflow_id=agent_id),
             json={"principal_id": user2_id, "principal_type": PRINCIPAL_TYPE_USER, "role": ROLE_READ},
             headers=headers1,
         )
 
         # User2 should NOT be able to update the agent
         update_response = test_client.patch(
-            ENDPOINT_AUTONOMOUS_AGENT_DETAIL.format(tenant_id=tenant_id, autonomous_agent_id=agent_id),
+            ENDPOINT_AUTONOMOUS_AGENT_DETAIL.format(tenant_id=tenant_id, workflow_id=agent_id),
             json={"name": "Updated Name"},
             headers=headers2,
         )
@@ -141,7 +137,7 @@ class TestAutonomousAgentRBAC:
 
         agent_data = {"name": "Test Agent", "description": "Test", "type": AGENT_TYPE_N8N, "config": VALID_N8N_CONFIG}
         create_response = test_client.post(
-            ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id), json=agent_data, headers=headers1
+            ENDPOINT_WORKFLOWS.format(tenant_id=tenant_id), json=agent_data, headers=headers1
         )
         agent_id = create_response.json()["id"]
 
@@ -153,7 +149,7 @@ class TestAutonomousAgentRBAC:
 
         # Grant READ permission to user2
         test_client.put(
-            ENDPOINT_AUTONOMOUS_AGENT_PRINCIPALS.format(tenant_id=tenant_id, autonomous_agent_id=agent_id),
+            ENDPOINT_AUTONOMOUS_AGENT_PRINCIPALS.format(tenant_id=tenant_id, workflow_id=agent_id),
             json={"principal_id": user2_id, "principal_type": PRINCIPAL_TYPE_USER, "role": ROLE_READ},
             headers=headers1,
         )
@@ -161,7 +157,7 @@ class TestAutonomousAgentRBAC:
         # User2 should NOT be able to delete the agent
         delete_response = test_client.request(
             "DELETE",
-            ENDPOINT_AUTONOMOUS_AGENT_DETAIL.format(tenant_id=tenant_id, autonomous_agent_id=agent_id),
+            ENDPOINT_AUTONOMOUS_AGENT_DETAIL.format(tenant_id=tenant_id, workflow_id=agent_id),
             headers=headers2,
         )
 
@@ -176,7 +172,7 @@ class TestAutonomousAgentRBAC:
 
         agent_data = {"name": "Test Agent", "description": "Test", "type": AGENT_TYPE_N8N, "config": VALID_N8N_CONFIG}
         create_response = test_client.post(
-            ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id), json=agent_data, headers=headers1
+            ENDPOINT_WORKFLOWS.format(tenant_id=tenant_id), json=agent_data, headers=headers1
         )
         agent_id = create_response.json()["id"]
 
@@ -188,14 +184,14 @@ class TestAutonomousAgentRBAC:
 
         # Grant READ permission to user2
         test_client.put(
-            ENDPOINT_AUTONOMOUS_AGENT_PRINCIPALS.format(tenant_id=tenant_id, autonomous_agent_id=agent_id),
+            ENDPOINT_AUTONOMOUS_AGENT_PRINCIPALS.format(tenant_id=tenant_id, workflow_id=agent_id),
             json={"principal_id": user2_id, "principal_type": PRINCIPAL_TYPE_USER, "role": ROLE_READ},
             headers=headers1,
         )
 
         # User2 should NOT be able to grant permissions
         grant_response = test_client.put(
-            ENDPOINT_AUTONOMOUS_AGENT_PRINCIPALS.format(tenant_id=tenant_id, autonomous_agent_id=agent_id),
+            ENDPOINT_AUTONOMOUS_AGENT_PRINCIPALS.format(tenant_id=tenant_id, workflow_id=agent_id),
             json={"principal_id": "other-user", "principal_type": PRINCIPAL_TYPE_USER, "role": ROLE_READ},
             headers=headers2,
         )
@@ -211,7 +207,7 @@ class TestAutonomousAgentRBAC:
 
         agent_data = {"name": "Test Agent", "description": "Test", "type": AGENT_TYPE_N8N, "config": VALID_N8N_CONFIG}
         create_response = test_client.post(
-            ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id), json=agent_data, headers=headers1
+            ENDPOINT_WORKFLOWS.format(tenant_id=tenant_id), json=agent_data, headers=headers1
         )
         agent_id = create_response.json()["id"]
 
@@ -223,14 +219,14 @@ class TestAutonomousAgentRBAC:
 
         # Grant WRITE permission to user2
         test_client.put(
-            ENDPOINT_AUTONOMOUS_AGENT_PRINCIPALS.format(tenant_id=tenant_id, autonomous_agent_id=agent_id),
+            ENDPOINT_AUTONOMOUS_AGENT_PRINCIPALS.format(tenant_id=tenant_id, workflow_id=agent_id),
             json={"principal_id": user2_id, "principal_type": PRINCIPAL_TYPE_USER, "role": ROLE_WRITE},
             headers=headers1,
         )
 
         # User2 should be able to update the agent
         update_response = test_client.patch(
-            ENDPOINT_AUTONOMOUS_AGENT_DETAIL.format(tenant_id=tenant_id, autonomous_agent_id=agent_id),
+            ENDPOINT_AUTONOMOUS_AGENT_DETAIL.format(tenant_id=tenant_id, workflow_id=agent_id),
             json={"name": "Updated by User2"},
             headers=headers2,
         )
@@ -247,7 +243,7 @@ class TestAutonomousAgentRBAC:
 
         agent_data = {"name": "Test Agent", "description": "Test", "type": AGENT_TYPE_N8N, "config": VALID_N8N_CONFIG}
         create_response = test_client.post(
-            ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id), json=agent_data, headers=headers1
+            ENDPOINT_WORKFLOWS.format(tenant_id=tenant_id), json=agent_data, headers=headers1
         )
         agent_id = create_response.json()["id"]
 
@@ -259,7 +255,7 @@ class TestAutonomousAgentRBAC:
 
         # Grant WRITE permission to user2
         test_client.put(
-            ENDPOINT_AUTONOMOUS_AGENT_PRINCIPALS.format(tenant_id=tenant_id, autonomous_agent_id=agent_id),
+            ENDPOINT_AUTONOMOUS_AGENT_PRINCIPALS.format(tenant_id=tenant_id, workflow_id=agent_id),
             json={"principal_id": user2_id, "principal_type": PRINCIPAL_TYPE_USER, "role": ROLE_WRITE},
             headers=headers1,
         )
@@ -267,7 +263,7 @@ class TestAutonomousAgentRBAC:
         # User2 should NOT be able to delete the agent
         delete_response = test_client.request(
             "DELETE",
-            ENDPOINT_AUTONOMOUS_AGENT_DETAIL.format(tenant_id=tenant_id, autonomous_agent_id=agent_id),
+            ENDPOINT_AUTONOMOUS_AGENT_DETAIL.format(tenant_id=tenant_id, workflow_id=agent_id),
             headers=headers2,
         )
 
@@ -282,7 +278,7 @@ class TestAutonomousAgentRBAC:
 
         agent_data = {"name": "Test Agent", "description": "Test", "type": AGENT_TYPE_N8N, "config": VALID_N8N_CONFIG}
         create_response = test_client.post(
-            ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id), json=agent_data, headers=headers1
+            ENDPOINT_WORKFLOWS.format(tenant_id=tenant_id), json=agent_data, headers=headers1
         )
         agent_id = create_response.json()["id"]
 
@@ -294,14 +290,14 @@ class TestAutonomousAgentRBAC:
 
         # Grant WRITE permission to user2
         test_client.put(
-            ENDPOINT_AUTONOMOUS_AGENT_PRINCIPALS.format(tenant_id=tenant_id, autonomous_agent_id=agent_id),
+            ENDPOINT_AUTONOMOUS_AGENT_PRINCIPALS.format(tenant_id=tenant_id, workflow_id=agent_id),
             json={"principal_id": user2_id, "principal_type": PRINCIPAL_TYPE_USER, "role": ROLE_WRITE},
             headers=headers1,
         )
 
         # User2 should NOT be able to grant permissions
         grant_response = test_client.put(
-            ENDPOINT_AUTONOMOUS_AGENT_PRINCIPALS.format(tenant_id=tenant_id, autonomous_agent_id=agent_id),
+            ENDPOINT_AUTONOMOUS_AGENT_PRINCIPALS.format(tenant_id=tenant_id, workflow_id=agent_id),
             json={"principal_id": "other-user", "principal_type": PRINCIPAL_TYPE_USER, "role": ROLE_READ},
             headers=headers2,
         )
@@ -317,7 +313,7 @@ class TestAutonomousAgentRBAC:
 
         agent_data = {"name": "Test Agent", "description": "Test", "type": AGENT_TYPE_N8N, "config": VALID_N8N_CONFIG}
         create_response = test_client.post(
-            ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id), json=agent_data, headers=headers1
+            ENDPOINT_WORKFLOWS.format(tenant_id=tenant_id), json=agent_data, headers=headers1
         )
         agent_id = create_response.json()["id"]
 
@@ -329,20 +325,20 @@ class TestAutonomousAgentRBAC:
 
         # Grant ADMIN permission to user2
         test_client.put(
-            ENDPOINT_AUTONOMOUS_AGENT_PRINCIPALS.format(tenant_id=tenant_id, autonomous_agent_id=agent_id),
+            ENDPOINT_AUTONOMOUS_AGENT_PRINCIPALS.format(tenant_id=tenant_id, workflow_id=agent_id),
             json={"principal_id": user2_id, "principal_type": PRINCIPAL_TYPE_USER, "role": ROLE_ADMIN},
             headers=headers1,
         )
 
         # User2 can read
         get_response = test_client.get(
-            ENDPOINT_AUTONOMOUS_AGENT_DETAIL.format(tenant_id=tenant_id, autonomous_agent_id=agent_id), headers=headers2
+            ENDPOINT_AUTONOMOUS_AGENT_DETAIL.format(tenant_id=tenant_id, workflow_id=agent_id), headers=headers2
         )
         assert get_response.status_code == status.HTTP_200_OK
 
         # User2 can update
         update_response = test_client.patch(
-            ENDPOINT_AUTONOMOUS_AGENT_DETAIL.format(tenant_id=tenant_id, autonomous_agent_id=agent_id),
+            ENDPOINT_AUTONOMOUS_AGENT_DETAIL.format(tenant_id=tenant_id, workflow_id=agent_id),
             json={"name": "Updated by Admin"},
             headers=headers2,
         )
@@ -350,7 +346,7 @@ class TestAutonomousAgentRBAC:
 
         # User2 can manage permissions
         grant_response = test_client.put(
-            ENDPOINT_AUTONOMOUS_AGENT_PRINCIPALS.format(tenant_id=tenant_id, autonomous_agent_id=agent_id),
+            ENDPOINT_AUTONOMOUS_AGENT_PRINCIPALS.format(tenant_id=tenant_id, workflow_id=agent_id),
             json={"principal_id": "other-user", "principal_type": PRINCIPAL_TYPE_USER, "role": ROLE_READ},
             headers=headers2,
         )
@@ -359,7 +355,7 @@ class TestAutonomousAgentRBAC:
         # User2 can delete (tested last as it destroys the resource)
         delete_response = test_client.request(
             "DELETE",
-            ENDPOINT_AUTONOMOUS_AGENT_DETAIL.format(tenant_id=tenant_id, autonomous_agent_id=agent_id),
+            ENDPOINT_AUTONOMOUS_AGENT_DETAIL.format(tenant_id=tenant_id, workflow_id=agent_id),
             headers=headers2,
         )
         assert delete_response.status_code == status.HTTP_204_NO_CONTENT
@@ -373,7 +369,7 @@ class TestAutonomousAgentRBAC:
 
         agent_data = {"name": "Test Agent", "description": "Test", "type": AGENT_TYPE_N8N, "config": VALID_N8N_CONFIG}
         create_response = test_client.post(
-            ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id), json=agent_data, headers=headers1
+            ENDPOINT_WORKFLOWS.format(tenant_id=tenant_id), json=agent_data, headers=headers1
         )
         agent_id = create_response.json()["id"]
 
@@ -385,7 +381,7 @@ class TestAutonomousAgentRBAC:
 
         # User2 should NOT be able to get the agent
         get_response = test_client.get(
-            ENDPOINT_AUTONOMOUS_AGENT_DETAIL.format(tenant_id=tenant_id, autonomous_agent_id=agent_id), headers=headers2
+            ENDPOINT_AUTONOMOUS_AGENT_DETAIL.format(tenant_id=tenant_id, workflow_id=agent_id), headers=headers2
         )
 
         assert get_response.status_code == status.HTTP_403_FORBIDDEN
@@ -399,19 +395,19 @@ class TestAutonomousAgentRBAC:
 
         # Create 3 agents
         agent1 = test_client.post(
-            ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id),
+            ENDPOINT_WORKFLOWS.format(tenant_id=tenant_id),
             json={"name": "Agent 1", "description": "Test", "type": AGENT_TYPE_N8N, "config": VALID_N8N_CONFIG},
             headers=headers1,
         ).json()
 
         agent2 = test_client.post(
-            ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id),
+            ENDPOINT_WORKFLOWS.format(tenant_id=tenant_id),
             json={"name": "Agent 2", "description": "Test", "type": AGENT_TYPE_N8N, "config": VALID_N8N_CONFIG},
             headers=headers1,
         ).json()
 
         agent3 = test_client.post(
-            ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id),
+            ENDPOINT_WORKFLOWS.format(tenant_id=tenant_id),
             json={"name": "Agent 3", "description": "Test", "type": AGENT_TYPE_N8N, "config": VALID_N8N_CONFIG},
             headers=headers1,
         ).json()
@@ -424,19 +420,19 @@ class TestAutonomousAgentRBAC:
 
         # Grant user2 access to only agent1 and agent2
         test_client.put(
-            ENDPOINT_AUTONOMOUS_AGENT_PRINCIPALS.format(tenant_id=tenant_id, autonomous_agent_id=agent1["id"]),
+            ENDPOINT_AUTONOMOUS_AGENT_PRINCIPALS.format(tenant_id=tenant_id, workflow_id=agent1["id"]),
             json={"principal_id": user2_id, "principal_type": PRINCIPAL_TYPE_USER, "role": ROLE_READ},
             headers=headers1,
         )
 
         test_client.put(
-            ENDPOINT_AUTONOMOUS_AGENT_PRINCIPALS.format(tenant_id=tenant_id, autonomous_agent_id=agent2["id"]),
+            ENDPOINT_AUTONOMOUS_AGENT_PRINCIPALS.format(tenant_id=tenant_id, workflow_id=agent2["id"]),
             json={"principal_id": user2_id, "principal_type": PRINCIPAL_TYPE_USER, "role": ROLE_WRITE},
             headers=headers1,
         )
 
         # User2 should only see agent1 and agent2
-        list_response = test_client.get(ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id), headers=headers2)
+        list_response = test_client.get(ENDPOINT_WORKFLOWS.format(tenant_id=tenant_id), headers=headers2)
 
         assert list_response.status_code == status.HTTP_200_OK
         data = list_response.json()

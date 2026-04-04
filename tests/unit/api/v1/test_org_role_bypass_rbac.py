@@ -2,7 +2,7 @@
 
 Verifies that ORGANISATION_GLOBAL_ADMIN and ORGANISATION_TENANT_ADMIN
 bypass ALL tenant-level permission checks (tenant, chat_agent, credential,
-autonomous_agent, conversation, custom_group, chat_widget, tool,
+workflow, conversation, custom_group, chat_widget, tool,
 tag, tenant_ai_model). Also verifies that ORGANISATION_TENANT_CREATOR does NOT
 get bypass.
 """
@@ -29,8 +29,8 @@ ENDPOINT_CHAT_AGENTS = "/api/v1/platform-service/tenants/{tenant_id}/chat-agents
 ENDPOINT_CHAT_AGENT_DETAIL = "/api/v1/platform-service/tenants/{tenant_id}/chat-agents/{entity_id}"
 ENDPOINT_CREDENTIALS = "/api/v1/platform-service/tenants/{tenant_id}/credentials"
 ENDPOINT_CREDENTIAL_DETAIL = "/api/v1/platform-service/tenants/{tenant_id}/credentials/{entity_id}"
-ENDPOINT_AUTONOMOUS_AGENTS = "/api/v1/platform-service/tenants/{tenant_id}/autonomous-agents"
-ENDPOINT_AUTONOMOUS_AGENT_DETAIL = "/api/v1/platform-service/tenants/{tenant_id}/autonomous-agents/{entity_id}"
+ENDPOINT_WORKFLOWS = "/api/v1/platform-service/tenants/{tenant_id}/workflows"
+ENDPOINT_AUTONOMOUS_AGENT_DETAIL = "/api/v1/platform-service/tenants/{tenant_id}/workflows/{entity_id}"
 ENDPOINT_CONVERSATIONS = "/api/v1/platform-service/tenants/{tenant_id}/conversations"
 ENDPOINT_CONVERSATION_DETAIL = "/api/v1/platform-service/tenants/{tenant_id}/conversations/{entity_id}"
 ENDPOINT_CUSTOM_GROUPS = "/api/v1/platform-service/tenants/{tenant_id}/custom-groups"
@@ -123,13 +123,11 @@ def _create_credential(test_client: TestClient, tenant_id: str, headers: dict[st
     return resp.json()["id"]
 
 
-@patch("unifiedui.apis.v1.autonomous_agents.trigger_autonomous_agent_run", return_value=None)
-def _create_autonomous_agent(
-    mock_trigger: Any, test_client: TestClient, tenant_id: str, headers: dict[str, str]
-) -> str:
+@patch("unifiedui.apis.v1.workflows.trigger_workflow_run", return_value=None)
+def _create_workflow(mock_trigger: Any, test_client: TestClient, tenant_id: str, headers: dict[str, str]) -> str:
     """Create an autonomous agent and return its ID."""
     resp = test_client.post(
-        ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id),
+        ENDPOINT_WORKFLOWS.format(tenant_id=tenant_id),
         json={"name": "Bypass Autonomous", "description": "Test", "type": "N8N"},
         headers=headers,
     )

@@ -1,4 +1,4 @@
-"""Business logic handlers for autonomous agent operations."""
+"""Business logic handlers for workflow operations."""
 
 from __future__ import annotations
 
@@ -9,8 +9,8 @@ from typing import TYPE_CHECKING
 from sqlalchemy import or_, select
 from sqlalchemy.orm import selectinload
 
-from unifiedui.core.database.enums import AutonomousAgentTypeEnum, PermissionActionEnum, PrincipalTypeEnum
-from unifiedui.core.database.models import AutonomousAgent, AutonomousAgentMember, AutonomousAgentTag
+from unifiedui.core.database.enums import PermissionActionEnum, PrincipalTypeEnum, WorkflowTypeEnum
+from unifiedui.core.database.models import Workflow, WorkflowMember, WorkflowTag
 from unifiedui.handlers.cache_utils import ResourceCacheInvalidator
 from unifiedui.handlers.permission_resolver import (
     check_is_admin,
@@ -28,37 +28,37 @@ if TYPE_CHECKING:
     from unifiedui.core.vault.client import BaseVaultClient
     from unifiedui.handlers.resource_permissions import ResourcePermissionsHandler
     from unifiedui.handlers.resource_tags import ResourceTagsHandler
-    from unifiedui.schema.requests.autonomous_agents import CreateAutonomousAgentRequest, UpdateAutonomousAgentRequest
     from unifiedui.schema.requests.permissions import SetResourcePermissionRequest
+    from unifiedui.schema.requests.workflows import CreateWorkflowRequest, UpdateWorkflowRequest
     from unifiedui.services.agent_service_client import AgentServiceClient
 
 from datetime import UTC
 
-from unifiedui.exc.autonomous_agents import (
-    AutonomousAgentApiKeysNotAllowedError,
-    AutonomousAgentConfigValidationError,
-    AutonomousAgentKeyNotFoundError,
-    AutonomousAgentNotFoundError,
-    AutonomousAgentPermissionNotFoundError,
+from unifiedui.exc.workflows import (
+    WorkflowApiKeysNotAllowedError,
+    WorkflowConfigValidationError,
+    WorkflowKeyNotFoundError,
+    WorkflowNotFoundError,
+    WorkflowPermissionNotFoundError,
 )
-from unifiedui.handlers.validators.autonomous_agent_config import AutonomousAgentConfigValidatorFactory
+from unifiedui.handlers.validators.workflow_config import WorkflowConfigValidatorFactory
 from unifiedui.logger import get_logger
-from unifiedui.schema.responses.autonomous_agents import (
-    AutonomousAgentKeyResponse,
-    AutonomousAgentResponse,
+from unifiedui.schema.responses.common import QuickListItemResponse
+from unifiedui.schema.responses.principals import PrincipalWithRolesResponse, ResourcePrincipalsResponse
+from unifiedui.schema.responses.tags import TagSummary
+from unifiedui.schema.responses.workflows import (
+    WorkflowKeyResponse,
+    WorkflowResponse,
     WorkflowRunDetailResponse,
     WorkflowRunRetryResponse,
     WorkflowRunsListResponse,
 )
-from unifiedui.schema.responses.common import QuickListItemResponse
-from unifiedui.schema.responses.principals import PrincipalWithRolesResponse, ResourcePrincipalsResponse
-from unifiedui.schema.responses.tags import TagSummary
 
 logger = get_logger(__name__)
 
 
-class AutonomousAgentHandler:
-    """Handler class for autonomous agent business logic."""
+class WorkflowHandler:
+    """Handler class for workflow business logic."""
 
     def __init__(
         self,
@@ -70,7 +70,7 @@ class AutonomousAgentHandler:
         agent_service_client: AgentServiceClient | None = None,
     ):
         """
-        Initialize the autonomous agent handler.
+        Initialize the workflow handler.
 
         Args:
             db_client: SQLAlchemy database client instance
@@ -86,7 +86,7 @@ class AutonomousAgentHandler:
         self._permissions_handler = permissions_handler
         self._tags_handler = tags_handler
         self._agent_service_client = agent_service_client
-        self._cache = ResourceCacheInvalidator(cache_client, "autonomous_agents", "agent")
+        self._cache = ResourceCacheInvalidator(cache_client, "workflows", "workflow")
 
     @property
     def permissions_handler(self) -> ResourcePermissionsHandler:
@@ -106,7 +106,7 @@ class AutonomousAgentHandler:
             self._tags_handler = ResourceTagsHandler(self.db_client, self.cache_client)
         return self._tags_handler
 
-    def list_autonomous_agents(
+    def list_workflows(
         self,
         tenant_id: str,
         user: ContextIdentityUser,
@@ -120,16 +120,16 @@ class AutonomousAgentHandler:
         view: str | None = None,
         use_cache: bool = True,
         id_list: list[str] | None = None,
-    ) -> list[AutonomousAgentResponse] | list[QuickListItemResponse]:
+    ) -> list[WorkflowResponse] | list[QuickListItemResponse]:
         """
-        Get a list of autonomous agents for a tenant (filtered by permissions).
+        Get a list of workflows for a tenant (filtered by permissions).
 
         Args:
             tenant_id: The ID of the tenant
             user: ContextIdentityUser object for permission checking (required)
             skip: Number of items to skip
             limit: Maximum number of items to return
-            name_filter: Optional filter by autonomous agent name
+            name_filter: Optional filter by workflow name
             is_active: Optional filter by active status (None=all, 1=active, 0=inactive)
             tag_ids: Optional list of tag IDs to filter by (agents must have AT LEAST ONE of the tags - OR logic)
             order_by: Optional column name to order by
@@ -137,13 +137,13 @@ class AutonomousAgentHandler:
             use_cache: Whether to use caching
 
         Returns:
-            List of autonomous agent responses
+            List of workflow responses
         """
         from unifiedui.core.database.enums import TenantRolesEnum
 
-        logger.info("Listing autonomous agents", extra={"tenant_id": tenant_id, "skip": skip, "limit": limit})
+        logger.info("Listing workflows", extra={"tenant_id": tenant_id, "skip": skip, "limit": limit})
 
-        # Check if user is admin (has TENANT_GLOBAL_ADMIN or AUTONOMOUS_AGENTS_ADMIN)
+        # Check if user is admin (has TENANT_GLOBAL_ADMIN or WORKFLOWS_ADMIN)
         user_id = user.identity.get_id()
         user_tenants = user.tenants
         matching_tenant = next((t for t in user_tenants if t["tenant"]["id"] == tenant_id), None)
@@ -153,7 +153,7 @@ class AutonomousAgentHandler:
             user_roles = matching_tenant["roles"]
             is_admin = any(
                 p in user_roles
-                for p in [TenantRolesEnum.TENANT_GLOBAL_ADMIN.value, TenantRolesEnum.AUTONOMOUS_AGENTS_ADMIN.value]
+                for p in [TenantRolesEnum.TENANT_GLOBAL_ADMIN.value, TenantRolesEnum.WORKFLOWS_ADMIN.value]
             )
 
         # Only get group IDs if not admin
@@ -170,7 +170,7 @@ class AutonomousAgentHandler:
         view_key = view or "full"
         order_key = f"{order_by or 'default'}:{order_direction or 'asc'}"
         is_active_key = "all" if is_active is None else str(is_active)
-        cache_key = f"autonomous_agents:list:tenant:{tenant_id}:user:{user_id}:skip:{skip}:limit:{limit}:view:{view_key}:order:{order_key}:active:{is_active_key}"
+        cache_key = f"workflows:list:tenant:{tenant_id}:user:{user_id}:skip:{skip}:limit:{limit}:view:{view_key}:order:{order_key}:active:{is_active_key}"
 
         # Check if any filters are applied (name_filter and tag_ids disable caching)
         has_filters = name_filter is not None or tag_ids is not None or id_list is not None
@@ -180,99 +180,99 @@ class AutonomousAgentHandler:
             try:
                 cached_data = self.cache_client.client.get(cache_key)
                 if cached_data is not None:
-                    logger.debug("Returning cached autonomous agents for tenant %s, user %s", tenant_id, user_id)
+                    logger.debug("Returning cached workflows for tenant %s, user %s", tenant_id, user_id)
                     if view == "quick-list":
                         return [QuickListItemResponse(**item) for item in cached_data]
-                    return [AutonomousAgentResponse(**item) for item in cached_data]
+                    return [WorkflowResponse(**item) for item in cached_data]
             except Exception as e:
-                logger.warning("Failed to get cached autonomous agents: %s", e)
+                logger.warning("Failed to get cached workflows: %s", e)
 
         with self.db_client.get_session() as session:
-            # If user is admin, return all autonomous agents
+            # If user is admin, return all workflows
             if is_admin:
                 query = (
-                    select(AutonomousAgent)
-                    .options(selectinload(AutonomousAgent.tags).selectinload(AutonomousAgentTag.tag))
-                    .where(AutonomousAgent.tenant_id == tenant_id)
+                    select(Workflow)
+                    .options(selectinload(Workflow.tags).selectinload(WorkflowTag.tag))
+                    .where(Workflow.tenant_id == tenant_id)
                 )
                 if id_list:
-                    query = query.where(AutonomousAgent.id.in_(id_list))
+                    query = query.where(Workflow.id.in_(id_list))
                 if name_filter:
-                    query = query.where(AutonomousAgent.name.ilike(f"%{name_filter}%"))
+                    query = query.where(Workflow.name.ilike(f"%{name_filter}%"))
                 # Filter by is_active status
                 if is_active is not None:
-                    query = query.where(AutonomousAgent.is_active == bool(is_active))
+                    query = query.where(Workflow.is_active == bool(is_active))
                 # Filter by tags (agents must have ALL specified tags)
                 if tag_ids:
                     for tag_id in tag_ids:
-                        tag_subquery = select(AutonomousAgentTag.autonomous_agent_id).where(
-                            AutonomousAgentTag.tenant_id == tenant_id, AutonomousAgentTag.tag_id == tag_id
+                        tag_subquery = select(WorkflowTag.workflow_id).where(
+                            WorkflowTag.tenant_id == tenant_id, WorkflowTag.tag_id == tag_id
                         )
-                        query = query.where(AutonomousAgent.id.in_(tag_subquery))
+                        query = query.where(Workflow.id.in_(tag_subquery))
                 # Apply ordering if specified
-                if order_by and hasattr(AutonomousAgent, order_by):
-                    column = getattr(AutonomousAgent, order_by)
+                if order_by and hasattr(Workflow, order_by):
+                    column = getattr(Workflow, order_by)
                     query = query.order_by(column.desc()) if order_direction == "desc" else query.order_by(column.asc())
                 query = query.offset(skip).limit(limit)
-                autonomous_agents = session.execute(query).scalars().all()
+                workflows = session.execute(query).scalars().all()
             else:
                 # Filter by permissions: user must have at least READ permission
                 query = (
-                    select(AutonomousAgent)
-                    .options(selectinload(AutonomousAgent.tags).selectinload(AutonomousAgentTag.tag))
-                    .join(AutonomousAgentMember, AutonomousAgent.id == AutonomousAgentMember.autonomous_agent_id)
-                    .where(AutonomousAgent.tenant_id == tenant_id)
+                    select(Workflow)
+                    .options(selectinload(Workflow.tags).selectinload(WorkflowTag.tag))
+                    .join(WorkflowMember, Workflow.id == WorkflowMember.workflow_id)
+                    .where(Workflow.tenant_id == tenant_id)
                 )
 
                 # Add permission filters
                 permission_filters = []
 
                 # User permission
-                permission_filters.append(AutonomousAgentMember.principal_id == user_id)
+                permission_filters.append(WorkflowMember.principal_id == user_id)
 
                 # Identity group permissions
                 if identity_group_ids:
-                    permission_filters.append(AutonomousAgentMember.principal_id.in_(identity_group_ids))
+                    permission_filters.append(WorkflowMember.principal_id.in_(identity_group_ids))
 
                 # Custom group permissions
                 if custom_group_ids:
-                    permission_filters.append(AutonomousAgentMember.principal_id.in_(custom_group_ids))
+                    permission_filters.append(WorkflowMember.principal_id.in_(custom_group_ids))
 
                 query = query.where(or_(*permission_filters))
 
                 if id_list:
-                    query = query.where(AutonomousAgent.id.in_(id_list))
+                    query = query.where(Workflow.id.in_(id_list))
 
                 if name_filter:
-                    query = query.where(AutonomousAgent.name.ilike(f"%{name_filter}%"))
+                    query = query.where(Workflow.name.ilike(f"%{name_filter}%"))
 
                 # Filter by is_active status
                 if is_active is not None:
-                    query = query.where(AutonomousAgent.is_active == bool(is_active))
+                    query = query.where(Workflow.is_active == bool(is_active))
 
                 # Filter by tags (agents must have AT LEAST ONE of the specified tags - OR logic)
                 if tag_ids:
                     tag_subquery = (
-                        select(AutonomousAgentTag.autonomous_agent_id)
-                        .where(AutonomousAgentTag.tenant_id == tenant_id, AutonomousAgentTag.tag_id.in_(tag_ids))
+                        select(WorkflowTag.workflow_id)
+                        .where(WorkflowTag.tenant_id == tenant_id, WorkflowTag.tag_id.in_(tag_ids))
                         .distinct()
                     )
-                    query = query.where(AutonomousAgent.id.in_(tag_subquery))
+                    query = query.where(Workflow.id.in_(tag_subquery))
 
                 # Apply ordering if specified
-                if order_by and hasattr(AutonomousAgent, order_by):
-                    column = getattr(AutonomousAgent, order_by)
+                if order_by and hasattr(Workflow, order_by):
+                    column = getattr(Workflow, order_by)
                     query = query.order_by(column.desc()) if order_direction == "desc" else query.order_by(column.asc())
 
                 query = query.distinct().offset(skip).limit(limit)
-                autonomous_agents = session.execute(query).scalars().all()
+                workflows = session.execute(query).scalars().all()
 
             # Return quick-list format if requested
             if view == "quick-list":
-                return [QuickListItemResponse(id=agent.id, name=agent.name) for agent in autonomous_agents]
+                return [QuickListItemResponse(id=agent.id, name=agent.name) for agent in workflows]
 
             # Convert to response models
-            responses = [self._model_to_response(agent) for agent in autonomous_agents]
+            responses = [self._model_to_response(agent) for agent in workflows]
 
             if is_admin:
                 for r in responses:
@@ -286,7 +286,7 @@ class AutonomousAgentHandler:
                     if custom_group_ids:
                         principal_ids.extend(custom_group_ids)
                     permissions = resolve_my_permissions_bulk(
-                        session, AutonomousAgentMember, "autonomous_agent_id", tenant_id, resource_ids, principal_ids
+                        session, WorkflowMember, "workflow_id", tenant_id, resource_ids, principal_ids
                     )
                     for r in responses:
                         r.my_permission = permissions.get(r.id)
@@ -296,126 +296,120 @@ class AutonomousAgentHandler:
                 try:
                     cache_data = [r.model_dump() for r in responses]
                     self.cache_client.client.set(cache_key, cache_data, ttl=300)
-                    logger.debug("Cached autonomous agents list for tenant %s, user %s", tenant_id, user_id)
+                    logger.debug("Cached workflows list for tenant %s, user %s", tenant_id, user_id)
                 except Exception as e:
-                    logger.warning("Failed to cache autonomous agents: %s", e)
+                    logger.warning("Failed to cache workflows: %s", e)
 
             return responses
 
-    def get_autonomous_agent(
-        self, tenant_id: str, autonomous_agent_id: str, user: ContextIdentityUser | None = None, use_cache: bool = True
-    ) -> AutonomousAgentResponse:
+    def get_workflow(
+        self, tenant_id: str, workflow_id: str, user: ContextIdentityUser | None = None, use_cache: bool = True
+    ) -> WorkflowResponse:
         """
-        Get a specific autonomous agent by ID.
+        Get a specific workflow by ID.
 
         Args:
             tenant_id: The ID of the tenant
-            autonomous_agent_id: The ID of the autonomous agent
+            workflow_id: The ID of the workflow
             user: Optional user context for permission resolution
             use_cache: Whether to use caching
 
         Returns:
-            Autonomous agent response
+            Workflow response
 
         Raises:
-            AutonomousAgentNotFoundError: If autonomous agent not found
+            WorkflowNotFoundError: If workflow not found
         """
-        logger.info(
-            "Fetching autonomous agent", extra={"tenant_id": tenant_id, "autonomous_agent_id": autonomous_agent_id}
-        )
+        logger.info("Fetching workflow", extra={"tenant_id": tenant_id, "workflow_id": workflow_id})
 
         # Build cache key
-        cache_key = f"autonomous_agents:detail:tenant:{tenant_id}:agent:{autonomous_agent_id}"
+        cache_key = f"workflows:detail:tenant:{tenant_id}:workflow:{workflow_id}"
 
         # Check cache
         if use_cache and self.cache_client:
             try:
                 cached_data = self.cache_client.client.get(cache_key)
                 if cached_data is not None:
-                    logger.debug("Returning cached autonomous agent %s", autonomous_agent_id)
-                    result = AutonomousAgentResponse(**cached_data)
+                    logger.debug("Returning cached workflow %s", workflow_id)
+                    result = WorkflowResponse(**cached_data)
                     if user:
                         with self.db_client.get_session() as session:
-                            result.my_permission = self._resolve_user_permission(
-                                session, tenant_id, autonomous_agent_id, user
-                            )
+                            result.my_permission = self._resolve_user_permission(session, tenant_id, workflow_id, user)
                     return result
             except Exception as e:
-                logger.warning("Failed to get cached autonomous agent: %s", e)
+                logger.warning("Failed to get cached workflow: %s", e)
 
         with self.db_client.get_session() as session:
             query = (
-                select(AutonomousAgent)
-                .options(selectinload(AutonomousAgent.tags).selectinload(AutonomousAgentTag.tag))
-                .where(AutonomousAgent.id == autonomous_agent_id, AutonomousAgent.tenant_id == tenant_id)
+                select(Workflow)
+                .options(selectinload(Workflow.tags).selectinload(WorkflowTag.tag))
+                .where(Workflow.id == workflow_id, Workflow.tenant_id == tenant_id)
             )
-            autonomous_agent = session.execute(query).scalar_one_or_none()
+            workflow = session.execute(query).scalar_one_or_none()
 
-            if not autonomous_agent:
-                raise AutonomousAgentNotFoundError(autonomous_agent_id)
+            if not workflow:
+                raise WorkflowNotFoundError(workflow_id)
 
-            result = self._model_to_response(autonomous_agent)
+            result = self._model_to_response(workflow)
 
             # Cache the result
             if use_cache and self.cache_client:
                 try:
                     self.cache_client.client.set(cache_key, result.model_dump(), ttl=300)
-                    logger.debug("Cached autonomous agent %s", autonomous_agent_id)
+                    logger.debug("Cached workflow %s", workflow_id)
                 except Exception as e:
-                    logger.warning("Failed to cache autonomous agent: %s", e)
+                    logger.warning("Failed to cache workflow: %s", e)
 
             if user:
-                result.my_permission = self._resolve_user_permission(session, tenant_id, autonomous_agent_id, user)
+                result.my_permission = self._resolve_user_permission(session, tenant_id, workflow_id, user)
 
             return result
 
-    def get_autonomous_agent_model(self, tenant_id: str, autonomous_agent_id: str) -> AutonomousAgent:
+    def get_workflow_model(self, tenant_id: str, workflow_id: str) -> Workflow:
         """
-        Get the raw autonomous agent DB model by ID.
+        Get the raw workflow DB model by ID.
 
         Args:
             tenant_id: The ID of the tenant
-            autonomous_agent_id: The ID of the autonomous agent
+            workflow_id: The ID of the workflow
 
         Returns:
-            AutonomousAgent SQLAlchemy model (detached from session)
+            Workflow SQLAlchemy model (detached from session)
 
         Raises:
-            AutonomousAgentNotFoundError: If autonomous agent not found
+            WorkflowNotFoundError: If workflow not found
         """
         with self.db_client.get_session() as session:
-            query = select(AutonomousAgent).where(
-                AutonomousAgent.id == autonomous_agent_id, AutonomousAgent.tenant_id == tenant_id
-            )
-            autonomous_agent = session.execute(query).scalar_one_or_none()
+            query = select(Workflow).where(Workflow.id == workflow_id, Workflow.tenant_id == tenant_id)
+            workflow = session.execute(query).scalar_one_or_none()
 
-            if not autonomous_agent:
-                raise AutonomousAgentNotFoundError(autonomous_agent_id)
+            if not workflow:
+                raise WorkflowNotFoundError(workflow_id)
 
-            session.expunge(autonomous_agent)
-            return autonomous_agent
+            session.expunge(workflow)
+            return workflow
 
-    def create_autonomous_agent(
-        self, tenant_id: str, request: CreateAutonomousAgentRequest, user_id: str, user: ContextIdentityUser
-    ) -> AutonomousAgentResponse:
+    def create_workflow(
+        self, tenant_id: str, request: CreateWorkflowRequest, user_id: str, user: ContextIdentityUser
+    ) -> WorkflowResponse:
         """
-        Create a new autonomous agent.
+        Create a new workflow.
 
         Args:
             tenant_id: The ID of the tenant
-            request: Autonomous agent creation data
-            user_id: ID of the user creating the autonomous agent
+            request: Workflow creation data
+            user_id: ID of the user creating the workflow
             user: The authenticated user context (for IDP access)
 
         Returns:
-            Created autonomous agent response
+            Created workflow response
 
         Raises:
-            AutonomousAgentConfigValidationError: If config validation fails
-            UnsupportedAutonomousAgentTypeError: If agent type is not supported
+            WorkflowConfigValidationError: If config validation fails
+            UnsupportedWorkflowTypeError: If agent type is not supported
         """
         logger.info(
-            "Creating autonomous agent",
+            "Creating workflow",
             extra={
                 "tenant_id": tenant_id,
                 "agent_name": request.name,
@@ -425,11 +419,11 @@ class AutonomousAgentHandler:
         )
 
         # Validate config based on agent type
-        validated_config = AutonomousAgentConfigValidatorFactory.validate_config(
+        validated_config = WorkflowConfigValidatorFactory.validate_config(
             agent_type=request.type, config=request.config
         )
 
-        autonomous_agent_id = str(uuid.uuid4())
+        workflow_id = str(uuid.uuid4())
 
         # Generate API keys and store them in vault
         primary_key = self._generate_api_key()
@@ -441,24 +435,24 @@ class AutonomousAgentHandler:
         if self.vault_client:
             try:
                 primary_key_vault_uri = self.vault_client.store_secret(
-                    key=f"{tenant_id}/autonomous-agents/{autonomous_agent_id}/primary-key",
+                    key=f"{tenant_id}/workflows/{workflow_id}/primary-key",
                     value=primary_key,
                     metadata={
                         "tenant_id": tenant_id,
-                        "autonomous_agent_id": autonomous_agent_id,
+                        "workflow_id": workflow_id,
                         "key_type": "primary",
                     },
                 )
                 secondary_key_vault_uri = self.vault_client.store_secret(
-                    key=f"{tenant_id}/autonomous-agents/{autonomous_agent_id}/secondary-key",
+                    key=f"{tenant_id}/workflows/{workflow_id}/secondary-key",
                     value=secondary_key,
                     metadata={
                         "tenant_id": tenant_id,
-                        "autonomous_agent_id": autonomous_agent_id,
+                        "workflow_id": workflow_id,
                         "key_type": "secondary",
                     },
                 )
-                logger.info("Stored API keys in vault for autonomous agent %s", autonomous_agent_id)
+                logger.info("Stored API keys in vault for workflow %s", workflow_id)
             except Exception as e:
                 logger.error("Failed to store API keys in vault: %s", e)
                 raise
@@ -466,9 +460,9 @@ class AutonomousAgentHandler:
             logger.warning("No vault client configured - API keys will not be stored")
 
         with self.db_client.get_session() as session:
-            # Create autonomous agent
-            autonomous_agent = AutonomousAgent(
-                id=autonomous_agent_id,
+            # Create workflow
+            workflow = Workflow(
+                id=workflow_id,
                 tenant_id=tenant_id,
                 name=request.name,
                 description=request.description,
@@ -481,199 +475,189 @@ class AutonomousAgentHandler:
                 created_by=user_id,
                 updated_by=user_id,
             )
-            session.add(autonomous_agent)
+            session.add(workflow)
 
             # Add creator as ADMIN using the central permissions handler
             self.permissions_handler.add_creator_permission(
                 session=session,
-                resource_type="autonomous_agent",
+                resource_type="workflow",
                 tenant_id=tenant_id,
-                resource_id=autonomous_agent_id,
+                resource_id=workflow_id,
                 user_id=user_id,
                 user=user,
             )
 
             session.commit()
-            session.refresh(autonomous_agent)
+            session.refresh(workflow)
 
-            response = self._model_to_response(autonomous_agent)
+            response = self._model_to_response(workflow)
 
         # Invalidate list cache
         self._invalidate_list_cache(tenant_id)
 
-        logger.info("Created autonomous agent %s", autonomous_agent_id)
+        logger.info("Created workflow %s", workflow_id)
         return response
 
-    def update_autonomous_agent(
-        self, tenant_id: str, autonomous_agent_id: str, request: UpdateAutonomousAgentRequest, user_id: str
-    ) -> AutonomousAgentResponse:
+    def update_workflow(
+        self, tenant_id: str, workflow_id: str, request: UpdateWorkflowRequest, user_id: str
+    ) -> WorkflowResponse:
         """
-        Update an existing autonomous agent.
+        Update an existing workflow.
 
         Note: type, primary_key_vault_uri, secondary_key_vault_uri, last_full_import
         are NOT updatable via this method.
 
         Args:
             tenant_id: The ID of the tenant
-            autonomous_agent_id: The ID of the autonomous agent
-            request: Autonomous agent update data
-            user_id: ID of the user updating the autonomous agent
+            workflow_id: The ID of the workflow
+            request: Workflow update data
+            user_id: ID of the user updating the workflow
 
         Returns:
-            Updated autonomous agent response
+            Updated workflow response
 
         Raises:
-            AutonomousAgentNotFoundError: If autonomous agent not found
-            AutonomousAgentConfigValidationError: If config validation fails
+            WorkflowNotFoundError: If workflow not found
+            WorkflowConfigValidationError: If config validation fails
         """
         logger.info(
-            "Updating autonomous agent",
-            extra={"tenant_id": tenant_id, "autonomous_agent_id": autonomous_agent_id, "user_id": user_id},
+            "Updating workflow",
+            extra={"tenant_id": tenant_id, "workflow_id": workflow_id, "user_id": user_id},
         )
 
         with self.db_client.get_session() as session:
             query = (
-                select(AutonomousAgent)
-                .options(selectinload(AutonomousAgent.tags).selectinload(AutonomousAgentTag.tag))
-                .where(AutonomousAgent.id == autonomous_agent_id, AutonomousAgent.tenant_id == tenant_id)
+                select(Workflow)
+                .options(selectinload(Workflow.tags).selectinload(WorkflowTag.tag))
+                .where(Workflow.id == workflow_id, Workflow.tenant_id == tenant_id)
             )
-            autonomous_agent = session.execute(query).scalar_one_or_none()
+            workflow = session.execute(query).scalar_one_or_none()
 
-            if not autonomous_agent:
-                raise AutonomousAgentNotFoundError(autonomous_agent_id)
+            if not workflow:
+                raise WorkflowNotFoundError(workflow_id)
 
             # Update fields if provided
             if request.name is not None:
-                autonomous_agent.name = request.name
+                workflow.name = request.name
             if request.description is not None:
-                autonomous_agent.description = request.description
+                workflow.description = request.description
             if request.config is not None:
                 # Validate config based on the existing agent type
-                validated_config = AutonomousAgentConfigValidatorFactory.validate_config(
-                    agent_type=AutonomousAgentTypeEnum(autonomous_agent.type), config=request.config
+                validated_config = WorkflowConfigValidatorFactory.validate_config(
+                    agent_type=WorkflowTypeEnum(workflow.type), config=request.config
                 )
-                autonomous_agent.config = validated_config
+                workflow.config = validated_config
             if request.is_active is not None:
-                autonomous_agent.is_active = request.is_active
+                workflow.is_active = request.is_active
             if request.allow_api_keys is not None:
-                autonomous_agent.allow_api_keys = request.allow_api_keys
+                workflow.allow_api_keys = request.allow_api_keys
 
-            autonomous_agent.updated_by = user_id
+            workflow.updated_by = user_id
 
             session.commit()
 
             # Re-fetch with tags to ensure they are loaded
             query = (
-                select(AutonomousAgent)
-                .options(selectinload(AutonomousAgent.tags).selectinload(AutonomousAgentTag.tag))
-                .where(AutonomousAgent.id == autonomous_agent_id, AutonomousAgent.tenant_id == tenant_id)
+                select(Workflow)
+                .options(selectinload(Workflow.tags).selectinload(WorkflowTag.tag))
+                .where(Workflow.id == workflow_id, Workflow.tenant_id == tenant_id)
             )
-            autonomous_agent = session.execute(query).scalar_one_or_none()
-            assert autonomous_agent is not None
+            workflow = session.execute(query).scalar_one_or_none()
+            assert workflow is not None
 
-            response = self._model_to_response(autonomous_agent)
+            response = self._model_to_response(workflow)
 
             # Invalidate caches
             self._invalidate_list_cache(tenant_id)
-            self._invalidate_detail_cache(tenant_id, autonomous_agent_id)
+            self._invalidate_detail_cache(tenant_id, workflow_id)
 
-            logger.info("Updated autonomous agent %s", autonomous_agent_id)
+            logger.info("Updated workflow %s", workflow_id)
             return response
 
-    def delete_autonomous_agent(self, tenant_id: str, autonomous_agent_id: str) -> None:
+    def delete_workflow(self, tenant_id: str, workflow_id: str) -> None:
         """
-        Delete an autonomous agent and cascade delete associated data.
+        Delete a workflow and cascade delete associated data.
 
         Args:
             tenant_id: The ID of the tenant
-            autonomous_agent_id: The ID of the autonomous agent
+            workflow_id: The ID of the workflow
 
         Raises:
-            AutonomousAgentNotFoundError: If autonomous agent not found
+            WorkflowNotFoundError: If workflow not found
         """
-        logger.info(
-            "Deleting autonomous agent", extra={"tenant_id": tenant_id, "autonomous_agent_id": autonomous_agent_id}
-        )
+        logger.info("Deleting workflow", extra={"tenant_id": tenant_id, "workflow_id": workflow_id})
 
         with self.db_client.get_session() as session:
-            query = select(AutonomousAgent).where(
-                AutonomousAgent.id == autonomous_agent_id, AutonomousAgent.tenant_id == tenant_id
-            )
-            autonomous_agent = session.execute(query).scalar_one_or_none()
+            query = select(Workflow).where(Workflow.id == workflow_id, Workflow.tenant_id == tenant_id)
+            workflow = session.execute(query).scalar_one_or_none()
 
-            if not autonomous_agent:
-                raise AutonomousAgentNotFoundError(autonomous_agent_id)
+            if not workflow:
+                raise WorkflowNotFoundError(workflow_id)
 
-            self._cascade_delete_agent_data(tenant_id, autonomous_agent_id, autonomous_agent)
+            self._cascade_delete_workflow_data(tenant_id, workflow_id, workflow)
 
-            session.delete(autonomous_agent)
+            session.delete(workflow)
             session.commit()
 
             # Invalidate caches
             self._invalidate_list_cache(tenant_id)
-            self._invalidate_detail_cache(tenant_id, autonomous_agent_id)
-            self._invalidate_permissions_cache(tenant_id, autonomous_agent_id)
+            self._invalidate_detail_cache(tenant_id, workflow_id)
+            self._invalidate_permissions_cache(tenant_id, workflow_id)
 
-            logger.info("Deleted autonomous agent %s", autonomous_agent_id)
+            logger.info("Deleted workflow %s", workflow_id)
 
-    def _cascade_delete_agent_data(
-        self, tenant_id: str, autonomous_agent_id: str, autonomous_agent: AutonomousAgent
-    ) -> None:
+    def _cascade_delete_workflow_data(self, tenant_id: str, workflow_id: str, workflow: Workflow) -> None:
         """
         Cascade delete agent service data and vault secrets (best-effort).
 
         Args:
             tenant_id: Tenant ID
-            autonomous_agent_id: Agent ID
-            autonomous_agent: Agent model instance
+            workflow_id: Workflow ID
+            workflow: Workflow model instance
         """
         if self._agent_service_client:
-            self._agent_service_client.delete_autonomous_agent_data(tenant_id, autonomous_agent_id)
+            self._agent_service_client.delete_workflow_data(tenant_id, workflow_id)
 
         if self.vault_client:
             for vault_uri_attr in ("primary_key_vault_uri", "secondary_key_vault_uri"):
-                vault_uri = getattr(autonomous_agent, vault_uri_attr, None)
+                vault_uri = getattr(workflow, vault_uri_attr, None)
                 if vault_uri:
                     try:
                         self.vault_client.delete_secret(vault_uri)
                     except Exception:
                         logger.warning(
                             f"Failed to delete vault secret {vault_uri_attr}",
-                            extra={"autonomous_agent_id": autonomous_agent_id},
+                            extra={"workflow_id": workflow_id},
                         )
 
-    def duplicate_autonomous_agent(
-        self, tenant_id: str, autonomous_agent_id: str, user_id: str, user: ContextIdentityUser
-    ) -> AutonomousAgentResponse:
+    def duplicate_workflow(
+        self, tenant_id: str, workflow_id: str, user_id: str, user: ContextIdentityUser
+    ) -> WorkflowResponse:
         """
-        Duplicate an existing autonomous agent.
+        Duplicate an existing workflow.
 
         Creates an exact copy with name + " Copy" (or " Copy(n)" if exists).
         New API keys are generated for the duplicate. Tags are NOT copied.
 
         Args:
             tenant_id: The ID of the tenant
-            autonomous_agent_id: The ID of the autonomous agent to duplicate
+            workflow_id: The ID of the workflow to duplicate
             user_id: The ID of the user performing the duplication
             user: The authenticated user context
 
         Returns:
-            The newly created autonomous agent response
+            The newly created workflow response
 
         Raises:
-            AutonomousAgentNotFoundError: If source agent not found
+            WorkflowNotFoundError: If source agent not found
         """
-        logger.info(
-            "Duplicating autonomous agent", extra={"tenant_id": tenant_id, "autonomous_agent_id": autonomous_agent_id}
-        )
+        logger.info("Duplicating workflow", extra={"tenant_id": tenant_id, "workflow_id": workflow_id})
 
         with self.db_client.get_session() as session:
-            query = select(AutonomousAgent).where(
-                AutonomousAgent.id == autonomous_agent_id, AutonomousAgent.tenant_id == tenant_id
-            )
+            query = select(Workflow).where(Workflow.id == workflow_id, Workflow.tenant_id == tenant_id)
             source_agent = session.execute(query).scalar_one_or_none()
             if not source_agent:
-                raise AutonomousAgentNotFoundError(autonomous_agent_id)
+                raise WorkflowNotFoundError(workflow_id)
 
             new_name = self._generate_copy_name(session, tenant_id, source_agent.name)
             new_agent_id = str(uuid.uuid4())
@@ -686,20 +670,20 @@ class AutonomousAgentHandler:
             if self.vault_client:
                 try:
                     primary_key_vault_uri = self.vault_client.store_secret(
-                        key=f"{tenant_id}/autonomous-agents/{new_agent_id}/primary-key",
+                        key=f"{tenant_id}/workflows/{new_agent_id}/primary-key",
                         value=primary_key,
                         metadata={
                             "tenant_id": tenant_id,
-                            "autonomous_agent_id": new_agent_id,
+                            "workflow_id": new_agent_id,
                             "key_type": "primary",
                         },
                     )
                     secondary_key_vault_uri = self.vault_client.store_secret(
-                        key=f"{tenant_id}/autonomous-agents/{new_agent_id}/secondary-key",
+                        key=f"{tenant_id}/workflows/{new_agent_id}/secondary-key",
                         value=secondary_key,
                         metadata={
                             "tenant_id": tenant_id,
-                            "autonomous_agent_id": new_agent_id,
+                            "workflow_id": new_agent_id,
                             "key_type": "secondary",
                         },
                     )
@@ -707,7 +691,7 @@ class AutonomousAgentHandler:
                     logger.error("Failed to store API keys in vault for duplicated agent: %s", e)
                     raise
 
-            new_agent = AutonomousAgent(
+            new_agent = Workflow(
                 id=new_agent_id,
                 tenant_id=tenant_id,
                 name=new_name,
@@ -725,7 +709,7 @@ class AutonomousAgentHandler:
 
             self.permissions_handler.add_creator_permission(
                 session=session,
-                resource_type="autonomous_agent",
+                resource_type="workflow",
                 tenant_id=tenant_id,
                 resource_id=new_agent_id,
                 user_id=user_id,
@@ -736,8 +720,8 @@ class AutonomousAgentHandler:
             session.refresh(new_agent)
 
             logger.info(
-                "Autonomous agent duplicated",
-                extra={"source_id": autonomous_agent_id, "new_id": new_agent_id, "new_name": new_name},
+                "Workflow duplicated",
+                extra={"source_id": workflow_id, "new_id": new_agent_id, "new_name": new_name},
             )
             self._invalidate_list_cache(tenant_id)
             return self._model_to_response(new_agent)
@@ -759,8 +743,8 @@ class AutonomousAgentHandler:
         base_name = f"{original_name} Copy"
         query = (
             select(func.count())
-            .select_from(AutonomousAgent)
-            .where(AutonomousAgent.tenant_id == tenant_id, AutonomousAgent.name.like(f"{original_name} Copy%"))
+            .select_from(Workflow)
+            .where(Workflow.tenant_id == tenant_id, Workflow.name.like(f"{original_name} Copy%"))
         )
         count = session.execute(query).scalar() or 0
 
@@ -772,13 +756,13 @@ class AutonomousAgentHandler:
         """Invalidate all list caches for a tenant."""
         self._cache.invalidate_list(tenant_id)
 
-    def _invalidate_detail_cache(self, tenant_id: str, autonomous_agent_id: str) -> None:
-        """Invalidate detail cache for a specific autonomous agent."""
-        self._cache.invalidate_detail(tenant_id, autonomous_agent_id)
+    def _invalidate_detail_cache(self, tenant_id: str, workflow_id: str) -> None:
+        """Invalidate detail cache for a specific workflow."""
+        self._cache.invalidate_detail(tenant_id, workflow_id)
 
-    def _invalidate_permissions_cache(self, tenant_id: str, autonomous_agent_id: str) -> None:
-        """Invalidate permissions cache for a specific autonomous agent."""
-        self._cache.invalidate_permissions(tenant_id, autonomous_agent_id)
+    def _invalidate_permissions_cache(self, tenant_id: str, workflow_id: str) -> None:
+        """Invalidate permissions cache for a specific workflow."""
+        self._cache.invalidate_permissions(tenant_id, workflow_id)
 
     @staticmethod
     def _generate_api_key() -> str:
@@ -787,43 +771,41 @@ class AutonomousAgentHandler:
 
     # ========== Config Endpoint Method ==========
 
-    def get_autonomous_agent_config(
-        self, tenant_id: str, autonomous_agent_id: str, autonomous_agent: AutonomousAgent, credential_handler
-    ):
+    def get_workflow_config(self, tenant_id: str, workflow_id: str, workflow: Workflow, credential_handler):
         """
-        Get the full autonomous agent configuration including credential secrets.
+        Get the full workflow configuration including credential secrets.
         This endpoint is for external systems (like N8N) to fetch complete configuration.
 
         Args:
             tenant_id: The ID of the tenant
-            autonomous_agent_id: The ID of the autonomous agent
-            autonomous_agent: The autonomous agent model (already fetched by middleware)
+            workflow_id: The ID of the workflow
+            workflow: The workflow model (already fetched by middleware)
             credential_handler: Credential handler for fetching secrets
 
         Returns:
-            AutonomousAgentConfigResponse with full config including secrets
+            WorkflowConfigResponse with full config including secrets
 
         Raises:
-            AutonomousAgentNotFoundError: If autonomous agent not found
+            WorkflowNotFoundError: If workflow not found
             InvalidCredentialError: If a credential cannot be fetched
         """
         from unifiedui.exc.chat_agent_config import InvalidCredentialError
-        from unifiedui.schema.responses.autonomous_agents import (
-            AutonomousAgentConfigResponse,
+        from unifiedui.schema.responses.workflows import (
             CredentialSecretResponse,
-            N8NAutonomousAgentConfigSettingsResponse,
+            N8NWorkflowConfigSettingsResponse,
+            WorkflowConfigResponse,
         )
 
         logger.info(
-            "Fetching autonomous agent config",
-            extra={"tenant_id": tenant_id, "autonomous_agent_id": autonomous_agent_id},
+            "Fetching workflow config",
+            extra={"tenant_id": tenant_id, "workflow_id": workflow_id},
         )
 
-        agent_type = AutonomousAgentTypeEnum(autonomous_agent.type)
-        config = autonomous_agent.config or {}
+        agent_type = WorkflowTypeEnum(workflow.type)
+        config = workflow.config or {}
 
         # Build settings based on agent type
-        if agent_type == AutonomousAgentTypeEnum.N8N:
+        if agent_type == WorkflowTypeEnum.N8N:
             # Extract config values
             api_version = config.get("api_version", "v1")
             workflow_endpoint = config.get("workflow_endpoint", "")
@@ -832,7 +814,7 @@ class AutonomousAgentHandler:
             if not api_credential_id:
                 raise InvalidCredentialError(
                     credential_id="unknown",
-                    message="Autonomous agent config is missing required api_api_key_credential_id",
+                    message="Workflow config is missing required api_api_key_credential_id",
                 )
 
             # Parse workflow URL to extract host and workflow ID
@@ -880,7 +862,7 @@ class AutonomousAgentHandler:
                 secret=api_secret,
             )
 
-            settings = N8NAutonomousAgentConfigSettingsResponse(
+            settings = N8NWorkflowConfigSettingsResponse(
                 api_version=api_version,
                 n8n_host=n8n_host,
                 n8n_workflow_endpoint=workflow_endpoint,
@@ -891,11 +873,11 @@ class AutonomousAgentHandler:
             # For unsupported types, return raw config
             settings = config
 
-        return AutonomousAgentConfigResponse(
+        return WorkflowConfigResponse(
             docversion="v1",
             type=agent_type,
             tenant_id=tenant_id,
-            autonomous_agent_id=autonomous_agent_id,
+            workflow_id=workflow_id,
             settings=settings,
         )
 
@@ -904,42 +886,42 @@ class AutonomousAgentHandler:
     def _get_n8n_connection_config(
         self,
         tenant_id: str,
-        autonomous_agent_id: str,
+        workflow_id: str,
         credential_handler,
     ) -> tuple[str, str, str, str]:
-        """Extract n8n connection details from autonomous agent config.
+        """Extract n8n connection details from workflow config.
 
         Args:
             tenant_id: The ID of the tenant
-            autonomous_agent_id: The ID of the autonomous agent
+            workflow_id: The ID of the workflow
             credential_handler: Credential handler for fetching API key secrets
 
         Returns:
             Tuple of (n8n_host, workflow_id, api_version, api_secret)
 
         Raises:
-            AutonomousAgentNotFoundError: If autonomous agent not found
-            UnsupportedAutonomousAgentTypeError: If agent type doesn't support workflow runs
-            AutonomousAgentConfigValidationError: If required config is missing
+            WorkflowNotFoundError: If workflow not found
+            UnsupportedWorkflowTypeError: If agent type doesn't support workflow runs
+            WorkflowConfigValidationError: If required config is missing
         """
         from urllib.parse import urlparse
 
-        from unifiedui.exc.autonomous_agents import UnsupportedAutonomousAgentTypeError
+        from unifiedui.exc.workflows import UnsupportedWorkflowTypeError
 
         with self.db_client.get_session() as session:
             agent = session.execute(
-                select(AutonomousAgent).where(
-                    AutonomousAgent.id == autonomous_agent_id,
-                    AutonomousAgent.tenant_id == tenant_id,
+                select(Workflow).where(
+                    Workflow.id == workflow_id,
+                    Workflow.tenant_id == tenant_id,
                 )
             ).scalar_one_or_none()
 
             if not agent:
-                raise AutonomousAgentNotFoundError(autonomous_agent_id)
+                raise WorkflowNotFoundError(workflow_id)
 
-            agent_type = AutonomousAgentTypeEnum(agent.type)
-            if agent_type != AutonomousAgentTypeEnum.N8N:
-                raise UnsupportedAutonomousAgentTypeError(agent.type)
+            agent_type = WorkflowTypeEnum(agent.type)
+            if agent_type != WorkflowTypeEnum.N8N:
+                raise UnsupportedWorkflowTypeError(agent.type)
 
             config = agent.config or {}
             workflow_endpoint = config.get("workflow_endpoint", "")
@@ -947,8 +929,8 @@ class AutonomousAgentHandler:
             api_credential_id = config.get("api_api_key_credential_id")
 
             if not workflow_endpoint or not api_credential_id:
-                raise AutonomousAgentConfigValidationError(
-                    message="Autonomous agent missing required config for workflow runs",
+                raise WorkflowConfigValidationError(
+                    message="Workflow missing required config for workflow runs",
                     errors=["workflow_endpoint and api_api_key_credential_id are required"],
                 )
 
@@ -958,14 +940,14 @@ class AutonomousAgentHandler:
             workflow_id = path_parts[1].strip("/") if len(path_parts) > 1 else ""
 
             if not workflow_id:
-                raise AutonomousAgentConfigValidationError(
+                raise WorkflowConfigValidationError(
                     message="Could not extract workflow ID from workflow_endpoint",
                     errors=["workflow_endpoint must contain /workflow/{id}"],
                 )
 
             api_secret = credential_handler.get_credential_secret(tenant_id, api_credential_id)
             if not api_secret:
-                raise AutonomousAgentConfigValidationError(
+                raise WorkflowConfigValidationError(
                     message="Failed to retrieve API key for workflow runs",
                     errors=["Ensure the vault is running and the credential secret exists"],
                 )
@@ -975,7 +957,7 @@ class AutonomousAgentHandler:
     def get_workflow_runs(
         self,
         tenant_id: str,
-        autonomous_agent_id: str,
+        workflow_id: str,
         credential_handler,
         limit: int = 20,
         cursor: str | None = None,
@@ -985,7 +967,7 @@ class AutonomousAgentHandler:
 
         Args:
             tenant_id: The ID of the tenant
-            autonomous_agent_id: The ID of the autonomous agent
+            workflow_id: The ID of the workflow
             credential_handler: Credential handler for fetching API key secrets
             limit: Maximum number of runs to return
             cursor: Pagination cursor for next page
@@ -995,16 +977,16 @@ class AutonomousAgentHandler:
             WorkflowRunsListResponse with list of workflow runs
 
         Raises:
-            AutonomousAgentNotFoundError: If autonomous agent not found
-            UnsupportedAutonomousAgentTypeError: If agent type doesn't support workflow runs
-            AutonomousAgentConfigValidationError: If config is missing or vault unavailable
+            WorkflowNotFoundError: If workflow not found
+            UnsupportedWorkflowTypeError: If agent type doesn't support workflow runs
+            WorkflowConfigValidationError: If config is missing or vault unavailable
         """
         import httpx
 
-        from unifiedui.schema.responses.autonomous_agents import WorkflowRunResponse, WorkflowRunsListResponse
+        from unifiedui.schema.responses.workflows import WorkflowRunResponse, WorkflowRunsListResponse
 
         n8n_host, workflow_id, api_version, api_secret = self._get_n8n_connection_config(
-            tenant_id, autonomous_agent_id, credential_handler
+            tenant_id, workflow_id, credential_handler
         )
 
         url = f"{n8n_host}/api/{api_version}/executions"
@@ -1053,7 +1035,7 @@ class AutonomousAgentHandler:
     def get_workflow_run_detail(
         self,
         tenant_id: str,
-        autonomous_agent_id: str,
+        workflow_id: str,
         execution_id: str,
         credential_handler,
     ) -> WorkflowRunDetailResponse:
@@ -1061,7 +1043,7 @@ class AutonomousAgentHandler:
 
         Args:
             tenant_id: The ID of the tenant
-            autonomous_agent_id: The ID of the autonomous agent
+            workflow_id: The ID of the workflow
             execution_id: The execution ID to fetch
             credential_handler: Credential handler for fetching API key secrets
 
@@ -1069,16 +1051,16 @@ class AutonomousAgentHandler:
             WorkflowRunDetailResponse with full execution data
 
         Raises:
-            AutonomousAgentNotFoundError: If autonomous agent not found
-            UnsupportedAutonomousAgentTypeError: If agent type doesn't support workflow runs
-            AutonomousAgentConfigValidationError: If config is missing or execution not found
+            WorkflowNotFoundError: If workflow not found
+            UnsupportedWorkflowTypeError: If agent type doesn't support workflow runs
+            WorkflowConfigValidationError: If config is missing or execution not found
         """
         import httpx
 
-        from unifiedui.schema.responses.autonomous_agents import WorkflowRunDetailResponse
+        from unifiedui.schema.responses.workflows import WorkflowRunDetailResponse
 
         n8n_host, _workflow_id, api_version, api_secret = self._get_n8n_connection_config(
-            tenant_id, autonomous_agent_id, credential_handler
+            tenant_id, workflow_id, credential_handler
         )
 
         url = f"{n8n_host}/api/{api_version}/executions/{execution_id}"
@@ -1091,14 +1073,14 @@ class AutonomousAgentHandler:
                 run = response.json()
         except httpx.HTTPStatusError as e:
             if e.response.status_code == 404:
-                raise AutonomousAgentConfigValidationError(
+                raise WorkflowConfigValidationError(
                     message=f"Execution {execution_id} not found",
                     errors=[str(e)],
                 )
             raise
         except httpx.HTTPError as e:
             logger.error("Failed to fetch workflow run detail from N8N: %s", e)
-            raise AutonomousAgentConfigValidationError(
+            raise WorkflowConfigValidationError(
                 message=f"Failed to fetch execution {execution_id}",
                 errors=[str(e)],
             )
@@ -1120,7 +1102,7 @@ class AutonomousAgentHandler:
     def retry_workflow_run(
         self,
         tenant_id: str,
-        autonomous_agent_id: str,
+        workflow_id: str,
         execution_id: str,
         credential_handler,
     ) -> WorkflowRunRetryResponse:
@@ -1128,7 +1110,7 @@ class AutonomousAgentHandler:
 
         Args:
             tenant_id: The ID of the tenant
-            autonomous_agent_id: The ID of the autonomous agent
+            workflow_id: The ID of the workflow
             execution_id: The execution ID to retry
             credential_handler: Credential handler for fetching API key secrets
 
@@ -1136,16 +1118,16 @@ class AutonomousAgentHandler:
             WorkflowRunRetryResponse with retry result
 
         Raises:
-            AutonomousAgentNotFoundError: If autonomous agent not found
-            UnsupportedAutonomousAgentTypeError: If agent type doesn't support workflow runs
-            AutonomousAgentConfigValidationError: If retry fails
+            WorkflowNotFoundError: If workflow not found
+            UnsupportedWorkflowTypeError: If agent type doesn't support workflow runs
+            WorkflowConfigValidationError: If retry fails
         """
         import httpx
 
-        from unifiedui.schema.responses.autonomous_agents import WorkflowRunRetryResponse
+        from unifiedui.schema.responses.workflows import WorkflowRunRetryResponse
 
         n8n_host, _workflow_id, api_version, api_secret = self._get_n8n_connection_config(
-            tenant_id, autonomous_agent_id, credential_handler
+            tenant_id, workflow_id, credential_handler
         )
 
         url = f"{n8n_host}/api/{api_version}/executions/{execution_id}/retry"
@@ -1158,7 +1140,7 @@ class AutonomousAgentHandler:
                 data = response.json()
         except httpx.HTTPError as e:
             logger.error("Failed to retry workflow execution: %s", e)
-            raise AutonomousAgentConfigValidationError(
+            raise WorkflowConfigValidationError(
                 message=f"Failed to retry execution {execution_id}",
                 errors=[str(e)],
             )
@@ -1175,7 +1157,7 @@ class AutonomousAgentHandler:
     def start_workflow(
         self,
         tenant_id: str,
-        autonomous_agent_id: str,
+        workflow_id: str,
         body: dict | None = None,
         files: list[dict] | None = None,
         query_params: dict[str, str] | None = None,
@@ -1185,7 +1167,7 @@ class AutonomousAgentHandler:
 
         Args:
             tenant_id: The ID of the tenant
-            autonomous_agent_id: The ID of the autonomous agent
+            workflow_id: The ID of the workflow
             body: Optional JSON body to send with the webhook request
             files: Optional list of file dicts with name, mimeType, and base64 data
             query_params: Optional query parameters to append to the webhook URL
@@ -1194,37 +1176,37 @@ class AutonomousAgentHandler:
             Response from the webhook endpoint
 
         Raises:
-            AutonomousAgentNotFoundError: If autonomous agent not found
-            UnsupportedAutonomousAgentTypeError: If agent type doesn't support workflows
-            AutonomousAgentConfigValidationError: If webhook_url is not configured
+            WorkflowNotFoundError: If workflow not found
+            UnsupportedWorkflowTypeError: If agent type doesn't support workflows
+            WorkflowConfigValidationError: If webhook_url is not configured
         """
         import httpx
 
-        from unifiedui.exc.autonomous_agents import UnsupportedAutonomousAgentTypeError
+        from unifiedui.exc.workflows import UnsupportedWorkflowTypeError
 
         with self.db_client.get_session() as session:
             agent = session.execute(
-                select(AutonomousAgent).where(
-                    AutonomousAgent.id == autonomous_agent_id,
-                    AutonomousAgent.tenant_id == tenant_id,
+                select(Workflow).where(
+                    Workflow.id == workflow_id,
+                    Workflow.tenant_id == tenant_id,
                 )
             ).scalar_one_or_none()
 
             if not agent:
-                raise AutonomousAgentNotFoundError(autonomous_agent_id)
+                raise WorkflowNotFoundError(workflow_id)
 
-            agent_type = AutonomousAgentTypeEnum(agent.type)
-            if agent_type != AutonomousAgentTypeEnum.N8N:
-                raise UnsupportedAutonomousAgentTypeError(agent.type)
+            agent_type = WorkflowTypeEnum(agent.type)
+            if agent_type != WorkflowTypeEnum.N8N:
+                raise UnsupportedWorkflowTypeError(agent.type)
 
             config = agent.config or {}
             webhook_url = config.get("webhook_url")
 
             if not webhook_url:
-                from unifiedui.exc.autonomous_agents import AutonomousAgentConfigValidationError
+                from unifiedui.exc.workflows import WorkflowConfigValidationError
 
-                raise AutonomousAgentConfigValidationError(
-                    message="No webhook_url configured for this autonomous agent",
+                raise WorkflowConfigValidationError(
+                    message="No webhook_url configured for this workflow",
                     errors=["webhook_url is required to start a workflow"],
                 )
 
@@ -1256,77 +1238,71 @@ class AutonomousAgentHandler:
                         return {"status": "ok", "statusCode": response.status_code}
             except httpx.HTTPError as e:
                 logger.error("Failed to trigger workflow webhook: %s", e)
-                from unifiedui.exc.autonomous_agents import AutonomousAgentConfigValidationError
+                from unifiedui.exc.workflows import WorkflowConfigValidationError
 
-                raise AutonomousAgentConfigValidationError(
+                raise WorkflowConfigValidationError(
                     message=f"Failed to trigger workflow: {e!s}",
                     errors=[str(e)],
                 )
 
     # ========== API Key Management Methods ==========
 
-    def get_api_key(self, tenant_id: str, autonomous_agent_id: str, key_number: int) -> AutonomousAgentKeyResponse:
+    def get_api_key(self, tenant_id: str, workflow_id: str, key_number: int) -> WorkflowKeyResponse:
         """
-        Get an API key for an autonomous agent.
+        Get an API key for a workflow.
 
         Args:
             tenant_id: The ID of the tenant
-            autonomous_agent_id: The ID of the autonomous agent
+            workflow_id: The ID of the workflow
             key_number: Key number (1 for primary, 2 for secondary)
 
         Returns:
             The API key response
 
         Raises:
-            AutonomousAgentNotFoundError: If autonomous agent not found
-            AutonomousAgentKeyNotFoundError: If key not found or vault not configured
+            WorkflowNotFoundError: If workflow not found
+            WorkflowKeyNotFoundError: If key not found or vault not configured
         """
         logger.info(
             "Getting API key",
-            extra={"tenant_id": tenant_id, "autonomous_agent_id": autonomous_agent_id, "key_number": key_number},
+            extra={"tenant_id": tenant_id, "workflow_id": workflow_id, "key_number": key_number},
         )
 
         if key_number not in [1, 2]:
-            raise AutonomousAgentKeyNotFoundError(autonomous_agent_id, key_number)
+            raise WorkflowKeyNotFoundError(workflow_id, key_number)
 
         if not self.vault_client:
-            raise AutonomousAgentKeyNotFoundError(autonomous_agent_id, key_number)
+            raise WorkflowKeyNotFoundError(workflow_id, key_number)
 
         with self.db_client.get_session() as session:
-            query = select(AutonomousAgent).where(
-                AutonomousAgent.id == autonomous_agent_id, AutonomousAgent.tenant_id == tenant_id
-            )
-            autonomous_agent = session.execute(query).scalar_one_or_none()
+            query = select(Workflow).where(Workflow.id == workflow_id, Workflow.tenant_id == tenant_id)
+            workflow = session.execute(query).scalar_one_or_none()
 
-            if not autonomous_agent:
-                raise AutonomousAgentNotFoundError(autonomous_agent_id)
+            if not workflow:
+                raise WorkflowNotFoundError(workflow_id)
 
-            if not autonomous_agent.allow_api_keys:
-                raise AutonomousAgentApiKeysNotAllowedError(autonomous_agent_id)
+            if not workflow.allow_api_keys:
+                raise WorkflowApiKeysNotAllowedError(workflow_id)
 
-            vault_uri = (
-                autonomous_agent.primary_key_vault_uri if key_number == 1 else autonomous_agent.secondary_key_vault_uri
-            )
+            vault_uri = workflow.primary_key_vault_uri if key_number == 1 else workflow.secondary_key_vault_uri
 
             if not vault_uri:
-                raise AutonomousAgentKeyNotFoundError(autonomous_agent_id, key_number)
+                raise WorkflowKeyNotFoundError(workflow_id, key_number)
 
             key = self.vault_client.get_secret(vault_uri, use_cache=False)
 
             if not key:
-                raise AutonomousAgentKeyNotFoundError(autonomous_agent_id, key_number)
+                raise WorkflowKeyNotFoundError(workflow_id, key_number)
 
-            return AutonomousAgentKeyResponse(key=key, key_number=key_number)
+            return WorkflowKeyResponse(key=key, key_number=key_number)
 
-    def rotate_api_key(
-        self, tenant_id: str, autonomous_agent_id: str, key_number: int, user_id: str
-    ) -> AutonomousAgentKeyResponse:
+    def rotate_api_key(self, tenant_id: str, workflow_id: str, key_number: int, user_id: str) -> WorkflowKeyResponse:
         """
-        Rotate an API key for an autonomous agent.
+        Rotate an API key for a workflow.
 
         Args:
             tenant_id: The ID of the tenant
-            autonomous_agent_id: The ID of the autonomous agent
+            workflow_id: The ID of the workflow
             key_number: Key number (1 for primary, 2 for secondary)
             user_id: ID of the user rotating the key
 
@@ -1334,131 +1310,121 @@ class AutonomousAgentHandler:
             The new API key response
 
         Raises:
-            AutonomousAgentNotFoundError: If autonomous agent not found
-            AutonomousAgentKeyNotFoundError: If vault not configured
+            WorkflowNotFoundError: If workflow not found
+            WorkflowKeyNotFoundError: If vault not configured
         """
         logger.info(
             "Rotating API key",
             extra={
                 "tenant_id": tenant_id,
-                "autonomous_agent_id": autonomous_agent_id,
+                "workflow_id": workflow_id,
                 "key_number": key_number,
                 "user_id": user_id,
             },
         )
 
         if key_number not in [1, 2]:
-            raise AutonomousAgentKeyNotFoundError(autonomous_agent_id, key_number)
+            raise WorkflowKeyNotFoundError(workflow_id, key_number)
 
         if not self.vault_client:
-            raise AutonomousAgentKeyNotFoundError(autonomous_agent_id, key_number)
+            raise WorkflowKeyNotFoundError(workflow_id, key_number)
 
         with self.db_client.get_session() as session:
-            query = select(AutonomousAgent).where(
-                AutonomousAgent.id == autonomous_agent_id, AutonomousAgent.tenant_id == tenant_id
-            )
-            autonomous_agent = session.execute(query).scalar_one_or_none()
+            query = select(Workflow).where(Workflow.id == workflow_id, Workflow.tenant_id == tenant_id)
+            workflow = session.execute(query).scalar_one_or_none()
 
-            if not autonomous_agent:
-                raise AutonomousAgentNotFoundError(autonomous_agent_id)
+            if not workflow:
+                raise WorkflowNotFoundError(workflow_id)
 
-            if not autonomous_agent.allow_api_keys:
-                raise AutonomousAgentApiKeysNotAllowedError(autonomous_agent_id)
+            if not workflow.allow_api_keys:
+                raise WorkflowApiKeysNotAllowedError(workflow_id)
 
             # Generate new key
             new_key = self._generate_api_key()
 
             # Determine which vault URI to use
-            vault_uri = (
-                autonomous_agent.primary_key_vault_uri if key_number == 1 else autonomous_agent.secondary_key_vault_uri
-            )
+            vault_uri = workflow.primary_key_vault_uri if key_number == 1 else workflow.secondary_key_vault_uri
 
             if vault_uri:
                 # Update existing secret
                 success = self.vault_client.update_secret(vault_uri, new_key)
                 if not success:
-                    logger.error(
-                        f"Failed to update key {key_number} in vault for autonomous agent {autonomous_agent_id}"
-                    )
+                    logger.error(f"Failed to update key {key_number} in vault for workflow {workflow_id}")
                     raise RuntimeError(f"Failed to rotate key {key_number}")
             else:
                 # Create new secret (shouldn't happen normally, but handle gracefully)
                 key_type = "primary" if key_number == 1 else "secondary"
                 vault_uri = self.vault_client.store_secret(
-                    key=f"{tenant_id}/autonomous-agents/{autonomous_agent_id}/{key_type}-key",
+                    key=f"{tenant_id}/workflows/{workflow_id}/{key_type}-key",
                     value=new_key,
-                    metadata={"tenant_id": tenant_id, "autonomous_agent_id": autonomous_agent_id, "key_type": key_type},
+                    metadata={"tenant_id": tenant_id, "workflow_id": workflow_id, "key_type": key_type},
                 )
 
                 # Update the model with the new vault URI
                 if key_number == 1:
-                    autonomous_agent.primary_key_vault_uri = vault_uri
+                    workflow.primary_key_vault_uri = vault_uri
                 else:
-                    autonomous_agent.secondary_key_vault_uri = vault_uri
+                    workflow.secondary_key_vault_uri = vault_uri
 
-            autonomous_agent.updated_by = user_id
+            workflow.updated_by = user_id
             session.commit()
 
             # Invalidate caches
-            self._invalidate_detail_cache(tenant_id, autonomous_agent_id)
+            self._invalidate_detail_cache(tenant_id, workflow_id)
 
-            logger.info("Rotated key %s for autonomous agent %s", key_number, autonomous_agent_id)
-            return AutonomousAgentKeyResponse(key=new_key, key_number=key_number)
+            logger.info("Rotated key %s for workflow %s", key_number, workflow_id)
+            return WorkflowKeyResponse(key=new_key, key_number=key_number)
 
-    def update_last_full_import(
-        self, tenant_id: str, autonomous_agent_id: str, user_id: str
-    ) -> AutonomousAgentResponse:
+    def update_last_full_import(self, tenant_id: str, workflow_id: str, user_id: str) -> WorkflowResponse:
         """
-        Update the last_full_import timestamp for an autonomous agent.
+        Update the last_full_import timestamp for a workflow.
         This is a system-only operation.
 
         Args:
             tenant_id: The ID of the tenant
-            autonomous_agent_id: The ID of the autonomous agent
+            workflow_id: The ID of the workflow
             user_id: ID of the system user performing the update
 
         Returns:
-            Updated autonomous agent response
+            Updated workflow response
 
         Raises:
-            AutonomousAgentNotFoundError: If autonomous agent not found
+            WorkflowNotFoundError: If workflow not found
         """
         from datetime import datetime
 
-        logger.info(
-            "Updating last_full_import", extra={"tenant_id": tenant_id, "autonomous_agent_id": autonomous_agent_id}
-        )
+        logger.info("Updating last_full_import", extra={"tenant_id": tenant_id, "workflow_id": workflow_id})
 
         with self.db_client.get_session() as session:
             query = (
-                select(AutonomousAgent)
-                .options(selectinload(AutonomousAgent.tags).selectinload(AutonomousAgentTag.tag))
-                .where(AutonomousAgent.id == autonomous_agent_id, AutonomousAgent.tenant_id == tenant_id)
+                select(Workflow)
+                .options(selectinload(Workflow.tags).selectinload(WorkflowTag.tag))
+                .where(Workflow.id == workflow_id, Workflow.tenant_id == tenant_id)
             )
-            autonomous_agent = session.execute(query).scalar_one_or_none()
+            workflow = session.execute(query).scalar_one_or_none()
 
-            if not autonomous_agent:
-                raise AutonomousAgentNotFoundError(autonomous_agent_id)
+            if not workflow:
+                raise WorkflowNotFoundError(workflow_id)
 
-            autonomous_agent.last_full_import = datetime.now(UTC)
-            autonomous_agent.updated_by = user_id
+            workflow.last_full_import = datetime.now(UTC)
+            workflow.updated_by = user_id
 
             session.commit()
-            session.refresh(autonomous_agent)
+            session.refresh(workflow)
 
-            response = self._model_to_response(autonomous_agent)
+            response = self._model_to_response(workflow)
 
             # Invalidate caches
-            self._invalidate_detail_cache(tenant_id, autonomous_agent_id)
+            self._invalidate_detail_cache(tenant_id, workflow_id)
 
             return response
 
     # ========== Permission Management Methods ==========
 
-    def list_autonomous_agent_permissions(
+    def list_workflow_permissions(
         self,
         tenant_id: str,
-        autonomous_agent_id: str,
+        workflow_id: str,
         skip: int = 0,
         limit: int = 100,
         search: str | None = None,
@@ -1469,11 +1435,11 @@ class AutonomousAgentHandler:
         use_cache: bool = True,
     ) -> ResourcePrincipalsResponse:
         """
-        Get all permissions for an autonomous agent.
+        Get all permissions for a workflow.
 
         Args:
             tenant_id: The ID of the tenant
-            autonomous_agent_id: The ID of the autonomous agent
+            workflow_id: The ID of the workflow
             skip: Number of principals to skip
             limit: Maximum number of principals to return
             search: Search term for display_name, principal_name, or mail
@@ -1487,18 +1453,18 @@ class AutonomousAgentHandler:
             List of principals with their permissions
 
         Raises:
-            AutonomousAgentNotFoundError: If autonomous agent not found
+            WorkflowNotFoundError: If workflow not found
         """
         logger.info(
-            "Listing autonomous agent permissions",
-            extra={"tenant_id": tenant_id, "autonomous_agent_id": autonomous_agent_id},
+            "Listing workflow permissions",
+            extra={"tenant_id": tenant_id, "workflow_id": workflow_id},
         )
 
         try:
             result = self.permissions_handler.list_permissions(
-                resource_type="autonomous_agent",
+                resource_type="workflow",
                 tenant_id=tenant_id,
-                resource_id=autonomous_agent_id,
+                resource_id=workflow_id,
                 skip=skip,
                 limit=limit,
                 search=search,
@@ -1509,7 +1475,7 @@ class AutonomousAgentHandler:
                 use_cache=use_cache,
             )
         except ValueError as e:
-            raise AutonomousAgentNotFoundError(autonomous_agent_id) from e
+            raise WorkflowNotFoundError(workflow_id) from e
 
         # Convert to response schema
         principals = [
@@ -1527,46 +1493,46 @@ class AutonomousAgentHandler:
         ]
 
         return ResourcePrincipalsResponse(
-            resource_id=autonomous_agent_id,
-            resource_type="autonomous_agent",
+            resource_id=workflow_id,
+            resource_type="workflow",
             tenant_id=tenant_id,
             principals=principals,
         )
 
-    def get_autonomous_agent_permission(
-        self, tenant_id: str, autonomous_agent_id: str, principal_id: str
+    def get_workflow_permission(
+        self, tenant_id: str, workflow_id: str, principal_id: str
     ) -> PrincipalWithRolesResponse:
         """
-        Get permissions for a specific principal on an autonomous agent.
+        Get permissions for a specific principal on a workflow.
 
         Args:
             tenant_id: The ID of the tenant
-            autonomous_agent_id: The ID of the autonomous agent
+            workflow_id: The ID of the workflow
             principal_id: The ID of the principal
 
         Returns:
             Principal's permissions
 
         Raises:
-            AutonomousAgentNotFoundError: If autonomous agent not found
+            WorkflowNotFoundError: If workflow not found
         """
         logger.info(
-            "Getting autonomous agent permission for principal",
-            extra={"tenant_id": tenant_id, "autonomous_agent_id": autonomous_agent_id, "principal_id": principal_id},
+            "Getting workflow permission for principal",
+            extra={"tenant_id": tenant_id, "workflow_id": workflow_id, "principal_id": principal_id},
         )
 
         try:
             result = self.permissions_handler.get_permission(
-                resource_type="autonomous_agent",
+                resource_type="workflow",
                 tenant_id=tenant_id,
-                resource_id=autonomous_agent_id,
+                resource_id=workflow_id,
                 principal_id=principal_id,
             )
         except ValueError as e:
             # If permission not found, return empty response
             if "No permissions found" in str(e):
                 return PrincipalWithRolesResponse(principal_id=principal_id, principal_type="", roles=[])
-            raise AutonomousAgentNotFoundError(str(e)) from e
+            raise WorkflowNotFoundError(str(e)) from e
 
         return PrincipalWithRolesResponse(
             principal_id=result["principal_id"],
@@ -1578,20 +1544,20 @@ class AutonomousAgentHandler:
             description=result.get("description"),
         )
 
-    def set_autonomous_agent_permission(
+    def set_workflow_permission(
         self,
         tenant_id: str,
-        autonomous_agent_id: str,
+        workflow_id: str,
         request: SetResourcePermissionRequest,
         user_id: str,
         user: ContextIdentityUser,
     ) -> PrincipalWithRolesResponse:
         """
-        Set or update a permission for a principal on an autonomous agent.
+        Set or update a permission for a principal on a workflow.
 
         Args:
             tenant_id: The ID of the tenant
-            autonomous_agent_id: The ID of the autonomous agent
+            workflow_id: The ID of the workflow
             request: Permission setting data
             user_id: ID of the user setting the permission
 
@@ -1599,13 +1565,13 @@ class AutonomousAgentHandler:
             Created or updated permission response
 
         Raises:
-            AutonomousAgentNotFoundError: If autonomous agent not found
+            WorkflowNotFoundError: If workflow not found
         """
         logger.info(
-            "Setting autonomous agent permission",
+            "Setting workflow permission",
             extra={
                 "tenant_id": tenant_id,
-                "autonomous_agent_id": autonomous_agent_id,
+                "workflow_id": workflow_id,
                 "principal_id": request.principal_id,
                 "agent_role": request.role,
                 "user_id": user_id,
@@ -1614,9 +1580,9 @@ class AutonomousAgentHandler:
 
         try:
             self.permissions_handler.set_permission(
-                resource_type="autonomous_agent",
+                resource_type="workflow",
                 tenant_id=tenant_id,
-                resource_id=autonomous_agent_id,
+                resource_id=workflow_id,
                 principal_id=request.principal_id,
                 principal_type=request.principal_type.value,
                 role=request.role,
@@ -1624,34 +1590,34 @@ class AutonomousAgentHandler:
                 user=user,
             )
         except ValueError as e:
-            raise AutonomousAgentNotFoundError(str(e)) from e
+            raise WorkflowNotFoundError(str(e)) from e
 
         # Fetch and return the enriched principal data
-        return self.get_autonomous_agent_permission(
-            tenant_id=tenant_id, autonomous_agent_id=autonomous_agent_id, principal_id=request.principal_id
+        return self.get_workflow_permission(
+            tenant_id=tenant_id, workflow_id=workflow_id, principal_id=request.principal_id
         )
 
-    def delete_autonomous_agent_permission(
-        self, tenant_id: str, autonomous_agent_id: str, principal_id: str, principal_type: str, role: str
+    def delete_workflow_permission(
+        self, tenant_id: str, workflow_id: str, principal_id: str, principal_type: str, role: str
     ) -> None:
         """
-        Delete a permission for a principal on an autonomous agent.
+        Delete a permission for a principal on a workflow.
 
         Args:
             tenant_id: The ID of the tenant
-            autonomous_agent_id: The ID of the autonomous agent
+            workflow_id: The ID of the workflow
             principal_id: The ID of the principal
             principal_type: The type of principal
             role: The role to delete
 
         Raises:
-            AutonomousAgentNotFoundError: If autonomous agent not found
+            WorkflowNotFoundError: If workflow not found
         """
         logger.info(
-            "Deleting autonomous agent permission",
+            "Deleting workflow permission",
             extra={
                 "tenant_id": tenant_id,
-                "autonomous_agent_id": autonomous_agent_id,
+                "workflow_id": workflow_id,
                 "principal_id": principal_id,
                 "agent_role": role,
             },
@@ -1659,17 +1625,17 @@ class AutonomousAgentHandler:
 
         try:
             self.permissions_handler.delete_permission(
-                resource_type="autonomous_agent",
+                resource_type="workflow",
                 tenant_id=tenant_id,
-                resource_id=autonomous_agent_id,
+                resource_id=workflow_id,
                 principal_id=principal_id,
                 principal_type=principal_type,
                 role=role,
             )
         except ValueError as e:
             if "No permissions found" in str(e) or "not found" in str(e).lower():
-                raise AutonomousAgentPermissionNotFoundError(principal_id) from e
-            raise AutonomousAgentNotFoundError(str(e)) from e
+                raise WorkflowPermissionNotFoundError(principal_id) from e
+            raise WorkflowNotFoundError(str(e)) from e
 
     @staticmethod
     def _group_permissions_by_principal(results) -> list[dict]:
@@ -1687,8 +1653,8 @@ class AutonomousAgentHandler:
         return list(principals_dict.values())
 
     @staticmethod
-    def _model_to_response(agent: AutonomousAgent) -> AutonomousAgentResponse:
-        """Convert AutonomousAgent model to AutonomousAgentResponse."""
+    def _model_to_response(agent: Workflow) -> WorkflowResponse:
+        """Convert Workflow model to WorkflowResponse."""
         # Extract tags from the agent's tags relationship
         tags = []
         if hasattr(agent, "tags") and agent.tags:
@@ -1696,12 +1662,12 @@ class AutonomousAgentHandler:
                 if agent_tag.tag:
                     tags.append(TagSummary(id=agent_tag.tag.id, name=agent_tag.tag.name))
 
-        return AutonomousAgentResponse(
+        return WorkflowResponse(
             id=agent.id,
             tenant_id=agent.tenant_id,
             name=agent.name,
             description=agent.description,
-            type=AutonomousAgentTypeEnum(agent.type),
+            type=WorkflowTypeEnum(agent.type),
             is_active=agent.is_active,
             allow_api_keys=agent.allow_api_keys,
             config=agent.config,
@@ -1714,19 +1680,15 @@ class AutonomousAgentHandler:
         )
 
     def _resolve_user_permission(
-        self, session: Session, tenant_id: str, autonomous_agent_id: str, user: ContextIdentityUser
+        self, session: Session, tenant_id: str, workflow_id: str, user: ContextIdentityUser
     ) -> str | None:
-        """Resolve the user's permission level on a specific autonomous agent."""
+        """Resolve the user's permission level on a specific workflow."""
         from unifiedui.core.database.enums import TenantRolesEnum
 
-        if check_is_admin(
-            user, tenant_id, [TenantRolesEnum.TENANT_GLOBAL_ADMIN, TenantRolesEnum.AUTONOMOUS_AGENTS_ADMIN]
-        ):
+        if check_is_admin(user, tenant_id, [TenantRolesEnum.TENANT_GLOBAL_ADMIN, TenantRolesEnum.WORKFLOWS_ADMIN]):
             return PermissionActionEnum.ADMIN.value
         principal_ids = get_principal_ids(user)
-        return resolve_my_permission(
-            session, AutonomousAgentMember, "autonomous_agent_id", tenant_id, autonomous_agent_id, principal_ids
-        )
+        return resolve_my_permission(session, WorkflowMember, "workflow_id", tenant_id, workflow_id, principal_ids)
 
     @staticmethod
     def _validate_principal_type(principal_type: str) -> bool:

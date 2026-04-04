@@ -65,7 +65,7 @@ def test_list_recent_visits_with_data(test_client: TestClient):
     user_id = user.get_id()
 
     create_visit_in_db(test_client, tenant_id, user_id, "chat_agent", resource_name="App 1")
-    create_visit_in_db(test_client, tenant_id, user_id, "autonomous_agent", resource_name="Agent 1")
+    create_visit_in_db(test_client, tenant_id, user_id, "workflow", resource_name="Agent 1")
     create_visit_in_db(test_client, tenant_id, user_id, "conversation", resource_name="Conv 1")
 
     response = test_client.get(
@@ -127,7 +127,7 @@ def test_sync_recent_visits_new(test_client: TestClient):
         json={
             "visits": [
                 {"resource_type": "chat_agent", "resource_id": str(uuid.uuid4()), "resource_name": "App A"},
-                {"resource_type": "autonomous_agent", "resource_id": str(uuid.uuid4()), "resource_name": "Agent B"},
+                {"resource_type": "workflow", "resource_id": str(uuid.uuid4()), "resource_name": "Agent B"},
             ],
         },
         headers=headers,

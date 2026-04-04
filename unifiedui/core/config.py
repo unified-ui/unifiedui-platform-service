@@ -81,7 +81,7 @@ class Settings(BaseSettings):
         "X-Request-ID",
         "X-Correlation-ID",
         "X-Microsoft-Foundry-API-Key",
-        "X-Unified-UI-Autonomous-Agent-API-Key",
+        "X-Unified-UI-Workflow-API-Key",
         "X-Use-Cache",
         "Cache-Control",
     ]

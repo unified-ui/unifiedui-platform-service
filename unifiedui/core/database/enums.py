@@ -12,8 +12,8 @@ class TenantRolesEnum(StrEnum):
     CREDENTIALS_CREATOR = "CREDENTIALS_CREATOR"
     CONVERSATIONS_ADMIN = "CONVERSATIONS_ADMIN"
     CONVERSATIONS_CREATOR = "CONVERSATIONS_CREATOR"
-    AUTONOMOUS_AGENTS_ADMIN = "AUTONOMOUS_AGENTS_ADMIN"
-    AUTONOMOUS_AGENTS_CREATOR = "AUTONOMOUS_AGENTS_CREATOR"
+    WORKFLOWS_ADMIN = "WORKFLOWS_ADMIN"
+    WORKFLOWS_CREATOR = "WORKFLOWS_CREATOR"
     CHAT_WIDGETS_ADMIN = "CHAT_WIDGETS_ADMIN"
     CHAT_WIDGETS_CREATOR = "CHAT_WIDGETS_CREATOR"
     REACT_AGENT_ADMIN = "REACT_AGENT_ADMIN"
@@ -63,14 +63,14 @@ class RestApiAuthTypeEnum(StrEnum):
         return [auth_type.value for auth_type in RestApiAuthTypeEnum]
 
 
-class AutonomousAgentTypeEnum(StrEnum):
-    """Supported autonomous agent types."""
+class WorkflowTypeEnum(StrEnum):
+    """Supported workflow types."""
 
     N8N = "N8N"
 
     @classmethod
     def all(cls) -> list[str]:
-        return [agent_type.value for agent_type in AutonomousAgentTypeEnum]
+        return [workflow_type.value for workflow_type in WorkflowTypeEnum]
 
 
 class ChatWidgetTypeEnum(StrEnum):
