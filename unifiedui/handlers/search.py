@@ -4,7 +4,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, cast
 
-from sqlalchemy import func, literal, or_, select, union_all
+from sqlalchemy import String, func, literal, or_, select, union_all
+from sqlalchemy import cast as sql_cast
 
 from unifiedui.core.database.enums import PrincipalTypeEnum, TenantRolesEnum
 from unifiedui.core.database.models import (
@@ -294,7 +295,7 @@ class SearchHandler:
             )
             base_filters.append(entity_model.id.in_(member_subquery))
 
-        sub_type_col = entity_model.type if has_type_col else literal(None)
+        sub_type_col = sql_cast(entity_model.type, String) if has_type_col else literal(None)
 
         return select(
             literal(search_type).label("entity_type"),
