@@ -155,6 +155,9 @@ class TenantAIModelHandler:
             if order_by and hasattr(TenantAIModel, order_by):
                 column = getattr(TenantAIModel, order_by)
                 query = query.order_by(column.desc()) if order_direction == "desc" else query.order_by(column.asc())
+            else:
+                # MSSQL requires ORDER BY when using OFFSET/LIMIT
+                query = query.order_by(TenantAIModel.created_at.desc())
 
             query = query.offset(skip).limit(limit)
             models = session.execute(query).scalars().all()
@@ -465,6 +468,65 @@ class TenantAIModelHandler:
                 )
 
             return result
+
+    def get_model_by_id_with_secret(
+        self,
+        tenant_id: str,
+        model_id: str,
+    ) -> AIModelWithSecretResponse:
+        """Get a single active AI model by ID with decrypted credentials (S2S only).
+
+        Args:
+            tenant_id: The ID of the tenant.
+            model_id: The ID of the AI model.
+
+        Returns:
+            AI model with decrypted credential secret.
+
+        Raises:
+            TenantAIModelNotFoundError: If the AI model is not found or inactive.
+        """
+        logger.info("Getting AI model by ID with secret", extra={"tenant_id": tenant_id, "model_id": model_id})
+
+        with self.db_client.get_session() as session:
+            ai_model = session.execute(
+                select(TenantAIModel).where(
+                    TenantAIModel.id == model_id,
+                    TenantAIModel.tenant_id == tenant_id,
+                    TenantAIModel.is_active,
+                )
+            ).scalar_one_or_none()
+
+            if not ai_model:
+                raise TenantAIModelNotFoundError(model_id)
+
+            credential_secret = None
+            if ai_model.credential_id and self.vault_client:
+                credential = session.execute(
+                    select(Credential).where(
+                        Credential.id == ai_model.credential_id,
+                        Credential.tenant_id == tenant_id,
+                    )
+                ).scalar_one_or_none()
+                if credential and credential.credential_uri:
+                    try:
+                        secret_str = self.vault_client.get_secret(credential.credential_uri, use_cache=False)
+                        if secret_str:
+                            try:
+                                credential_secret = json.loads(secret_str)
+                            except (json.JSONDecodeError, ValueError):
+                                credential_secret = {"api_key": secret_str}
+                    except Exception as e:
+                        logger.error("Failed to decrypt credential secret: %s", e)
+
+            return AIModelWithSecretResponse(
+                id=ai_model.id,
+                type=ai_model.type,
+                provider=ai_model.provider,
+                config=ai_model.config or {},
+                credential_secret=credential_secret,
+                priority=ai_model.priority,
+            )
 
     def _invalidate_list_cache(self, tenant_id: str) -> None:
         """Invalidate cached AI model list for a tenant.

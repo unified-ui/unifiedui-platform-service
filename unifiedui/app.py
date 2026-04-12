@@ -7,14 +7,17 @@ from unifiedui.apis.v1 import (
     auth,
     chat_agents,
     chat_widgets,
+    config_suggestions,
     conversations,
     credentials,
     custom_groups,
     dashboard,
     external_apps,
     files,
+    foundry,
     health,
     identity,
+    n8n,
     organizations,
     principals,
     recent_visits,
@@ -30,6 +33,7 @@ from unifiedui.core.config import settings
 from unifiedui.exc.auth import AuthError, InvalidCredentialsError, InvalidRefreshTokenError, LDAPConnectionError
 from unifiedui.exc.chat_agent_config import (
     ChatAgentConfigValidationError,
+    InvalidAIModelReferenceError,
     InvalidCredentialError,
     UnsupportedChatAgentTypeError,
 )
@@ -198,6 +202,11 @@ def create_app() -> FastAPI:
     async def invalid_credential_handler(request: Request, exc: InvalidCredentialError):
         """Handle invalid credential errors."""
         return JSONResponse(status_code=400, content={"detail": exc.message, "credential_id": exc.credential_id})
+
+    @app.exception_handler(InvalidAIModelReferenceError)
+    async def invalid_ai_model_reference_handler(request: Request, exc: InvalidAIModelReferenceError):
+        """Handle invalid AI model reference errors."""
+        return JSONResponse(status_code=400, content={"detail": exc.message, "ai_model_id": exc.ai_model_id})
 
     # Credential validation exception handlers
 
@@ -474,6 +483,17 @@ def create_app() -> FastAPI:
 
     # Dashboard routes
     app.include_router(dashboard.router, prefix="/api/v1/platform-service/tenants/{tenant_id}", tags=["Dashboard"])
+
+    # Config Suggestions routes
+    app.include_router(
+        config_suggestions.router, prefix="/api/v1/platform-service/tenants/{tenant_id}", tags=["Config Suggestions"]
+    )
+
+    # Foundry Agent Discovery routes
+    app.include_router(foundry.router, prefix="/api/v1/platform-service/tenants/{tenant_id}", tags=["Foundry"])
+
+    # N8N Workflow Browser routes
+    app.include_router(n8n.router, prefix="/api/v1/platform-service/tenants/{tenant_id}", tags=["N8N"])
 
     # Search routes
     app.include_router(search.router, prefix="/api/v1/platform-service/tenants/{tenant_id}", tags=["Search"])

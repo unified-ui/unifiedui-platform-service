@@ -151,7 +151,7 @@ class TestN8NChatAgentConfig:
                 use_unified_chat_history=True,
                 chat_url="https://example.com/webhook",
                 workflow_endpoint="https://n8n.example.com/workflow/abc123",
-                # Missing api_api_key_credential_id and chat_auth_credential_id
+                # Missing api_api_key_credential_id
             )
 
     def test_empty_credential_id_not_allowed(self):

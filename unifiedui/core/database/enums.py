@@ -43,6 +43,7 @@ class ChatAgentTypeEnum(StrEnum):
     MICROSOFT_FOUNDRY = "MICROSOFT_FOUNDRY"
     REST_API = "REST_API"
     REACT_AGENT = "REACT_AGENT"
+    LLM = "LLM"
 
     @classmethod
     def all(cls) -> list[str]:
@@ -193,6 +194,7 @@ class AIModelPurposeGroupEnum(StrEnum):
     TRACE_ANALYSIS = "TRACE_ANALYSIS"
     GENERAL = "GENERAL"
     REACT_AGENT = "REACT_AGENT"
+    DIRECT_CHAT = "DIRECT_CHAT"
 
     @classmethod
     def all(cls) -> list[str]:

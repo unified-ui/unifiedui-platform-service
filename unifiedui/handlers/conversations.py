@@ -189,6 +189,9 @@ class ConversationHandler:
             if order_by and hasattr(Conversation, order_by):
                 column = getattr(Conversation, order_by)
                 query = query.order_by(column.desc()) if order_direction == "desc" else query.order_by(column.asc())
+            else:
+                # MSSQL requires ORDER BY when using OFFSET/LIMIT
+                query = query.order_by(Conversation.created_at.desc())
 
             query = query.offset(skip).limit(limit)
             conversations = session.execute(query).scalars().all()

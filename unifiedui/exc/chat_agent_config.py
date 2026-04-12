@@ -25,3 +25,12 @@ class InvalidCredentialError(Exception):
         self.credential_id = credential_id
         self.message = message or f"Invalid or inaccessible credential with ID '{credential_id}'"
         super().__init__(self.message)
+
+
+class InvalidAIModelReferenceError(Exception):
+    """Exception raised when a referenced AI model does not exist or is inactive."""
+
+    def __init__(self, ai_model_id: str, message: str | None = None):
+        self.ai_model_id = ai_model_id
+        self.message = message or f"AI model with ID '{ai_model_id}' not found or inactive"
+        super().__init__(self.message)

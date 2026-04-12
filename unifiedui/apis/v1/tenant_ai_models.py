@@ -339,3 +339,40 @@ async def get_models_by_purpose(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to get AI models by purpose"
         )
+
+
+@router.get(
+    "/{model_id}/with-secret",
+    summary="Get AI model by ID with secret (S2S)",
+    description="Get a single active AI model with decrypted credentials. Service-to-service only.",
+)
+@authenticate_service_key("X_AGENT_SERVICE_KEY")
+async def get_model_by_id_with_secret(
+    request: Request,
+    tenant_id: str,
+    model_id: str,
+    handler: TenantAIModelHandler = Depends(get_tenant_ai_model_handler),
+):
+    """Get a single AI model with decrypted credentials for service-to-service calls."""
+    try:
+        logger.info(
+            "API: Get AI model by ID with secret (S2S)",
+            extra={
+                "tenant_id": tenant_id,
+                "model_id": model_id,
+            },
+        )
+        return handler.get_model_by_id_with_secret(
+            tenant_id=tenant_id,
+            model_id=model_id,
+        )
+    except TenantAIModelNotFoundError as e:
+        logger.warning("AI model not found: %s", e)
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Failed to get AI model by ID with secret: %s", e)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to get AI model with secret"
+        )

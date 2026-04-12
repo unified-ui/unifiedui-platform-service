@@ -177,6 +177,9 @@ class ExternalAppHandler:
             if order_by and hasattr(ExternalApp, order_by):
                 column = getattr(ExternalApp, order_by)
                 query = query.order_by(column.desc()) if order_direction == "desc" else query.order_by(column.asc())
+            else:
+                # MSSQL requires ORDER BY when using OFFSET/LIMIT
+                query = query.order_by(ExternalApp.created_at.desc())
 
             query = query.offset(skip).limit(limit)
             external_apps = session.execute(query).scalars().all()

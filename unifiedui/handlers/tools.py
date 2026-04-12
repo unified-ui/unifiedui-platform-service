@@ -212,6 +212,9 @@ class ToolHandler:
             if order_by and hasattr(Tool, order_by):
                 column = getattr(Tool, order_by)
                 query = query.order_by(column.desc()) if order_direction == "desc" else query.order_by(column.asc())
+            else:
+                # MSSQL requires ORDER BY when using OFFSET/LIMIT
+                query = query.order_by(Tool.created_at.desc())
 
             query = query.offset(skip).limit(limit)
             tools = session.execute(query).scalars().all()

@@ -115,6 +115,9 @@ class CustomGroupHandler:
             if order_by and order_by in field_mapping:
                 column = getattr(Principal, field_mapping[order_by])
                 query = query.order_by(column.desc()) if order_direction == "desc" else query.order_by(column.asc())
+            else:
+                # MSSQL requires ORDER BY when using OFFSET/LIMIT
+                query = query.order_by(Principal.created_at.desc())
 
             query = query.offset(skip).limit(limit)
             groups = session.execute(query).scalars().all()

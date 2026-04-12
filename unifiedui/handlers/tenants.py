@@ -91,6 +91,9 @@ class TenantHandler:
             if order_by and hasattr(Tenant, order_by):
                 column = getattr(Tenant, order_by)
                 query = query.order_by(column.desc()) if order_direction == "desc" else query.order_by(column.asc())
+            else:
+                # MSSQL requires ORDER BY when using OFFSET/LIMIT
+                query = query.order_by(Tenant.created_at.desc())
 
             # Apply pagination
             query = query.offset(skip).limit(limit)

@@ -1,4 +1,4 @@
-"""Microsoft Foundry API Client for conversation creation."""
+"""Microsoft Foundry API Client for conversation creation and agent discovery."""
 
 from typing import Any
 
@@ -23,7 +23,7 @@ class MicrosoftFoundryClient:
     """
     Client for Microsoft Foundry API.
 
-    Handles conversation creation and other Foundry-related operations.
+    Handles conversation creation and agent discovery operations.
     """
 
     def __init__(self, project_endpoint: str, api_token: str, api_version: str = "2025-11-15-preview"):
@@ -40,6 +40,67 @@ class MicrosoftFoundryClient:
         self.api_token = api_token
         self.api_version = api_version
         self.headers = {"Content-Type": "application/json", "Authorization": f"Bearer {api_token}"}
+
+    def list_agents(self) -> list[dict[str, str]]:
+        """List available agents from the Foundry project.
+
+        Returns:
+            List of dicts with 'id' and 'name' for each discovered agent.
+        """
+        url = f"{self.project_endpoint}/agents?api-version=v1"
+
+        logger.info(
+            "Listing Foundry agents",
+            extra={"project_endpoint": self.project_endpoint},
+        )
+
+        try:
+            logger.info("Calling Foundry API: %s", url)
+            response = requests.get(url, headers=self.headers, timeout=15)
+            logger.info("Foundry API response status: %s", response.status_code)
+            response.raise_for_status()
+            data = response.json()
+            logger.info(
+                "Foundry API raw response keys: %s, data count: %d",
+                list(data.keys()),
+                len(data.get("data", [])),
+            )
+            agents: list[dict[str, str]] = []
+            for item in data.get("data", []):
+                agent_name = item.get("name", "")
+                agent_description = item.get("description", "")
+                logger.info("Found agent: name=%s, description=%s", agent_name, agent_description)
+                if agent_name:
+                    agents.append({"id": agent_name, "name": agent_name})
+            logger.info("Total agents discovered: %d", len(agents))
+            return agents
+
+        except requests.exceptions.HTTPError as e:
+            status_code = e.response.status_code if e.response is not None else None
+            response_body = e.response.text if e.response is not None else None
+            response_headers = dict(e.response.headers) if e.response is not None else {}
+            logger.warning(
+                "Failed to list Foundry agents: HTTP %s — body: %s",
+                status_code,
+                response_body,
+            )
+            logger.debug(
+                "Foundry agents error response headers: %s",
+                {
+                    k: v
+                    for k, v in response_headers.items()
+                    if k.lower().startswith("www-") or k.lower().startswith("x-")
+                },
+            )
+            raise MicrosoftFoundryError(
+                message=f"Failed to list Foundry agents: HTTP {status_code}",
+                status_code=status_code,
+                response_body=response_body,
+            ) from e
+
+        except requests.exceptions.RequestException as e:
+            logger.warning("Failed to list Foundry agents: %s", e)
+            raise MicrosoftFoundryError(message=f"Failed to list Foundry agents: {e!s}") from e
 
     def create_conversation(self, metadata: dict[str, Any] | None = None) -> dict[str, Any]:
         """

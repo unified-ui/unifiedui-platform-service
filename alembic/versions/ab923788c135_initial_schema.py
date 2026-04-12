@@ -1,10 +1,11 @@
 """initial_schema
 
-Revision ID: a75f474e1ca6
+Revision ID: ab923788c135
 Revises:
-Create Date: 2026-03-21 08:36:24.991212
+Create Date: 2026-04-06 22:46:55.857765
 
 """
+import os
 from typing import Sequence, Union
 
 from alembic import op
@@ -14,10 +15,22 @@ from sqlalchemy.dialects import postgresql
 from unifiedui.core.database.models import HighPrecisionDateTime
 
 # revision identifiers, used by Alembic.
-revision: str = 'a75f474e1ca6'
+revision: str = 'ab923788c135'
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
+
+
+def cascade_or_no_action() -> str:
+    """Return CASCADE for PostgreSQL, NO ACTION for MSSQL.
+
+    MSSQL does not allow CASCADE when multiple cascade paths exist.
+    This applies to FKs referencing principals (tenant_id, principal_id)
+    because there are two paths from tenants to these tables:
+    1. Direct: tenant → member_table
+    2. Indirect: tenant → principals → member_table
+    """
+    return "NO ACTION" if os.getenv("DB_TYPE") == "mssql" else "CASCADE"
 
 
 def upgrade() -> None:
@@ -47,14 +60,14 @@ def upgrade() -> None:
     op.create_table('organization_members',
     sa.Column('organization_id', sa.String(length=36), nullable=False),
     sa.Column('principal_id', sa.String(length=50), nullable=False),
-    sa.Column('principal_type', sa.Enum('IDENTITY_USER', 'IDENTITY_GROUP', 'CUSTOM_GROUP', name='principal_type', native_enum=False, create_constraint=True), nullable=False),
-    sa.Column('role', sa.Enum('ORGANISATION_GLOBAL_ADMIN', 'ORGANISATION_TENANT_ADMIN', 'ORGANISATION_TENANT_CREATOR', name='organization_role', native_enum=False, create_constraint=True), nullable=False),
+    sa.Column('principal_type', sa.Enum('IDENTITY_USER', 'IDENTITY_GROUP', 'CUSTOM_GROUP', name='principal_type', native_enum=False, create_constraint=False), nullable=False),
+    sa.Column('role', sa.Enum('ORGANISATION_GLOBAL_ADMIN', 'ORGANISATION_TENANT_ADMIN', 'ORGANISATION_TENANT_CREATOR', name='organization_role', native_enum=False, create_constraint=False), nullable=False),
     sa.Column('id', sa.String(length=36), nullable=False),
     sa.Column('created_at', HighPrecisionDateTime(), nullable=False),
     sa.Column('updated_at', HighPrecisionDateTime(), nullable=False),
     sa.Column('created_by', sa.String(length=50), nullable=True),
     sa.Column('updated_by', sa.String(length=50), nullable=True),
-    sa.ForeignKeyConstraint(['organization_id'], ['unifiedui.organizations.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['organization_id'], ['unifiedui.organizations.id'], ondelete=cascade_or_no_action()),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('organization_id', 'principal_id', 'role', name='uq_org_member'),
     schema='unifiedui'
@@ -63,7 +76,7 @@ def upgrade() -> None:
     op.create_index('ix_org_member_principal', 'organization_members', ['principal_id'], unique=False, schema='unifiedui')
     op.create_table('tenants',
     sa.Column('organization_id', sa.String(length=36), nullable=False),
-    sa.Column('environment_type', sa.Enum('SANDBOX', 'PRODUCTION', name='environment_type', native_enum=False, create_constraint=True), nullable=False),
+    sa.Column('environment_type', sa.Enum('SANDBOX', 'PRODUCTION', name='environment_type', native_enum=False, create_constraint=False), nullable=False),
     sa.Column('previous_stage_id', sa.String(length=36), nullable=True),
     sa.Column('is_default', sa.Boolean(), nullable=False),
     sa.Column('can_be_deleted', sa.Boolean(), nullable=False),
@@ -74,37 +87,15 @@ def upgrade() -> None:
     sa.Column('updated_at', HighPrecisionDateTime(), nullable=False),
     sa.Column('created_by', sa.String(length=50), nullable=True),
     sa.Column('updated_by', sa.String(length=50), nullable=True),
-    sa.ForeignKeyConstraint(['organization_id'], ['unifiedui.organizations.id'], ondelete='CASCADE'),
-    sa.ForeignKeyConstraint(['previous_stage_id'], ['unifiedui.tenants.id'], ondelete='SET NULL'),
+    sa.ForeignKeyConstraint(['organization_id'], ['unifiedui.organizations.id'], ondelete=cascade_or_no_action()),
+    sa.ForeignKeyConstraint(['previous_stage_id'], ['unifiedui.tenants.id'], ondelete=('NO ACTION' if os.getenv('DB_TYPE') == 'mssql' else 'SET NULL')),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('organization_id', 'name', 'environment_type', name='uq_tenant_org_name_env'),
     schema='unifiedui'
     )
     op.create_index('ix_tenant_org', 'tenants', ['organization_id'], unique=False, schema='unifiedui')
-    op.create_table('autonomous_agents',
-    sa.Column('type', sa.Enum('N8N', name='autonomous_agent_type', native_enum=False, create_constraint=True), nullable=False),
-    sa.Column('config', sa.JSON().with_variant(mssql.JSON(), 'mssql').with_variant(postgresql.JSONB(astext_type=sa.Text()), 'postgresql'), nullable=False),
-    sa.Column('is_active', sa.Boolean(), nullable=False),
-    sa.Column('allow_api_keys', sa.Boolean(), nullable=False),
-    sa.Column('primary_key_vault_uri', sa.String(length=2000), nullable=True),
-    sa.Column('secondary_key_vault_uri', sa.String(length=2000), nullable=True),
-    sa.Column('last_full_import', HighPrecisionDateTime(), nullable=True),
-    sa.Column('name', sa.String(length=255), nullable=False),
-    sa.Column('description', sa.String(length=2000), nullable=True),
-    sa.Column('id', sa.String(length=36), nullable=False),
-    sa.Column('created_at', HighPrecisionDateTime(), nullable=False),
-    sa.Column('updated_at', HighPrecisionDateTime(), nullable=False),
-    sa.Column('created_by', sa.String(length=50), nullable=True),
-    sa.Column('updated_by', sa.String(length=50), nullable=True),
-    sa.Column('tenant_id', sa.String(length=36), nullable=False),
-    sa.ForeignKeyConstraint(['tenant_id'], ['unifiedui.tenants.id'], ondelete='CASCADE'),
-    sa.PrimaryKeyConstraint('id'),
-    sa.UniqueConstraint('tenant_id', 'name', name='uq_autonomous_agent_tenant_name'),
-    schema='unifiedui'
-    )
-    op.create_index('ix_autonomous_agents_tenant', 'autonomous_agents', ['tenant_id'], unique=False, schema='unifiedui')
     op.create_table('chat_agents',
-    sa.Column('type', sa.Enum('N8N', 'MICROSOFT_FOUNDRY', 'REST_API', 'REACT_AGENT', name='chat_agent_type', native_enum=False, create_constraint=True), nullable=False),
+    sa.Column('type', sa.Enum('N8N', 'MICROSOFT_FOUNDRY', 'REST_API', 'REACT_AGENT', name='chat_agent_type', native_enum=False, create_constraint=False), nullable=False),
     sa.Column('config', sa.JSON().with_variant(mssql.JSON(), 'mssql').with_variant(postgresql.JSONB(astext_type=sa.Text()), 'postgresql'), nullable=False),
     sa.Column('is_active', sa.Boolean(), nullable=False),
     sa.Column('embed_allowed_origins', sa.String(length=2000), nullable=True),
@@ -117,7 +108,7 @@ def upgrade() -> None:
     sa.Column('created_by', sa.String(length=50), nullable=True),
     sa.Column('updated_by', sa.String(length=50), nullable=True),
     sa.Column('tenant_id', sa.String(length=36), nullable=False),
-    sa.ForeignKeyConstraint(['tenant_id'], ['unifiedui.tenants.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['tenant_id'], ['unifiedui.tenants.id'], ondelete=cascade_or_no_action()),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('tenant_id', 'name', name='uq_chat_agent_tenant_name'),
     schema='unifiedui'
@@ -135,7 +126,7 @@ def upgrade() -> None:
     sa.Column('created_by', sa.String(length=50), nullable=True),
     sa.Column('updated_by', sa.String(length=50), nullable=True),
     sa.Column('tenant_id', sa.String(length=36), nullable=False),
-    sa.ForeignKeyConstraint(['tenant_id'], ['unifiedui.tenants.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['tenant_id'], ['unifiedui.tenants.id'], ondelete=cascade_or_no_action()),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('tenant_id', 'name', name='uq_chat_widget_tenant_name'),
     schema='unifiedui'
@@ -154,7 +145,7 @@ def upgrade() -> None:
     sa.Column('created_by', sa.String(length=50), nullable=True),
     sa.Column('updated_by', sa.String(length=50), nullable=True),
     sa.Column('tenant_id', sa.String(length=36), nullable=False),
-    sa.ForeignKeyConstraint(['tenant_id'], ['unifiedui.tenants.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['tenant_id'], ['unifiedui.tenants.id'], ondelete=cascade_or_no_action()),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('tenant_id', 'name', name='uq_credential_tenant_name'),
     schema='unifiedui'
@@ -163,6 +154,7 @@ def upgrade() -> None:
     op.create_table('external_apps',
     sa.Column('url', sa.String(length=2000), nullable=False),
     sa.Column('image_url', sa.String(length=2000), nullable=True),
+    sa.Column('image_file_id', sa.String(length=36), nullable=True),
     sa.Column('name', sa.String(length=255), nullable=False),
     sa.Column('description', sa.String(length=2000), nullable=True),
     sa.Column('id', sa.String(length=36), nullable=False),
@@ -171,16 +163,37 @@ def upgrade() -> None:
     sa.Column('created_by', sa.String(length=50), nullable=True),
     sa.Column('updated_by', sa.String(length=50), nullable=True),
     sa.Column('tenant_id', sa.String(length=36), nullable=False),
-    sa.ForeignKeyConstraint(['tenant_id'], ['unifiedui.tenants.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['tenant_id'], ['unifiedui.tenants.id'], ondelete=cascade_or_no_action()),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('tenant_id', 'name', name='uq_external_app_tenant_name'),
     schema='unifiedui'
     )
     op.create_index('ix_external_apps_tenant', 'external_apps', ['tenant_id'], unique=False, schema='unifiedui')
+    op.create_table('files',
+    sa.Column('file_name', sa.String(length=500), nullable=False),
+    sa.Column('file_size', sa.Integer(), nullable=False),
+    sa.Column('content_type', sa.String(length=255), nullable=False),
+    sa.Column('storage_path', sa.String(length=1000), nullable=False),
+    sa.Column('context_type', sa.Enum('CHAT_ATTACHMENT', 'APP_IMAGE', name='file_context_type', native_enum=False, create_constraint=False), nullable=False),
+    sa.Column('context_id', sa.String(length=36), nullable=True),
+    sa.Column('id', sa.String(length=36), nullable=False),
+    sa.Column('created_at', HighPrecisionDateTime(), nullable=False),
+    sa.Column('updated_at', HighPrecisionDateTime(), nullable=False),
+    sa.Column('created_by', sa.String(length=50), nullable=True),
+    sa.Column('updated_by', sa.String(length=50), nullable=True),
+    sa.Column('tenant_id', sa.String(length=36), nullable=False),
+    sa.ForeignKeyConstraint(['tenant_id'], ['unifiedui.tenants.id'], ondelete=cascade_or_no_action()),
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('storage_path'),
+    schema='unifiedui'
+    )
+    op.create_index('ix_files_context', 'files', ['tenant_id', 'context_type', 'context_id'], unique=False, schema='unifiedui')
+    op.create_index('ix_files_storage_path', 'files', ['storage_path'], unique=True, schema='unifiedui')
+    op.create_index('ix_files_tenant', 'files', ['tenant_id'], unique=False, schema='unifiedui')
     op.create_table('principals',
     sa.Column('tenant_id', sa.String(length=36), nullable=False),
     sa.Column('principal_id', sa.String(length=50), nullable=False),
-    sa.Column('principal_type', sa.Enum('IDENTITY_USER', 'IDENTITY_GROUP', 'CUSTOM_GROUP', name='principal_type', native_enum=False, create_constraint=True), nullable=False),
+    sa.Column('principal_type', sa.Enum('IDENTITY_USER', 'IDENTITY_GROUP', 'CUSTOM_GROUP', name='principal_type', native_enum=False, create_constraint=False), nullable=False),
     sa.Column('mail', sa.String(length=255), nullable=True),
     sa.Column('display_name', sa.String(length=255), nullable=False),
     sa.Column('principal_name', sa.String(length=255), nullable=False),
@@ -188,7 +201,7 @@ def upgrade() -> None:
     sa.Column('is_active', sa.Boolean(), nullable=False),
     sa.Column('created_at', HighPrecisionDateTime(), nullable=False),
     sa.Column('updated_at', HighPrecisionDateTime(), nullable=False),
-    sa.ForeignKeyConstraint(['tenant_id'], ['unifiedui.tenants.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['tenant_id'], ['unifiedui.tenants.id'], ondelete=cascade_or_no_action()),
     sa.PrimaryKeyConstraint('tenant_id', 'principal_id'),
     schema='unifiedui'
     )
@@ -204,7 +217,7 @@ def upgrade() -> None:
     sa.Column('visited_at', HighPrecisionDateTime(), nullable=False),
     sa.Column('id', sa.String(length=36), nullable=False),
     sa.Column('tenant_id', sa.String(length=36), nullable=False),
-    sa.ForeignKeyConstraint(['tenant_id'], ['unifiedui.tenants.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['tenant_id'], ['unifiedui.tenants.id'], ondelete=cascade_or_no_action()),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('tenant_id', 'user_id', 'resource_type', 'resource_id', name='uq_recent_visits'),
     schema='unifiedui'
@@ -218,74 +231,47 @@ def upgrade() -> None:
     sa.Column('updated_at', HighPrecisionDateTime(), nullable=False),
     sa.Column('created_by', sa.String(length=50), nullable=True),
     sa.Column('updated_by', sa.String(length=50), nullable=True),
-    sa.ForeignKeyConstraint(['tenant_id'], ['unifiedui.tenants.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['tenant_id'], ['unifiedui.tenants.id'], ondelete=cascade_or_no_action()),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('tenant_id', 'name', name='uq_tag_tenant_name'),
     schema='unifiedui'
     )
     op.create_index('ix_tags_name', 'tags', ['name'], unique=False, schema='unifiedui')
     op.create_index('ix_tags_tenant', 'tags', ['tenant_id'], unique=False, schema='unifiedui')
-    op.create_table('autonomous_agent_members',
-    sa.Column('tenant_id', sa.String(length=36), nullable=False),
-    sa.Column('autonomous_agent_id', sa.String(length=36), nullable=False),
-    sa.Column('principal_id', sa.String(length=50), nullable=False),
-    sa.Column('role', sa.Enum('READ', 'WRITE', 'ADMIN', name='permission_action', native_enum=False, create_constraint=True), nullable=False),
+    op.create_table('workflows',
+    sa.Column('type', sa.Enum('N8N', name='workflow_type', native_enum=False, create_constraint=False), nullable=False),
+    sa.Column('config', sa.JSON().with_variant(mssql.JSON(), 'mssql').with_variant(postgresql.JSONB(astext_type=sa.Text()), 'postgresql'), nullable=False),
+    sa.Column('is_active', sa.Boolean(), nullable=False),
+    sa.Column('allow_api_keys', sa.Boolean(), nullable=False),
+    sa.Column('primary_key_vault_uri', sa.String(length=2000), nullable=True),
+    sa.Column('secondary_key_vault_uri', sa.String(length=2000), nullable=True),
+    sa.Column('last_full_import', HighPrecisionDateTime(), nullable=True),
+    sa.Column('name', sa.String(length=255), nullable=False),
+    sa.Column('description', sa.String(length=2000), nullable=True),
     sa.Column('id', sa.String(length=36), nullable=False),
     sa.Column('created_at', HighPrecisionDateTime(), nullable=False),
     sa.Column('updated_at', HighPrecisionDateTime(), nullable=False),
     sa.Column('created_by', sa.String(length=50), nullable=True),
     sa.Column('updated_by', sa.String(length=50), nullable=True),
-    sa.ForeignKeyConstraint(['autonomous_agent_id'], ['unifiedui.autonomous_agents.id'], ondelete='CASCADE'),
-    sa.ForeignKeyConstraint(['tenant_id', 'principal_id'], ['unifiedui.principals.tenant_id', 'unifiedui.principals.principal_id'], name='fk_autonomous_agent_members_principal', ondelete='CASCADE'),
+    sa.Column('tenant_id', sa.String(length=36), nullable=False),
+    sa.ForeignKeyConstraint(['tenant_id'], ['unifiedui.tenants.id'], ondelete=cascade_or_no_action()),
     sa.PrimaryKeyConstraint('id'),
-    sa.UniqueConstraint('autonomous_agent_id', 'principal_id', name='uq_autonomous_agent_members'),
+    sa.UniqueConstraint('tenant_id', 'name', name='uq_workflow_tenant_name'),
     schema='unifiedui'
     )
-    op.create_index('ix_aam_autonomous_agent', 'autonomous_agent_members', ['autonomous_agent_id'], unique=False, schema='unifiedui')
-    op.create_index('ix_aam_principal', 'autonomous_agent_members', ['principal_id'], unique=False, schema='unifiedui')
-    op.create_table('autonomous_agent_tags',
-    sa.Column('tenant_id', sa.String(length=36), nullable=False),
-    sa.Column('tag_id', sa.Integer(), nullable=False),
-    sa.Column('autonomous_agent_id', sa.String(length=36), nullable=False),
-    sa.Column('created_at', HighPrecisionDateTime(), nullable=False),
-    sa.Column('updated_at', HighPrecisionDateTime(), nullable=False),
-    sa.Column('created_by', sa.String(length=50), nullable=True),
-    sa.Column('updated_by', sa.String(length=50), nullable=True),
-    sa.ForeignKeyConstraint(['autonomous_agent_id'], ['unifiedui.autonomous_agents.id'], ondelete='CASCADE'),
-    sa.ForeignKeyConstraint(['tag_id'], ['unifiedui.tags.id'], ondelete='CASCADE'),
-    sa.PrimaryKeyConstraint('tenant_id', 'tag_id', 'autonomous_agent_id'),
-    schema='unifiedui'
-    )
-    op.create_index('ix_aat_autonomous_agent', 'autonomous_agent_tags', ['autonomous_agent_id'], unique=False, schema='unifiedui')
-    op.create_index('ix_aat_tag', 'autonomous_agent_tags', ['tag_id'], unique=False, schema='unifiedui')
-    op.create_table('autonomous_agent_user_favorites',
-    sa.Column('tenant_id', sa.String(length=36), nullable=False),
-    sa.Column('user_id', sa.String(length=50), nullable=False),
-    sa.Column('autonomous_agent_id', sa.String(length=36), nullable=False),
-    sa.Column('created_at', HighPrecisionDateTime(), nullable=False),
-    sa.Column('updated_at', HighPrecisionDateTime(), nullable=False),
-    sa.Column('created_by', sa.String(length=50), nullable=True),
-    sa.Column('updated_by', sa.String(length=50), nullable=True),
-    sa.ForeignKeyConstraint(['autonomous_agent_id'], ['unifiedui.autonomous_agents.id'], ondelete='CASCADE'),
-    sa.ForeignKeyConstraint(['tenant_id', 'user_id'], ['unifiedui.principals.tenant_id', 'unifiedui.principals.principal_id'], name='fk_autonomous_agent_user_favorites_principal', ondelete='CASCADE'),
-    sa.ForeignKeyConstraint(['tenant_id'], ['unifiedui.tenants.id'], ondelete='CASCADE'),
-    sa.PrimaryKeyConstraint('tenant_id', 'user_id', 'autonomous_agent_id'),
-    schema='unifiedui'
-    )
-    op.create_index('ix_aauf_autonomous_agent', 'autonomous_agent_user_favorites', ['autonomous_agent_id'], unique=False, schema='unifiedui')
-    op.create_index('ix_aauf_user', 'autonomous_agent_user_favorites', ['user_id'], unique=False, schema='unifiedui')
+    op.create_index('ix_workflows_tenant', 'workflows', ['tenant_id'], unique=False, schema='unifiedui')
     op.create_table('chat_agent_members',
     sa.Column('tenant_id', sa.String(length=36), nullable=False),
     sa.Column('chat_agent_id', sa.String(length=36), nullable=False),
     sa.Column('principal_id', sa.String(length=50), nullable=False),
-    sa.Column('role', sa.Enum('READ', 'WRITE', 'ADMIN', name='permission_action', native_enum=False, create_constraint=True), nullable=False),
+    sa.Column('role', sa.Enum('READ', 'WRITE', 'ADMIN', name='permission_action', native_enum=False, create_constraint=False), nullable=False),
     sa.Column('id', sa.String(length=36), nullable=False),
     sa.Column('created_at', HighPrecisionDateTime(), nullable=False),
     sa.Column('updated_at', HighPrecisionDateTime(), nullable=False),
     sa.Column('created_by', sa.String(length=50), nullable=True),
     sa.Column('updated_by', sa.String(length=50), nullable=True),
-    sa.ForeignKeyConstraint(['chat_agent_id'], ['unifiedui.chat_agents.id'], ondelete='CASCADE'),
-    sa.ForeignKeyConstraint(['tenant_id', 'principal_id'], ['unifiedui.principals.tenant_id', 'unifiedui.principals.principal_id'], name='fk_chat_agent_members_principal', ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['chat_agent_id'], ['unifiedui.chat_agents.id'], ondelete=cascade_or_no_action()),
+    sa.ForeignKeyConstraint(['tenant_id', 'principal_id'], ['unifiedui.principals.tenant_id', 'unifiedui.principals.principal_id'], name='fk_chat_agent_members_principal', ondelete=cascade_or_no_action()),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('chat_agent_id', 'principal_id', name='uq_chat_agent_members'),
     schema='unifiedui'
@@ -300,8 +286,8 @@ def upgrade() -> None:
     sa.Column('updated_at', HighPrecisionDateTime(), nullable=False),
     sa.Column('created_by', sa.String(length=50), nullable=True),
     sa.Column('updated_by', sa.String(length=50), nullable=True),
-    sa.ForeignKeyConstraint(['chat_agent_id'], ['unifiedui.chat_agents.id'], ondelete='CASCADE'),
-    sa.ForeignKeyConstraint(['tag_id'], ['unifiedui.tags.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['chat_agent_id'], ['unifiedui.chat_agents.id'], ondelete=cascade_or_no_action()),
+    sa.ForeignKeyConstraint(['tag_id'], ['unifiedui.tags.id'], ondelete=cascade_or_no_action()),
     sa.PrimaryKeyConstraint('tenant_id', 'tag_id', 'chat_agent_id'),
     schema='unifiedui'
     )
@@ -315,9 +301,9 @@ def upgrade() -> None:
     sa.Column('updated_at', HighPrecisionDateTime(), nullable=False),
     sa.Column('created_by', sa.String(length=50), nullable=True),
     sa.Column('updated_by', sa.String(length=50), nullable=True),
-    sa.ForeignKeyConstraint(['chat_agent_id'], ['unifiedui.chat_agents.id'], ondelete='CASCADE'),
-    sa.ForeignKeyConstraint(['tenant_id', 'user_id'], ['unifiedui.principals.tenant_id', 'unifiedui.principals.principal_id'], name='fk_chat_agent_user_favorites_principal', ondelete='CASCADE'),
-    sa.ForeignKeyConstraint(['tenant_id'], ['unifiedui.tenants.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['chat_agent_id'], ['unifiedui.chat_agents.id'], ondelete=cascade_or_no_action()),
+    sa.ForeignKeyConstraint(['tenant_id', 'user_id'], ['unifiedui.principals.tenant_id', 'unifiedui.principals.principal_id'], name='fk_chat_agent_user_favorites_principal', ondelete=cascade_or_no_action()),
+    sa.ForeignKeyConstraint(['tenant_id'], ['unifiedui.tenants.id'], ondelete=cascade_or_no_action()),
     sa.PrimaryKeyConstraint('tenant_id', 'user_id', 'chat_agent_id'),
     schema='unifiedui'
     )
@@ -327,14 +313,14 @@ def upgrade() -> None:
     sa.Column('tenant_id', sa.String(length=36), nullable=False),
     sa.Column('chat_widget_id', sa.String(length=36), nullable=False),
     sa.Column('principal_id', sa.String(length=50), nullable=False),
-    sa.Column('role', sa.Enum('READ', 'WRITE', 'ADMIN', name='permission_action', native_enum=False, create_constraint=True), nullable=False),
+    sa.Column('role', sa.Enum('READ', 'WRITE', 'ADMIN', name='permission_action', native_enum=False, create_constraint=False), nullable=False),
     sa.Column('id', sa.String(length=36), nullable=False),
     sa.Column('created_at', HighPrecisionDateTime(), nullable=False),
     sa.Column('updated_at', HighPrecisionDateTime(), nullable=False),
     sa.Column('created_by', sa.String(length=50), nullable=True),
     sa.Column('updated_by', sa.String(length=50), nullable=True),
-    sa.ForeignKeyConstraint(['chat_widget_id'], ['unifiedui.chat_widgets.id'], ondelete='CASCADE'),
-    sa.ForeignKeyConstraint(['tenant_id', 'principal_id'], ['unifiedui.principals.tenant_id', 'unifiedui.principals.principal_id'], name='fk_chat_widget_members_principal', ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['chat_widget_id'], ['unifiedui.chat_widgets.id'], ondelete=cascade_or_no_action()),
+    sa.ForeignKeyConstraint(['tenant_id', 'principal_id'], ['unifiedui.principals.tenant_id', 'unifiedui.principals.principal_id'], name='fk_chat_widget_members_principal', ondelete=cascade_or_no_action()),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('chat_widget_id', 'principal_id', name='uq_chat_widget_members'),
     schema='unifiedui'
@@ -349,8 +335,8 @@ def upgrade() -> None:
     sa.Column('updated_at', HighPrecisionDateTime(), nullable=False),
     sa.Column('created_by', sa.String(length=50), nullable=True),
     sa.Column('updated_by', sa.String(length=50), nullable=True),
-    sa.ForeignKeyConstraint(['chat_widget_id'], ['unifiedui.chat_widgets.id'], ondelete='CASCADE'),
-    sa.ForeignKeyConstraint(['tag_id'], ['unifiedui.tags.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['chat_widget_id'], ['unifiedui.chat_widgets.id'], ondelete=cascade_or_no_action()),
+    sa.ForeignKeyConstraint(['tag_id'], ['unifiedui.tags.id'], ondelete=cascade_or_no_action()),
     sa.PrimaryKeyConstraint('tenant_id', 'tag_id', 'chat_widget_id'),
     schema='unifiedui'
     )
@@ -364,9 +350,9 @@ def upgrade() -> None:
     sa.Column('updated_at', HighPrecisionDateTime(), nullable=False),
     sa.Column('created_by', sa.String(length=50), nullable=True),
     sa.Column('updated_by', sa.String(length=50), nullable=True),
-    sa.ForeignKeyConstraint(['chat_widget_id'], ['unifiedui.chat_widgets.id'], ondelete='CASCADE'),
-    sa.ForeignKeyConstraint(['tenant_id', 'user_id'], ['unifiedui.principals.tenant_id', 'unifiedui.principals.principal_id'], name='fk_chat_widget_user_favorites_principal', ondelete='CASCADE'),
-    sa.ForeignKeyConstraint(['tenant_id'], ['unifiedui.tenants.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['chat_widget_id'], ['unifiedui.chat_widgets.id'], ondelete=cascade_or_no_action()),
+    sa.ForeignKeyConstraint(['tenant_id', 'user_id'], ['unifiedui.principals.tenant_id', 'unifiedui.principals.principal_id'], name='fk_chat_widget_user_favorites_principal', ondelete=cascade_or_no_action()),
+    sa.ForeignKeyConstraint(['tenant_id'], ['unifiedui.tenants.id'], ondelete=cascade_or_no_action()),
     sa.PrimaryKeyConstraint('tenant_id', 'user_id', 'chat_widget_id'),
     schema='unifiedui'
     )
@@ -384,8 +370,8 @@ def upgrade() -> None:
     sa.Column('created_by', sa.String(length=50), nullable=True),
     sa.Column('updated_by', sa.String(length=50), nullable=True),
     sa.Column('tenant_id', sa.String(length=36), nullable=False),
-    sa.ForeignKeyConstraint(['chat_agent_id'], ['unifiedui.chat_agents.id'], ondelete='CASCADE'),
-    sa.ForeignKeyConstraint(['tenant_id'], ['unifiedui.tenants.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['chat_agent_id'], ['unifiedui.chat_agents.id'], ondelete=cascade_or_no_action()),
+    sa.ForeignKeyConstraint(['tenant_id'], ['unifiedui.tenants.id'], ondelete=cascade_or_no_action()),
     sa.PrimaryKeyConstraint('id'),
     schema='unifiedui'
     )
@@ -395,14 +381,14 @@ def upgrade() -> None:
     sa.Column('tenant_id', sa.String(length=36), nullable=False),
     sa.Column('credential_id', sa.String(length=36), nullable=False),
     sa.Column('principal_id', sa.String(length=50), nullable=False),
-    sa.Column('role', sa.Enum('READ', 'WRITE', 'ADMIN', name='permission_action', native_enum=False, create_constraint=True), nullable=False),
+    sa.Column('role', sa.Enum('READ', 'WRITE', 'ADMIN', name='permission_action', native_enum=False, create_constraint=False), nullable=False),
     sa.Column('id', sa.String(length=36), nullable=False),
     sa.Column('created_at', HighPrecisionDateTime(), nullable=False),
     sa.Column('updated_at', HighPrecisionDateTime(), nullable=False),
     sa.Column('created_by', sa.String(length=50), nullable=True),
     sa.Column('updated_by', sa.String(length=50), nullable=True),
-    sa.ForeignKeyConstraint(['credential_id'], ['unifiedui.credentials.id'], ondelete='CASCADE'),
-    sa.ForeignKeyConstraint(['tenant_id', 'principal_id'], ['unifiedui.principals.tenant_id', 'unifiedui.principals.principal_id'], name='fk_credential_members_principal', ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['credential_id'], ['unifiedui.credentials.id'], ondelete=cascade_or_no_action()),
+    sa.ForeignKeyConstraint(['tenant_id', 'principal_id'], ['unifiedui.principals.tenant_id', 'unifiedui.principals.principal_id'], name='fk_credential_members_principal', ondelete=cascade_or_no_action()),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('credential_id', 'principal_id', name='uq_credential_members'),
     schema='unifiedui'
@@ -417,8 +403,8 @@ def upgrade() -> None:
     sa.Column('updated_at', HighPrecisionDateTime(), nullable=False),
     sa.Column('created_by', sa.String(length=50), nullable=True),
     sa.Column('updated_by', sa.String(length=50), nullable=True),
-    sa.ForeignKeyConstraint(['credential_id'], ['unifiedui.credentials.id'], ondelete='CASCADE'),
-    sa.ForeignKeyConstraint(['tag_id'], ['unifiedui.tags.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['credential_id'], ['unifiedui.credentials.id'], ondelete=cascade_or_no_action()),
+    sa.ForeignKeyConstraint(['tag_id'], ['unifiedui.tags.id'], ondelete=cascade_or_no_action()),
     sa.PrimaryKeyConstraint('tenant_id', 'tag_id', 'credential_id'),
     schema='unifiedui'
     )
@@ -428,15 +414,15 @@ def upgrade() -> None:
     sa.Column('tenant_id', sa.String(length=36), nullable=False),
     sa.Column('custom_group_id', sa.String(length=50), nullable=False),
     sa.Column('principal_id', sa.String(length=50), nullable=False),
-    sa.Column('role', sa.Enum('READ', 'WRITE', 'ADMIN', name='permission_action', native_enum=False, create_constraint=True), nullable=False),
+    sa.Column('role', sa.Enum('READ', 'WRITE', 'ADMIN', name='permission_action', native_enum=False, create_constraint=False), nullable=False),
     sa.Column('id', sa.String(length=36), nullable=False),
     sa.Column('created_at', HighPrecisionDateTime(), nullable=False),
     sa.Column('updated_at', HighPrecisionDateTime(), nullable=False),
     sa.Column('created_by', sa.String(length=50), nullable=True),
     sa.Column('updated_by', sa.String(length=50), nullable=True),
-    sa.ForeignKeyConstraint(['tenant_id', 'custom_group_id'], ['unifiedui.principals.tenant_id', 'unifiedui.principals.principal_id'], name='fk_custom_group_members_custom_group', ondelete='CASCADE'),
-    sa.ForeignKeyConstraint(['tenant_id', 'principal_id'], ['unifiedui.principals.tenant_id', 'unifiedui.principals.principal_id'], name='fk_custom_group_members_principal', ondelete='CASCADE'),
-    sa.ForeignKeyConstraint(['tenant_id'], ['unifiedui.tenants.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['tenant_id', 'custom_group_id'], ['unifiedui.principals.tenant_id', 'unifiedui.principals.principal_id'], name='fk_custom_group_members_custom_group', ondelete=cascade_or_no_action()),
+    sa.ForeignKeyConstraint(['tenant_id', 'principal_id'], ['unifiedui.principals.tenant_id', 'unifiedui.principals.principal_id'], name='fk_custom_group_members_principal', ondelete=cascade_or_no_action()),
+    sa.ForeignKeyConstraint(['tenant_id'], ['unifiedui.tenants.id'], ondelete=cascade_or_no_action()),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('tenant_id', 'custom_group_id', 'principal_id', name='uq_custom_group_members'),
     schema='unifiedui'
@@ -444,6 +430,55 @@ def upgrade() -> None:
     op.create_index('ix_cgm_custom_group', 'custom_group_members', ['custom_group_id'], unique=False, schema='unifiedui')
     op.create_index('ix_cgm_principal', 'custom_group_members', ['principal_id'], unique=False, schema='unifiedui')
     op.create_index('ix_cgm_tenant', 'custom_group_members', ['tenant_id'], unique=False, schema='unifiedui')
+    op.create_table('external_app_members',
+    sa.Column('tenant_id', sa.String(length=36), nullable=False),
+    sa.Column('external_app_id', sa.String(length=36), nullable=False),
+    sa.Column('principal_id', sa.String(length=50), nullable=False),
+    sa.Column('role', sa.Enum('READ', 'WRITE', 'ADMIN', name='permission_action', native_enum=False, create_constraint=False), nullable=False),
+    sa.Column('id', sa.String(length=36), nullable=False),
+    sa.Column('created_at', HighPrecisionDateTime(), nullable=False),
+    sa.Column('updated_at', HighPrecisionDateTime(), nullable=False),
+    sa.Column('created_by', sa.String(length=50), nullable=True),
+    sa.Column('updated_by', sa.String(length=50), nullable=True),
+    sa.ForeignKeyConstraint(['external_app_id'], ['unifiedui.external_apps.id'], ondelete=cascade_or_no_action()),
+    sa.ForeignKeyConstraint(['tenant_id', 'principal_id'], ['unifiedui.principals.tenant_id', 'unifiedui.principals.principal_id'], ondelete=cascade_or_no_action()),
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('external_app_id', 'principal_id', 'role', name='uq_external_app_member'),
+    schema='unifiedui'
+    )
+    op.create_index('ix_eam_external_app', 'external_app_members', ['external_app_id'], unique=False, schema='unifiedui')
+    op.create_index('ix_eam_principal', 'external_app_members', ['principal_id'], unique=False, schema='unifiedui')
+    op.create_table('external_app_tags',
+    sa.Column('tenant_id', sa.String(length=36), nullable=False),
+    sa.Column('tag_id', sa.Integer(), nullable=False),
+    sa.Column('external_app_id', sa.String(length=36), nullable=False),
+    sa.Column('created_at', HighPrecisionDateTime(), nullable=False),
+    sa.Column('updated_at', HighPrecisionDateTime(), nullable=False),
+    sa.Column('created_by', sa.String(length=50), nullable=True),
+    sa.Column('updated_by', sa.String(length=50), nullable=True),
+    sa.ForeignKeyConstraint(['external_app_id'], ['unifiedui.external_apps.id'], ondelete=cascade_or_no_action()),
+    sa.ForeignKeyConstraint(['tag_id'], ['unifiedui.tags.id'], ondelete=cascade_or_no_action()),
+    sa.PrimaryKeyConstraint('tenant_id', 'tag_id', 'external_app_id'),
+    schema='unifiedui'
+    )
+    op.create_index('ix_eat_external_app', 'external_app_tags', ['external_app_id'], unique=False, schema='unifiedui')
+    op.create_index('ix_eat_tag', 'external_app_tags', ['tag_id'], unique=False, schema='unifiedui')
+    op.create_table('external_app_user_favorites',
+    sa.Column('tenant_id', sa.String(length=36), nullable=False),
+    sa.Column('user_id', sa.String(length=50), nullable=False),
+    sa.Column('external_app_id', sa.String(length=36), nullable=False),
+    sa.Column('created_at', HighPrecisionDateTime(), nullable=False),
+    sa.Column('updated_at', HighPrecisionDateTime(), nullable=False),
+    sa.Column('created_by', sa.String(length=50), nullable=True),
+    sa.Column('updated_by', sa.String(length=50), nullable=True),
+    sa.ForeignKeyConstraint(['external_app_id'], ['unifiedui.external_apps.id'], ondelete=cascade_or_no_action()),
+    sa.ForeignKeyConstraint(['tenant_id', 'user_id'], ['unifiedui.principals.tenant_id', 'unifiedui.principals.principal_id'], name='fk_external_app_user_favorites_principal', ondelete=cascade_or_no_action()),
+    sa.ForeignKeyConstraint(['tenant_id'], ['unifiedui.tenants.id'], ondelete=cascade_or_no_action()),
+    sa.PrimaryKeyConstraint('tenant_id', 'user_id', 'external_app_id'),
+    schema='unifiedui'
+    )
+    op.create_index('ix_eauf_external_app', 'external_app_user_favorites', ['external_app_id'], unique=False, schema='unifiedui')
+    op.create_index('ix_eauf_user', 'external_app_user_favorites', ['user_id'], unique=False, schema='unifiedui')
     op.create_table('re_act_agent_versions',
     sa.Column('chat_agent_id', sa.String(length=36), nullable=False),
     sa.Column('version', sa.Integer(), nullable=False),
@@ -460,7 +495,7 @@ def upgrade() -> None:
     sa.Column('updated_at', HighPrecisionDateTime(), nullable=False),
     sa.Column('created_by', sa.String(length=50), nullable=True),
     sa.Column('updated_by', sa.String(length=50), nullable=True),
-    sa.ForeignKeyConstraint(['chat_agent_id'], ['unifiedui.chat_agents.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['chat_agent_id'], ['unifiedui.chat_agents.id'], ondelete=cascade_or_no_action()),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('chat_agent_id', 'version', name='uq_re_act_agent_version'),
     schema='unifiedui'
@@ -468,8 +503,8 @@ def upgrade() -> None:
     op.create_index('ix_re_act_agent_versions_agent', 're_act_agent_versions', ['chat_agent_id'], unique=False, schema='unifiedui')
     op.create_index('ix_re_act_agent_versions_agent_version', 're_act_agent_versions', ['chat_agent_id', 'version'], unique=False, schema='unifiedui')
     op.create_table('tenant_ai_models',
-    sa.Column('type', sa.Enum('LLM_MODEL', 'EMBEDDING_MODEL', name='ai_model_type', native_enum=False, create_constraint=True), nullable=False),
-    sa.Column('provider', sa.Enum('AZURE_OPENAI', 'OPENAI', 'ANTHROPIC', 'GOOGLE_GENAI', 'OLLAMA', 'MISTRAL', 'GROQ', name='ai_model_provider', native_enum=False, create_constraint=True), nullable=False),
+    sa.Column('type', sa.Enum('LLM_MODEL', 'EMBEDDING_MODEL', name='ai_model_type', native_enum=False, create_constraint=False), nullable=False),
+    sa.Column('provider', sa.Enum('AZURE_OPENAI', 'OPENAI', 'ANTHROPIC', 'GOOGLE_GENAI', 'OLLAMA', 'MISTRAL', 'GROQ', name='ai_model_provider', native_enum=False, create_constraint=False), nullable=False),
     sa.Column('purpose_groups', sa.JSON().with_variant(mssql.JSON(), 'mssql').with_variant(postgresql.JSONB(astext_type=sa.Text()), 'postgresql'), nullable=False),
     sa.Column('config', sa.JSON().with_variant(mssql.JSON(), 'mssql').with_variant(postgresql.JSONB(astext_type=sa.Text()), 'postgresql'), nullable=False),
     sa.Column('credential_id', sa.String(length=36), nullable=True),
@@ -483,8 +518,8 @@ def upgrade() -> None:
     sa.Column('created_by', sa.String(length=50), nullable=True),
     sa.Column('updated_by', sa.String(length=50), nullable=True),
     sa.Column('tenant_id', sa.String(length=36), nullable=False),
-    sa.ForeignKeyConstraint(['credential_id'], ['unifiedui.credentials.id'], ondelete='SET NULL'),
-    sa.ForeignKeyConstraint(['tenant_id'], ['unifiedui.tenants.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['credential_id'], ['unifiedui.credentials.id'], ondelete=('NO ACTION' if os.getenv('DB_TYPE') == 'mssql' else 'SET NULL')),
+    sa.ForeignKeyConstraint(['tenant_id'], ['unifiedui.tenants.id'], ondelete=cascade_or_no_action()),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('tenant_id', 'name', name='uq_tenant_ai_model_tenant_name'),
     schema='unifiedui'
@@ -493,14 +528,14 @@ def upgrade() -> None:
     op.create_table('tenant_members',
     sa.Column('tenant_id', sa.String(length=36), nullable=False),
     sa.Column('principal_id', sa.String(length=50), nullable=False),
-    sa.Column('role', sa.Enum('READER', 'TENANT_GLOBAL_ADMIN', 'CUSTOM_GROUPS_ADMIN', 'CUSTOM_GROUP_CREATOR', 'CHAT_AGENTS_ADMIN', 'CHAT_AGENTS_CREATOR', 'CREDENTIALS_ADMIN', 'CREDENTIALS_CREATOR', 'CONVERSATIONS_ADMIN', 'CONVERSATIONS_CREATOR', 'AUTONOMOUS_AGENTS_ADMIN', 'AUTONOMOUS_AGENTS_CREATOR', 'CHAT_WIDGETS_ADMIN', 'CHAT_WIDGETS_CREATOR', 'REACT_AGENT_ADMIN', 'REACT_AGENT_CREATOR', 'TENANT_AI_MODELS_ADMIN', 'EXTERNAL_APPS_ADMIN', 'EXTERNAL_APPS_CREATOR', name='tenant_role', native_enum=False, create_constraint=True), nullable=False),
+    sa.Column('role', sa.Enum('READER', 'TENANT_GLOBAL_ADMIN', 'CUSTOM_GROUPS_ADMIN', 'CUSTOM_GROUP_CREATOR', 'CHAT_AGENTS_ADMIN', 'CHAT_AGENTS_CREATOR', 'CREDENTIALS_ADMIN', 'CREDENTIALS_CREATOR', 'CONVERSATIONS_ADMIN', 'CONVERSATIONS_CREATOR', 'WORKFLOWS_ADMIN', 'WORKFLOWS_CREATOR', 'CHAT_WIDGETS_ADMIN', 'CHAT_WIDGETS_CREATOR', 'REACT_AGENT_ADMIN', 'REACT_AGENT_CREATOR', 'TENANT_AI_MODELS_ADMIN', 'EXTERNAL_APPS_ADMIN', 'EXTERNAL_APPS_CREATOR', name='tenant_role', native_enum=False, create_constraint=False), nullable=False),
     sa.Column('id', sa.String(length=36), nullable=False),
     sa.Column('created_at', HighPrecisionDateTime(), nullable=False),
     sa.Column('updated_at', HighPrecisionDateTime(), nullable=False),
     sa.Column('created_by', sa.String(length=50), nullable=True),
     sa.Column('updated_by', sa.String(length=50), nullable=True),
-    sa.ForeignKeyConstraint(['tenant_id', 'principal_id'], ['unifiedui.principals.tenant_id', 'unifiedui.principals.principal_id'], name='fk_tenant_members_principal', ondelete='CASCADE'),
-    sa.ForeignKeyConstraint(['tenant_id'], ['unifiedui.tenants.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['tenant_id', 'principal_id'], ['unifiedui.principals.tenant_id', 'unifiedui.principals.principal_id'], name='fk_tenant_members_principal', ondelete=cascade_or_no_action()),
+    sa.ForeignKeyConstraint(['tenant_id'], ['unifiedui.tenants.id'], ondelete=cascade_or_no_action()),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('tenant_id', 'principal_id', 'role', name='uq_tenant_members'),
     schema='unifiedui'
@@ -520,25 +555,74 @@ def upgrade() -> None:
     sa.Column('created_by', sa.String(length=50), nullable=True),
     sa.Column('updated_by', sa.String(length=50), nullable=True),
     sa.Column('tenant_id', sa.String(length=36), nullable=False),
-    sa.ForeignKeyConstraint(['credential_id'], ['unifiedui.credentials.id'], ondelete='SET NULL'),
-    sa.ForeignKeyConstraint(['tenant_id'], ['unifiedui.tenants.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['credential_id'], ['unifiedui.credentials.id'], ondelete=('NO ACTION' if os.getenv('DB_TYPE') == 'mssql' else 'SET NULL')),
+    sa.ForeignKeyConstraint(['tenant_id'], ['unifiedui.tenants.id'], ondelete=cascade_or_no_action()),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('tenant_id', 'name', name='uq_tool_tenant_name'),
     schema='unifiedui'
     )
     op.create_index('ix_tools_tenant', 'tools', ['tenant_id'], unique=False, schema='unifiedui')
-    op.create_table('conversation_members',
+    op.create_table('workflow_members',
     sa.Column('tenant_id', sa.String(length=36), nullable=False),
-    sa.Column('conversation_id', sa.String(length=36), nullable=False),
+    sa.Column('workflow_id', sa.String(length=36), nullable=False),
     sa.Column('principal_id', sa.String(length=50), nullable=False),
-    sa.Column('role', sa.Enum('READ', 'WRITE', 'ADMIN', name='permission_action', native_enum=False, create_constraint=True), nullable=False),
+    sa.Column('role', sa.Enum('READ', 'WRITE', 'ADMIN', name='permission_action', native_enum=False, create_constraint=False), nullable=False),
     sa.Column('id', sa.String(length=36), nullable=False),
     sa.Column('created_at', HighPrecisionDateTime(), nullable=False),
     sa.Column('updated_at', HighPrecisionDateTime(), nullable=False),
     sa.Column('created_by', sa.String(length=50), nullable=True),
     sa.Column('updated_by', sa.String(length=50), nullable=True),
-    sa.ForeignKeyConstraint(['conversation_id'], ['unifiedui.conversations.id'], ondelete='CASCADE'),
-    sa.ForeignKeyConstraint(['tenant_id', 'principal_id'], ['unifiedui.principals.tenant_id', 'unifiedui.principals.principal_id'], name='fk_conversation_members_principal', ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['tenant_id', 'principal_id'], ['unifiedui.principals.tenant_id', 'unifiedui.principals.principal_id'], name='fk_workflow_members_principal', ondelete=cascade_or_no_action()),
+    sa.ForeignKeyConstraint(['workflow_id'], ['unifiedui.workflows.id'], ondelete=cascade_or_no_action()),
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('workflow_id', 'principal_id', name='uq_workflow_members'),
+    schema='unifiedui'
+    )
+    op.create_index('ix_wm_principal', 'workflow_members', ['principal_id'], unique=False, schema='unifiedui')
+    op.create_index('ix_wm_workflow', 'workflow_members', ['workflow_id'], unique=False, schema='unifiedui')
+    op.create_table('workflow_tags',
+    sa.Column('tenant_id', sa.String(length=36), nullable=False),
+    sa.Column('tag_id', sa.Integer(), nullable=False),
+    sa.Column('workflow_id', sa.String(length=36), nullable=False),
+    sa.Column('created_at', HighPrecisionDateTime(), nullable=False),
+    sa.Column('updated_at', HighPrecisionDateTime(), nullable=False),
+    sa.Column('created_by', sa.String(length=50), nullable=True),
+    sa.Column('updated_by', sa.String(length=50), nullable=True),
+    sa.ForeignKeyConstraint(['tag_id'], ['unifiedui.tags.id'], ondelete=cascade_or_no_action()),
+    sa.ForeignKeyConstraint(['workflow_id'], ['unifiedui.workflows.id'], ondelete=cascade_or_no_action()),
+    sa.PrimaryKeyConstraint('tenant_id', 'tag_id', 'workflow_id'),
+    schema='unifiedui'
+    )
+    op.create_index('ix_wt_tag', 'workflow_tags', ['tag_id'], unique=False, schema='unifiedui')
+    op.create_index('ix_wt_workflow', 'workflow_tags', ['workflow_id'], unique=False, schema='unifiedui')
+    op.create_table('workflow_user_favorites',
+    sa.Column('tenant_id', sa.String(length=36), nullable=False),
+    sa.Column('user_id', sa.String(length=50), nullable=False),
+    sa.Column('workflow_id', sa.String(length=36), nullable=False),
+    sa.Column('created_at', HighPrecisionDateTime(), nullable=False),
+    sa.Column('updated_at', HighPrecisionDateTime(), nullable=False),
+    sa.Column('created_by', sa.String(length=50), nullable=True),
+    sa.Column('updated_by', sa.String(length=50), nullable=True),
+    sa.ForeignKeyConstraint(['tenant_id', 'user_id'], ['unifiedui.principals.tenant_id', 'unifiedui.principals.principal_id'], name='fk_workflow_user_favorites_principal', ondelete=cascade_or_no_action()),
+    sa.ForeignKeyConstraint(['tenant_id'], ['unifiedui.tenants.id'], ondelete=cascade_or_no_action()),
+    sa.ForeignKeyConstraint(['workflow_id'], ['unifiedui.workflows.id'], ondelete=cascade_or_no_action()),
+    sa.PrimaryKeyConstraint('tenant_id', 'user_id', 'workflow_id'),
+    schema='unifiedui'
+    )
+    op.create_index('ix_wuf_user', 'workflow_user_favorites', ['user_id'], unique=False, schema='unifiedui')
+    op.create_index('ix_wuf_workflow', 'workflow_user_favorites', ['workflow_id'], unique=False, schema='unifiedui')
+    op.create_table('conversation_members',
+    sa.Column('tenant_id', sa.String(length=36), nullable=False),
+    sa.Column('conversation_id', sa.String(length=36), nullable=False),
+    sa.Column('principal_id', sa.String(length=50), nullable=False),
+    sa.Column('role', sa.Enum('READ', 'WRITE', 'ADMIN', name='permission_action', native_enum=False, create_constraint=False), nullable=False),
+    sa.Column('id', sa.String(length=36), nullable=False),
+    sa.Column('created_at', HighPrecisionDateTime(), nullable=False),
+    sa.Column('updated_at', HighPrecisionDateTime(), nullable=False),
+    sa.Column('created_by', sa.String(length=50), nullable=True),
+    sa.Column('updated_by', sa.String(length=50), nullable=True),
+    sa.ForeignKeyConstraint(['conversation_id'], ['unifiedui.conversations.id'], ondelete=cascade_or_no_action()),
+    sa.ForeignKeyConstraint(['tenant_id', 'principal_id'], ['unifiedui.principals.tenant_id', 'unifiedui.principals.principal_id'], name='fk_conversation_members_principal', ondelete=cascade_or_no_action()),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('conversation_id', 'principal_id', name='uq_conversation_members'),
     schema='unifiedui'
@@ -553,26 +637,41 @@ def upgrade() -> None:
     sa.Column('updated_at', HighPrecisionDateTime(), nullable=False),
     sa.Column('created_by', sa.String(length=50), nullable=True),
     sa.Column('updated_by', sa.String(length=50), nullable=True),
-    sa.ForeignKeyConstraint(['conversation_id'], ['unifiedui.conversations.id'], ondelete='CASCADE'),
-    sa.ForeignKeyConstraint(['tenant_id', 'user_id'], ['unifiedui.principals.tenant_id', 'unifiedui.principals.principal_id'], name='fk_conversation_user_favorites_principal', ondelete='CASCADE'),
-    sa.ForeignKeyConstraint(['tenant_id'], ['unifiedui.tenants.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['conversation_id'], ['unifiedui.conversations.id'], ondelete=cascade_or_no_action()),
+    sa.ForeignKeyConstraint(['tenant_id', 'user_id'], ['unifiedui.principals.tenant_id', 'unifiedui.principals.principal_id'], name='fk_conversation_user_favorites_principal', ondelete=cascade_or_no_action()),
+    sa.ForeignKeyConstraint(['tenant_id'], ['unifiedui.tenants.id'], ondelete=cascade_or_no_action()),
     sa.PrimaryKeyConstraint('tenant_id', 'user_id', 'conversation_id'),
     schema='unifiedui'
     )
     op.create_index('ix_cuf_conversation', 'conversation_user_favorites', ['conversation_id'], unique=False, schema='unifiedui')
     op.create_index('ix_cuf_user', 'conversation_user_favorites', ['user_id'], unique=False, schema='unifiedui')
+    op.create_table('tenant_ai_model_tags',
+    sa.Column('tenant_id', sa.String(length=36), nullable=False),
+    sa.Column('tag_id', sa.Integer(), nullable=False),
+    sa.Column('tenant_ai_model_id', sa.String(length=36), nullable=False),
+    sa.Column('created_at', HighPrecisionDateTime(), nullable=False),
+    sa.Column('updated_at', HighPrecisionDateTime(), nullable=False),
+    sa.Column('created_by', sa.String(length=50), nullable=True),
+    sa.Column('updated_by', sa.String(length=50), nullable=True),
+    sa.ForeignKeyConstraint(['tag_id'], ['unifiedui.tags.id'], ondelete=cascade_or_no_action()),
+    sa.ForeignKeyConstraint(['tenant_ai_model_id'], ['unifiedui.tenant_ai_models.id'], ondelete=cascade_or_no_action()),
+    sa.PrimaryKeyConstraint('tenant_id', 'tag_id', 'tenant_ai_model_id'),
+    schema='unifiedui'
+    )
+    op.create_index('ix_tamt_tag', 'tenant_ai_model_tags', ['tag_id'], unique=False, schema='unifiedui')
+    op.create_index('ix_tamt_tenant_ai_model', 'tenant_ai_model_tags', ['tenant_ai_model_id'], unique=False, schema='unifiedui')
     op.create_table('tool_members',
     sa.Column('tenant_id', sa.String(length=36), nullable=False),
     sa.Column('tool_id', sa.String(length=36), nullable=False),
     sa.Column('principal_id', sa.String(length=50), nullable=False),
-    sa.Column('role', sa.Enum('READ', 'WRITE', 'ADMIN', name='permission_action', native_enum=False, create_constraint=True), nullable=False),
+    sa.Column('role', sa.Enum('READ', 'WRITE', 'ADMIN', name='permission_action', native_enum=False, create_constraint=False), nullable=False),
     sa.Column('id', sa.String(length=36), nullable=False),
     sa.Column('created_at', HighPrecisionDateTime(), nullable=False),
     sa.Column('updated_at', HighPrecisionDateTime(), nullable=False),
     sa.Column('created_by', sa.String(length=50), nullable=True),
     sa.Column('updated_by', sa.String(length=50), nullable=True),
-    sa.ForeignKeyConstraint(['tenant_id', 'principal_id'], ['unifiedui.principals.tenant_id', 'unifiedui.principals.principal_id'], name='fk_tool_members_principal', ondelete='CASCADE'),
-    sa.ForeignKeyConstraint(['tool_id'], ['unifiedui.tools.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['tenant_id', 'principal_id'], ['unifiedui.principals.tenant_id', 'unifiedui.principals.principal_id'], name='fk_tool_members_principal', ondelete=cascade_or_no_action()),
+    sa.ForeignKeyConstraint(['tool_id'], ['unifiedui.tools.id'], ondelete=cascade_or_no_action()),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('tool_id', 'principal_id', name='uq_tool_members'),
     schema='unifiedui'
@@ -587,8 +686,8 @@ def upgrade() -> None:
     sa.Column('updated_at', HighPrecisionDateTime(), nullable=False),
     sa.Column('created_by', sa.String(length=50), nullable=True),
     sa.Column('updated_by', sa.String(length=50), nullable=True),
-    sa.ForeignKeyConstraint(['tag_id'], ['unifiedui.tags.id'], ondelete='CASCADE'),
-    sa.ForeignKeyConstraint(['tool_id'], ['unifiedui.tools.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['tag_id'], ['unifiedui.tags.id'], ondelete=cascade_or_no_action()),
+    sa.ForeignKeyConstraint(['tool_id'], ['unifiedui.tools.id'], ondelete=cascade_or_no_action()),
     sa.PrimaryKeyConstraint('tenant_id', 'tag_id', 'tool_id'),
     schema='unifiedui'
     )
@@ -606,12 +705,24 @@ def downgrade() -> None:
     op.drop_index('ix_tool_members_tool', table_name='tool_members', schema='unifiedui')
     op.drop_index('ix_tool_members_principal', table_name='tool_members', schema='unifiedui')
     op.drop_table('tool_members', schema='unifiedui')
+    op.drop_index('ix_tamt_tenant_ai_model', table_name='tenant_ai_model_tags', schema='unifiedui')
+    op.drop_index('ix_tamt_tag', table_name='tenant_ai_model_tags', schema='unifiedui')
+    op.drop_table('tenant_ai_model_tags', schema='unifiedui')
     op.drop_index('ix_cuf_user', table_name='conversation_user_favorites', schema='unifiedui')
     op.drop_index('ix_cuf_conversation', table_name='conversation_user_favorites', schema='unifiedui')
     op.drop_table('conversation_user_favorites', schema='unifiedui')
     op.drop_index('ix_cm_principal', table_name='conversation_members', schema='unifiedui')
     op.drop_index('ix_cm_conversation', table_name='conversation_members', schema='unifiedui')
     op.drop_table('conversation_members', schema='unifiedui')
+    op.drop_index('ix_wuf_workflow', table_name='workflow_user_favorites', schema='unifiedui')
+    op.drop_index('ix_wuf_user', table_name='workflow_user_favorites', schema='unifiedui')
+    op.drop_table('workflow_user_favorites', schema='unifiedui')
+    op.drop_index('ix_wt_workflow', table_name='workflow_tags', schema='unifiedui')
+    op.drop_index('ix_wt_tag', table_name='workflow_tags', schema='unifiedui')
+    op.drop_table('workflow_tags', schema='unifiedui')
+    op.drop_index('ix_wm_workflow', table_name='workflow_members', schema='unifiedui')
+    op.drop_index('ix_wm_principal', table_name='workflow_members', schema='unifiedui')
+    op.drop_table('workflow_members', schema='unifiedui')
     op.drop_index('ix_tools_tenant', table_name='tools', schema='unifiedui')
     op.drop_table('tools', schema='unifiedui')
     op.drop_index('ix_tm_tenant', table_name='tenant_members', schema='unifiedui')
@@ -622,6 +733,15 @@ def downgrade() -> None:
     op.drop_index('ix_re_act_agent_versions_agent_version', table_name='re_act_agent_versions', schema='unifiedui')
     op.drop_index('ix_re_act_agent_versions_agent', table_name='re_act_agent_versions', schema='unifiedui')
     op.drop_table('re_act_agent_versions', schema='unifiedui')
+    op.drop_index('ix_eauf_user', table_name='external_app_user_favorites', schema='unifiedui')
+    op.drop_index('ix_eauf_external_app', table_name='external_app_user_favorites', schema='unifiedui')
+    op.drop_table('external_app_user_favorites', schema='unifiedui')
+    op.drop_index('ix_eat_tag', table_name='external_app_tags', schema='unifiedui')
+    op.drop_index('ix_eat_external_app', table_name='external_app_tags', schema='unifiedui')
+    op.drop_table('external_app_tags', schema='unifiedui')
+    op.drop_index('ix_eam_principal', table_name='external_app_members', schema='unifiedui')
+    op.drop_index('ix_eam_external_app', table_name='external_app_members', schema='unifiedui')
+    op.drop_table('external_app_members', schema='unifiedui')
     op.drop_index('ix_cgm_tenant', table_name='custom_group_members', schema='unifiedui')
     op.drop_index('ix_cgm_principal', table_name='custom_group_members', schema='unifiedui')
     op.drop_index('ix_cgm_custom_group', table_name='custom_group_members', schema='unifiedui')
@@ -653,15 +773,8 @@ def downgrade() -> None:
     op.drop_index('ix_cam_principal', table_name='chat_agent_members', schema='unifiedui')
     op.drop_index('ix_cam_chat_agent', table_name='chat_agent_members', schema='unifiedui')
     op.drop_table('chat_agent_members', schema='unifiedui')
-    op.drop_index('ix_aauf_user', table_name='autonomous_agent_user_favorites', schema='unifiedui')
-    op.drop_index('ix_aauf_autonomous_agent', table_name='autonomous_agent_user_favorites', schema='unifiedui')
-    op.drop_table('autonomous_agent_user_favorites', schema='unifiedui')
-    op.drop_index('ix_aat_tag', table_name='autonomous_agent_tags', schema='unifiedui')
-    op.drop_index('ix_aat_autonomous_agent', table_name='autonomous_agent_tags', schema='unifiedui')
-    op.drop_table('autonomous_agent_tags', schema='unifiedui')
-    op.drop_index('ix_aam_principal', table_name='autonomous_agent_members', schema='unifiedui')
-    op.drop_index('ix_aam_autonomous_agent', table_name='autonomous_agent_members', schema='unifiedui')
-    op.drop_table('autonomous_agent_members', schema='unifiedui')
+    op.drop_index('ix_workflows_tenant', table_name='workflows', schema='unifiedui')
+    op.drop_table('workflows', schema='unifiedui')
     op.drop_index('ix_tags_tenant', table_name='tags', schema='unifiedui')
     op.drop_index('ix_tags_name', table_name='tags', schema='unifiedui')
     op.drop_table('tags', schema='unifiedui')
@@ -672,6 +785,10 @@ def downgrade() -> None:
     op.drop_index('ix_principals_mail', table_name='principals', schema='unifiedui')
     op.drop_index('ix_principals_display_name', table_name='principals', schema='unifiedui')
     op.drop_table('principals', schema='unifiedui')
+    op.drop_index('ix_files_tenant', table_name='files', schema='unifiedui')
+    op.drop_index('ix_files_storage_path', table_name='files', schema='unifiedui')
+    op.drop_index('ix_files_context', table_name='files', schema='unifiedui')
+    op.drop_table('files', schema='unifiedui')
     op.drop_index('ix_external_apps_tenant', table_name='external_apps', schema='unifiedui')
     op.drop_table('external_apps', schema='unifiedui')
     op.drop_index('ix_credentials_tenant', table_name='credentials', schema='unifiedui')
@@ -680,8 +797,6 @@ def downgrade() -> None:
     op.drop_table('chat_widgets', schema='unifiedui')
     op.drop_index('ix_chat_agents_tenant', table_name='chat_agents', schema='unifiedui')
     op.drop_table('chat_agents', schema='unifiedui')
-    op.drop_index('ix_autonomous_agents_tenant', table_name='autonomous_agents', schema='unifiedui')
-    op.drop_table('autonomous_agents', schema='unifiedui')
     op.drop_index('ix_tenant_org', table_name='tenants', schema='unifiedui')
     op.drop_table('tenants', schema='unifiedui')
     op.drop_index('ix_org_member_principal', table_name='organization_members', schema='unifiedui')

@@ -213,6 +213,9 @@ class WorkflowHandler:
                 if order_by and hasattr(Workflow, order_by):
                     column = getattr(Workflow, order_by)
                     query = query.order_by(column.desc()) if order_direction == "desc" else query.order_by(column.asc())
+                else:
+                    # MSSQL requires ORDER BY when using OFFSET/LIMIT
+                    query = query.order_by(Workflow.created_at.desc())
                 query = query.offset(skip).limit(limit)
                 workflows = session.execute(query).scalars().all()
             else:
@@ -263,6 +266,9 @@ class WorkflowHandler:
                 if order_by and hasattr(Workflow, order_by):
                     column = getattr(Workflow, order_by)
                     query = query.order_by(column.desc()) if order_direction == "desc" else query.order_by(column.asc())
+                else:
+                    # MSSQL requires ORDER BY when using OFFSET/LIMIT
+                    query = query.order_by(Workflow.created_at.desc())
 
                 query = query.distinct().offset(skip).limit(limit)
                 workflows = session.execute(query).scalars().all()

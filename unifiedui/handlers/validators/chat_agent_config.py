@@ -55,7 +55,7 @@ class N8NChatAgentConfig(BaseModel):
         ..., min_length=1, description="N8N workflow endpoint URL (e.g., https://n8n.example.com/workflow/abc123)"
     )
     api_api_key_credential_id: str = Field(..., min_length=1, description="Credential ID for N8N API key")
-    chat_auth_credential_id: str = Field(..., min_length=1, description="Credential ID for chat authentication")
+    chat_auth_credential_id: str | None = Field(default=None, description="Credential ID for chat authentication")
 
     @field_validator("chat_url")
     @classmethod
@@ -297,6 +297,45 @@ class RestApiConfigValidator(BaseChatAgentConfigValidator):
         return ChatAgentTypeEnum.REST_API
 
 
+# ========== LLM Config Schema ==========
+
+
+class LLMChatAgentConfig(BaseModel):
+    """Pydantic model for LLM chat agent configuration validation."""
+
+    ai_model_id: str = Field(..., min_length=1, max_length=36, description="Reference to a TenantAIModel ID")
+    system_prompt: str | None = Field(default=None, max_length=10000, description="Optional system prompt for the LLM")
+
+
+# ========== LLM Validator ==========
+
+
+class LLMConfigValidator(BaseChatAgentConfigValidator):
+    """Validator for LLM chat agent configuration."""
+
+    def validate(self, config: dict[str, Any]) -> dict[str, Any]:
+        """Validate LLM configuration.
+
+        Args:
+            config: Configuration dictionary to validate
+
+        Returns:
+            Validated configuration dictionary with defaults applied
+
+        Raises:
+            ChatAgentConfigValidationError: If validation fails
+        """
+        try:
+            validated = LLMChatAgentConfig(**config)
+            return validated.model_dump()
+        except Exception as e:
+            logger.error("LLM config validation failed: %s", e)
+            raise ChatAgentConfigValidationError(message=f"LLM configuration validation failed: {e!s}", errors=[str(e)])
+
+    def get_supported_type(self) -> ChatAgentTypeEnum:
+        return ChatAgentTypeEnum.LLM
+
+
 # ========== Config Validator Factory ==========
 
 
@@ -307,6 +346,7 @@ class ChatAgentConfigValidatorFactory:
         ChatAgentTypeEnum.N8N: N8NConfigValidator(),
         ChatAgentTypeEnum.MICROSOFT_FOUNDRY: MicrosoftFoundryConfigValidator(),
         ChatAgentTypeEnum.REST_API: RestApiConfigValidator(),
+        ChatAgentTypeEnum.LLM: LLMConfigValidator(),
     }
 
     @classmethod

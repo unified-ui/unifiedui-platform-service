@@ -208,6 +208,9 @@ class ChatWidgetHandler:
             if order_by and hasattr(ChatWidget, order_by):
                 column = getattr(ChatWidget, order_by)
                 query = query.order_by(column.desc()) if order_direction == "desc" else query.order_by(column.asc())
+            else:
+                # MSSQL requires ORDER BY when using OFFSET/LIMIT
+                query = query.order_by(ChatWidget.created_at.desc())
 
             query = query.offset(skip).limit(limit)
             chat_widgets = session.execute(query).scalars().all()

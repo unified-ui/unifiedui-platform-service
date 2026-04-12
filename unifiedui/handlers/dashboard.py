@@ -118,7 +118,8 @@ class DashboardHandler:
             total = session.execute(total_query).scalar() or 0
 
             if has_active_field:
-                active_query = select(func.count(entity_model.id)).where(*base_filter, entity_model.is_active.is_(True))
+                # Use == True instead of is_(True) for MSSQL compatibility
+                active_query = select(func.count(entity_model.id)).where(*base_filter, entity_model.is_active == True)  # noqa: E712
                 active = session.execute(active_query).scalar() or 0
                 inactive = total - active
             else:

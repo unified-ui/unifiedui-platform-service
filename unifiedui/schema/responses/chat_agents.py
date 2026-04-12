@@ -79,7 +79,9 @@ class N8NConfigSettingsResponse(BaseModel):
     workflow_id: str = Field(..., description="N8N workflow ID extracted from workflow_endpoint")
     n8n_host: str = Field(..., description="N8N host URL extracted from workflow_endpoint")
     api_credentials: CredentialSecretResponse = Field(..., description="API key credentials with secret")
-    chat_credentials: CredentialSecretResponse = Field(..., description="Chat auth credentials with secret")
+    chat_credentials: CredentialSecretResponse | None = Field(
+        default=None, description="Chat auth credentials with secret"
+    )
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -118,6 +120,27 @@ class RestApiConfigSettingsResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class LLMResolvedAIModelResponse(BaseModel):
+    """Resolved AI model with credentials for an LLM chat agent."""
+
+    id: str = Field(..., description="AI model ID")
+    provider: str = Field(..., description="AI model provider (e.g. AZURE_OPENAI, OPENAI)")
+    config: dict = Field(default_factory=dict, description="Model config (model_name, endpoint, etc.)")
+    credential_secret: dict | None = Field(None, description="Decrypted credential secret")
+
+
+class LLMConfigSettingsResponse(BaseModel):
+    """Response model for LLM chat agent config settings."""
+
+    ai_model_id: str = Field(..., description="ID of the referenced AI model")
+    ai_model: LLMResolvedAIModelResponse = Field(..., description="Resolved AI model with credentials")
+    system_prompt: str | None = Field(None, description="System prompt for the LLM")
+    use_unified_chat_history: bool = Field(True, description="Whether to send chat history")
+    chat_history_count: int = Field(30, description="Number of chat history messages")
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class ChatAgentConfigResponse(BaseModel):
     """
     Response model for chat agent configuration (for agent service).
@@ -132,6 +155,7 @@ class ChatAgentConfigResponse(BaseModel):
         N8NConfigSettingsResponse
         | MicrosoftFoundryConfigSettingsResponse
         | RestApiConfigSettingsResponse
+        | LLMConfigSettingsResponse
         | ReActAgentConfigSettingsResponse
         | dict
     ) = Field(..., description="Chat agent settings with resolved credentials")

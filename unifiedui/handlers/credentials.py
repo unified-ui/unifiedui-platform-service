@@ -219,6 +219,9 @@ class CredentialHandler:
             if order_by and hasattr(Credential, order_by):
                 column = getattr(Credential, order_by)
                 query = query.order_by(column.desc()) if order_direction == "desc" else query.order_by(column.asc())
+            else:
+                # MSSQL requires ORDER BY when using OFFSET/LIMIT
+                query = query.order_by(Credential.created_at.desc())
 
             query = query.offset(skip).limit(limit)
             credentials = session.execute(query).scalars().all()
