@@ -17,6 +17,8 @@ logger = get_logger(__name__)
 def _is_system_admin(idp: str, mail: str, principal_name: str, settings: object) -> bool:
     """Check if the user is a system admin based on their identity provider.
 
+    If no system admin is configured for any IdP, returns True (unrestricted).
+
     Args:
         idp: Identity provider identifier.
         mail: User's email address.
@@ -24,31 +26,28 @@ def _is_system_admin(idp: str, mail: str, principal_name: str, settings: object)
         settings: Application settings with per-IdP system admin fields.
 
     Returns:
-        True if the user matches the system admin for their IdP.
+        True if no restriction is configured, or if user matches the system admin.
     """
+    msal_admin = getattr(settings, "msal_system_admin_email", None)
+    ldap_admin = getattr(settings, "ldap_system_admin_username", None)
+    oidc_admin = getattr(settings, "oidc_zitadel_system_admin_username", None)
+
+    if not msal_admin and not ldap_admin and not oidc_admin:
+        return True
+
     if idp == IdenityProviderEnum.EXTRA_ID.value:
-        admin_email = getattr(settings, "msal_system_admin_email", None)
-        return bool(admin_email and mail and mail.lower().strip() == admin_email.lower().strip())
+        return bool(msal_admin and mail and mail.lower().strip() == msal_admin.lower().strip())
 
     if idp == IdenityProviderEnum.LDAP.value:
-        admin_username = getattr(settings, "ldap_system_admin_username", None)
-        return bool(
-            admin_username and principal_name and principal_name.lower().strip() == admin_username.lower().strip()
-        )
+        return bool(ldap_admin and principal_name and principal_name.lower().strip() == ldap_admin.lower().strip())
 
     if idp == IdenityProviderEnum.OIDC.value:
-        admin_username = getattr(settings, "oidc_zitadel_system_admin_username", None)
-        return bool(
-            admin_username and principal_name and principal_name.lower().strip() == admin_username.lower().strip()
-        )
+        return bool(oidc_admin and principal_name and principal_name.lower().strip() == oidc_admin.lower().strip())
 
     if idp == IdenityProviderEnum.MOCK.value:
-        admin_email = getattr(settings, "msal_system_admin_email", None)
-        if admin_email and mail and mail.lower().strip() == admin_email.lower().strip():
+        if msal_admin and mail and mail.lower().strip() == msal_admin.lower().strip():
             return True
-        admin_username = getattr(settings, "ldap_system_admin_username", None) or getattr(
-            settings, "oidc_zitadel_system_admin_username", None
-        )
+        admin_username = ldap_admin or oidc_admin
         return bool(
             admin_username and principal_name and principal_name.lower().strip() == admin_username.lower().strip()
         )

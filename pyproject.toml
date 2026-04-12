@@ -107,3 +107,21 @@ warn_unused_configs = true
 ignore_missing_imports = true
 plugins = ["pydantic.mypy"]
 exclude = ["alembic", "notebooks", "htmlcov"]
+
+[tool.coverage.run]
+source = ["unifiedui"]
+omit = [
+    # Integration-specific modules that require external services
+    "unifiedui/docdatabase/mongo/*",
+    "unifiedui/core/filestorage/azureblob.py",
+    "unifiedui/core/filestorage/local.py",
+    "unifiedui/core/identity/obo_token_exchange.py",
+    "unifiedui/core/identity/client_credentials.py",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+]

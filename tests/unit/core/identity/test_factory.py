@@ -554,6 +554,7 @@ class TestIdentityTokenFactoryLDAP:
             mock_settings.oidc_issuer_url = None
             mock_settings.saml_entity_id = None
             mock_settings.ldap_server_url = "ldap://ldap.acme.com"
+            mock_settings.ldap_jwt_secret = "test-secret"
             mock_settings.kerberos_realm = None
             result = IdentityTokenFactory.create(token_str)
 
@@ -575,8 +576,9 @@ class TestIdentityTokenFactoryLDAP:
             mock_settings.oidc_issuer_url = None
             mock_settings.saml_entity_id = None
             mock_settings.ldap_server_url = "ldap://ldap.acme.com"
+            mock_settings.ldap_jwt_secret = "test-secret"
             mock_settings.kerberos_realm = None
-            with pytest.raises(ValueError, match="Token has expired"):
+            with pytest.raises(ValueError, match="Invalid LDAP token: Signature has expired"):
                 IdentityTokenFactory.create(token_str)
 
     def test_create_ldaps_token(self):
@@ -593,6 +595,7 @@ class TestIdentityTokenFactoryLDAP:
             mock_settings.oidc_issuer_url = None
             mock_settings.saml_entity_id = None
             mock_settings.ldap_server_url = "ldaps://ldap.acme.com"
+            mock_settings.ldap_jwt_secret = "test-secret"
             mock_settings.kerberos_realm = None
             result = IdentityTokenFactory.create(token_str)
 
@@ -977,6 +980,9 @@ class TestIdentityProviderFactoryOIDC:
 
         with patch("unifiedui.core.config.settings") as mock_settings:
             mock_settings.oidc_userinfo_url = "https://auth.example.com/userinfo"
+            mock_settings.oidc_issuer_url = "https://auth.example.com"
+            mock_settings.oidc_zitadel_management_api_url = None
+            mock_settings.oidc_zitadel_service_token = None
             provider = IdentityProviderFactory.create(token)
 
         assert isinstance(provider, OIDCIdentityProvider)

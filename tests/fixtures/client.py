@@ -63,7 +63,7 @@ def test_client(
     app = create_app()
     logger.info("App created")
 
-    client = TestClient(app)
+    client = TestClient(app, raise_server_exceptions=False)
 
     # Store references for access in tests
     client.db_client = test_db_client
