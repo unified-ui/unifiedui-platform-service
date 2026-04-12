@@ -13,11 +13,8 @@ from unifiedui.core.database.enums import OrganizationRoleEnum, PrincipalTypeEnu
 
 @pytest.fixture(autouse=True)
 def _disable_system_admin_restriction():
-    """Disable system admin restriction for all org tests in this module."""
-    with patch("unifiedui.core.config.settings") as mock_settings:
-        mock_settings.msal_system_admin_email = None
-        mock_settings.ldap_system_admin_username = None
-        mock_settings.oidc_zitadel_system_admin_username = None
+    """Bypass system admin restriction for all org tests in this module."""
+    with patch("unifiedui.core.identity.users._is_system_admin", return_value=True):
         yield
 
 
