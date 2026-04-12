@@ -2,7 +2,7 @@
 
 Verifies that ORGANISATION_GLOBAL_ADMIN and ORGANISATION_TENANT_ADMIN
 bypass ALL tenant-level permission checks (tenant, chat_agent, credential,
-autonomous_agent, conversation, custom_group, chat_widget, tool,
+workflow, conversation, custom_group, chat_widget, tool,
 tag, tenant_ai_model). Also verifies that ORGANISATION_TENANT_CREATOR does NOT
 get bypass.
 """
@@ -29,8 +29,8 @@ ENDPOINT_CHAT_AGENTS = "/api/v1/platform-service/tenants/{tenant_id}/chat-agents
 ENDPOINT_CHAT_AGENT_DETAIL = "/api/v1/platform-service/tenants/{tenant_id}/chat-agents/{entity_id}"
 ENDPOINT_CREDENTIALS = "/api/v1/platform-service/tenants/{tenant_id}/credentials"
 ENDPOINT_CREDENTIAL_DETAIL = "/api/v1/platform-service/tenants/{tenant_id}/credentials/{entity_id}"
-ENDPOINT_AUTONOMOUS_AGENTS = "/api/v1/platform-service/tenants/{tenant_id}/autonomous-agents"
-ENDPOINT_AUTONOMOUS_AGENT_DETAIL = "/api/v1/platform-service/tenants/{tenant_id}/autonomous-agents/{entity_id}"
+ENDPOINT_WORKFLOWS = "/api/v1/platform-service/tenants/{tenant_id}/workflows"
+ENDPOINT_AUTONOMOUS_AGENT_DETAIL = "/api/v1/platform-service/tenants/{tenant_id}/workflows/{entity_id}"
 ENDPOINT_CONVERSATIONS = "/api/v1/platform-service/tenants/{tenant_id}/conversations"
 ENDPOINT_CONVERSATION_DETAIL = "/api/v1/platform-service/tenants/{tenant_id}/conversations/{entity_id}"
 ENDPOINT_CUSTOM_GROUPS = "/api/v1/platform-service/tenants/{tenant_id}/custom-groups"
@@ -123,13 +123,11 @@ def _create_credential(test_client: TestClient, tenant_id: str, headers: dict[st
     return resp.json()["id"]
 
 
-@patch("unifiedui.apis.v1.autonomous_agents.trigger_autonomous_agent_run", return_value=None)
-def _create_autonomous_agent(
-    mock_trigger: Any, test_client: TestClient, tenant_id: str, headers: dict[str, str]
-) -> str:
+@patch("unifiedui.apis.v1.workflows.trigger_workflow_run", return_value=None)
+def _create_workflow(mock_trigger: Any, test_client: TestClient, tenant_id: str, headers: dict[str, str]) -> str:
     """Create an autonomous agent and return its ID."""
     resp = test_client.post(
-        ENDPOINT_AUTONOMOUS_AGENTS.format(tenant_id=tenant_id),
+        ENDPOINT_WORKFLOWS.format(tenant_id=tenant_id),
         json={"name": "Bypass Autonomous", "description": "Test", "type": "N8N"},
         headers=headers,
     )
@@ -567,16 +565,18 @@ class TestOrgTenantCreatorDoesNotGetBypass:
 
 
 class TestOrgCreationRestriction:
-    """Verify that organization creation is restricted to system_admin_email."""
+    """Verify that organization creation is restricted to system admin."""
 
     def test_create_org_allowed_for_system_admin(self, test_client: TestClient) -> None:
-        """User whose email matches system_admin_email can create an org."""
+        """User whose email matches msal_system_admin_email can create an org."""
         slug = f"sysadm-org-{uuid.uuid4().hex[:6]}"
         token = test_client.create_test_user("sysadm-creator", "Sys Admin", mail="admin@example.com")
         headers = create_auth_headers(token, use_cache=False)
 
         with patch("unifiedui.core.config.settings") as mock_settings:
-            mock_settings.system_admin_email = "admin@example.com"
+            mock_settings.msal_system_admin_email = "admin@example.com"
+            mock_settings.ldap_system_admin_username = None
+            mock_settings.oidc_zitadel_system_admin_username = None
             resp = test_client.post(
                 ENDPOINT_ORGANIZATIONS,
                 json={
@@ -591,12 +591,14 @@ class TestOrgCreationRestriction:
         assert resp.json()["name"] == "SysAdmin Org"
 
     def test_create_org_denied_for_non_system_admin(self, test_client: TestClient) -> None:
-        """User whose email does NOT match system_admin_email gets 403."""
+        """User whose email does NOT match system admin gets 403."""
         token = test_client.create_test_user("nonsysadm", "Normal User", mail="user@example.com")
         headers = create_auth_headers(token, use_cache=False)
 
         with patch("unifiedui.core.config.settings") as mock_settings:
-            mock_settings.system_admin_email = "admin@example.com"
+            mock_settings.msal_system_admin_email = "admin@example.com"
+            mock_settings.ldap_system_admin_username = None
+            mock_settings.oidc_zitadel_system_admin_username = None
             resp = test_client.post(
                 ENDPOINT_ORGANIZATIONS,
                 json={
@@ -610,12 +612,14 @@ class TestOrgCreationRestriction:
         assert resp.status_code == status.HTTP_403_FORBIDDEN
 
     def test_create_org_denied_when_no_email(self, test_client: TestClient) -> None:
-        """User with no email set gets 403 when system_admin_email is configured."""
+        """User with no email set gets 403 when system admin is configured."""
         token = test_client.create_test_user("nomail", "No Mail User")
         headers = create_auth_headers(token, use_cache=False)
 
         with patch("unifiedui.core.config.settings") as mock_settings:
-            mock_settings.system_admin_email = "admin@example.com"
+            mock_settings.msal_system_admin_email = "admin@example.com"
+            mock_settings.ldap_system_admin_username = None
+            mock_settings.oidc_zitadel_system_admin_username = None
             resp = test_client.post(
                 ENDPOINT_ORGANIZATIONS,
                 json={
@@ -629,13 +633,15 @@ class TestOrgCreationRestriction:
         assert resp.status_code == status.HTTP_403_FORBIDDEN
 
     def test_create_org_allowed_when_no_restriction(self, test_client: TestClient) -> None:
-        """When system_admin_email is None, any authenticated user can create an org."""
+        """When no system admin is configured, any authenticated user can create an org."""
         slug = f"norestrict-{uuid.uuid4().hex[:6]}"
         token = test_client.create_test_user("anyuser", "Any User", mail="any@example.com")
         headers = create_auth_headers(token, use_cache=False)
 
         with patch("unifiedui.core.config.settings") as mock_settings:
-            mock_settings.system_admin_email = None
+            mock_settings.msal_system_admin_email = None
+            mock_settings.ldap_system_admin_username = None
+            mock_settings.oidc_zitadel_system_admin_username = None
             resp = test_client.post(
                 ENDPOINT_ORGANIZATIONS,
                 json={
@@ -669,7 +675,9 @@ class TestGetOrgRequiresMembership:
         admin_headers = _get_admin_headers(test_client)
         slug = f"other-org-{uuid.uuid4().hex[:6]}"
         with patch("unifiedui.core.config.settings") as mock_settings:
-            mock_settings.system_admin_email = None
+            mock_settings.msal_system_admin_email = None
+            mock_settings.ldap_system_admin_username = None
+            mock_settings.oidc_zitadel_system_admin_username = None
             resp_create = test_client.post(
                 ENDPOINT_ORGANIZATIONS,
                 json={
@@ -708,7 +716,9 @@ class TestOrgRolePermissionBoundaries:
         admin_headers = create_auth_headers(admin_token, use_cache=False)
 
         with patch("unifiedui.core.config.settings") as mock_settings:
-            mock_settings.system_admin_email = None
+            mock_settings.msal_system_admin_email = None
+            mock_settings.ldap_system_admin_username = None
+            mock_settings.oidc_zitadel_system_admin_username = None
             resp = test_client.post(
                 ENDPOINT_ORGANIZATIONS,
                 json={

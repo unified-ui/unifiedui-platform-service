@@ -18,6 +18,8 @@ from unifiedui.handlers.validators.chat_agent_config import (
     N8NChatAgentConfig,
     N8NConfigValidator,
     N8NWorkflowTypeEnum,
+    RestApiChatAgentConfig,
+    RestApiConfigValidator,
 )
 
 
@@ -149,7 +151,7 @@ class TestN8NChatAgentConfig:
                 use_unified_chat_history=True,
                 chat_url="https://example.com/webhook",
                 workflow_endpoint="https://n8n.example.com/workflow/abc123",
-                # Missing api_api_key_credential_id and chat_auth_credential_id
+                # Missing api_api_key_credential_id
             )
 
     def test_empty_credential_id_not_allowed(self):
@@ -298,7 +300,7 @@ class TestChatAgentConfigValidatorFactory:
     def test_get_validator_unsupported_type(self):
         """Test getting validator for unsupported type raises error."""
         with pytest.raises(UnsupportedChatAgentTypeError):
-            ChatAgentConfigValidatorFactory.get_validator(ChatAgentTypeEnum.REST_API)
+            ChatAgentConfigValidatorFactory.get_validator(ChatAgentTypeEnum.REACT_AGENT)
 
     def test_validate_config_n8n(self):
         """Test validate_config with N8N type."""
@@ -329,7 +331,7 @@ class TestChatAgentConfigValidatorFactory:
         config = {"key": "value"}
 
         with pytest.raises(UnsupportedChatAgentTypeError):
-            ChatAgentConfigValidatorFactory.validate_config(ChatAgentTypeEnum.REST_API, config)
+            ChatAgentConfigValidatorFactory.validate_config(ChatAgentTypeEnum.REACT_AGENT, config)
 
     def test_is_supported_n8n(self):
         """Test is_supported returns True for N8N."""
@@ -337,7 +339,7 @@ class TestChatAgentConfigValidatorFactory:
 
     def test_is_supported_unsupported_type(self):
         """Test is_supported returns False for unsupported types."""
-        assert ChatAgentConfigValidatorFactory.is_supported(ChatAgentTypeEnum.REST_API) is False
+        assert ChatAgentConfigValidatorFactory.is_supported(ChatAgentTypeEnum.REACT_AGENT) is False
 
     def test_get_supported_types(self):
         """Test get_supported_types returns list with N8N and MICROSOFT_FOUNDRY."""
@@ -552,3 +554,218 @@ class TestChatAgentConfigValidatorFactoryMicrosoftFoundry:
     def test_is_supported_microsoft_foundry(self):
         """Test is_supported returns True for MICROSOFT_FOUNDRY."""
         assert ChatAgentConfigValidatorFactory.is_supported(ChatAgentTypeEnum.MICROSOFT_FOUNDRY) is True
+
+
+# ========== REST API Tests ==========
+
+
+class TestRestApiChatAgentConfig:
+    """Tests for RestApiChatAgentConfig Pydantic model."""
+
+    def test_valid_config_anonymous(self):
+        """Test a valid anonymous REST API configuration."""
+        config = RestApiChatAgentConfig(
+            auth_type="ANONYMOUS",
+            invoke_endpoint="https://api.example.com/agent/invoke",
+        )
+
+        assert config.auth_type == "ANONYMOUS"
+        assert config.invoke_endpoint == "https://api.example.com/agent/invoke"
+        assert config.credential_id is None
+        assert config.use_unified_chat_history is True
+        assert config.chat_history_count == 30
+        assert config.create_conversation_endpoint is None
+
+    def test_valid_config_api_key_with_credential(self):
+        """Test a valid API key REST API configuration."""
+        config = RestApiChatAgentConfig(
+            auth_type="API_KEY",
+            invoke_endpoint="https://api.example.com/agent/invoke",
+            credential_id="cred-123",
+        )
+
+        assert config.auth_type == "API_KEY"
+        assert config.credential_id == "cred-123"
+
+    def test_valid_config_with_conversation_endpoint(self):
+        """Test config with conversation creation endpoint."""
+        config = RestApiChatAgentConfig(
+            auth_type="ANONYMOUS",
+            invoke_endpoint="https://api.example.com/agent/invoke",
+            create_conversation_endpoint="https://api.example.com/conversations",
+        )
+
+        assert config.create_conversation_endpoint == "https://api.example.com/conversations"
+
+    def test_valid_config_chat_history_disabled(self):
+        """Test config with chat history disabled."""
+        config = RestApiChatAgentConfig(
+            auth_type="ANONYMOUS",
+            invoke_endpoint="https://api.example.com/agent/invoke",
+            use_unified_chat_history=False,
+        )
+
+        assert config.use_unified_chat_history is False
+
+    def test_credential_required_for_basic_auth(self):
+        """Test that credential_id is required for BASIC_AUTH."""
+        with pytest.raises(ValidationError) as exc_info:
+            RestApiChatAgentConfig(
+                auth_type="BASIC_AUTH",
+                invoke_endpoint="https://api.example.com/agent/invoke",
+            )
+        assert "credential_id is required" in str(exc_info.value)
+
+    def test_credential_required_for_api_key(self):
+        """Test that credential_id is required for API_KEY."""
+        with pytest.raises(ValidationError) as exc_info:
+            RestApiChatAgentConfig(
+                auth_type="API_KEY",
+                invoke_endpoint="https://api.example.com/agent/invoke",
+            )
+        assert "credential_id is required" in str(exc_info.value)
+
+    def test_credential_required_for_entra_id_app_registration(self):
+        """Test that credential_id is required for ENTRA_ID_APP_REGISTRATION."""
+        with pytest.raises(ValidationError) as exc_info:
+            RestApiChatAgentConfig(
+                auth_type="ENTRA_ID_APP_REGISTRATION",
+                invoke_endpoint="https://api.example.com/agent/invoke",
+            )
+        assert "credential_id is required" in str(exc_info.value)
+
+    def test_credential_not_required_for_anonymous(self):
+        """Test that credential_id is optional for ANONYMOUS."""
+        config = RestApiChatAgentConfig(
+            auth_type="ANONYMOUS",
+            invoke_endpoint="https://api.example.com/agent/invoke",
+        )
+        assert config.credential_id is None
+
+    def test_credential_not_required_for_entra_id_user_token(self):
+        """Test that credential_id is optional for ENTRA_ID_USER_TOKEN."""
+        config = RestApiChatAgentConfig(
+            auth_type="ENTRA_ID_USER_TOKEN",
+            invoke_endpoint="https://api.example.com/agent/invoke",
+        )
+        assert config.credential_id is None
+
+    def test_invoke_endpoint_must_be_url(self):
+        """Test that invoke_endpoint must start with http:// or https://."""
+        with pytest.raises(ValidationError) as exc_info:
+            RestApiChatAgentConfig(
+                auth_type="ANONYMOUS",
+                invoke_endpoint="ftp://example.com/invoke",
+            )
+        assert "invoke_endpoint must start with http:// or https://" in str(exc_info.value)
+
+    def test_create_conversation_endpoint_must_be_url(self):
+        """Test that create_conversation_endpoint must be a valid URL."""
+        with pytest.raises(ValidationError) as exc_info:
+            RestApiChatAgentConfig(
+                auth_type="ANONYMOUS",
+                invoke_endpoint="https://api.example.com/invoke",
+                create_conversation_endpoint="not-a-url",
+            )
+        assert "create_conversation_endpoint must start with http:// or https://" in str(exc_info.value)
+
+    def test_invalid_auth_type(self):
+        """Test that invalid auth_type raises ValidationError."""
+        with pytest.raises(ValidationError):
+            RestApiChatAgentConfig(
+                auth_type="INVALID",
+                invoke_endpoint="https://api.example.com/invoke",
+            )
+
+    def test_chat_history_count_range(self):
+        """Test chat_history_count must be between 1 and 100."""
+        with pytest.raises(ValidationError):
+            RestApiChatAgentConfig(
+                auth_type="ANONYMOUS",
+                invoke_endpoint="https://api.example.com/invoke",
+                chat_history_count=0,
+            )
+
+        with pytest.raises(ValidationError):
+            RestApiChatAgentConfig(
+                auth_type="ANONYMOUS",
+                invoke_endpoint="https://api.example.com/invoke",
+                chat_history_count=101,
+            )
+
+    def test_model_dump(self):
+        """Test serialization via model_dump."""
+        config = RestApiChatAgentConfig(
+            auth_type="API_KEY",
+            invoke_endpoint="https://api.example.com/invoke",
+            credential_id="cred-1",
+            use_unified_chat_history=False,
+            chat_history_count=10,
+            create_conversation_endpoint="https://api.example.com/conversations",
+        )
+        data = config.model_dump()
+
+        assert data["auth_type"] == "API_KEY"
+        assert data["invoke_endpoint"] == "https://api.example.com/invoke"
+        assert data["credential_id"] == "cred-1"
+        assert data["use_unified_chat_history"] is False
+        assert data["chat_history_count"] == 10
+        assert data["create_conversation_endpoint"] == "https://api.example.com/conversations"
+
+
+class TestRestApiConfigValidator:
+    """Tests for RestApiConfigValidator."""
+
+    def test_validate_valid_config(self):
+        """Test validation of a valid config."""
+        validator = RestApiConfigValidator()
+        config = {
+            "auth_type": "ANONYMOUS",
+            "invoke_endpoint": "https://api.example.com/agent/invoke",
+        }
+
+        result = validator.validate(config)
+
+        assert result["auth_type"] == "ANONYMOUS"
+        assert result["invoke_endpoint"] == "https://api.example.com/agent/invoke"
+        assert result["use_unified_chat_history"] is True
+        assert result["chat_history_count"] == 30
+
+    def test_validate_invalid_config_raises_error(self):
+        """Test that invalid config raises ChatAgentConfigValidationError."""
+        validator = RestApiConfigValidator()
+        config = {"auth_type": "INVALID"}
+
+        with pytest.raises(ChatAgentConfigValidationError):
+            validator.validate(config)
+
+    def test_get_supported_type(self):
+        """Test that get_supported_type returns REST_API."""
+        validator = RestApiConfigValidator()
+        assert validator.get_supported_type() == ChatAgentTypeEnum.REST_API
+
+
+class TestChatAgentConfigValidatorFactoryRestApi:
+    """Tests for ChatAgentConfigValidatorFactory with REST API."""
+
+    def test_get_validator_rest_api(self):
+        """Test getting REST API validator."""
+        validator = ChatAgentConfigValidatorFactory.get_validator(ChatAgentTypeEnum.REST_API)
+        assert isinstance(validator, RestApiConfigValidator)
+
+    def test_validate_config_rest_api(self):
+        """Test validate_config with REST API type."""
+        config = {
+            "auth_type": "API_KEY",
+            "invoke_endpoint": "https://api.example.com/invoke",
+            "credential_id": "cred-123",
+        }
+
+        result = ChatAgentConfigValidatorFactory.validate_config(ChatAgentTypeEnum.REST_API, config)
+
+        assert result["auth_type"] == "API_KEY"
+        assert result["invoke_endpoint"] == "https://api.example.com/invoke"
+
+    def test_is_supported_rest_api(self):
+        """Test is_supported returns True for REST_API."""
+        assert ChatAgentConfigValidatorFactory.is_supported(ChatAgentTypeEnum.REST_API) is True

@@ -61,7 +61,7 @@ class LDAPIdentityProvider(BaseIdentityProvider):
             server = ldap3.Server(self._server_url, use_ssl=self._use_ssl, get_info=ldap3.ALL)
             conn = ldap3.Connection(server, user=self._bind_dn, password=self._bind_password, auto_bind=True)
 
-            user_dn = self.identity_token.get_identity_tenant_id()
+            user_dn = self.identity_token.deserialized_token.get("dn", "")
             search_filter = f"(&{self._group_search_filter}(member={user_dn}))"
 
             max_results = query.top if query and query.top else 100

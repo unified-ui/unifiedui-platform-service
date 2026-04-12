@@ -74,3 +74,4 @@ local.settings.json
 
 # Cosmos DB Emulator
 CosmosDB.Emulator/
+.vite/

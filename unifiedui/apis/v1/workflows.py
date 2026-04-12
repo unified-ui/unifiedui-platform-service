@@ -1,0 +1,1179 @@
+"""API routes for workflow management."""
+
+from typing import TYPE_CHECKING
+
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi.responses import Response
+
+from unifiedui.core.database.enums import ListViewEnum, OrderDirectionEnum, PermissionActionEnum, TenantRolesEnum
+from unifiedui.core.middleware.apis.v1.auth import (
+    authenticate,
+    authenticate_workflow_api_key,
+    check_permissions,
+)
+from unifiedui.exc.chat_agent_config import InvalidCredentialError
+from unifiedui.exc.workflows import (
+    UnsupportedWorkflowTypeError,
+    WorkflowApiKeysNotAllowedError,
+    WorkflowConfigValidationError,
+    WorkflowKeyNotFoundError,
+    WorkflowNotFoundError,
+    WorkflowPermissionNotFoundError,
+)
+from unifiedui.handlers.credentials import CredentialHandler
+from unifiedui.handlers.dependencies import get_credential_handler, get_workflow_handler
+from unifiedui.handlers.field_filter import filtered_response, parse_ids
+from unifiedui.handlers.workflows import WorkflowHandler
+from unifiedui.logger import get_logger
+from unifiedui.schema.requests.permissions import SetResourcePermissionRequest
+from unifiedui.schema.requests.workflows import (
+    CreateWorkflowRequest,
+    StartWorkflowRequest,
+    UpdateWorkflowRequest,
+)
+from unifiedui.schema.responses.principals import PrincipalWithRolesResponse, ResourcePrincipalsResponse
+from unifiedui.schema.responses.workflows import (
+    WorkflowConfigResponse,
+    WorkflowKeyResponse,
+    WorkflowResponse,
+    WorkflowRunDetailResponse,
+    WorkflowRunRetryResponse,
+    WorkflowRunsListResponse,
+)
+
+if TYPE_CHECKING:
+    from unifiedui.core.identity.users import ContextIdentityUser
+
+logger = get_logger(__name__)
+
+router = APIRouter(prefix="/workflows")
+
+
+@router.get(
+    "",
+    summary="List workflows",
+    description="Get a paginated list of workflows for the current tenant. Use view=quick-list to get only id and name.",
+)
+@authenticate()
+async def list_workflows(
+    request: Request,
+    tenant_id: str,
+    skip: int = Query(0, ge=0, description="Number of items to skip"),
+    limit: int = Query(100, ge=1, le=1000, description="Maximum number of items to return"),
+    name: str | None = Query(None, description="Filter by workflow name"),
+    is_active: int | None = Query(None, ge=0, le=1, description="Filter by active status (1=active, 0=inactive)"),
+    tags: str | None = Query(
+        None, description="Comma-separated list of tag IDs to filter by (e.g., '10001,10002,10003')"
+    ),
+    order_by: str | None = Query(
+        None, description="Column name to order by (e.g., 'name', 'created_at', 'updated_at')"
+    ),
+    order_direction: OrderDirectionEnum | None = Query(None, description="Sort direction: 'asc' or 'desc'"),
+    view: ListViewEnum | None = Query(
+        None, description="View type: 'full' (default) or 'quick-list' (returns only id and name)"
+    ),
+    ids: str | None = Query(None, description="Comma-separated list of IDs to filter by"),
+    fields: str | None = Query(None, description="Comma-separated list of fields to include in the response"),
+    handler: WorkflowHandler = Depends(get_workflow_handler),
+):
+    """
+    List workflows for a tenant.
+
+    Users see only workflows they have permissions for, unless they have
+    TENANT_GLOBAL_ADMIN or WORKFLOWS_ADMIN on tenant level.
+
+    Args:
+        request: FastAPI request with user in state
+        tenant_id: Tenant ID from path
+        skip: Number of items to skip
+        limit: Maximum number of items to return
+        name: Optional filter by workflow name
+        is_active: Optional filter by active status (None=all, 1=active, 0=inactive)
+        tags: Optional comma-separated tag IDs to filter by
+        handler: Workflow handler dependency
+
+    Returns:
+        List of workflows
+    """
+    try:
+        # Parse tag IDs from comma-separated string
+        tag_ids = None
+        if tags:
+            try:
+                tag_ids = [int(t.strip()) for t in tags.split(",") if t.strip()]
+            except ValueError:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid tag IDs format. Must be comma-separated integers.",
+                )
+
+        user: ContextIdentityUser = request.state.user
+        return filtered_response(
+            handler.list_workflows(
+                tenant_id=tenant_id,
+                user=user,
+                skip=skip,
+                limit=limit,
+                name_filter=name,
+                is_active=is_active,
+                tag_ids=tag_ids,
+                order_by=order_by,
+                order_direction=order_direction.value if order_direction else None,
+                view=view.value if view else None,
+                id_list=parse_ids(ids),
+            ),
+            fields,
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Failed to list workflows: %s", e, exc_info=True)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to list workflows")
+
+
+@router.post(
+    "",
+    response_model=WorkflowResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create workflow",
+    description="Create a new workflow",
+)
+@authenticate()
+@check_permissions(
+    entity="tenant",
+    required_permissions=[
+        TenantRolesEnum.TENANT_GLOBAL_ADMIN,
+        TenantRolesEnum.WORKFLOWS_ADMIN,
+        TenantRolesEnum.WORKFLOWS_CREATOR,
+    ],
+)
+async def create_workflow(
+    request: Request,
+    tenant_id: str,
+    create_request: CreateWorkflowRequest,
+    handler: WorkflowHandler = Depends(get_workflow_handler),
+) -> WorkflowResponse:
+    """
+    Create a new workflow.
+
+    Requires TENANT_GLOBAL_ADMIN, WORKFLOWS_ADMIN, or WORKFLOWS_CREATOR permission on tenant level.
+    Creator is automatically assigned ADMIN permission on the workflow.
+
+    Args:
+        request: FastAPI request with user in state
+        tenant_id: Tenant ID from path
+        create_request: Workflow creation data
+        handler: Workflow handler dependency
+
+    Returns:
+        Created workflow
+    """
+    try:
+        user: ContextIdentityUser = request.state.user
+        user_id = user.identity.get_id()
+
+        return handler.create_workflow(tenant_id=tenant_id, request=create_request, user_id=user_id, user=user)
+    except WorkflowConfigValidationError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except UnsupportedWorkflowTypeError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except Exception as e:
+        logger.error("Failed to create workflow: %s", e, exc_info=True)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to create workflow")
+
+
+@router.get(
+    "/{workflow_id}",
+    response_model=WorkflowResponse,
+    summary="Get workflow",
+    description="Get a specific workflow by ID",
+)
+@authenticate()
+@check_permissions(
+    entity="workflow",
+    required_permissions=[
+        TenantRolesEnum.TENANT_GLOBAL_ADMIN,
+        TenantRolesEnum.WORKFLOWS_ADMIN,
+        PermissionActionEnum.ADMIN,
+        PermissionActionEnum.WRITE,
+        PermissionActionEnum.READ,
+    ],
+)
+async def get_workflow(
+    request: Request,
+    tenant_id: str,
+    workflow_id: str,
+    fields: str | None = Query(None, description="Comma-separated list of fields to include in the response"),
+    handler: WorkflowHandler = Depends(get_workflow_handler),
+):
+    """
+    Get a specific workflow by ID.
+
+    Requires READ permission or higher on the workflow, or TENANT_GLOBAL_ADMIN/WORKFLOWS_ADMIN on tenant.
+
+    Args:
+        request: FastAPI request with user in state
+        tenant_id: Tenant ID from path
+        workflow_id: Workflow ID from path
+        handler: Workflow handler dependency
+
+    Returns:
+        Workflow details
+    """
+    try:
+        user: ContextIdentityUser = request.state.user
+        return filtered_response(
+            handler.get_workflow(tenant_id=tenant_id, workflow_id=workflow_id, user=user),
+            fields,
+        )
+    except WorkflowNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except Exception as e:
+        logger.error("Failed to get workflow: %s", e, exc_info=True)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to get workflow")
+
+
+@router.patch(
+    "/{workflow_id}",
+    response_model=WorkflowResponse,
+    summary="Update workflow",
+    description="Update an existing workflow",
+)
+@authenticate()
+@check_permissions(
+    entity="workflow",
+    required_permissions=[
+        TenantRolesEnum.TENANT_GLOBAL_ADMIN,
+        TenantRolesEnum.WORKFLOWS_ADMIN,
+        PermissionActionEnum.ADMIN,
+        PermissionActionEnum.WRITE,
+    ],
+)
+async def update_workflow(
+    request: Request,
+    tenant_id: str,
+    workflow_id: str,
+    update_request: UpdateWorkflowRequest,
+    handler: WorkflowHandler = Depends(get_workflow_handler),
+) -> WorkflowResponse:
+    """
+    Update an existing workflow.
+
+    Requires WRITE permission or higher on the workflow, or TENANT_GLOBAL_ADMIN/WORKFLOWS_ADMIN on tenant.
+
+    Args:
+        request: FastAPI request with user in state
+        tenant_id: Tenant ID from path
+        workflow_id: Workflow ID from path
+        update_request: Workflow update data
+        handler: Workflow handler dependency
+
+    Returns:
+        Updated workflow
+    """
+    try:
+        user: ContextIdentityUser = request.state.user
+        user_id = user.identity.get_id()
+
+        return handler.update_workflow(
+            tenant_id=tenant_id, workflow_id=workflow_id, request=update_request, user_id=user_id
+        )
+    except WorkflowNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except WorkflowConfigValidationError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except Exception as e:
+        logger.error("Failed to update workflow: %s", e, exc_info=True)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to update workflow")
+
+
+@router.delete(
+    "/{workflow_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Delete workflow",
+    description="Delete an workflow",
+)
+@authenticate()
+@check_permissions(
+    entity="workflow",
+    required_permissions=[
+        TenantRolesEnum.TENANT_GLOBAL_ADMIN,
+        TenantRolesEnum.WORKFLOWS_ADMIN,
+        PermissionActionEnum.ADMIN,
+    ],
+)
+async def delete_workflow(
+    request: Request,
+    tenant_id: str,
+    workflow_id: str,
+    handler: WorkflowHandler = Depends(get_workflow_handler),
+) -> Response:
+    """
+    Delete an workflow.
+
+    Requires WRITE permission or higher on the workflow, or TENANT_GLOBAL_ADMIN/WORKFLOWS_ADMIN on tenant.
+
+    Args:
+        request: FastAPI request with user in state
+        tenant_id: Tenant ID from path
+        workflow_id: Workflow ID from path
+        handler: Workflow handler dependency
+
+    Returns:
+        204 No Content on success
+    """
+    try:
+        handler.delete_workflow(tenant_id=tenant_id, workflow_id=workflow_id)
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
+    except WorkflowNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except Exception as e:
+        logger.error("Failed to delete workflow: %s", e, exc_info=True)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to delete workflow")
+
+
+@router.post(
+    "/{workflow_id}/duplicate",
+    response_model=WorkflowResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Duplicate workflow",
+    description="Create an exact copy of an workflow with name + ' Copy'",
+)
+@authenticate()
+@check_permissions(
+    entity="workflow",
+    required_permissions=[
+        TenantRolesEnum.TENANT_GLOBAL_ADMIN,
+        TenantRolesEnum.WORKFLOWS_ADMIN,
+        TenantRolesEnum.WORKFLOWS_CREATOR,
+        PermissionActionEnum.ADMIN,
+        PermissionActionEnum.WRITE,
+    ],
+)
+async def duplicate_workflow(
+    request: Request,
+    tenant_id: str,
+    workflow_id: str,
+    handler: WorkflowHandler = Depends(get_workflow_handler),
+) -> WorkflowResponse:
+    """
+    Duplicate an workflow.
+
+    Creates an exact copy of the workflow with name + " Copy".
+    New API keys are generated for the duplicate.
+    Requires WRITE permission or higher, or WORKFLOWS_CREATOR on tenant.
+
+    Args:
+        request: FastAPI request with user in state
+        tenant_id: Tenant ID from path
+        workflow_id: Workflow ID to duplicate
+
+    Returns:
+        The newly created workflow
+    """
+    try:
+        user: ContextIdentityUser = request.state.user
+        logger.info(
+            "API: Duplicate workflow",
+            extra={
+                "tenant_id": tenant_id,
+                "workflow_id": workflow_id,
+                "user_id": user.identity.get_id(),
+            },
+        )
+        return handler.duplicate_workflow(
+            tenant_id=tenant_id, workflow_id=workflow_id, user_id=user.identity.get_id(), user=user
+        )
+    except WorkflowNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except Exception as e:
+        logger.error("Failed to duplicate workflow: %s", e, exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to duplicate workflow: {e!s}"
+        )
+
+
+# ========== Workflow Permission Endpoints ==========
+
+
+@router.get(
+    "/{workflow_id}/principals",
+    response_model=ResourcePrincipalsResponse,
+    summary="List workflow permissions",
+    description="Get all principals with permissions for an workflow",
+)
+@authenticate()
+@check_permissions(
+    entity="workflow",
+    required_permissions=[
+        TenantRolesEnum.TENANT_GLOBAL_ADMIN,
+        TenantRolesEnum.WORKFLOWS_ADMIN,
+        PermissionActionEnum.ADMIN,
+        PermissionActionEnum.WRITE,
+        PermissionActionEnum.READ,
+    ],
+)
+async def list_workflow_permissions(
+    request: Request,
+    tenant_id: str,
+    workflow_id: str,
+    skip: int = Query(0, ge=0, description="Number of principals to skip"),
+    limit: int = Query(100, ge=1, le=500, description="Maximum number of principals to return"),
+    search: str | None = Query(None, description="Search term for display_name, principal_name, or mail"),
+    roles: str | None = Query(None, description="Comma-separated roles to filter by (OR logic)"),
+    is_active: bool | None = Query(None, description="Filter by is_active status"),
+    order_by: str | None = Query(None, enum=["display_name"], description="Column to order by"),
+    order_direction: str | None = Query("asc", enum=["asc", "desc"], description="Sort direction"),
+    handler: WorkflowHandler = Depends(get_workflow_handler),
+) -> ResourcePrincipalsResponse:
+    """
+    Get all principals with permissions for an workflow.
+
+    Requires READ permission or higher on the workflow, or TENANT_GLOBAL_ADMIN/WORKFLOWS_ADMIN on tenant.
+
+    Args:
+        request: FastAPI request with user in state
+        tenant_id: Tenant ID from path
+        workflow_id: Workflow ID from path
+        skip: Number of principals to skip
+        limit: Maximum number of principals to return
+        search: Search term for display_name, principal_name, or mail
+        roles: Comma-separated roles to filter by (OR logic)
+        is_active: Filter by is_active status
+        order_by: Column to order by
+        order_direction: Sort direction
+        handler: Workflow handler dependency
+
+    Returns:
+        List of principals with their permissions
+    """
+    try:
+        # Parse comma-separated roles
+        roles_list = [r.strip() for r in roles.split(",")] if roles else None
+
+        return handler.list_workflow_permissions(
+            tenant_id=tenant_id,
+            workflow_id=workflow_id,
+            skip=skip,
+            limit=limit,
+            search=search,
+            roles=roles_list,
+            is_active=is_active,
+            order_by=order_by,
+            order_direction=order_direction,
+        )
+    except WorkflowNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except Exception as e:
+        logger.error("Failed to list workflow permissions: %s", e, exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to list workflow permissions"
+        )
+
+
+@router.get(
+    "/{workflow_id}/principals/{principal_id}",
+    response_model=PrincipalWithRolesResponse,
+    summary="Get workflow permissions for principal",
+    description="Get all permissions for a specific principal on an workflow",
+)
+@authenticate()
+@check_permissions(
+    entity="workflow",
+    required_permissions=[
+        TenantRolesEnum.TENANT_GLOBAL_ADMIN,
+        TenantRolesEnum.WORKFLOWS_ADMIN,
+        PermissionActionEnum.ADMIN,
+        PermissionActionEnum.WRITE,
+        PermissionActionEnum.READ,
+    ],
+)
+async def get_workflow_permission(
+    request: Request,
+    tenant_id: str,
+    workflow_id: str,
+    principal_id: str,
+    handler: WorkflowHandler = Depends(get_workflow_handler),
+) -> PrincipalWithRolesResponse:
+    """
+    Get all permissions for a specific principal on an workflow.
+
+    Requires READ permission or higher on the workflow, or TENANT_GLOBAL_ADMIN/WORKFLOWS_ADMIN on tenant.
+
+    Args:
+        request: FastAPI request with user in state
+        tenant_id: Tenant ID from path
+        workflow_id: Workflow ID from path
+        principal_id: Principal ID from path
+        handler: Workflow handler dependency
+
+    Returns:
+        Principal's permissions on the workflow
+    """
+    try:
+        return handler.get_workflow_permission(tenant_id=tenant_id, workflow_id=workflow_id, principal_id=principal_id)
+    except WorkflowNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except Exception as e:
+        logger.error("Failed to get workflow permission: %s", e, exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to get workflow permission"
+        )
+
+
+@router.put(
+    "/{workflow_id}/principals",
+    response_model=PrincipalWithRolesResponse,
+    summary="Set workflow permission",
+    description="Set or update a principal's permission for an workflow",
+)
+@authenticate()
+@check_permissions(
+    entity="workflow",
+    required_permissions=[
+        TenantRolesEnum.TENANT_GLOBAL_ADMIN,
+        TenantRolesEnum.WORKFLOWS_ADMIN,
+        PermissionActionEnum.ADMIN,
+    ],
+)
+async def set_workflow_permission(
+    request: Request,
+    tenant_id: str,
+    workflow_id: str,
+    permission_request: SetResourcePermissionRequest,
+    handler: WorkflowHandler = Depends(get_workflow_handler),
+) -> PrincipalWithRolesResponse:
+    """
+    Set or update a principal's permission for an workflow.
+
+    Requires ADMIN permission on the workflow, or TENANT_GLOBAL_ADMIN/WORKFLOWS_ADMIN on tenant.
+
+    Args:
+        request: FastAPI request with user in state
+        tenant_id: Tenant ID from path
+        workflow_id: Workflow ID from path
+        permission_request: Permission data
+        handler: Workflow handler dependency
+
+    Returns:
+        Created or updated permission
+    """
+    try:
+        user: ContextIdentityUser = request.state.user
+        user_id = user.identity.get_id()
+
+        return handler.set_workflow_permission(
+            tenant_id=tenant_id,
+            workflow_id=workflow_id,
+            request=permission_request,
+            user_id=user_id,
+            user=user,
+        )
+    except WorkflowNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except Exception as e:
+        logger.error("Failed to set workflow permission: %s", e, exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to set workflow permission"
+        )
+
+
+@router.delete(
+    "/{workflow_id}/principals",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Delete workflow permission",
+    description="Remove a principal's permission for an workflow",
+)
+@authenticate()
+@check_permissions(
+    entity="workflow",
+    required_permissions=[
+        TenantRolesEnum.TENANT_GLOBAL_ADMIN,
+        TenantRolesEnum.WORKFLOWS_ADMIN,
+        PermissionActionEnum.ADMIN,
+    ],
+)
+async def delete_workflow_permission(
+    request: Request,
+    tenant_id: str,
+    workflow_id: str,
+    delete_request: SetResourcePermissionRequest,
+    handler: WorkflowHandler = Depends(get_workflow_handler),
+) -> Response:
+    """
+    Remove a principal's permission for an workflow.
+
+    Requires ADMIN permission on the workflow, or TENANT_GLOBAL_ADMIN/WORKFLOWS_ADMIN on tenant.
+
+    Args:
+        request: FastAPI request with user in state
+        tenant_id: Tenant ID from path
+        workflow_id: Workflow ID from path
+        delete_request: Permission data (principal_id, principal_type, permission)
+        handler: Workflow handler dependency
+
+    Returns:
+        204 No Content on success
+    """
+    try:
+        handler.delete_workflow_permission(
+            tenant_id=tenant_id,
+            workflow_id=workflow_id,
+            principal_id=delete_request.principal_id,
+            principal_type=delete_request.principal_type,
+            role=delete_request.role,
+        )
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
+    except WorkflowNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except WorkflowPermissionNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except Exception as e:
+        logger.error("Failed to delete workflow permission: %s", e, exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to delete workflow permission"
+        )
+
+
+# ========== API Key Management Endpoints ==========
+
+
+@router.get(
+    "/{workflow_id}/keys/{key_number}",
+    response_model=WorkflowKeyResponse,
+    summary="Get workflow API key",
+    description="Get an API key for an workflow (1 = primary, 2 = secondary)",
+)
+@authenticate()
+@check_permissions(
+    entity="workflow",
+    required_permissions=[
+        TenantRolesEnum.TENANT_GLOBAL_ADMIN,
+        TenantRolesEnum.WORKFLOWS_ADMIN,
+        PermissionActionEnum.ADMIN,
+        PermissionActionEnum.WRITE,
+    ],
+)
+async def get_workflow_key(
+    request: Request,
+    tenant_id: str,
+    workflow_id: str,
+    key_number: int,
+    handler: WorkflowHandler = Depends(get_workflow_handler),
+) -> WorkflowKeyResponse:
+    """
+    Get an API key for an workflow.
+
+    Requires WRITE or ADMIN permission on the workflow, or TENANT_GLOBAL_ADMIN/WORKFLOWS_ADMIN on tenant.
+
+    Args:
+        request: FastAPI request with user in state
+        tenant_id: Tenant ID from path
+        workflow_id: Workflow ID from path
+        key_number: Key number (1 for primary, 2 for secondary)
+        handler: Workflow handler dependency
+
+    Returns:
+        The API key
+    """
+    try:
+        if key_number not in [1, 2]:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="key_number must be 1 or 2")
+
+        return handler.get_api_key(tenant_id=tenant_id, workflow_id=workflow_id, key_number=key_number)
+    except WorkflowNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except WorkflowApiKeysNotAllowedError as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+    except WorkflowKeyNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Failed to get workflow key: %s", e, exc_info=True)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to get workflow key")
+
+
+@router.put(
+    "/{workflow_id}/keys/{key_number}/rotate",
+    response_model=WorkflowKeyResponse,
+    summary="Rotate workflow API key",
+    description="Rotate an API key for an workflow (1 = primary, 2 = secondary)",
+)
+@authenticate()
+@check_permissions(
+    entity="workflow",
+    required_permissions=[
+        TenantRolesEnum.TENANT_GLOBAL_ADMIN,
+        TenantRolesEnum.WORKFLOWS_ADMIN,
+        PermissionActionEnum.ADMIN,
+        PermissionActionEnum.WRITE,
+    ],
+)
+async def rotate_workflow_key(
+    request: Request,
+    tenant_id: str,
+    workflow_id: str,
+    key_number: int,
+    handler: WorkflowHandler = Depends(get_workflow_handler),
+) -> WorkflowKeyResponse:
+    """
+    Rotate an API key for an workflow.
+
+    This generates a new random API key and replaces the existing one.
+    Requires WRITE or ADMIN permission on the workflow, or TENANT_GLOBAL_ADMIN/WORKFLOWS_ADMIN on tenant.
+
+    Args:
+        request: FastAPI request with user in state
+        tenant_id: Tenant ID from path
+        workflow_id: Workflow ID from path
+        key_number: Key number (1 for primary, 2 for secondary)
+        handler: Workflow handler dependency
+
+    Returns:
+        The new API key
+    """
+    try:
+        if key_number not in [1, 2]:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="key_number must be 1 or 2")
+
+        user: ContextIdentityUser = request.state.user
+        user_id = user.identity.get_id()
+
+        return handler.rotate_api_key(
+            tenant_id=tenant_id, workflow_id=workflow_id, key_number=key_number, user_id=user_id
+        )
+    except WorkflowNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except WorkflowApiKeysNotAllowedError as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+    except WorkflowKeyNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Failed to rotate workflow key: %s", e, exc_info=True)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to rotate workflow key")
+
+
+# ========== API Key Validation Endpoint (Agent Service) ==========
+
+
+@router.post(
+    "/{workflow_id}/validate-api-key",
+    summary="Validate workflow API key",
+    description="""
+    Lightweight endpoint to validate an workflow API key without loading
+    the full configuration or credential secrets.
+
+    **Authentication**: This endpoint uses API key authentication via the
+    `X-Unified-UI-Workflow-API-Key` header (NOT Bearer token).
+
+    Returns the workflow ID and tenant ID if the API key is valid.
+    This is used by the agent-service to validate API keys for trace ingestion
+    without triggering credential secret resolution.
+    """,
+)
+@authenticate_workflow_api_key()
+async def validate_workflow_api_key(
+    request: Request,
+    tenant_id: str,
+    workflow_id: str,
+) -> dict:
+    workflow = request.state.workflow
+    return {
+        "valid": True,
+        "workflow_id": str(workflow.id),
+        "tenant_id": tenant_id,
+    }
+
+
+# ========== Config Endpoint (Agent Service) ==========
+
+
+@router.get(
+    "/{workflow_id}/config",
+    response_model=WorkflowConfigResponse,
+    summary="Get workflow configuration (API Key)",
+    description="""
+    Get the full workflow configuration including credential secrets.
+
+    **Authentication**: This endpoint uses API key authentication via the
+    `X-Unified-UI-Workflow-API-Key` header (NOT Bearer token).
+
+    The API key must match either the primary or secondary key of the workflow.
+
+    This endpoint is designed for external systems (like N8N) to fetch configuration
+    and credentials needed to perform workflow operations.
+
+    **IMPORTANT**: No caching is used for this endpoint to ensure key rotation
+    takes effect immediately.
+    """,
+)
+@authenticate_workflow_api_key()
+async def get_workflow_config(
+    request: Request,
+    tenant_id: str,
+    workflow_id: str,
+    handler: WorkflowHandler = Depends(get_workflow_handler),
+    credential_handler: CredentialHandler = Depends(get_credential_handler),
+) -> WorkflowConfigResponse:
+    """
+    Get workflow configuration with resolved credentials via API Key auth.
+
+    Args:
+        request: FastAPI request with workflow in state
+        tenant_id: Tenant ID from path
+        workflow_id: Workflow ID from path
+        handler: Workflow handler dependency
+        credential_handler: Credential handler for fetching secrets
+
+    Returns:
+        WorkflowConfigResponse with full config including secrets
+    """
+    try:
+        workflow = request.state.workflow
+
+        return handler.get_workflow_config(
+            tenant_id=tenant_id,
+            workflow_id=workflow_id,
+            workflow=workflow,
+            credential_handler=credential_handler,
+        )
+    except InvalidCredentialError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except WorkflowNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Failed to get workflow config: %s", e, exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to get workflow configuration"
+        )
+
+
+@router.get(
+    "/{workflow_id}/config/bearer",
+    response_model=WorkflowConfigResponse,
+    summary="Get workflow configuration (Bearer)",
+    description="""
+    Get the full workflow configuration including credential secrets.
+
+    **Authentication**: This endpoint uses Bearer token authentication.
+    Requires WRITE or ADMIN permission on the workflow (direct or via group).
+
+    This enables users and service principals to fetch agent configuration
+    for trace import operations without needing the agent's API key.
+    """,
+)
+@authenticate("X_AGENT_SERVICE_KEY")
+@check_permissions(
+    entity="workflow",
+    required_permissions=[
+        TenantRolesEnum.TENANT_GLOBAL_ADMIN,
+        TenantRolesEnum.WORKFLOWS_ADMIN,
+        PermissionActionEnum.ADMIN,
+        PermissionActionEnum.WRITE,
+    ],
+)
+async def get_workflow_config_bearer(
+    request: Request,
+    tenant_id: str,
+    workflow_id: str,
+    handler: WorkflowHandler = Depends(get_workflow_handler),
+    credential_handler: CredentialHandler = Depends(get_credential_handler),
+) -> WorkflowConfigResponse:
+    """
+    Get workflow configuration with resolved credentials via Bearer auth.
+
+    Args:
+        request: FastAPI request with user in state
+        tenant_id: Tenant ID from path
+        workflow_id: Workflow ID from path
+        handler: Workflow handler dependency
+        credential_handler: Credential handler for fetching secrets
+
+    Returns:
+        WorkflowConfigResponse with full config including secrets
+    """
+    try:
+        workflow = handler.get_workflow_model(tenant_id=tenant_id, workflow_id=workflow_id)
+
+        return handler.get_workflow_config(
+            tenant_id=tenant_id,
+            workflow_id=workflow_id,
+            workflow=workflow,
+            credential_handler=credential_handler,
+        )
+    except InvalidCredentialError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except WorkflowNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Failed to get workflow config: %s", e, exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to get workflow configuration"
+        )
+
+
+@router.get(
+    "/{workflow_id}/workflow-runs",
+    response_model=WorkflowRunsListResponse,
+    summary="List workflow runs",
+    description="""
+    List workflow execution runs from the external workflow platform (e.g., N8N).
+    Fetches recent executions using the agent's stored configuration and credentials.
+
+    Requires WRITE or ADMIN permission on the workflow.
+    """,
+)
+@authenticate()
+@check_permissions(
+    entity="workflow",
+    required_permissions=[
+        TenantRolesEnum.TENANT_GLOBAL_ADMIN,
+        TenantRolesEnum.WORKFLOWS_ADMIN,
+        PermissionActionEnum.ADMIN,
+        PermissionActionEnum.WRITE,
+    ],
+)
+async def list_workflow_runs(
+    request: Request,
+    tenant_id: str,
+    workflow_id: str,
+    limit: int = Query(20, ge=1, le=100, description="Maximum number of runs to return"),
+    cursor: str | None = Query(None, description="Pagination cursor for next page"),
+    execution_status: str | None = Query(
+        None, alias="status", description="Filter by execution status (e.g., success, error, running)"
+    ),
+    handler: WorkflowHandler = Depends(get_workflow_handler),
+    credential_handler: CredentialHandler = Depends(get_credential_handler),
+) -> WorkflowRunsListResponse:
+    """List workflow runs for an workflow.
+
+    Args:
+        request: FastAPI request
+        tenant_id: Tenant ID from path
+        workflow_id: Workflow ID from path
+        limit: Maximum number of runs to return
+        cursor: Pagination cursor for next page
+        execution_status: Filter by execution status
+        handler: Workflow handler dependency
+        credential_handler: Credential handler for fetching secrets
+
+    Returns:
+        WorkflowRunsListResponse with list of execution runs
+    """
+    try:
+        return handler.get_workflow_runs(
+            tenant_id=tenant_id,
+            workflow_id=workflow_id,
+            credential_handler=credential_handler,
+            limit=limit,
+            cursor=cursor,
+            status=execution_status,
+        )
+    except WorkflowNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except UnsupportedWorkflowTypeError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Failed to list workflow runs: %s", e, exc_info=True)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to list workflow runs")
+
+
+@router.get(
+    "/{workflow_id}/workflow-runs/{execution_id}",
+    response_model=WorkflowRunDetailResponse,
+    summary="Get workflow run detail",
+    description="""
+    Get a single workflow execution with full data (input/output) from the external platform.
+    Uses includeData=true to fetch the complete execution data.
+
+    Requires WRITE or ADMIN permission on the workflow.
+    """,
+)
+@authenticate()
+@check_permissions(
+    entity="workflow",
+    required_permissions=[
+        TenantRolesEnum.TENANT_GLOBAL_ADMIN,
+        TenantRolesEnum.WORKFLOWS_ADMIN,
+        PermissionActionEnum.ADMIN,
+        PermissionActionEnum.WRITE,
+    ],
+)
+async def get_workflow_run_detail(
+    request: Request,
+    tenant_id: str,
+    workflow_id: str,
+    execution_id: str,
+    handler: WorkflowHandler = Depends(get_workflow_handler),
+    credential_handler: CredentialHandler = Depends(get_credential_handler),
+) -> WorkflowRunDetailResponse:
+    """Get full details of a single workflow execution.
+
+    Args:
+        request: FastAPI request
+        tenant_id: Tenant ID from path
+        workflow_id: Workflow ID from path
+        execution_id: Execution ID from path
+        handler: Workflow handler dependency
+        credential_handler: Credential handler for fetching secrets
+
+    Returns:
+        WorkflowRunDetailResponse with full execution data
+    """
+    try:
+        return handler.get_workflow_run_detail(
+            tenant_id=tenant_id,
+            workflow_id=workflow_id,
+            execution_id=execution_id,
+            credential_handler=credential_handler,
+        )
+    except WorkflowNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except UnsupportedWorkflowTypeError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except WorkflowConfigValidationError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Failed to get workflow run detail: %s", e, exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to get workflow run detail"
+        )
+
+
+@router.post(
+    "/{workflow_id}/workflow-runs/{execution_id}/retry",
+    response_model=WorkflowRunRetryResponse,
+    summary="Retry workflow execution",
+    description="""
+    Retry a failed workflow execution. Only executions with status 'error' can be retried.
+
+    Requires WRITE or ADMIN permission on the workflow.
+    """,
+)
+@authenticate()
+@check_permissions(
+    entity="workflow",
+    required_permissions=[
+        TenantRolesEnum.TENANT_GLOBAL_ADMIN,
+        TenantRolesEnum.WORKFLOWS_ADMIN,
+        PermissionActionEnum.ADMIN,
+        PermissionActionEnum.WRITE,
+    ],
+)
+async def retry_workflow_run(
+    request: Request,
+    tenant_id: str,
+    workflow_id: str,
+    execution_id: str,
+    handler: WorkflowHandler = Depends(get_workflow_handler),
+    credential_handler: CredentialHandler = Depends(get_credential_handler),
+) -> WorkflowRunRetryResponse:
+    """Retry a failed workflow execution.
+
+    Args:
+        request: FastAPI request
+        tenant_id: Tenant ID from path
+        workflow_id: Workflow ID from path
+        execution_id: Execution ID to retry
+        handler: Workflow handler dependency
+        credential_handler: Credential handler for fetching secrets
+
+    Returns:
+        WorkflowRunRetryResponse with retry result
+    """
+    try:
+        return handler.retry_workflow_run(
+            tenant_id=tenant_id,
+            workflow_id=workflow_id,
+            execution_id=execution_id,
+            credential_handler=credential_handler,
+        )
+    except WorkflowNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except UnsupportedWorkflowTypeError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except WorkflowConfigValidationError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Failed to retry workflow execution: %s", e, exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to retry workflow execution"
+        )
+
+
+@router.post(
+    "/{workflow_id}/workflow-start",
+    summary="Start workflow",
+    description="""
+    Trigger the workflow via its configured webhook URL.
+    The workflow must have a webhook_url configured.
+
+    Requires WRITE or ADMIN permission on the workflow.
+    """,
+)
+@authenticate()
+@check_permissions(
+    entity="workflow",
+    required_permissions=[
+        TenantRolesEnum.TENANT_GLOBAL_ADMIN,
+        TenantRolesEnum.WORKFLOWS_ADMIN,
+        PermissionActionEnum.ADMIN,
+        PermissionActionEnum.WRITE,
+    ],
+)
+async def start_workflow(
+    request: Request,
+    tenant_id: str,
+    workflow_id: str,
+    body: StartWorkflowRequest | None = None,
+    handler: WorkflowHandler = Depends(get_workflow_handler),
+) -> dict:
+    """
+    Trigger a workflow via webhook.
+
+    Args:
+        request: FastAPI request
+        tenant_id: Tenant ID from path
+        workflow_id: Workflow ID from path
+        body: Optional request body with webhook payload
+        handler: Workflow handler dependency
+
+    Returns:
+        Response from the webhook endpoint
+    """
+    try:
+        return handler.start_workflow(
+            tenant_id=tenant_id,
+            workflow_id=workflow_id,
+            body=body.body if body else None,
+            files=[f.model_dump(by_alias=True) for f in body.files] if body and body.files else None,
+            query_params=body.query_params if body else None,
+        )
+    except WorkflowNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except UnsupportedWorkflowTypeError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except WorkflowConfigValidationError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Failed to start workflow: %s", e, exc_info=True)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to start workflow")

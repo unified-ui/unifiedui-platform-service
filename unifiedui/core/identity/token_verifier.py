@@ -12,7 +12,13 @@ logger = get_logger(__name__)
 class JWKSTokenVerifier:
     """Verifies JWT tokens using JWKS endpoint for signature validation and audience check."""
 
-    def __init__(self, jwks_url: str, algorithms: list[str], audience: str | list[str] | None = None):
+    def __init__(
+        self,
+        jwks_url: str,
+        algorithms: list[str],
+        audience: str | list[str] | None = None,
+        headers: dict[str, str] | None = None,
+    ):
         """Initialize the JWKS token verifier.
 
         Args:
@@ -20,8 +26,9 @@ class JWKSTokenVerifier:
             algorithms: List of accepted signing algorithms (e.g. ["RS256"]).
             audience: Expected audience claim(s). Can be a single string or list
                       of accepted audiences. If None, audience is not validated.
+            headers: Optional HTTP headers to include when fetching JWKS keys.
         """
-        self._jwks_client = PyJWKClient(jwks_url, cache_keys=True)
+        self._jwks_client = PyJWKClient(jwks_url, cache_keys=True, headers=headers or {})
         self._algorithms = algorithms
         self._audience = audience
 

@@ -31,6 +31,14 @@ class OrganizationSlugAlreadyExistsError(OrganizationError):
         super().__init__(f"Organization with slug '{slug}' already exists")
 
 
+class OrganizationNameAlreadyExistsError(OrganizationError):
+    """Exception raised when organization name already exists."""
+
+    def __init__(self, name: str):
+        self.name = name
+        super().__init__(f"Organization with name '{name}' already exists")
+
+
 class OrganizationUpdateError(OrganizationError):
     """Exception raised when organization update fails."""
 

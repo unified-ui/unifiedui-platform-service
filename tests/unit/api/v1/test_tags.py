@@ -10,8 +10,6 @@ from tests.conftest import create_auth_headers
 from tests.helpers.tenant import create_tenant_for_user
 from unifiedui.core.database.enums import PermissionActionEnum
 from unifiedui.core.database.models import (
-    AutonomousAgent,
-    AutonomousAgentMember,
     ChatAgent,
     ChatAgentMember,
     ChatWidget,
@@ -20,22 +18,22 @@ from unifiedui.core.database.models import (
     CredentialMember,
     Tool,
     ToolMember,
+    Workflow,
+    WorkflowMember,
 )
 
 # API Endpoints
 ENDPOINT_TAGS = "/api/v1/platform-service/tenants/{tenant_id}/tags"
 ENDPOINT_TAG_DETAIL = "/api/v1/platform-service/tenants/{tenant_id}/tags/{tag_id}"
 ENDPOINT_CHAT_AGENT_TAGS = "/api/v1/platform-service/tenants/{tenant_id}/chat-agents/{chat_agent_id}/tags"
-ENDPOINT_AUTONOMOUS_AGENT_TAGS = (
-    "/api/v1/platform-service/tenants/{tenant_id}/autonomous-agents/{autonomous_agent_id}/tags"
-)
+ENDPOINT_AUTONOMOUS_AGENT_TAGS = "/api/v1/platform-service/tenants/{tenant_id}/workflows/{workflow_id}/tags"
 ENDPOINT_CHAT_WIDGET_TAGS = "/api/v1/platform-service/tenants/{tenant_id}/chat-widgets/{chat_widget_id}/tags"
 ENDPOINT_CREDENTIAL_TAGS = "/api/v1/platform-service/tenants/{tenant_id}/credentials/{credential_id}/tags"
 ENDPOINT_TOOL_TAGS = "/api/v1/platform-service/tenants/{tenant_id}/tools/{tool_id}/tags"
 
 # Resource endpoints for list with tags filter
 ENDPOINT_CHAT_AGENTS = "/api/v1/platform-service/tenants/{tenant_id}/chat-agents"
-ENDPOINT_AUTONOMOUS_AGENTS = "/api/v1/platform-service/tenants/{tenant_id}/autonomous-agents"
+ENDPOINT_WORKFLOWS = "/api/v1/platform-service/tenants/{tenant_id}/workflows"
 ENDPOINT_CHAT_WIDGETS = "/api/v1/platform-service/tenants/{tenant_id}/chat-widgets"
 ENDPOINT_CREDENTIALS = "/api/v1/platform-service/tenants/{tenant_id}/credentials"
 ENDPOINT_DEVELOPMENT_PLATFORMS = "/api/v1/platform-service/tenants/{tenant_id}/development-platforms"
@@ -43,7 +41,7 @@ ENDPOINT_DEVELOPMENT_PLATFORMS = "/api/v1/platform-service/tenants/{tenant_id}/d
 # Resource-type tag list endpoints
 ENDPOINT_TOOLS_TAGS_LIST = "/api/v1/platform-service/tenants/{tenant_id}/tools/tags"
 ENDPOINT_CHAT_AGENTS_TAGS_LIST = "/api/v1/platform-service/tenants/{tenant_id}/chat-agents/tags"
-ENDPOINT_AUTONOMOUS_AGENTS_TAGS_LIST = "/api/v1/platform-service/tenants/{tenant_id}/autonomous-agents/tags"
+ENDPOINT_WORKFLOWS_TAGS_LIST = "/api/v1/platform-service/tenants/{tenant_id}/workflows/tags"
 ENDPOINT_CHAT_WIDGETS_TAGS_LIST = "/api/v1/platform-service/tenants/{tenant_id}/chat-widgets/tags"
 ENDPOINT_CREDENTIALS_TAGS_LIST = "/api/v1/platform-service/tenants/{tenant_id}/credentials/tags"
 
@@ -80,13 +78,11 @@ def create_chat_agent_in_db(test_client: TestClient, tenant_id: str, user_id: st
     return app_id
 
 
-def create_autonomous_agent_in_db(
-    test_client: TestClient, tenant_id: str, user_id: str, name: str = "Test Agent"
-) -> str:
+def create_workflow_in_db(test_client: TestClient, tenant_id: str, user_id: str, name: str = "Test Agent") -> str:
     """Helper function to create an autonomous agent directly in DB and return its ID."""
     agent_id = str(uuid.uuid4())
     with test_client.db_client.get_session() as session:
-        agent = AutonomousAgent(
+        agent = Workflow(
             id=agent_id,
             tenant_id=tenant_id,
             name=name,
@@ -100,10 +96,10 @@ def create_autonomous_agent_in_db(
         session.add(agent)
         session.commit()
 
-        member = AutonomousAgentMember(
+        member = WorkflowMember(
             id=str(uuid.uuid4()),
             tenant_id=tenant_id,
-            autonomous_agent_id=agent_id,
+            workflow_id=agent_id,
             principal_id=user_id,
             role=PermissionActionEnum.ADMIN,
             created_by=user_id,
@@ -600,18 +596,18 @@ class TestChatAgentListFilterByTags:
         assert "Invalid tag IDs format" in response.json()["detail"]
 
 
-class TestAutonomousAgentTagRoutes:
+class TestWorkflowTagRoutes:
     """Test suite for autonomous agent tag management."""
 
-    def test_set_and_get_autonomous_agent_tags(self, test_client: TestClient, test_user_token: Any) -> None:
+    def test_set_and_get_workflow_tags(self, test_client: TestClient, test_user_token: Any) -> None:
         """Test setting and getting tags on an autonomous agent."""
         tenant_id = create_tenant_for_user(test_client, test_user_token)
-        agent_id = create_autonomous_agent_in_db(test_client, tenant_id, test_user_token.get_id())
+        agent_id = create_workflow_in_db(test_client, tenant_id, test_user_token.get_id())
         headers = create_auth_headers(test_user_token, use_cache=False)
 
         # Set tags
         response = test_client.put(
-            ENDPOINT_AUTONOMOUS_AGENT_TAGS.format(tenant_id=tenant_id, autonomous_agent_id=agent_id),
+            ENDPOINT_AUTONOMOUS_AGENT_TAGS.format(tenant_id=tenant_id, workflow_id=agent_id),
             json={"tags": ["ai", "PRODUCTION"]},
             headers=headers,
         )
@@ -622,7 +618,7 @@ class TestAutonomousAgentTagRoutes:
 
         # Get tags
         get_response = test_client.get(
-            ENDPOINT_AUTONOMOUS_AGENT_TAGS.format(tenant_id=tenant_id, autonomous_agent_id=agent_id), headers=headers
+            ENDPOINT_AUTONOMOUS_AGENT_TAGS.format(tenant_id=tenant_id, workflow_id=agent_id), headers=headers
         )
 
         assert get_response.status_code == status.HTTP_200_OK
@@ -840,19 +836,19 @@ class TestResourceTypeTagListEndpoints:
         data = response.json()
         assert len(data) >= 1
 
-    def test_list_autonomous_agent_tags(self, test_client: TestClient, test_user_token: Any) -> None:
+    def test_list_workflow_tags(self, test_client: TestClient, test_user_token: Any) -> None:
         """Test listing tags filtered by autonomous agents resource type."""
         tenant_id = create_tenant_for_user(test_client, test_user_token)
-        agent_id = create_autonomous_agent_in_db(test_client, tenant_id, test_user_token.get_id())
+        agent_id = create_workflow_in_db(test_client, tenant_id, test_user_token.get_id())
         headers = create_auth_headers(test_user_token, use_cache=False)
 
         test_client.put(
-            ENDPOINT_AUTONOMOUS_AGENT_TAGS.format(tenant_id=tenant_id, autonomous_agent_id=agent_id),
+            ENDPOINT_AUTONOMOUS_AGENT_TAGS.format(tenant_id=tenant_id, workflow_id=agent_id),
             json={"tags": ["AUTO-AGENT-TAG"]},
             headers=headers,
         )
 
-        response = test_client.get(ENDPOINT_AUTONOMOUS_AGENTS_TAGS_LIST.format(tenant_id=tenant_id), headers=headers)
+        response = test_client.get(ENDPOINT_WORKFLOWS_TAGS_LIST.format(tenant_id=tenant_id), headers=headers)
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()

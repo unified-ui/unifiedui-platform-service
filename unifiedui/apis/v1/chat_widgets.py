@@ -10,6 +10,7 @@ from unifiedui.core.middleware.apis.v1.auth import authenticate, check_permissio
 from unifiedui.exc.chat_widgets import ChatWidgetNotFoundError
 from unifiedui.handlers.chat_widgets import ChatWidgetHandler
 from unifiedui.handlers.dependencies import get_chat_widget_handler
+from unifiedui.handlers.field_filter import filtered_response, parse_ids
 from unifiedui.logger import get_logger
 from unifiedui.schema.requests.chat_widgets import CreateChatWidgetRequest, UpdateChatWidgetRequest
 from unifiedui.schema.requests.permissions import SetResourcePermissionRequest
@@ -47,6 +48,8 @@ async def list_chat_widgets(
     view: ListViewEnum | None = Query(
         None, description="View type: 'full' (default) or 'quick-list' (returns only id and name)"
     ),
+    ids: str | None = Query(None, description="Comma-separated list of IDs to filter by"),
+    fields: str | None = Query(None, description="Comma-separated list of fields to include in the response"),
     handler: ChatWidgetHandler = Depends(get_chat_widget_handler),
 ):
     """
@@ -87,17 +90,21 @@ async def list_chat_widgets(
             extra={"tenant_id": tenant_id, "user_id": user.identity.get_id(), "skip": skip, "limit": limit},
         )
 
-        return handler.list_chat_widgets(
-            tenant_id=tenant_id,
-            skip=skip,
-            limit=limit,
-            name_filter=name,
-            is_active=is_active,
-            user=user,
-            tag_ids=tag_ids,
-            order_by=order_by,
-            order_direction=order_direction.value if order_direction else None,
-            view=view.value if view else None,
+        return filtered_response(
+            handler.list_chat_widgets(
+                tenant_id=tenant_id,
+                skip=skip,
+                limit=limit,
+                name_filter=name,
+                is_active=is_active,
+                user=user,
+                tag_ids=tag_ids,
+                order_by=order_by,
+                order_direction=order_direction.value if order_direction else None,
+                view=view.value if view else None,
+                id_list=parse_ids(ids),
+            ),
+            fields,
         )
     except HTTPException:
         raise
@@ -174,8 +181,12 @@ async def create_chat_widget(
     ],
 )
 async def get_chat_widget(
-    request: Request, tenant_id: str, chat_widget_id: str, handler: ChatWidgetHandler = Depends(get_chat_widget_handler)
-) -> ChatWidgetResponse:
+    request: Request,
+    tenant_id: str,
+    chat_widget_id: str,
+    fields: str | None = Query(None, description="Comma-separated list of fields to include in the response"),
+    handler: ChatWidgetHandler = Depends(get_chat_widget_handler),
+):
     """
     Get a specific chat widget.
 
@@ -197,7 +208,10 @@ async def get_chat_widget(
             "API: Get chat widget",
             extra={"tenant_id": tenant_id, "chat_widget_id": chat_widget_id, "user_id": user.identity.get_id()},
         )
-        return handler.get_chat_widget(tenant_id=tenant_id, chat_widget_id=chat_widget_id, user=user)
+        return filtered_response(
+            handler.get_chat_widget(tenant_id=tenant_id, chat_widget_id=chat_widget_id, user=user),
+            fields,
+        )
     except ChatWidgetNotFoundError as e:
         logger.warning("Chat widget not found: %s", e)
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
@@ -311,6 +325,60 @@ async def delete_chat_widget(
     except Exception as e:
         logger.error("Failed to delete chat widget: %s", e)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to delete chat widget")
+
+
+@router.post(
+    "/{chat_widget_id}/duplicate",
+    response_model=ChatWidgetResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Duplicate chat widget",
+    description="Create an exact copy of a chat widget with name + ' Copy'",
+)
+@authenticate()
+@check_permissions(
+    entity="chat_widget",
+    required_permissions=[
+        TenantRolesEnum.TENANT_GLOBAL_ADMIN,
+        TenantRolesEnum.CHAT_WIDGETS_ADMIN,
+        TenantRolesEnum.CHAT_WIDGETS_CREATOR,
+        PermissionActionEnum.ADMIN,
+        PermissionActionEnum.WRITE,
+    ],
+)
+async def duplicate_chat_widget(
+    request: Request, tenant_id: str, chat_widget_id: str, handler: ChatWidgetHandler = Depends(get_chat_widget_handler)
+) -> ChatWidgetResponse:
+    """
+    Duplicate a chat widget.
+
+    Creates an exact copy of the chat widget with name + " Copy".
+    Requires WRITE permission or higher, or CHAT_WIDGETS_CREATOR on tenant.
+
+    Args:
+        request: FastAPI request with user in state
+        tenant_id: Tenant ID from path
+        chat_widget_id: Chat widget ID to duplicate
+
+    Returns:
+        The newly created chat widget
+    """
+    try:
+        user: ContextIdentityUser = request.state.user
+        logger.info(
+            "API: Duplicate chat widget",
+            extra={"tenant_id": tenant_id, "chat_widget_id": chat_widget_id, "user_id": user.identity.get_id()},
+        )
+        return handler.duplicate_chat_widget(
+            tenant_id=tenant_id, chat_widget_id=chat_widget_id, user_id=user.identity.get_id(), user=user
+        )
+    except ChatWidgetNotFoundError as e:
+        logger.warning("Chat widget not found: %s", e)
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except Exception as e:
+        logger.error("Failed to duplicate chat widget: %s", e)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to duplicate chat widget: {e!s}"
+        )
 
 
 # ========== Chat Widget Permission Endpoints ==========

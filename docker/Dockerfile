@@ -8,10 +8,17 @@ FROM python:3.14-slim AS builder
 
 WORKDIR /app
 
-# Install system dependencies for building
+# Install system dependencies for building (PostgreSQL + MSSQL/ODBC)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     libpq-dev \
+    unixodbc-dev \
+    gnupg2 \
+    curl \
+    && curl -fsSL https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor -o /usr/share/keyrings/microsoft-prod.gpg \
+    && curl https://packages.microsoft.com/config/debian/12/prod.list > /etc/apt/sources.list.d/mssql-release.list \
+    && apt-get update \
+    && ACCEPT_EULA=Y apt-get install -y msodbcsql18 \
     && rm -rf /var/lib/apt/lists/*
 
 # Install UV
@@ -35,10 +42,16 @@ FROM python:3.14-slim
 
 WORKDIR /app
 
-# Install runtime dependencies only
+# Install runtime dependencies only (PostgreSQL + MSSQL/ODBC)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq5 \
     curl \
+    gnupg2 \
+    unixodbc \
+    && curl -fsSL https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor -o /usr/share/keyrings/microsoft-prod.gpg \
+    && curl https://packages.microsoft.com/config/debian/12/prod.list > /etc/apt/sources.list.d/mssql-release.list \
+    && apt-get update \
+    && ACCEPT_EULA=Y apt-get install -y msodbcsql18 \
     && rm -rf /var/lib/apt/lists/* \
     && useradd --create-home --shell /bin/bash appuser
 

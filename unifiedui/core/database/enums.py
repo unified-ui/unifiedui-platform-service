@@ -12,13 +12,15 @@ class TenantRolesEnum(StrEnum):
     CREDENTIALS_CREATOR = "CREDENTIALS_CREATOR"
     CONVERSATIONS_ADMIN = "CONVERSATIONS_ADMIN"
     CONVERSATIONS_CREATOR = "CONVERSATIONS_CREATOR"
-    AUTONOMOUS_AGENTS_ADMIN = "AUTONOMOUS_AGENTS_ADMIN"
-    AUTONOMOUS_AGENTS_CREATOR = "AUTONOMOUS_AGENTS_CREATOR"
+    WORKFLOWS_ADMIN = "WORKFLOWS_ADMIN"
+    WORKFLOWS_CREATOR = "WORKFLOWS_CREATOR"
     CHAT_WIDGETS_ADMIN = "CHAT_WIDGETS_ADMIN"
     CHAT_WIDGETS_CREATOR = "CHAT_WIDGETS_CREATOR"
     REACT_AGENT_ADMIN = "REACT_AGENT_ADMIN"
     REACT_AGENT_CREATOR = "REACT_AGENT_CREATOR"
     TENANT_AI_MODELS_ADMIN = "TENANT_AI_MODELS_ADMIN"
+    EXTERNAL_APPS_ADMIN = "EXTERNAL_APPS_ADMIN"
+    EXTERNAL_APPS_CREATOR = "EXTERNAL_APPS_CREATOR"
 
     @classmethod
     def all(cls) -> list[str]:
@@ -41,20 +43,35 @@ class ChatAgentTypeEnum(StrEnum):
     MICROSOFT_FOUNDRY = "MICROSOFT_FOUNDRY"
     REST_API = "REST_API"
     REACT_AGENT = "REACT_AGENT"
+    LLM = "LLM"
 
     @classmethod
     def all(cls) -> list[str]:
         return [agent_type.value for agent_type in ChatAgentTypeEnum]
 
 
-class AutonomousAgentTypeEnum(StrEnum):
-    """Supported autonomous agent types."""
+class RestApiAuthTypeEnum(StrEnum):
+    """Supported authentication types for REST API agents."""
+
+    ANONYMOUS = "ANONYMOUS"
+    BASIC_AUTH = "BASIC_AUTH"
+    API_KEY = "API_KEY"
+    ENTRA_ID_USER_TOKEN = "ENTRA_ID_USER_TOKEN"
+    ENTRA_ID_APP_REGISTRATION = "ENTRA_ID_APP_REGISTRATION"
+
+    @classmethod
+    def all(cls) -> list[str]:
+        return [auth_type.value for auth_type in RestApiAuthTypeEnum]
+
+
+class WorkflowTypeEnum(StrEnum):
+    """Supported workflow types."""
 
     N8N = "N8N"
 
     @classmethod
     def all(cls) -> list[str]:
-        return [agent_type.value for agent_type in AutonomousAgentTypeEnum]
+        return [workflow_type.value for workflow_type in WorkflowTypeEnum]
 
 
 class ChatWidgetTypeEnum(StrEnum):
@@ -177,7 +194,19 @@ class AIModelPurposeGroupEnum(StrEnum):
     TRACE_ANALYSIS = "TRACE_ANALYSIS"
     GENERAL = "GENERAL"
     REACT_AGENT = "REACT_AGENT"
+    DIRECT_CHAT = "DIRECT_CHAT"
 
     @classmethod
     def all(cls) -> list[str]:
         return [g.value for g in AIModelPurposeGroupEnum]
+
+
+class FileContextTypeEnum(StrEnum):
+    """Context types for uploaded files."""
+
+    CHAT_ATTACHMENT = "CHAT_ATTACHMENT"
+    APP_IMAGE = "APP_IMAGE"
+
+    @classmethod
+    def all(cls) -> list[str]:
+        return [t.value for t in FileContextTypeEnum]

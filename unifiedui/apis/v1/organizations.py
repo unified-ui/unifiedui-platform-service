@@ -76,11 +76,15 @@ async def create_organization(
     """Create a new organization with a default tenant."""
     user: ContextIdentityUser = request.state.user
     user_id = user.identity.get_id()
-    user_mail = user.identity.get_mail()
+    profile = user._get_user_profile()
+    user_mail = profile.mail or user.identity.get_mail()
+    user_principal = profile.principal_name or user.identity.get_principal_name()
 
     from unifiedui.core.config import settings
+    from unifiedui.core.identity.users import _is_system_admin
 
-    if settings.system_admin_email and (not user_mail or user_mail != settings.system_admin_email):
+    idp = user.identity.get_identity_provider()
+    if not _is_system_admin(idp, user_mail, user_principal, settings):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Access denied: Only system administrators can create organizations",

@@ -80,7 +80,8 @@ class Settings(BaseSettings):
         "X-Service-Key",
         "X-Request-ID",
         "X-Correlation-ID",
-        "X-Unified-UI-Autonomous-Agent-API-Key",
+        "X-Microsoft-Foundry-API-Key",
+        "X-Unified-UI-Workflow-API-Key",
         "X-Use-Cache",
         "Cache-Control",
     ]
@@ -112,6 +113,10 @@ class Settings(BaseSettings):
     ldap_user_search_filter: str = "(objectClass=person)"
     ldap_group_search_filter: str = "(objectClass=groupOfNames)"
     ldap_use_ssl: bool = True
+    ldap_jwt_secret: str | None = None
+    ldap_jwt_refresh_secret: str | None = None
+    ldap_access_token_expiry_seconds: int = 900
+    ldap_refresh_token_expiry_seconds: int = 604800
 
     # Kerberos Identity Configuration
     kerberos_realm: str | None = None
@@ -146,9 +151,22 @@ class Settings(BaseSettings):
     oidc_userinfo_url: str | None = None
     oidc_scopes: str = "openid profile email"
 
+    # Zitadel Management API (for user/group search)
+    oidc_zitadel_management_api_url: str | None = None
+    oidc_zitadel_service_token: str | None = None
+
+    # File Storage Configuration
+    file_storage_type: str | None = None  # "local" or "azureblob"
+    file_storage_local_base_path: str | None = None
+    file_storage_azure_blob_account_url: str | None = None
+    file_storage_azure_blob_container: str | None = None
+    file_storage_max_file_size_bytes: int = 26214400  # 25 MB
+
     # Deployment Mode
     deployment_mode: str = "self-hosted"
-    system_admin_email: str | None = None
+    msal_system_admin_email: str | None = None
+    ldap_system_admin_username: str | None = None
+    oidc_zitadel_system_admin_username: str | None = None
 
     # Logging Configuration
     log_level: str = "INFO"

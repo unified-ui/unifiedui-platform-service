@@ -8,11 +8,58 @@ from unifiedui.core.middleware.apis.v1.auth import authenticate, check_permissio
 from unifiedui.handlers.dependencies import get_user_favorites_handler
 from unifiedui.handlers.user_favorites import UserFavoritesHandler
 from unifiedui.logger import get_logger
-from unifiedui.schema.responses.user_favorites import UserFavoriteResponse, UserFavoritesListResponse
+from unifiedui.schema.responses.user_favorites import (
+    UserFavoriteResponse,
+    UserFavoritesListResponse,
+    UserFavoritesUnifiedResponse,
+)
 
 logger = get_logger(__name__)
 
 router = APIRouter(prefix="/users/{user_id}/favorites")
+
+
+@router.get(
+    "",
+    response_model=UserFavoritesUnifiedResponse,
+    summary="List all user favorites with names",
+    description="Get all user favorites across all resource types with resource names",
+)
+@authenticate()
+@check_permissions(entity="user_favorite", required_permissions=[UserPermissionEnum.IS_CREATOR])
+async def list_all_user_favorites(
+    request: Request,
+    tenant_id: str,
+    user_id: str,
+    handler: UserFavoritesHandler = Depends(get_user_favorites_handler),
+) -> UserFavoritesUnifiedResponse:
+    """
+    List all user favorites across all resource types with resource names.
+
+    Args:
+        request: FastAPI request with user in state
+        tenant_id: Tenant ID from path
+        user_id: User ID from path
+        handler: User favorites handler dependency
+
+    Returns:
+        Unified list of all user favorites with resource names
+    """
+    try:
+        use_cache = request.headers.get("X-Use-Cache", "true").lower() == "true"
+
+        logger.info(
+            "API: List all user favorites with names",
+            extra={"tenant_id": tenant_id, "user_id": user_id},
+        )
+
+        return handler.list_all_favorites_with_names(tenant_id=tenant_id, user_id=user_id, use_cache=use_cache)
+    except Exception as e:
+        logger.error("Failed to list all user favorites: %s", e, exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to list all user favorites",
+        )
 
 
 @router.get(
@@ -37,7 +84,7 @@ async def list_user_favorites(
         request: FastAPI request with user in state
         tenant_id: Tenant ID from path
         user_id: User ID from path
-        resource_type: Type of resource (chat-agents, autonomous-agents, development-platforms, conversations)
+        resource_type: Type of resource (chat-agents, workflows, development-platforms, conversations)
         handler: User favorites handler dependency
 
     Returns:
@@ -84,7 +131,7 @@ async def add_user_favorite(
         request: FastAPI request with user in state
         tenant_id: Tenant ID from path
         user_id: User ID from path
-        resource_type: Type of resource (chat-agents, autonomous-agents, development-platforms, conversations)
+        resource_type: Type of resource (chat-agents, workflows, development-platforms, conversations)
         resource_id: ID of the resource to favorite
         handler: User favorites handler dependency
 
@@ -135,7 +182,7 @@ async def remove_user_favorite(
         request: FastAPI request with user in state
         tenant_id: Tenant ID from path
         user_id: User ID from path
-        resource_type: Type of resource (chat-agents, autonomous-agents, development-platforms, conversations)
+        resource_type: Type of resource (chat-agents, workflows, development-platforms, conversations)
         resource_id: ID of the resource to unfavorite
         handler: User favorites handler dependency
 

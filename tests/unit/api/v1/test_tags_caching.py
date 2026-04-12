@@ -10,10 +10,10 @@ from tests.conftest import create_auth_headers
 from tests.helpers.tenant import add_user_to_tenant, create_tenant_for_user
 from unifiedui.core.database.enums import PermissionActionEnum, PrincipalTypeEnum
 from unifiedui.core.database.models import (
-    AutonomousAgent,
-    AutonomousAgentMember,
     ChatAgent,
     ChatAgentMember,
+    Workflow,
+    WorkflowMember,
 )
 
 # API Endpoints
@@ -24,13 +24,9 @@ ENDPOINT_CHAT_AGENTS = "/api/v1/platform-service/tenants/{tenant_id}/chat-agents
 ENDPOINT_CHAT_AGENT_DETAIL = "/api/v1/platform-service/tenants/{tenant_id}/chat-agents/{chat_agent_id}"
 ENDPOINT_CHAT_AGENT_TAGS = "/api/v1/platform-service/tenants/{tenant_id}/chat-agents/{chat_agent_id}/tags"
 ENDPOINT_CHAT_AGENT_PRINCIPALS = "/api/v1/platform-service/tenants/{tenant_id}/chat-agents/{chat_agent_id}/principals"
-ENDPOINT_AUTONOMOUS_AGENTS = "/api/v1/platform-service/tenants/{tenant_id}/autonomous-agents"
-ENDPOINT_AUTONOMOUS_AGENT_DETAIL = (
-    "/api/v1/platform-service/tenants/{tenant_id}/autonomous-agents/{autonomous_agent_id}"
-)
-ENDPOINT_AUTONOMOUS_AGENT_TAGS = (
-    "/api/v1/platform-service/tenants/{tenant_id}/autonomous-agents/{autonomous_agent_id}/tags"
-)
+ENDPOINT_WORKFLOWS = "/api/v1/platform-service/tenants/{tenant_id}/workflows"
+ENDPOINT_AUTONOMOUS_AGENT_DETAIL = "/api/v1/platform-service/tenants/{tenant_id}/workflows/{workflow_id}"
+ENDPOINT_AUTONOMOUS_AGENT_TAGS = "/api/v1/platform-service/tenants/{tenant_id}/workflows/{workflow_id}/tags"
 
 # Roles
 ROLE_READ = PermissionActionEnum.READ.value
@@ -73,13 +69,11 @@ def create_chat_agent_in_db(test_client: TestClient, tenant_id: str, user_id: st
     return app_id
 
 
-def create_autonomous_agent_in_db(
-    test_client: TestClient, tenant_id: str, user_id: str, name: str = "Test Agent"
-) -> str:
+def create_workflow_in_db(test_client: TestClient, tenant_id: str, user_id: str, name: str = "Test Agent") -> str:
     """Helper function to create an autonomous agent directly in DB and return its ID."""
     agent_id = str(uuid.uuid4())
     with test_client.db_client.get_session() as session:
-        agent = AutonomousAgent(
+        agent = Workflow(
             id=agent_id,
             tenant_id=tenant_id,
             name=name,
@@ -93,10 +87,10 @@ def create_autonomous_agent_in_db(
         session.add(agent)
         session.commit()
 
-        member = AutonomousAgentMember(
+        member = WorkflowMember(
             id=str(uuid.uuid4()),
             tenant_id=tenant_id,
-            autonomous_agent_id=agent_id,
+            workflow_id=agent_id,
             principal_id=user_id,
             role=PermissionActionEnum.ADMIN,
             created_by=user_id,
@@ -304,18 +298,16 @@ class TestResourceTagCacheInvalidation:
         assert "NEW-TAG-3" in tag_names2
         assert "OLD-TAG-1" not in tag_names2
 
-    def test_adding_tags_to_autonomous_agent_invalidates_cache(
-        self, test_client: TestClient, fake_redis_client: Any
-    ) -> None:
+    def test_adding_tags_to_workflow_invalidates_cache(self, test_client: TestClient, fake_redis_client: Any) -> None:
         """Test that adding tags to an autonomous agent invalidates the agent cache."""
         admin_token = test_client.create_test_user("agent-tag-cache-1", "Agent Tag Cache 1")
         admin_headers = create_auth_headers(admin_token)
         tenant_id = create_tenant_for_user(test_client, admin_token)
-        agent_id = create_autonomous_agent_in_db(test_client, tenant_id, "agent-tag-cache-1", "Cached Agent")
+        agent_id = create_workflow_in_db(test_client, tenant_id, "agent-tag-cache-1", "Cached Agent")
 
         # First read - cache the agent (no tags)
         response1 = test_client.get(
-            ENDPOINT_AUTONOMOUS_AGENT_DETAIL.format(tenant_id=tenant_id, autonomous_agent_id=agent_id),
+            ENDPOINT_AUTONOMOUS_AGENT_DETAIL.format(tenant_id=tenant_id, workflow_id=agent_id),
             headers=admin_headers,
         )
         assert response1.status_code == status.HTTP_200_OK
@@ -323,14 +315,14 @@ class TestResourceTagCacheInvalidation:
 
         # Add tags to agent
         test_client.put(
-            ENDPOINT_AUTONOMOUS_AGENT_TAGS.format(tenant_id=tenant_id, autonomous_agent_id=agent_id),
+            ENDPOINT_AUTONOMOUS_AGENT_TAGS.format(tenant_id=tenant_id, workflow_id=agent_id),
             json={"tags": ["ai", "ml"]},
             headers=admin_headers,
         )
 
         # Read agent again - should see the tags
         response2 = test_client.get(
-            ENDPOINT_AUTONOMOUS_AGENT_DETAIL.format(tenant_id=tenant_id, autonomous_agent_id=agent_id),
+            ENDPOINT_AUTONOMOUS_AGENT_DETAIL.format(tenant_id=tenant_id, workflow_id=agent_id),
             headers=admin_headers,
         )
         assert len(response2.json()["tags"]) == 2

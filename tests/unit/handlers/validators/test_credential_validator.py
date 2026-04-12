@@ -33,7 +33,8 @@ class TestCredentialTypeEnum:
         assert "BASIC_AUTH" in types
         assert "OPENAPI_CONNECTION" in types
         assert "AI_MODEL_PROVIDER" in types
-        assert len(types) == 4
+        assert "ENTRA_ID_APP_REGISTRATION" in types
+        assert len(types) == 5
 
 
 class TestBasicAuthCredential:
@@ -239,3 +240,55 @@ class TestValidateCredentialSecret:
         """Test that mixed case credential type is normalized to uppercase."""
         result = validate_credential_secret("Api_Key", "my-key")
         assert result == "my-key"
+
+    # ENTRA_ID_APP_REGISTRATION with scopes
+    def test_entra_id_with_scopes_valid(self):
+        """Test that ENTRA_ID_APP_REGISTRATION with scopes is valid."""
+        secret = json.dumps(
+            {
+                "tenant_id": "t-id",
+                "client_id": "c-id",
+                "client_secret": "c-secret",
+                "scopes": ["https://graph.microsoft.com/.default"],
+            }
+        )
+        result = validate_credential_secret(CredentialTypeEnum.ENTRA_ID_APP_REGISTRATION, secret)
+        assert result == secret
+
+    def test_entra_id_without_scopes_valid(self):
+        """Test that ENTRA_ID_APP_REGISTRATION without scopes is valid."""
+        secret = json.dumps(
+            {
+                "tenant_id": "t-id",
+                "client_id": "c-id",
+                "client_secret": "c-secret",
+            }
+        )
+        result = validate_credential_secret(CredentialTypeEnum.ENTRA_ID_APP_REGISTRATION, secret)
+        assert result == secret
+
+    def test_entra_id_with_empty_scopes_valid(self):
+        """Test that ENTRA_ID_APP_REGISTRATION with empty scopes is valid."""
+        secret = json.dumps(
+            {
+                "tenant_id": "t-id",
+                "client_id": "c-id",
+                "client_secret": "c-secret",
+                "scopes": [],
+            }
+        )
+        result = validate_credential_secret(CredentialTypeEnum.ENTRA_ID_APP_REGISTRATION, secret)
+        assert result == secret
+
+    def test_entra_id_with_multiple_scopes_valid(self):
+        """Test that ENTRA_ID_APP_REGISTRATION with multiple scopes is valid."""
+        secret = json.dumps(
+            {
+                "tenant_id": "t-id",
+                "client_id": "c-id",
+                "client_secret": "c-secret",
+                "scopes": ["https://graph.microsoft.com/.default", "https://my-api.com/.default"],
+            }
+        )
+        result = validate_credential_secret(CredentialTypeEnum.ENTRA_ID_APP_REGISTRATION, secret)
+        assert result == secret

@@ -15,14 +15,15 @@ from unifiedui.core.database.enums import (
     UserPermissionEnum,
 )
 from unifiedui.core.database.models import (
-    AutonomousAgentMember,
     ChatAgentMember,
     ChatWidgetMember,
     ConversationMember,
     CredentialMember,
     CustomGroupMember,
+    ExternalAppMember,
     Tag,
     ToolMember,
+    WorkflowMember,
 )
 from unifiedui.core.identity.users import ContextIdentityUser
 from unifiedui.handlers.dependencies.database import get_db_client
@@ -106,33 +107,33 @@ def _resolve_service_credential(required_service_auth_config: str) -> str | None
     return getattr(settings, config_name, None)
 
 
-def authenticate_autonomous_agent_api_key() -> Callable:
+def authenticate_workflow_api_key() -> Callable:
     """
-    Decorator factory to authenticate requests via X-Unified-UI-Autonomous-Agent-API-Key header.
+    Decorator factory to authenticate requests via X-Unified-UI-Workflow-API-Key header.
 
-    This validates the API key against the autonomous agent's primary or secondary key
+    This validates the API key against the workflow's primary or secondary key
     stored in the vault. No Bearer token is required.
 
     The decorated function must have:
     - request: Request - FastAPI request object
     - tenant_id: str - Path parameter
-    - autonomous_agent_id: str - Path parameter
+    - workflow_id: str - Path parameter
 
     Stores validated data in request.state:
-    - request.state.autonomous_agent: The autonomous agent model
+    - request.state.workflow: The workflow model
     - request.state.authenticated_via_api_key: True
 
     Usage:
-        @authenticate_autonomous_agent_api_key()
-        async def get_config(request: Request, tenant_id: str, autonomous_agent_id: str): ...
+        @authenticate_workflow_api_key()
+        async def get_config(request: Request, tenant_id: str, workflow_id: str): ...
     """
 
     def decorator(func: Callable) -> Callable:
         @wraps(func)
         async def wrapper(*args: Any, **kwargs: Any) -> Any:
-            from unifiedui.core.database.models import AutonomousAgent
+            from unifiedui.core.database.models import Workflow
             from unifiedui.handlers.dependencies.database import get_db_client
-            from unifiedui.handlers.dependencies.vault import get_vault_client
+            from unifiedui.handlers.dependencies.vault import get_secrets_vault
 
             # Extract request from args or kwargs
             request: Request | None = kwargs.get("request")
@@ -148,25 +149,25 @@ def authenticate_autonomous_agent_api_key() -> Callable:
                 )
 
             # Extract API key from header
-            api_key_header = request.headers.get("X-Unified-UI-Autonomous-Agent-API-Key")
+            api_key_header = request.headers.get("X-Unified-UI-Workflow-API-Key")
             if not api_key_header:
-                logger.warning("X-Unified-UI-Autonomous-Agent-API-Key header missing")
+                logger.warning("X-Unified-UI-Workflow-API-Key header missing")
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="X-Unified-UI-Autonomous-Agent-API-Key header missing",
+                    detail="X-Unified-UI-Workflow-API-Key header missing",
                 )
 
-            # Extract tenant_id and autonomous_agent_id from path params
+            # Extract tenant_id and workflow_id from path params
             tenant_id = request.path_params.get("tenant_id")
-            autonomous_agent_id = request.path_params.get("autonomous_agent_id")
+            workflow_id = request.path_params.get("workflow_id")
 
-            if not tenant_id or not autonomous_agent_id:
+            if not tenant_id or not workflow_id:
                 raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST, detail="Missing tenant_id or autonomous_agent_id in path"
+                    status_code=status.HTTP_400_BAD_REQUEST, detail="Missing tenant_id or workflow_id in path"
                 )
 
             # Get vault client and db client
-            vault_client = get_vault_client()
+            vault_client = get_secrets_vault()
             db_client = get_db_client()
 
             if not vault_client:
@@ -176,37 +177,35 @@ def authenticate_autonomous_agent_api_key() -> Callable:
                     detail="Service configuration error: vault not available",
                 )
 
-            # Fetch the autonomous agent to get vault URIs
+            # Fetch the workflow to get vault URIs
             with db_client.get_session() as session:
-                query = select(AutonomousAgent).where(
-                    AutonomousAgent.id == autonomous_agent_id, AutonomousAgent.tenant_id == tenant_id
-                )
-                autonomous_agent = session.execute(query).scalar_one_or_none()
+                query = select(Workflow).where(Workflow.id == workflow_id, Workflow.tenant_id == tenant_id)
+                workflow = session.execute(query).scalar_one_or_none()
 
-                if not autonomous_agent:
+                if not workflow:
                     raise HTTPException(
                         status_code=status.HTTP_404_NOT_FOUND,
-                        detail=f"Autonomous agent not found: {autonomous_agent_id}",
+                        detail=f"Workflow not found: {workflow_id}",
                     )
 
-                # Check if autonomous agent is active
-                if not autonomous_agent.is_active:
-                    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Autonomous agent is not active")
+                # Check if workflow is active
+                if not workflow.is_active:
+                    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Workflow is not active")
 
                 # Check if API key authentication is allowed
-                if not autonomous_agent.allow_api_keys:
+                if not workflow.allow_api_keys:
                     raise HTTPException(
                         status_code=status.HTTP_403_FORBIDDEN,
-                        detail="API key authentication is not allowed for this autonomous agent. Use Bearer token with a service principal instead.",
+                        detail="API key authentication is not allowed for this workflow. Use Bearer token with a service principal instead.",
                     )
 
                 # Retrieve keys from vault and compare (always fresh, no cache)
                 is_valid = False
 
-                if autonomous_agent.primary_key_vault_uri:
+                if workflow.primary_key_vault_uri:
                     try:
                         primary_key = vault_client.get_secret(
-                            autonomous_agent.primary_key_vault_uri,
+                            workflow.primary_key_vault_uri,
                             use_cache=False,  # Critical: no caching for key rotation
                         )
                         if primary_key and primary_key == api_key_header:
@@ -214,10 +213,10 @@ def authenticate_autonomous_agent_api_key() -> Callable:
                     except Exception as e:
                         logger.warning("Failed to retrieve primary key from vault: %s", e)
 
-                if not is_valid and autonomous_agent.secondary_key_vault_uri:
+                if not is_valid and workflow.secondary_key_vault_uri:
                     try:
                         secondary_key = vault_client.get_secret(
-                            autonomous_agent.secondary_key_vault_uri,
+                            workflow.secondary_key_vault_uri,
                             use_cache=False,  # Critical: no caching for key rotation
                         )
                         if secondary_key and secondary_key == api_key_header:
@@ -226,18 +225,18 @@ def authenticate_autonomous_agent_api_key() -> Callable:
                         logger.warning("Failed to retrieve secondary key from vault: %s", e)
 
                 if not is_valid:
-                    logger.warning("Invalid API key for autonomous agent %s", autonomous_agent_id)
+                    logger.warning("Invalid API key for workflow %s", workflow_id)
                     raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid API key")
 
-                # Store autonomous agent in request state for handler use
+                # Store workflow in request state for handler use
                 # Need to expunge from session to use outside
-                session.expunge(autonomous_agent)
-                request.state.autonomous_agent = autonomous_agent
+                session.expunge(workflow)
+                request.state.workflow = workflow
                 request.state.authenticated_via_api_key = True
 
                 logger.info(
-                    f"API key authentication successful for autonomous agent {autonomous_agent_id}",
-                    extra={"tenant_id": tenant_id, "autonomous_agent_id": autonomous_agent_id},
+                    f"API key authentication successful for workflow {workflow_id}",
+                    extra={"tenant_id": tenant_id, "workflow_id": workflow_id},
                 )
 
             return await func(*args, **kwargs)
@@ -481,8 +480,8 @@ def check_permissions(
 
     Args:
         entity: The entity type to check permissions for
-               Options: "tenant", "organization", "chat_agent", "credential", "autonomous_agent",
-                        "custom_group", "conversation", "tag"
+               Options: "tenant", "organization", "chat_agent", "credential", "workflow",
+                        "custom_group", "conversation", "tag", "chat_widget", "tool", "external_app"
         required_permissions: List of required permission enums
                             - For tenant: [TenantPermissionEnum.TENANT_GLOBAL_ADMIN, TenantPermissionEnum.READER, etc.]
                             - For resources: [PermissionActionEnum.READ, PermissionActionEnum.WRITE, PermissionActionEnum.ADMIN]
@@ -700,18 +699,19 @@ def check_permissions(
                 )
 
             else:
-                # Handle resource entities (chat_agent, credential, autonomous_agent, custom_group, conversation)
+                # Handle resource entities (chat_agent, credential, workflow, custom_group, conversation)
                 # Now role is directly in member table - no need for JOIN
 
                 # Map entity type to member model and ID parameter name
                 entity_config = {
                     "chat_agent": (ChatAgentMember, "chat_agent_id"),
                     "credential": (CredentialMember, "credential_id"),
-                    "autonomous_agent": (AutonomousAgentMember, "autonomous_agent_id"),
+                    "workflow": (WorkflowMember, "workflow_id"),
                     "custom_group": (CustomGroupMember, "custom_group_id"),
                     "conversation": (ConversationMember, "conversation_id"),
                     "chat_widget": (ChatWidgetMember, "chat_widget_id"),
                     "tool": (ToolMember, "tool_id"),
+                    "external_app": (ExternalAppMember, "external_app_id"),
                 }
 
                 if entity not in entity_config:
@@ -753,11 +753,12 @@ def check_permissions(
                     entity_admin_map = {
                         "chat_agent": TenantRolesEnum.CHAT_AGENTS_ADMIN.value,
                         "credential": TenantRolesEnum.CREDENTIALS_ADMIN.value,
-                        "autonomous_agent": TenantRolesEnum.AUTONOMOUS_AGENTS_ADMIN.value,
+                        "workflow": TenantRolesEnum.WORKFLOWS_ADMIN.value,
                         "custom_group": TenantRolesEnum.CUSTOM_GROUPS_ADMIN.value,
                         "conversation": TenantRolesEnum.CONVERSATIONS_ADMIN.value,
                         "chat_widget": TenantRolesEnum.CHAT_WIDGETS_ADMIN.value,
                         "tool": TenantRolesEnum.REACT_AGENT_ADMIN.value,
+                        "external_app": TenantRolesEnum.EXTERNAL_APPS_ADMIN.value,
                     }
 
                     entity_admin = entity_admin_map.get(entity)

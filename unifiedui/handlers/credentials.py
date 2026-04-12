@@ -27,16 +27,22 @@ if TYPE_CHECKING:
     from unifiedui.core.vault.client import BaseVaultClient
     from unifiedui.handlers.resource_permissions import ResourcePermissionsHandler
     from unifiedui.handlers.resource_tags import ResourceTagsHandler
-    from unifiedui.schema.requests.credentials import CreateCredentialRequest, UpdateCredentialRequest
+    from unifiedui.schema.requests.credentials import (
+        CreateCredentialRequest,
+        TestCredentialConnectionRequest,
+        UpdateCredentialRequest,
+    )
     from unifiedui.schema.requests.permissions import SetResourcePermissionRequest
 
 from unifiedui.exc.credentials import CredentialNotFoundError
 from unifiedui.handlers.validators.credential_validator import (
+    CredentialTypeEnum,
+    CredentialValidationError,
     validate_credential_secret,
 )
 from unifiedui.logger import get_logger
 from unifiedui.schema.responses.common import QuickListItemResponse
-from unifiedui.schema.responses.credentials import CredentialResponse
+from unifiedui.schema.responses.credentials import CredentialResponse, TestCredentialConnectionResponse
 from unifiedui.schema.responses.principals import PrincipalWithRolesResponse, ResourcePrincipalsResponse
 from unifiedui.schema.responses.tags import TagSummary
 
@@ -102,6 +108,7 @@ class CredentialHandler:
         order_direction: str | None = None,
         view: str | None = None,
         use_cache: bool = True,
+        id_list: list[str] | None = None,
     ) -> list[CredentialResponse] | list[QuickListItemResponse]:
         """
         Get a list of credentials for a tenant (filtered by permissions).
@@ -150,7 +157,7 @@ class CredentialHandler:
         cache_key = f"credentials:list:tenant:{tenant_id}:user:{user_id}:skip:{skip}:limit:{limit}:view:{view_key}:order:{order_key}:active:{is_active_key}"
 
         # Check if any filters are applied (name_filter and tag_ids disable caching)
-        has_filters = name_filter is not None or tag_ids is not None
+        has_filters = name_filter is not None or tag_ids is not None or id_list is not None
 
         # Check cache (disable caching when any filters are applied)
         if use_cache and self.cache_client and not has_filters:
@@ -189,6 +196,9 @@ class CredentialHandler:
 
                 query = query.where(Credential.id.in_(member_subquery))
 
+            if id_list:
+                query = query.where(Credential.id.in_(id_list))
+
             if name_filter:
                 query = query.where(Credential.name.ilike(f"%{name_filter}%"))
 
@@ -209,6 +219,9 @@ class CredentialHandler:
             if order_by and hasattr(Credential, order_by):
                 column = getattr(Credential, order_by)
                 query = query.order_by(column.desc()) if order_direction == "desc" else query.order_by(column.asc())
+            else:
+                # MSSQL requires ORDER BY when using OFFSET/LIMIT
+                query = query.order_by(Credential.created_at.desc())
 
             query = query.offset(skip).limit(limit)
             credentials = session.execute(query).scalars().all()
@@ -769,6 +782,55 @@ class CredentialHandler:
             )
         except ValueError as e:
             raise CredentialNotFoundError(str(e)) from e
+
+    @staticmethod
+    def test_credential_connection(
+        request: TestCredentialConnectionRequest,
+    ) -> TestCredentialConnectionResponse:
+        """Test a credential connection by attempting to acquire a token.
+
+        Args:
+            request: Test connection request with credential details
+
+        Returns:
+            Test connection response with success/failure and timing
+
+        Raises:
+            CredentialValidationError: If credential type is not supported for testing
+        """
+        cred_type = request.credential_type.upper()
+        if cred_type != CredentialTypeEnum.ENTRA_ID_APP_REGISTRATION.value:
+            raise CredentialValidationError(
+                f"Connection testing is only supported for ENTRA_ID_APP_REGISTRATION, got '{request.credential_type}'"
+            )
+
+        scope = request.scopes[0] if request.scopes else "https://graph.microsoft.com/.default"
+
+        import time
+
+        from unifiedui.core.identity.client_credentials import ClientCredentialsTokenClient
+
+        start_time = time.time()
+        try:
+            client = ClientCredentialsTokenClient(
+                tenant_id=request.tenant_id,
+                client_id=request.client_id,
+                client_secret=request.client_secret,
+            )
+            client.acquire_token(scope=scope)
+            elapsed_ms = int((time.time() - start_time) * 1000)
+            return TestCredentialConnectionResponse(
+                success=True,
+                message="Token acquired successfully",
+                response_time_ms=elapsed_ms,
+            )
+        except ValueError as e:
+            elapsed_ms = int((time.time() - start_time) * 1000)
+            return TestCredentialConnectionResponse(
+                success=False,
+                message=str(e),
+                response_time_ms=elapsed_ms,
+            )
 
     def _resolve_user_permission(
         self, session: Session, tenant_id: str, credential_id: str, user: ContextIdentityUser

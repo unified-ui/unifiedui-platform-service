@@ -81,21 +81,21 @@ class AgentServiceClient:
         url = f"{self._base_url}/api/v1/agent-service/tenants/{tenant_id}/conversations/{conversation_id}/data"
         return self._perform_delete(url, "conversation data", tenant_id, conversation_id)
 
-    def delete_autonomous_agent_data(self, tenant_id: str, autonomous_agent_id: str) -> bool:
+    def delete_workflow_data(self, tenant_id: str, workflow_id: str) -> bool:
         """
-        Delete all autonomous agent data (traces) from agent service.
+        Delete all workflow data (traces) from agent service.
 
         This is a best-effort operation. Failures are logged but not raised.
 
         Args:
             tenant_id: Tenant ID
-            autonomous_agent_id: Autonomous agent ID
+            workflow_id: Workflow ID
 
         Returns:
             True if successful, False on failure
         """
-        url = f"{self._base_url}/api/v1/agent-service/tenants/{tenant_id}/autonomous-agents/{autonomous_agent_id}/data"
-        return self._perform_delete(url, "autonomous agent data", tenant_id, autonomous_agent_id)
+        url = f"{self._base_url}/api/v1/agent-service/tenants/{tenant_id}/workflows/{workflow_id}/data"
+        return self._perform_delete(url, "workflow data", tenant_id, workflow_id)
 
     def _perform_delete(self, url: str, resource_label: str, tenant_id: str, resource_id: str) -> bool:
         """

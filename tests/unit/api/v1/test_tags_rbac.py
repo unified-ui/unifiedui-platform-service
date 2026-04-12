@@ -9,10 +9,10 @@ from tests.conftest import create_auth_headers
 from tests.helpers.tenant import add_user_to_tenant, create_tenant_for_user
 from unifiedui.core.database.enums import PermissionActionEnum, PrincipalTypeEnum
 from unifiedui.core.database.models import (
-    AutonomousAgent,
-    AutonomousAgentMember,
     ChatAgent,
     ChatAgentMember,
+    Workflow,
+    WorkflowMember,
 )
 
 # API Endpoints
@@ -22,13 +22,9 @@ ENDPOINT_TAG_DETAIL = "/api/v1/platform-service/tenants/{tenant_id}/tags/{tag_id
 ENDPOINT_CHAT_AGENTS = "/api/v1/platform-service/tenants/{tenant_id}/chat-agents"
 ENDPOINT_CHAT_AGENT_TAGS = "/api/v1/platform-service/tenants/{tenant_id}/chat-agents/{chat_agent_id}/tags"
 ENDPOINT_CHAT_AGENT_PRINCIPALS = "/api/v1/platform-service/tenants/{tenant_id}/chat-agents/{chat_agent_id}/principals"
-ENDPOINT_AUTONOMOUS_AGENTS = "/api/v1/platform-service/tenants/{tenant_id}/autonomous-agents"
-ENDPOINT_AUTONOMOUS_AGENT_TAGS = (
-    "/api/v1/platform-service/tenants/{tenant_id}/autonomous-agents/{autonomous_agent_id}/tags"
-)
-ENDPOINT_AUTONOMOUS_AGENT_PRINCIPALS = (
-    "/api/v1/platform-service/tenants/{tenant_id}/autonomous-agents/{autonomous_agent_id}/principals"
-)
+ENDPOINT_WORKFLOWS = "/api/v1/platform-service/tenants/{tenant_id}/workflows"
+ENDPOINT_AUTONOMOUS_AGENT_TAGS = "/api/v1/platform-service/tenants/{tenant_id}/workflows/{workflow_id}/tags"
+ENDPOINT_AUTONOMOUS_AGENT_PRINCIPALS = "/api/v1/platform-service/tenants/{tenant_id}/workflows/{workflow_id}/principals"
 
 # Common Test IDs
 NON_EXISTENT_ID = "non-existent-id"
@@ -76,13 +72,11 @@ def create_chat_agent_in_db(test_client: TestClient, tenant_id: str, user_id: st
     return app_id
 
 
-def create_autonomous_agent_in_db(
-    test_client: TestClient, tenant_id: str, user_id: str, name: str = "Test Agent"
-) -> str:
+def create_workflow_in_db(test_client: TestClient, tenant_id: str, user_id: str, name: str = "Test Agent") -> str:
     """Helper function to create an autonomous agent directly in DB and return its ID."""
     agent_id = str(uuid.uuid4())
     with test_client.db_client.get_session() as session:
-        agent = AutonomousAgent(
+        agent = Workflow(
             id=agent_id,
             tenant_id=tenant_id,
             name=name,
@@ -96,10 +90,10 @@ def create_autonomous_agent_in_db(
         session.add(agent)
         session.commit()
 
-        member = AutonomousAgentMember(
+        member = WorkflowMember(
             id=str(uuid.uuid4()),
             tenant_id=tenant_id,
-            autonomous_agent_id=agent_id,
+            workflow_id=agent_id,
             principal_id=user_id,
             role=PermissionActionEnum.ADMIN,
             created_by=user_id,
@@ -133,20 +127,20 @@ def add_user_to_chat_agent_in_db(
         session.commit()
 
 
-def add_user_to_autonomous_agent_in_db(
+def add_user_to_workflow_in_db(
     test_client: TestClient,
     tenant_id: str,
-    autonomous_agent_id: str,
+    workflow_id: str,
     user_id: str,
     admin_id: str,
     role: PermissionActionEnum = PermissionActionEnum.READ,
 ) -> None:
     """Helper function to add a user to an autonomous agent directly in DB."""
     with test_client.db_client.get_session() as session:
-        member = AutonomousAgentMember(
+        member = WorkflowMember(
             id=str(uuid.uuid4()),
             tenant_id=tenant_id,
-            autonomous_agent_id=autonomous_agent_id,
+            workflow_id=workflow_id,
             principal_id=user_id,
             role=role,
             created_by=admin_id,
@@ -521,7 +515,7 @@ class TestResourceTagRBAC:
         assert set_response.status_code == status.HTTP_200_OK
 
 
-class TestAutonomousAgentTagRBAC:
+class TestWorkflowTagRBAC:
     """Test suite for autonomous agent tag permissions."""
 
     def test_write_user_can_set_agent_tags(self, test_client: TestClient) -> None:
@@ -529,19 +523,19 @@ class TestAutonomousAgentTagRBAC:
         admin_token = test_client.create_test_user("agent-tag-admin-1", "Agent Tag Admin 1")
         admin_headers = create_auth_headers(admin_token, use_cache=False)
         tenant_id = create_tenant_for_user(test_client, admin_token)
-        agent_id = create_autonomous_agent_in_db(test_client, tenant_id, "agent-tag-admin-1", "Test Agent")
+        agent_id = create_workflow_in_db(test_client, tenant_id, "agent-tag-admin-1", "Test Agent")
 
         # Add writer user
         writer_token = test_client.create_test_user("agent-tag-writer-1", "Agent Tag Writer 1")
         writer_headers = create_auth_headers(writer_token, use_cache=False)
         add_user_to_tenant(test_client, tenant_id, admin_headers, "agent-tag-writer-1", "READER")
-        add_user_to_autonomous_agent_in_db(
+        add_user_to_workflow_in_db(
             test_client, tenant_id, agent_id, "agent-tag-writer-1", "agent-tag-admin-1", PermissionActionEnum.WRITE
         )
 
         # Writer can set tags
         response = test_client.put(
-            ENDPOINT_AUTONOMOUS_AGENT_TAGS.format(tenant_id=tenant_id, autonomous_agent_id=agent_id),
+            ENDPOINT_AUTONOMOUS_AGENT_TAGS.format(tenant_id=tenant_id, workflow_id=agent_id),
             json={"tags": ["ai-tag", "PRODUCTION"]},
             headers=writer_headers,
         )
@@ -553,19 +547,19 @@ class TestAutonomousAgentTagRBAC:
         admin_token = test_client.create_test_user("agent-tag-admin-2", "Agent Tag Admin 2")
         admin_headers = create_auth_headers(admin_token, use_cache=False)
         tenant_id = create_tenant_for_user(test_client, admin_token)
-        agent_id = create_autonomous_agent_in_db(test_client, tenant_id, "agent-tag-admin-2", "Test Agent 2")
+        agent_id = create_workflow_in_db(test_client, tenant_id, "agent-tag-admin-2", "Test Agent 2")
 
         # Add reader user
         reader_token = test_client.create_test_user("agent-tag-reader-1", "Agent Tag Reader 1")
         reader_headers = create_auth_headers(reader_token, use_cache=False)
         add_user_to_tenant(test_client, tenant_id, admin_headers, "agent-tag-reader-1", "READER")
-        add_user_to_autonomous_agent_in_db(
+        add_user_to_workflow_in_db(
             test_client, tenant_id, agent_id, "agent-tag-reader-1", "agent-tag-admin-2", PermissionActionEnum.READ
         )
 
         # Reader cannot set tags
         response = test_client.put(
-            ENDPOINT_AUTONOMOUS_AGENT_TAGS.format(tenant_id=tenant_id, autonomous_agent_id=agent_id),
+            ENDPOINT_AUTONOMOUS_AGENT_TAGS.format(tenant_id=tenant_id, workflow_id=agent_id),
             json={"tags": ["hacker-tag"]},
             headers=reader_headers,
         )

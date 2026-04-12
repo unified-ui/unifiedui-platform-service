@@ -4,15 +4,20 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from unifiedui.apis.v1 import (
-    autonomous_agents,
+    auth,
     chat_agents,
     chat_widgets,
+    config_suggestions,
     conversations,
     credentials,
     custom_groups,
     dashboard,
+    external_apps,
+    files,
+    foundry,
     health,
     identity,
+    n8n,
     organizations,
     principals,
     recent_visits,
@@ -22,11 +27,13 @@ from unifiedui.apis.v1 import (
     tenants,
     tools,
     user_favorites,
+    workflows,
 )
 from unifiedui.core.config import settings
-from unifiedui.exc.autonomous_agents import AutonomousAgentNotFoundError
+from unifiedui.exc.auth import AuthError, InvalidCredentialsError, InvalidRefreshTokenError, LDAPConnectionError
 from unifiedui.exc.chat_agent_config import (
     ChatAgentConfigValidationError,
+    InvalidAIModelReferenceError,
     InvalidCredentialError,
     UnsupportedChatAgentTypeError,
 )
@@ -35,11 +42,14 @@ from unifiedui.exc.chat_widgets import ChatWidgetNotFoundError
 from unifiedui.exc.conversations import ConversationNotFoundError
 from unifiedui.exc.credentials import CredentialNotFoundError
 from unifiedui.exc.custom_groups import CustomGroupError, CustomGroupNotFoundError
+from unifiedui.exc.external_apps import ExternalAppAlreadyExistsError, ExternalAppNotFoundError
+from unifiedui.exc.files import FileNotFoundByIdError, FileStorageNotConfiguredError, FileTooLargeError
 from unifiedui.exc.organizations import (
     OrganizationAlreadyExistsError,
     OrganizationError,
     OrganizationMemberAlreadyExistsError,
     OrganizationMemberNotFoundError,
+    OrganizationNameAlreadyExistsError,
     OrganizationNotFoundError,
     OrganizationSlugAlreadyExistsError,
     TenantCannotBeDeletedError,
@@ -53,13 +63,14 @@ from unifiedui.exc.tenant_ai_models import (
     TenantAIModelNotFoundError,
     UnsupportedAIModelProviderError,
 )
-from unifiedui.exc.tenants import TenantError, TenantNotFoundError
+from unifiedui.exc.tenants import TenantAlreadyExistsError, TenantError, TenantNotFoundError
 from unifiedui.exc.tools import (
     InvalidToolCredentialError,
     ToolConfigValidationError,
     ToolNotFoundError,
     UnsupportedToolTypeError,
 )
+from unifiedui.exc.workflows import WorkflowNotFoundError
 from unifiedui.handlers.validators.credential_validator import (
     CredentialValidationError,
     UnsupportedCredentialTypeError,
@@ -105,6 +116,11 @@ def create_app() -> FastAPI:
         """Handle tenant not found errors."""
         return JSONResponse(status_code=404, content={"detail": str(exc)})
 
+    @app.exception_handler(TenantAlreadyExistsError)
+    async def tenant_already_exists_handler(request: Request, exc: TenantAlreadyExistsError):
+        """Handle tenant already exists errors."""
+        return JSONResponse(status_code=409, content={"detail": str(exc)})
+
     @app.exception_handler(TenantError)
     async def tenant_error_handler(request: Request, exc: TenantError):
         """Handle general tenant errors."""
@@ -125,6 +141,11 @@ def create_app() -> FastAPI:
     @app.exception_handler(OrganizationSlugAlreadyExistsError)
     async def organization_slug_exists_handler(request: Request, exc: OrganizationSlugAlreadyExistsError):
         """Handle organization slug already exists errors."""
+        return JSONResponse(status_code=409, content={"detail": str(exc)})
+
+    @app.exception_handler(OrganizationNameAlreadyExistsError)
+    async def organization_name_exists_handler(request: Request, exc: OrganizationNameAlreadyExistsError):
+        """Handle organization name already exists errors."""
         return JSONResponse(status_code=409, content={"detail": str(exc)})
 
     @app.exception_handler(OrganizationMemberNotFoundError)
@@ -182,6 +203,11 @@ def create_app() -> FastAPI:
         """Handle invalid credential errors."""
         return JSONResponse(status_code=400, content={"detail": exc.message, "credential_id": exc.credential_id})
 
+    @app.exception_handler(InvalidAIModelReferenceError)
+    async def invalid_ai_model_reference_handler(request: Request, exc: InvalidAIModelReferenceError):
+        """Handle invalid AI model reference errors."""
+        return JSONResponse(status_code=400, content={"detail": exc.message, "ai_model_id": exc.ai_model_id})
+
     # Credential validation exception handlers
 
     @app.exception_handler(CredentialValidationError)
@@ -207,11 +233,11 @@ def create_app() -> FastAPI:
         """Handle conversation not found errors."""
         return JSONResponse(status_code=404, content={"detail": str(exc)})
 
-    # Autonomous Agent exception handlers
+    # Workflow exception handlers
 
-    @app.exception_handler(AutonomousAgentNotFoundError)
-    async def autonomous_agent_not_found_handler(request: Request, exc: AutonomousAgentNotFoundError):
-        """Handle autonomous agent not found errors."""
+    @app.exception_handler(WorkflowNotFoundError)
+    async def workflow_not_found_handler(request: Request, exc: WorkflowNotFoundError):
+        """Handle workflow not found errors."""
         return JSONResponse(status_code=404, content={"detail": str(exc)})
 
     # Chat Widget exception handlers
@@ -220,6 +246,35 @@ def create_app() -> FastAPI:
     async def chat_widget_not_found_handler(request: Request, exc: ChatWidgetNotFoundError):
         """Handle chat widget not found errors."""
         return JSONResponse(status_code=404, content={"detail": str(exc)})
+
+    # External App exception handlers
+
+    @app.exception_handler(ExternalAppNotFoundError)
+    async def external_app_not_found_handler(request: Request, exc: ExternalAppNotFoundError):
+        """Handle external app not found errors."""
+        return JSONResponse(status_code=404, content={"detail": str(exc)})
+
+    @app.exception_handler(ExternalAppAlreadyExistsError)
+    async def external_app_already_exists_handler(request: Request, exc: ExternalAppAlreadyExistsError):
+        """Handle external app already exists errors."""
+        return JSONResponse(status_code=409, content={"detail": str(exc)})
+
+    # File exception handlers
+
+    @app.exception_handler(FileNotFoundByIdError)
+    async def file_not_found_handler(request: Request, exc: FileNotFoundByIdError):
+        """Handle file not found errors."""
+        return JSONResponse(status_code=404, content={"detail": str(exc)})
+
+    @app.exception_handler(FileTooLargeError)
+    async def file_too_large_handler(request: Request, exc: FileTooLargeError):
+        """Handle file too large errors."""
+        return JSONResponse(status_code=413, content={"detail": str(exc)})
+
+    @app.exception_handler(FileStorageNotConfiguredError)
+    async def file_storage_not_configured_handler(request: Request, exc: FileStorageNotConfiguredError):
+        """Handle file storage not configured errors."""
+        return JSONResponse(status_code=503, content={"detail": str(exc)})
 
     # Tag exception handlers
 
@@ -280,7 +335,31 @@ def create_app() -> FastAPI:
         """Handle invalid AI model credential errors."""
         return JSONResponse(status_code=400, content={"detail": str(exc), "credential_id": exc.credential_id})
 
+    # Auth exception handlers
+
+    @app.exception_handler(InvalidCredentialsError)
+    async def invalid_credentials_handler(request: Request, exc: InvalidCredentialsError):
+        """Handle invalid credentials errors."""
+        return JSONResponse(status_code=401, content={"detail": str(exc)})
+
+    @app.exception_handler(InvalidRefreshTokenError)
+    async def invalid_refresh_token_handler(request: Request, exc: InvalidRefreshTokenError):
+        """Handle invalid refresh token errors."""
+        return JSONResponse(status_code=401, content={"detail": str(exc)})
+
+    @app.exception_handler(LDAPConnectionError)
+    async def ldap_connection_handler(request: Request, exc: LDAPConnectionError):
+        """Handle LDAP connection errors."""
+        return JSONResponse(status_code=503, content={"detail": str(exc)})
+
+    @app.exception_handler(AuthError)
+    async def auth_error_handler(request: Request, exc: AuthError):
+        """Handle general auth errors."""
+        return JSONResponse(status_code=400, content={"detail": str(exc)})
+
     # Include routers
+    app.include_router(auth.router, prefix="/api/v1/platform-service/auth", tags=["Authentication"])
+
     app.include_router(health.router, prefix="/api/v1/platform-service", tags=["Health"])
 
     app.include_router(identity.router, prefix="/api/v1/platform-service/identity", tags=["Identity"])
@@ -318,14 +397,12 @@ def create_app() -> FastAPI:
     )
 
     app.include_router(
-        tags.autonomous_agents_tags_list_router,
+        tags.workflows_tags_list_router,
         prefix="/api/v1/platform-service/tenants/{tenant_id}",
-        tags=["Autonomous Agents"],
+        tags=["Workflows"],
     )
 
-    app.include_router(
-        autonomous_agents.router, prefix="/api/v1/platform-service/tenants/{tenant_id}", tags=["Autonomous Agents"]
-    )
+    app.include_router(workflows.router, prefix="/api/v1/platform-service/tenants/{tenant_id}", tags=["Workflows"])
 
     app.include_router(
         tags.chat_widgets_tags_list_router, prefix="/api/v1/platform-service/tenants/{tenant_id}", tags=["Chat Widgets"]
@@ -344,9 +421,9 @@ def create_app() -> FastAPI:
     )
 
     app.include_router(
-        tags.autonomous_agent_tags_router,
+        tags.workflow_tags_router,
         prefix="/api/v1/platform-service/tenants/{tenant_id}",
-        tags=["Autonomous Agents"],
+        tags=["Workflows"],
     )
 
     app.include_router(
@@ -377,8 +454,46 @@ def create_app() -> FastAPI:
         tenant_ai_models.router, prefix="/api/v1/platform-service/tenants/{tenant_id}", tags=["Tenant AI Models"]
     )
 
+    # AI Model tag routes
+    app.include_router(
+        tags.ai_models_tags_list_router,
+        prefix="/api/v1/platform-service/tenants/{tenant_id}",
+        tags=["Tenant AI Models"],
+    )
+
+    app.include_router(
+        tags.ai_model_tags_router, prefix="/api/v1/platform-service/tenants/{tenant_id}", tags=["Tenant AI Models"]
+    )
+
+    # External Apps routes - tags list router MUST be before external apps router to avoid path conflicts
+    app.include_router(
+        tags.external_apps_tags_list_router,
+        prefix="/api/v1/platform-service/tenants/{tenant_id}",
+        tags=["External Apps"],
+    )
+
+    app.include_router(
+        external_apps.router, prefix="/api/v1/platform-service/tenants/{tenant_id}", tags=["External Apps"]
+    )
+
+    # External App tag routes
+    app.include_router(
+        tags.external_app_tags_router, prefix="/api/v1/platform-service/tenants/{tenant_id}", tags=["External Apps"]
+    )
+
     # Dashboard routes
     app.include_router(dashboard.router, prefix="/api/v1/platform-service/tenants/{tenant_id}", tags=["Dashboard"])
+
+    # Config Suggestions routes
+    app.include_router(
+        config_suggestions.router, prefix="/api/v1/platform-service/tenants/{tenant_id}", tags=["Config Suggestions"]
+    )
+
+    # Foundry Agent Discovery routes
+    app.include_router(foundry.router, prefix="/api/v1/platform-service/tenants/{tenant_id}", tags=["Foundry"])
+
+    # N8N Workflow Browser routes
+    app.include_router(n8n.router, prefix="/api/v1/platform-service/tenants/{tenant_id}", tags=["N8N"])
 
     # Search routes
     app.include_router(search.router, prefix="/api/v1/platform-service/tenants/{tenant_id}", tags=["Search"])
@@ -387,6 +502,9 @@ def create_app() -> FastAPI:
     app.include_router(
         recent_visits.router, prefix="/api/v1/platform-service/tenants/{tenant_id}", tags=["Recent Visits"]
     )
+
+    # Files routes
+    app.include_router(files.router, prefix="/api/v1/platform-service/tenants/{tenant_id}", tags=["Files"])
 
     return app
 

@@ -64,8 +64,8 @@ class TestAgentServiceClient:
 
         assert result is False
 
-    def test_delete_autonomous_agent_data_success(self) -> None:
-        """Test successful cascade delete of autonomous agent data."""
+    def test_delete_workflow_data_success(self) -> None:
+        """Test successful cascade delete of workflow data."""
         client = self._create_client()
 
         mock_response = MagicMock()
@@ -77,15 +77,15 @@ class TestAgentServiceClient:
             mock_httpx.return_value.__enter__ = MagicMock(return_value=mock_httpx_instance)
             mock_httpx.return_value.__exit__ = MagicMock(return_value=False)
 
-            result = client.delete_autonomous_agent_data("tenant-1", "agent-1")
+            result = client.delete_workflow_data("tenant-1", "workflow-1")
 
         assert result is True
         mock_httpx_instance.delete.assert_called_once()
         call_args = mock_httpx_instance.delete.call_args
-        assert "/autonomous-agents/agent-1/data" in call_args[0][0]
+        assert "/workflows/workflow-1/data" in call_args[0][0]
 
-    def test_delete_autonomous_agent_data_failure(self) -> None:
-        """Test cascade delete of agent data returns False on error."""
+    def test_delete_workflow_data_failure(self) -> None:
+        """Test cascade delete of workflow data returns False on error."""
         client = self._create_client()
 
         with patch("unifiedui.services.agent_service_client.httpx.Client") as mock_httpx:
@@ -94,7 +94,7 @@ class TestAgentServiceClient:
             mock_httpx.return_value.__enter__ = MagicMock(return_value=mock_httpx_instance)
             mock_httpx.return_value.__exit__ = MagicMock(return_value=False)
 
-            result = client.delete_autonomous_agent_data("tenant-1", "agent-1")
+            result = client.delete_workflow_data("tenant-1", "workflow-1")
 
         assert result is False
 

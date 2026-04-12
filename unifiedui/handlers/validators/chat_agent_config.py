@@ -4,9 +4,9 @@ from abc import ABC, abstractmethod
 from enum import StrEnum
 from typing import Any
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
-from unifiedui.core.database.enums import ChatAgentTypeEnum
+from unifiedui.core.database.enums import ChatAgentTypeEnum, RestApiAuthTypeEnum
 from unifiedui.exc.chat_agent_config import ChatAgentConfigValidationError, UnsupportedChatAgentTypeError
 from unifiedui.logger import get_logger
 
@@ -55,7 +55,7 @@ class N8NChatAgentConfig(BaseModel):
         ..., min_length=1, description="N8N workflow endpoint URL (e.g., https://n8n.example.com/workflow/abc123)"
     )
     api_api_key_credential_id: str = Field(..., min_length=1, description="Credential ID for N8N API key")
-    chat_auth_credential_id: str = Field(..., min_length=1, description="Credential ID for chat authentication")
+    chat_auth_credential_id: str | None = Field(default=None, description="Credential ID for chat authentication")
 
     @field_validator("chat_url")
     @classmethod
@@ -214,6 +214,128 @@ class MicrosoftFoundryConfigValidator(BaseChatAgentConfigValidator):
         return ChatAgentTypeEnum.MICROSOFT_FOUNDRY
 
 
+# ========== REST API Config Schema ==========
+
+
+class RestApiChatAgentConfig(BaseModel):
+    """Pydantic model for REST API chat agent configuration validation."""
+
+    auth_type: RestApiAuthTypeEnum = Field(..., description="Authentication type for the REST API")
+    invoke_endpoint: str = Field(..., min_length=1, description="URL for the agent invoke endpoint")
+    credential_id: str | None = Field(
+        default=None, description="Credential ID (required for BASIC_AUTH, API_KEY, ENTRA_ID_APP_REGISTRATION)"
+    )
+    api_key_header_name: str = Field(
+        default="X-API-Key", description="Header name for API key auth (default: X-API-Key)"
+    )
+    use_unified_chat_history: bool = Field(default=True, description="Whether to send chat history from unified-ui")
+    chat_history_count: int = Field(
+        default=30, ge=1, le=100, description="Number of chat history messages to include (default: 30)"
+    )
+    create_conversation_endpoint: str | None = Field(
+        default=None, description="Optional POST endpoint URL for conversation creation"
+    )
+
+    @field_validator("invoke_endpoint")
+    @classmethod
+    def validate_invoke_endpoint(cls, v: str) -> str:
+        """Validate that invoke_endpoint is a valid URL format."""
+        if not v.startswith(("http://", "https://")):
+            raise ValueError("invoke_endpoint must start with http:// or https://")
+        return v
+
+    @field_validator("create_conversation_endpoint")
+    @classmethod
+    def validate_create_conversation_endpoint(cls, v: str | None) -> str | None:
+        """Validate that create_conversation_endpoint is a valid URL format if provided."""
+        if v is not None and not v.startswith(("http://", "https://")):
+            raise ValueError("create_conversation_endpoint must start with http:// or https://")
+        return v
+
+    @model_validator(mode="after")
+    def validate_credential_required(self) -> "RestApiChatAgentConfig":
+        """Validate that credential_id is provided when auth_type requires it."""
+        requires_credential = {
+            RestApiAuthTypeEnum.BASIC_AUTH,
+            RestApiAuthTypeEnum.API_KEY,
+            RestApiAuthTypeEnum.ENTRA_ID_APP_REGISTRATION,
+        }
+        if self.auth_type in requires_credential and not self.credential_id:
+            raise ValueError(f"credential_id is required for auth_type '{self.auth_type}'")
+        return self
+
+
+# ========== REST API Validator ==========
+
+
+class RestApiConfigValidator(BaseChatAgentConfigValidator):
+    """Validator for REST API chat agent configuration."""
+
+    def validate(self, config: dict[str, Any]) -> dict[str, Any]:
+        """
+        Validate REST API configuration.
+
+        Args:
+            config: Configuration dictionary to validate
+
+        Returns:
+            Validated configuration dictionary with defaults applied
+
+        Raises:
+            ChatAgentConfigValidationError: If validation fails
+        """
+        try:
+            validated = RestApiChatAgentConfig(**config)
+            return validated.model_dump()
+        except Exception as e:
+            logger.error("REST API config validation failed: %s", e)
+            raise ChatAgentConfigValidationError(
+                message=f"REST API configuration validation failed: {e!s}", errors=[str(e)]
+            )
+
+    def get_supported_type(self) -> ChatAgentTypeEnum:
+        return ChatAgentTypeEnum.REST_API
+
+
+# ========== LLM Config Schema ==========
+
+
+class LLMChatAgentConfig(BaseModel):
+    """Pydantic model for LLM chat agent configuration validation."""
+
+    ai_model_id: str = Field(..., min_length=1, max_length=36, description="Reference to a TenantAIModel ID")
+    system_prompt: str | None = Field(default=None, max_length=10000, description="Optional system prompt for the LLM")
+
+
+# ========== LLM Validator ==========
+
+
+class LLMConfigValidator(BaseChatAgentConfigValidator):
+    """Validator for LLM chat agent configuration."""
+
+    def validate(self, config: dict[str, Any]) -> dict[str, Any]:
+        """Validate LLM configuration.
+
+        Args:
+            config: Configuration dictionary to validate
+
+        Returns:
+            Validated configuration dictionary with defaults applied
+
+        Raises:
+            ChatAgentConfigValidationError: If validation fails
+        """
+        try:
+            validated = LLMChatAgentConfig(**config)
+            return validated.model_dump()
+        except Exception as e:
+            logger.error("LLM config validation failed: %s", e)
+            raise ChatAgentConfigValidationError(message=f"LLM configuration validation failed: {e!s}", errors=[str(e)])
+
+    def get_supported_type(self) -> ChatAgentTypeEnum:
+        return ChatAgentTypeEnum.LLM
+
+
 # ========== Config Validator Factory ==========
 
 
@@ -223,6 +345,8 @@ class ChatAgentConfigValidatorFactory:
     _validators: dict[ChatAgentTypeEnum, BaseChatAgentConfigValidator] = {
         ChatAgentTypeEnum.N8N: N8NConfigValidator(),
         ChatAgentTypeEnum.MICROSOFT_FOUNDRY: MicrosoftFoundryConfigValidator(),
+        ChatAgentTypeEnum.REST_API: RestApiConfigValidator(),
+        ChatAgentTypeEnum.LLM: LLMConfigValidator(),
     }
 
     @classmethod

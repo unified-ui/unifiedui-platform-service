@@ -5,7 +5,7 @@ resource types that follow the standard *_member pattern (READ, WRITE, ADMIN rol
 
 Supported resource types:
 - chat_agent
-- autonomous_agent
+- workflow
 - chat_widget
 - conversation
 - credential
@@ -23,8 +23,6 @@ from sqlalchemy import select
 
 from unifiedui.core.database.enums import PermissionActionEnum, PrincipalTypeEnum, TenantRolesEnum
 from unifiedui.core.database.models import (
-    AutonomousAgent,
-    AutonomousAgentMember,
     ChatAgent,
     ChatAgentMember,
     ChatWidget,
@@ -34,9 +32,13 @@ from unifiedui.core.database.models import (
     Credential,
     CredentialMember,
     CustomGroupMember,
+    ExternalApp,
+    ExternalAppMember,
     Principal,
     Tool,
     ToolMember,
+    Workflow,
+    WorkflowMember,
 )
 from unifiedui.handlers.principals_helper import ensure_principal_exists
 from unifiedui.logger import get_logger
@@ -60,12 +62,12 @@ RESOURCE_PERMISSION_CONFIG: dict[str, dict[str, Any]] = {
         "cache_prefix": "chat_agents",
         "tenant_admin_role": TenantRolesEnum.CHAT_AGENTS_ADMIN,
     },
-    "autonomous_agent": {
-        "resource_model": AutonomousAgent,
-        "member_model": AutonomousAgentMember,
-        "id_field": "autonomous_agent_id",
-        "cache_prefix": "autonomous_agents",
-        "tenant_admin_role": TenantRolesEnum.AUTONOMOUS_AGENTS_ADMIN,
+    "workflow": {
+        "resource_model": Workflow,
+        "member_model": WorkflowMember,
+        "id_field": "workflow_id",
+        "cache_prefix": "workflows",
+        "tenant_admin_role": TenantRolesEnum.WORKFLOWS_ADMIN,
     },
     "chat_widget": {
         "resource_model": ChatWidget,
@@ -101,6 +103,13 @@ RESOURCE_PERMISSION_CONFIG: dict[str, dict[str, Any]] = {
         "id_field": "tool_id",
         "cache_prefix": "tools",
         "tenant_admin_role": TenantRolesEnum.REACT_AGENT_ADMIN,
+    },
+    "external_app": {
+        "resource_model": ExternalApp,
+        "member_model": ExternalAppMember,
+        "id_field": "external_app_id",
+        "cache_prefix": "external_apps",
+        "tenant_admin_role": TenantRolesEnum.EXTERNAL_APPS_ADMIN,
     },
 }
 

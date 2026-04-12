@@ -3,11 +3,18 @@
 from __future__ import annotations
 
 import uuid as uuid_mod
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import delete, func, select
 
-from unifiedui.core.database.models import RecentVisit, utc_now
+from unifiedui.core.database.models import (
+    ChatAgent,
+    ChatWidget,
+    ExternalApp,
+    RecentVisit,
+    Workflow,
+    utc_now,
+)
 from unifiedui.logger import get_logger
 from unifiedui.schema.responses.recent_visits import (
     RecentVisitListResponse,
@@ -15,6 +22,8 @@ from unifiedui.schema.responses.recent_visits import (
 )
 
 if TYPE_CHECKING:
+    from sqlalchemy.orm import Session
+
     from unifiedui.caching.client import CacheClient
     from unifiedui.core.database.client import SQLAlchemyClient
     from unifiedui.schema.requests.recent_visits import SyncRecentVisitsRequest
@@ -22,6 +31,13 @@ if TYPE_CHECKING:
 logger = get_logger(__name__)
 
 MAX_VISITS_PER_USER = 50
+
+RESOURCE_TYPE_TO_MODEL: dict[str, Any] = {
+    "chat_agent": ChatAgent,
+    "workflow": Workflow,
+    "external_app": ExternalApp,
+    "chat_widget": ChatWidget,
+}
 
 
 class RecentVisitsHandler:
@@ -65,39 +81,87 @@ class RecentVisitsHandler:
         tenant_id: str,
         user_id: str,
         limit: int = 20,
+        resource_types: list[str] | None = None,
     ) -> RecentVisitListResponse:
-        """List recent visits for a user.
+        """List recent visits for a user, filtering out deleted resources.
 
         Args:
             tenant_id: Tenant ID for scoping.
             user_id: User ID to get visits for.
             limit: Maximum results to return.
+            resource_types: Optional list of resource types to filter by.
 
         Returns:
             RecentVisitListResponse with visits and total count.
         """
         with self.db_client.get_session() as session:
-            count_query = select(func.count(RecentVisit.id)).where(
+            base_filters = [
                 RecentVisit.tenant_id == tenant_id,
                 RecentVisit.user_id == user_id,
-            )
-            total = session.execute(count_query).scalar() or 0
+            ]
+            if resource_types:
+                base_filters.append(RecentVisit.resource_type.in_(resource_types))
 
             list_query = (
                 select(RecentVisit)
-                .where(
-                    RecentVisit.tenant_id == tenant_id,
-                    RecentVisit.user_id == user_id,
-                )
+                .where(*base_filters)
                 .order_by(RecentVisit.visited_at.desc())
-                .limit(limit)
+                .limit(limit * 2)  # Fetch more to account for deleted resources
             )
-            visits = session.execute(list_query).scalars().all()
+            visits = list(session.execute(list_query).scalars().all())
+
+            # Filter out visits where resource no longer exists
+            valid_visits = self._filter_existing_resources(session, tenant_id, visits)
+
+            # Apply limit after filtering
+            valid_visits = valid_visits[:limit]
 
             return RecentVisitListResponse(
-                visits=[self._visit_to_response(v) for v in visits],
-                total=total,
+                visits=[self._visit_to_response(v) for v in valid_visits],
+                total=len(valid_visits),
             )
+
+    def _filter_existing_resources(
+        self,
+        session: Session,
+        tenant_id: str,
+        visits: list[RecentVisit],
+    ) -> list[RecentVisit]:
+        """Filter visits to only include resources that still exist.
+
+        Args:
+            session: Database session.
+            tenant_id: Tenant ID for scoping.
+            visits: List of recent visits to filter.
+
+        Returns:
+            Filtered list of visits with existing resources.
+        """
+        if not visits:
+            return []
+
+        # Group visits by resource_type
+        visits_by_type: dict[str, list[RecentVisit]] = {}
+        for visit in visits:
+            visits_by_type.setdefault(visit.resource_type, []).append(visit)
+
+        # Check existence for each resource type
+        existing_ids: set[str] = set()
+        for resource_type, type_visits in visits_by_type.items():
+            model = RESOURCE_TYPE_TO_MODEL.get(resource_type)
+            if not model:
+                continue
+
+            resource_ids = [v.resource_id for v in type_visits]
+            existing_query = select(model.id).where(
+                model.tenant_id == tenant_id,
+                model.id.in_(resource_ids),
+            )
+            result = session.execute(existing_query).scalars().all()
+            existing_ids.update(result)
+
+        # Filter visits to only include existing resources
+        return [v for v in visits if v.resource_id in existing_ids]
 
     def _cleanup_old_visits(
         self,
@@ -182,3 +246,33 @@ class RecentVisitsHandler:
             session.commit()
 
         return self.list_recent_visits(tenant_id, user_id, limit=20)
+
+    def delete_visits_for_resource(
+        self,
+        tenant_id: str,
+        resource_type: str,
+        resource_id: str,
+    ) -> None:
+        """Delete all recent visits for a specific resource.
+
+        Called when a resource is deleted to clean up visit history.
+
+        Args:
+            tenant_id: Tenant ID for scoping.
+            resource_type: Type of the deleted resource.
+            resource_id: ID of the deleted resource.
+        """
+        with self.db_client.get_session() as session:
+            session.execute(
+                delete(RecentVisit).where(
+                    RecentVisit.tenant_id == tenant_id,
+                    RecentVisit.resource_type == resource_type,
+                    RecentVisit.resource_id == resource_id,
+                )
+            )
+            session.commit()
+            logger.debug(
+                "Cleaned up recent visits for deleted %s %s",
+                resource_type,
+                resource_id,
+            )

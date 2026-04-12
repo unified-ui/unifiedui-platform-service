@@ -25,3 +25,17 @@ class UserFavoritesListResponse(BaseModel):
 
     favorites: list[UserFavoriteResponse]
     total: int
+
+
+class UserFavoriteWithNameResponse(BaseModel):
+    """Minimal response schema for user favorite with resource name."""
+
+    resource_id: str
+    resource_type: str
+    resource_name: str
+
+
+class UserFavoritesUnifiedResponse(BaseModel):
+    """Response schema for unified list of all user favorites with names."""
+
+    favorites: list[UserFavoriteWithNameResponse]

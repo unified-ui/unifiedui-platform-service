@@ -24,7 +24,7 @@ class TestResourcePermissionsHandlerConfig:
 
     def test_supported_resource_types(self):
         """Test that all expected resource types are configured."""
-        expected_types = ["chat_agent", "autonomous_agent", "chat_widget", "conversation", "credential", "custom_group"]
+        expected_types = ["chat_agent", "workflow", "chat_widget", "conversation", "credential", "custom_group"]
         for resource_type in expected_types:
             assert resource_type in RESOURCE_PERMISSION_CONFIG
 

@@ -8,9 +8,10 @@ import uuid
 from typing import TYPE_CHECKING
 
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 
 from unifiedui.core.database.enums import AIModelPurposeGroupEnum
-from unifiedui.core.database.models import Credential, TenantAIModel
+from unifiedui.core.database.models import Credential, TenantAIModel, TenantAIModelTag
 from unifiedui.exc.tenant_ai_models import (
     InvalidAIModelCredentialError,
     TenantAIModelNotFoundError,
@@ -18,6 +19,7 @@ from unifiedui.exc.tenant_ai_models import (
 from unifiedui.handlers.cache_utils import ResourceCacheInvalidator
 from unifiedui.handlers.validators.tenant_ai_model_validator import AIModelConfigValidatorFactory
 from unifiedui.logger import get_logger
+from unifiedui.schema.responses.tags import TagSummary
 from unifiedui.schema.responses.tenant_ai_models import AIModelWithSecretResponse, TenantAIModelResponse
 
 if TYPE_CHECKING:
@@ -26,6 +28,7 @@ if TYPE_CHECKING:
     from unifiedui.caching.client import CacheClient
     from unifiedui.core.database.client import SQLAlchemyClient
     from unifiedui.core.vault.client import BaseVaultClient
+    from unifiedui.handlers.resource_tags import ResourceTagsHandler
     from unifiedui.schema.requests.tenant_ai_models import CreateTenantAIModelRequest, UpdateTenantAIModelRequest
 
 logger = get_logger(__name__)
@@ -39,6 +42,7 @@ class TenantAIModelHandler:
         db_client: SQLAlchemyClient,
         cache_client: CacheClient | None = None,
         vault_client: BaseVaultClient | None = None,
+        tags_handler: ResourceTagsHandler | None = None,
     ):
         """Initialize the tenant AI model handler.
 
@@ -46,11 +50,22 @@ class TenantAIModelHandler:
             db_client: SQLAlchemy database client instance.
             cache_client: Optional cache client for Redis caching.
             vault_client: Optional vault client for secret retrieval.
+            tags_handler: Optional central tags handler.
         """
         self.db_client = db_client
         self.cache_client = cache_client
         self.vault_client = vault_client
+        self._tags_handler = tags_handler
         self._cache = ResourceCacheInvalidator(cache_client, "ai_models", "model")
+
+    @property
+    def tags_handler(self) -> ResourceTagsHandler:
+        """Get the tags handler, creating one if needed."""
+        if self._tags_handler is None:
+            from unifiedui.handlers.resource_tags import ResourceTagsHandler
+
+            self._tags_handler = ResourceTagsHandler(self.db_client, self.cache_client)
+        return self._tags_handler
 
     def list_tenant_ai_models(
         self,
@@ -61,9 +76,11 @@ class TenantAIModelHandler:
         type_filter: Sequence[str] | None = None,
         provider_filter: Sequence[str] | None = None,
         is_active: int | None = None,
+        tag_ids: list[int] | None = None,
         order_by: str | None = None,
         order_direction: str | None = None,
         use_cache: bool = True,
+        id_list: list[str] | None = None,
     ) -> list[TenantAIModelResponse]:
         """Get a list of tenant AI models.
 
@@ -75,9 +92,11 @@ class TenantAIModelHandler:
             type_filter: Optional list of model types to filter by.
             provider_filter: Optional list of providers to filter by.
             is_active: Optional filter by active status.
+            tag_ids: Optional list of tag IDs to filter by (OR logic).
             order_by: Optional column to order by.
             order_direction: Optional sort direction.
             use_cache: Whether to use caching.
+            id_list: Optional list of IDs to filter by.
 
         Returns:
             List of tenant AI model responses.
@@ -90,7 +109,13 @@ class TenantAIModelHandler:
             f"ai_models:list:tenant:{tenant_id}:skip:{skip}:limit:{limit}:order:{order_key}:active:{is_active_key}"
         )
 
-        has_filters = name_filter is not None or type_filter is not None or provider_filter is not None
+        has_filters = (
+            name_filter is not None
+            or type_filter is not None
+            or provider_filter is not None
+            or tag_ids is not None
+            or id_list is not None
+        )
 
         if use_cache and self.cache_client and not has_filters:
             try:
@@ -101,7 +126,14 @@ class TenantAIModelHandler:
                 logger.warning("Failed to get cached AI model list: %s", e)
 
         with self.db_client.get_session() as session:
-            query = select(TenantAIModel).where(TenantAIModel.tenant_id == tenant_id)
+            query = (
+                select(TenantAIModel)
+                .options(selectinload(TenantAIModel.tags).selectinload(TenantAIModelTag.tag))
+                .where(TenantAIModel.tenant_id == tenant_id)
+            )
+
+            if id_list:
+                query = query.where(TenantAIModel.id.in_(id_list))
 
             if name_filter:
                 query = query.where(TenantAIModel.name.ilike(f"%{name_filter}%"))
@@ -112,9 +144,20 @@ class TenantAIModelHandler:
             if is_active is not None:
                 query = query.where(TenantAIModel.is_active == bool(is_active))
 
+            if tag_ids:
+                tag_subquery = (
+                    select(TenantAIModelTag.tenant_ai_model_id)
+                    .where(TenantAIModelTag.tenant_id == tenant_id, TenantAIModelTag.tag_id.in_(tag_ids))
+                    .distinct()
+                )
+                query = query.where(TenantAIModel.id.in_(tag_subquery))
+
             if order_by and hasattr(TenantAIModel, order_by):
                 column = getattr(TenantAIModel, order_by)
                 query = query.order_by(column.desc()) if order_direction == "desc" else query.order_by(column.asc())
+            else:
+                # MSSQL requires ORDER BY when using OFFSET/LIMIT
+                query = query.order_by(TenantAIModel.created_at.desc())
 
             query = query.offset(skip).limit(limit)
             models = session.execute(query).scalars().all()
@@ -161,7 +204,9 @@ class TenantAIModelHandler:
 
         with self.db_client.get_session() as session:
             model = session.execute(
-                select(TenantAIModel).where(
+                select(TenantAIModel)
+                .options(selectinload(TenantAIModel.tags).selectinload(TenantAIModelTag.tag))
+                .where(
                     TenantAIModel.id == model_id,
                     TenantAIModel.tenant_id == tenant_id,
                 )
@@ -424,6 +469,65 @@ class TenantAIModelHandler:
 
             return result
 
+    def get_model_by_id_with_secret(
+        self,
+        tenant_id: str,
+        model_id: str,
+    ) -> AIModelWithSecretResponse:
+        """Get a single active AI model by ID with decrypted credentials (S2S only).
+
+        Args:
+            tenant_id: The ID of the tenant.
+            model_id: The ID of the AI model.
+
+        Returns:
+            AI model with decrypted credential secret.
+
+        Raises:
+            TenantAIModelNotFoundError: If the AI model is not found or inactive.
+        """
+        logger.info("Getting AI model by ID with secret", extra={"tenant_id": tenant_id, "model_id": model_id})
+
+        with self.db_client.get_session() as session:
+            ai_model = session.execute(
+                select(TenantAIModel).where(
+                    TenantAIModel.id == model_id,
+                    TenantAIModel.tenant_id == tenant_id,
+                    TenantAIModel.is_active,
+                )
+            ).scalar_one_or_none()
+
+            if not ai_model:
+                raise TenantAIModelNotFoundError(model_id)
+
+            credential_secret = None
+            if ai_model.credential_id and self.vault_client:
+                credential = session.execute(
+                    select(Credential).where(
+                        Credential.id == ai_model.credential_id,
+                        Credential.tenant_id == tenant_id,
+                    )
+                ).scalar_one_or_none()
+                if credential and credential.credential_uri:
+                    try:
+                        secret_str = self.vault_client.get_secret(credential.credential_uri, use_cache=False)
+                        if secret_str:
+                            try:
+                                credential_secret = json.loads(secret_str)
+                            except (json.JSONDecodeError, ValueError):
+                                credential_secret = {"api_key": secret_str}
+                    except Exception as e:
+                        logger.error("Failed to decrypt credential secret: %s", e)
+
+            return AIModelWithSecretResponse(
+                id=ai_model.id,
+                type=ai_model.type,
+                provider=ai_model.provider,
+                config=ai_model.config or {},
+                credential_secret=credential_secret,
+                priority=ai_model.priority,
+            )
+
     def _invalidate_list_cache(self, tenant_id: str) -> None:
         """Invalidate cached AI model list for a tenant.
 
@@ -457,6 +561,12 @@ class TenantAIModelHandler:
             with contextlib.suppress(ValueError):
                 purpose_group_enums.append(AIModelPurposeGroupEnum(pg))
 
+        tags = []
+        if hasattr(model, "tags") and model.tags:
+            for m_tag in model.tags:
+                if m_tag.tag:
+                    tags.append(TagSummary(id=m_tag.tag.id, name=m_tag.tag.name))
+
         return TenantAIModelResponse(
             id=model.id,
             tenant_id=model.tenant_id,
@@ -469,6 +579,7 @@ class TenantAIModelHandler:
             credential_id=model.credential_id,
             priority=model.priority,
             is_active=model.is_active,
+            tags=tags,
             created_at=model.created_at,
             updated_at=model.updated_at,
             created_by=model.created_by,

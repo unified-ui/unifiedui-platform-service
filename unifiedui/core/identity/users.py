@@ -4,6 +4,7 @@ from unifiedui.caching.client import CacheClient
 from unifiedui.core.database.client import SQLAlchemyClient
 from unifiedui.core.database.enums import PrincipalTypeEnum
 from unifiedui.core.database.models import CustomGroupMember, Principal
+from unifiedui.core.identity.enums import IdenityProviderEnum
 from unifiedui.core.identity.factory import IdentityProviderFactory, IdentityTokenFactory
 from unifiedui.logger import get_logger
 from unifiedui.schema.responses.identity import IdentityGroupResponse, IdentityUserResponse
@@ -11,6 +12,47 @@ from unifiedui.schema.responses.organizations import OrganizationContextResponse
 from unifiedui.utils.api_query import APIFilterQuery
 
 logger = get_logger(__name__)
+
+
+def _is_system_admin(idp: str, mail: str, principal_name: str, settings: object) -> bool:
+    """Check if the user is a system admin based on their identity provider.
+
+    If no system admin is configured for any IdP, returns True (unrestricted).
+
+    Args:
+        idp: Identity provider identifier.
+        mail: User's email address.
+        principal_name: User's principal/username.
+        settings: Application settings with per-IdP system admin fields.
+
+    Returns:
+        True if no restriction is configured, or if user matches the system admin.
+    """
+    msal_admin = getattr(settings, "msal_system_admin_email", None)
+    ldap_admin = getattr(settings, "ldap_system_admin_username", None)
+    oidc_admin = getattr(settings, "oidc_zitadel_system_admin_username", None)
+
+    if not msal_admin and not ldap_admin and not oidc_admin:
+        return True
+
+    if idp == IdenityProviderEnum.EXTRA_ID.value:
+        return bool(msal_admin and mail and mail.lower().strip() == msal_admin.lower().strip())
+
+    if idp == IdenityProviderEnum.LDAP.value:
+        return bool(ldap_admin and principal_name and principal_name.lower().strip() == ldap_admin.lower().strip())
+
+    if idp == IdenityProviderEnum.OIDC.value:
+        return bool(oidc_admin and principal_name and principal_name.lower().strip() == oidc_admin.lower().strip())
+
+    if idp == IdenityProviderEnum.MOCK.value:
+        if msal_admin and mail and mail.lower().strip() == msal_admin.lower().strip():
+            return True
+        admin_username = ldap_admin or oidc_admin
+        return bool(
+            admin_username and principal_name and principal_name.lower().strip() == admin_username.lower().strip()
+        )
+
+    return False
 
 
 class ContextIdentityUser:
@@ -30,8 +72,42 @@ class ContextIdentityUser:
         self._idp_group_ids: list[str] | None = None
         self._tenants: list[dict] | None = None
         self._organization_context: OrganizationContextResponse | None = None
+        self._user_profile: IdentityUserResponse | None = None
         self._cache = cache_client
         self._database_client = database_client
+
+    def _get_user_profile(self) -> IdentityUserResponse:
+        """Get user profile, enriching from identity provider if needed.
+
+        For OIDC tokens that lack profile claims, fetches data from
+        the provider's UserInfo endpoint.
+
+        Returns:
+            User profile with display name, email, etc.
+        """
+        if self._user_profile is not None:
+            return self._user_profile
+
+        has_profile = bool(self.identity.get_display_name() or self.identity.get_mail())
+        if not has_profile:
+            try:
+                users, _ = self.idp.get_users()
+                if users:
+                    self._user_profile = users[0]
+                    return self._user_profile
+            except Exception as exc:
+                logger.warning("Failed to fetch user profile from provider: %s", exc)
+
+        self._user_profile = IdentityUserResponse(
+            id=self.identity.get_id(),
+            identity_provider=self.identity.get_identity_provider(),
+            display_name=self.identity.get_display_name(),
+            principal_name=self.identity.get_principal_name(),
+            mail=self.identity.get_mail(),
+            firstname=self.identity.get_firstname(),
+            lastname=self.identity.get_lastname(),
+        )
+        return self._user_profile
 
     def _get_idp_group_ids(self) -> list[str]:
         """Get identity group IDs from the identity provider."""
@@ -261,30 +337,88 @@ class ContextIdentityUser:
         return self._organization_context
 
     def get_me(self) -> IdentityUserResponse:
-        """Get the current user's identity information."""
+        """Get the current user's identity information.
+
+        If the user is a system admin with an organization but no roles,
+        they are automatically enrolled as ORGANISATION_GLOBAL_ADMIN.
+        """
         from unifiedui.core.config import settings
 
         org_context = self.organization_context
         tenants_with_permissions = self.tenants
 
-        user_mail = self.identity.get_mail()
-        is_system_admin = bool(
-            settings.system_admin_email
-            and user_mail
-            and user_mail.lower().strip() == settings.system_admin_email.lower().strip()
-        )
+        profile = self._get_user_profile()
+        idp = self.identity.get_identity_provider()
+        user_mail = profile.mail or self.identity.get_mail()
+        user_principal = profile.principal_name or self.identity.get_principal_name()
+
+        is_system_admin = _is_system_admin(idp, user_mail, user_principal, settings)
+
+        if is_system_admin and org_context and not org_context.roles:
+            org_context = self._auto_enroll_system_admin(org_context)
+
+        profile = self._get_user_profile()
 
         return IdentityUserResponse(
             id=self.identity.get_id(),
             identity_provider=self.identity.get_identity_provider(),
             identity_tenant_id=self.identity.get_identity_tenant_id(),
-            display_name=self.identity.get_display_name(),
-            principal_name=self.identity.get_principal_name(),
-            mail=user_mail,
-            firstname=self.identity.get_firstname(),
-            lastname=self.identity.get_lastname(),
+            display_name=profile.display_name,
+            principal_name=profile.principal_name or user_principal,
+            mail=profile.mail or user_mail,
+            firstname=profile.firstname,
+            lastname=profile.lastname,
             is_system_admin=is_system_admin,
             organization=org_context,
             tenants=tenants_with_permissions,
             groups=self.groups,
+        )
+
+    def _auto_enroll_system_admin(
+        self,
+        org_context: OrganizationContextResponse,
+    ) -> OrganizationContextResponse:
+        """Auto-enroll a system admin as ORGANISATION_GLOBAL_ADMIN.
+
+        When a system admin sees an organization (via IDP match) but has
+        no roles, they are automatically added as a member so they can
+        manage the organization.
+
+        Args:
+            org_context: The matched organization context with empty roles.
+
+        Returns:
+            Updated organization context with the admin role assigned.
+        """
+        import uuid
+
+        from unifiedui.core.database.enums import OrganizationRoleEnum
+        from unifiedui.core.database.models import OrganizationMember
+
+        if not self._database_client:
+            return org_context
+
+        user_id = self.identity.get_id()
+        role = OrganizationRoleEnum.ORGANISATION_GLOBAL_ADMIN.value
+
+        with self._database_client.get_session() as session:
+            member = OrganizationMember(
+                id=str(uuid.uuid4()),
+                organization_id=org_context.id,
+                principal_id=user_id,
+                principal_type=PrincipalTypeEnum.IDENTITY_USER.value,
+                role=role,
+                created_by=user_id,
+                updated_by=user_id,
+            )
+            session.add(member)
+            session.commit()
+
+        logger.info("Auto-enrolled system admin %s as %s in org %s", user_id, role, org_context.id)
+
+        return OrganizationContextResponse(
+            id=org_context.id,
+            name=org_context.name,
+            slug=org_context.slug,
+            roles=[role],
         )

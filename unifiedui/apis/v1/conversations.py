@@ -10,6 +10,7 @@ from unifiedui.core.middleware.apis.v1.auth import authenticate, check_permissio
 from unifiedui.exc.conversations import ConversationNotFoundError, FoundryConversationCreationError
 from unifiedui.handlers.conversations import ConversationHandler
 from unifiedui.handlers.dependencies import get_conversation_handler
+from unifiedui.handlers.field_filter import filtered_response, parse_ids
 from unifiedui.logger import get_logger
 from unifiedui.schema.requests.conversations import CreateConversationRequest, UpdateConversationRequest
 from unifiedui.schema.requests.permissions import SetResourcePermissionRequest
@@ -44,6 +45,8 @@ async def list_conversations(
     view: ListViewEnum | None = Query(
         None, description="View type: 'full' (default) or 'quick-list' (returns only id and name)"
     ),
+    ids: str | None = Query(None, description="Comma-separated list of IDs to filter by"),
+    fields: str | None = Query(None, description="Comma-separated list of fields to include in the response"),
     handler: ConversationHandler = Depends(get_conversation_handler),
 ):
     """
@@ -72,16 +75,20 @@ async def list_conversations(
             extra={"tenant_id": tenant_id, "user_id": user.identity.get_id(), "skip": skip, "limit": limit},
         )
 
-        return handler.list_conversations(
-            tenant_id=tenant_id,
-            skip=skip,
-            limit=limit,
-            name_filter=name,
-            is_active=is_active,
-            order_by=order_by,
-            order_direction=order_direction.value if order_direction else None,
-            view=view.value if view else None,
-            user=user,
+        return filtered_response(
+            handler.list_conversations(
+                tenant_id=tenant_id,
+                skip=skip,
+                limit=limit,
+                name_filter=name,
+                is_active=is_active,
+                order_by=order_by,
+                order_direction=order_direction.value if order_direction else None,
+                view=view.value if view else None,
+                user=user,
+                id_list=parse_ids(ids),
+            ),
+            fields,
         )
     except Exception as e:
         logger.error("Failed to list conversations: %s", e)
@@ -171,8 +178,9 @@ async def get_conversation(
     request: Request,
     tenant_id: str,
     conversation_id: str,
+    fields: str | None = Query(None, description="Comma-separated list of fields to include in the response"),
     handler: ConversationHandler = Depends(get_conversation_handler),
-) -> ConversationResponse:
+):
     """
     Get a specific conversation.
 
@@ -194,7 +202,10 @@ async def get_conversation(
             "API: Get conversation",
             extra={"tenant_id": tenant_id, "conversation_id": conversation_id, "user_id": user.identity.get_id()},
         )
-        return handler.get_conversation(tenant_id=tenant_id, conversation_id=conversation_id, user=user)
+        return filtered_response(
+            handler.get_conversation(tenant_id=tenant_id, conversation_id=conversation_id, user=user),
+            fields,
+        )
     except ConversationNotFoundError as e:
         logger.warning("Conversation not found: %s", e)
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
