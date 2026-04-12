@@ -18,16 +18,16 @@ Read the relevant instruction file **before** working in that area.
 
 | File | Read when... |
 |------|-------------|
-| [project-structure.instructions.md](./project-structure.instructions.md) | Understanding folder layout, adding new modules, modifying structure |
-| [api-routes.instructions.md](./api-routes.instructions.md) | Adding or modifying API routes in `apis/v1/` |
-| [handlers.instructions.md](./handlers.instructions.md) | Implementing business logic in `handlers/` |
-| [database.instructions.md](./database.instructions.md) | Working with models, enums, migrations, or queries |
-| [auth-permissions.instructions.md](./auth-permissions.instructions.md) | Touching auth middleware, RBAC, permission checks, or tenant access |
-| [infrastructure.instructions.md](./infrastructure.instructions.md) | Working with caching, vault, identity providers, or document DB |
-| [security.instructions.md](./security.instructions.md) | **ALWAYS read** — SQL injection, SSRF, input validation, auth, secrets |
-| [testing.instructions.md](./testing.instructions.md) | Writing tests, running tests, or understanding test patterns |
-| [github-pipelines.instructions.md](./github-pipelines.instructions.md) | Working with CI/CD workflows, adding pipelines, coverage thresholds |
-| [instruction-management.instructions.md](./instruction-management.instructions.md) | After completing work — decides if/how to update docs |
+| [project-structure.instructions.md](./instructions/project-structure.instructions.md) | Understanding folder layout, adding new modules, modifying structure |
+| [api-routes.instructions.md](./instructions/api-routes.instructions.md) | Adding or modifying API routes in `apis/v1/` |
+| [handlers.instructions.md](./instructions/handlers.instructions.md) | Implementing business logic in `handlers/` |
+| [database.instructions.md](./instructions/database.instructions.md) | Working with models, enums, migrations, or queries |
+| [auth-permissions.instructions.md](./instructions/auth-permissions.instructions.md) | Touching auth middleware, RBAC, permission checks, or tenant access |
+| [infrastructure.instructions.md](./instructions/infrastructure.instructions.md) | Working with caching, vault, identity providers, or document DB |
+| [security.instructions.md](./instructions/security.instructions.md) | **ALWAYS read** — SQL injection, SSRF, input validation, auth, secrets |
+| [testing.instructions.md](./instructions/testing.instructions.md) | Writing tests, running tests, or understanding test patterns |
+| [github-pipelines.instructions.md](./instructions/github-pipelines.instructions.md) | Working with CI/CD workflows, adding pipelines, coverage thresholds |
+| [instruction-management.instructions.md](./instructions/instruction-management.instructions.md) | After completing work — decides if/how to update docs |
 
 ---
 
@@ -129,7 +129,7 @@ if user.has_permission(...):
 
 ## Instruction Management (Summary)
 
-After completing work, evaluate whether documentation needs updating. Full rules in [instruction-management.instructions.md](./instruction-management.instructions.md).
+After completing work, evaluate whether documentation needs updating. Full rules in [instruction-management.instructions.md](./instructions/instruction-management.instructions.md).
 
 **Update docs when:**
 - New resource entity added → update `project-structure`, `api-routes`, `handlers`, `database`, `testing`

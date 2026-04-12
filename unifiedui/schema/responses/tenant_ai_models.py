@@ -5,6 +5,7 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field
 
 from unifiedui.core.database.enums import AIModelProviderEnum, AIModelPurposeGroupEnum, AIModelTypeEnum
+from unifiedui.schema.responses.tags import TagSummary
 
 
 class TenantAIModelResponse(BaseModel):
@@ -21,6 +22,7 @@ class TenantAIModelResponse(BaseModel):
     credential_id: str | None = Field(None, description="Linked credential ID")
     priority: int = Field(..., description="Priority for load-balancing")
     is_active: bool = Field(..., description="Whether the model is active")
+    tags: list[TagSummary] = Field(default_factory=list, description="Tags on the AI model")
     created_at: datetime = Field(..., description="Creation timestamp")
     updated_at: datetime = Field(..., description="Last update timestamp")
     created_by: str | None = Field(None, description="Creator user ID")

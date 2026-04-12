@@ -14,12 +14,15 @@ from unifiedui.logger import get_logger
 logger = get_logger(__name__)
 
 
+DEFAULT_AZURE_OPENAI_API_VERSION = "2024-12-01-preview"
+
+
 class AzureOpenAIConfig(BaseModel):
     """Validation model for Azure OpenAI provider config."""
 
     endpoint: str = Field(..., min_length=1)
-    api_version: str = Field(..., min_length=1)
     deployment_name: str = Field(..., min_length=1)
+    api_version: str = Field(DEFAULT_AZURE_OPENAI_API_VERSION)
 
 
 class OpenAIConfig(BaseModel):
@@ -94,7 +97,7 @@ class AzureOpenAIConfigValidator(BaseAIModelConfigValidator):
             return validated.model_dump()
         except Exception as e:
             raise TenantAIModelConfigValidationError(
-                f"Azure OpenAI config validation failed: {e!s}. Required fields: endpoint, api_version, deployment_name"
+                f"Azure OpenAI config validation failed: {e!s}. Required fields: endpoint, deployment_name"
             )
 
     def get_supported_provider(self) -> AIModelProviderEnum:

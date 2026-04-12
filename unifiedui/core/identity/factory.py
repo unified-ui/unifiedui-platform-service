@@ -23,6 +23,7 @@ from unifiedui.identity.mock.provider import MockIdentityProvider
 from unifiedui.identity.mock.token import MockIdentityToken
 from unifiedui.identity.oidc.provider import OIDCIdentityProvider
 from unifiedui.identity.oidc.token import OIDCIdentityTokenSerializer
+from unifiedui.identity.oidc.zitadel import ZitadelIdentityProvider
 from unifiedui.identity.okta.provider import OktaIdentityProvider
 from unifiedui.identity.okta.token import OktaIdentityTokenSerializer
 from unifiedui.identity.saml.provider import SAMLIdentityProvider
@@ -230,7 +231,10 @@ class IdentityTokenFactory:
 
     @staticmethod
     def _create_ldap_token(token: str, unverified_claims: dict) -> LDAPIdentityTokenSerializer:
-        """Create an LDAP identity token (no JWKS verification, gateway-trusted).
+        """Create an LDAP identity token with HS256 signature verification.
+
+        Verifies tokens signed by the platform's own LDAP JWT secret.
+        Falls back to expiry-only check if no secret is configured.
 
         Args:
             token: Raw JWT token string.
@@ -239,11 +243,20 @@ class IdentityTokenFactory:
         Returns:
             LDAPIdentityTokenSerializer instance.
         """
-        exp = unverified_claims.get("exp")
-        if exp and int(time.time()) >= exp:
-            raise ValueError("Token has expired")
+        from unifiedui.core.config import settings
 
-        return LDAPIdentityTokenSerializer(token, unverified_claims)
+        if not settings.ldap_jwt_secret:
+            raise ValueError("LDAP_JWT_SECRET is not configured — cannot verify LDAP tokens")
+
+        try:
+            verified_claims: dict = jwt.decode(
+                token,
+                settings.ldap_jwt_secret,
+                algorithms=["HS256"],
+            )
+            return LDAPIdentityTokenSerializer(token, verified_claims)
+        except InvalidTokenError as e:
+            raise ValueError(f"Invalid LDAP token: {e!s}")
 
     @staticmethod
     def _create_kerberos_token(token: str, unverified_claims: dict) -> KerberosIdentityTokenSerializer:
@@ -528,17 +541,40 @@ class IdentityProviderFactory:
     def _create_oidc_provider(identity_token: BaseIdentityToken) -> OIDCIdentityProvider:
         """Create a generic OIDC identity provider.
 
+        Uses ZitadelIdentityProvider when Zitadel Management API is configured,
+        otherwise falls back to the generic OIDC provider.
+
         Args:
             identity_token: The user's verified OIDC identity token.
 
         Returns:
-            Configured OIDCIdentityProvider instance.
+            Configured OIDCIdentityProvider or ZitadelIdentityProvider instance.
         """
+        from urllib.parse import urlparse
+
         from unifiedui.core.config import settings
+
+        extra_headers: dict[str, str] = {}
+        userinfo_url = settings.oidc_userinfo_url
+        if userinfo_url and settings.oidc_issuer_url:
+            issuer_host = urlparse(settings.oidc_issuer_url).netloc
+            userinfo_host = urlparse(userinfo_url).netloc
+            if issuer_host and userinfo_host and issuer_host != userinfo_host:
+                extra_headers["Host"] = issuer_host
+
+        if settings.oidc_zitadel_management_api_url and settings.oidc_zitadel_service_token:
+            return ZitadelIdentityProvider(
+                identity_token=identity_token,
+                userinfo_url=userinfo_url,
+                extra_headers=extra_headers if extra_headers else None,
+                management_api_url=settings.oidc_zitadel_management_api_url,
+                service_token=settings.oidc_zitadel_service_token,
+            )
 
         return OIDCIdentityProvider(
             identity_token=identity_token,
-            userinfo_url=settings.oidc_userinfo_url,
+            userinfo_url=userinfo_url,
+            extra_headers=extra_headers if extra_headers else None,
         )
 
 
@@ -630,6 +666,8 @@ def _get_oidc_token_verifier() -> JWKSTokenVerifier:
     """
     global _oidc_verifier_instance
     if _oidc_verifier_instance is None:
+        from urllib.parse import urlparse
+
         from unifiedui.core.config import settings
 
         jwks_url = settings.oidc_jwks_url
@@ -639,10 +677,18 @@ def _get_oidc_token_verifier() -> JWKSTokenVerifier:
         if not jwks_url:
             raise ValueError("OIDC_JWKS_URL or OIDC_ISSUER_URL is required for OIDC token verification")
 
+        headers: dict[str, str] = {}
+        if settings.oidc_issuer_url and jwks_url:
+            issuer_host = urlparse(settings.oidc_issuer_url).netloc
+            jwks_host = urlparse(jwks_url).netloc
+            if issuer_host and jwks_host and issuer_host != jwks_host:
+                headers["Host"] = issuer_host
+
         _oidc_verifier_instance = JWKSTokenVerifier(
             jwks_url=jwks_url,
             algorithms=["RS256"],
             audience=settings.oidc_client_id,
+            headers=headers if headers else None,
         )
     return _oidc_verifier_instance
 

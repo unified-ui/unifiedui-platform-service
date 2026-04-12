@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Fixed
+
+- Workflow runs pagination: `WorkflowRunsListResponse` now includes `model_config = ConfigDict(populate_by_name=True)` so `next_cursor` is correctly serialized as `nextCursor` in JSON responses — previously the cursor was silently dropped due to Pydantic alias-only construction
+
 ### Added
 
 - FastAPI application with full RBAC and multi-tenant architecture

@@ -15,5 +15,6 @@ class DashboardStatsResponse(BaseModel):
     """Dashboard quick stats response."""
 
     chat_agents: EntityStatsResponse
-    autonomous_agents: EntityStatsResponse
+    workflows: EntityStatsResponse
     conversations: EntityStatsResponse
+    external_apps: EntityStatsResponse

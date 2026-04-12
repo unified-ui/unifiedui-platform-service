@@ -7,17 +7,21 @@ from typing import TYPE_CHECKING, Any, cast
 from sqlalchemy import delete, select
 
 from unifiedui.core.database.models import (
-    AutonomousAgent,
-    AutonomousAgentTag,
     ChatAgent,
     ChatAgentTag,
     ChatWidget,
     ChatWidgetTag,
     Credential,
     CredentialTag,
+    ExternalApp,
+    ExternalAppTag,
     Tag,
+    TenantAIModel,
+    TenantAIModelTag,
     Tool,
     ToolTag,
+    Workflow,
+    WorkflowTag,
 )
 from unifiedui.exc.tags import TagNotFoundError
 from unifiedui.logger import get_logger
@@ -41,11 +45,11 @@ RESOURCE_TAG_MAPPING = {
         "id_field": "chat_agent_id",
         "cache_key_pattern": "chat_agents:detail:tenant:{tenant_id}:chat_agent:{resource_id}",
     },
-    "autonomous_agent": {
-        "model": AutonomousAgent,
-        "tag_model": AutonomousAgentTag,
-        "id_field": "autonomous_agent_id",
-        "cache_key_pattern": "autonomous_agents:detail:tenant:{tenant_id}:agent:{resource_id}",
+    "workflow": {
+        "model": Workflow,
+        "tag_model": WorkflowTag,
+        "id_field": "workflow_id",
+        "cache_key_pattern": "workflows:detail:tenant:{tenant_id}:workflow:{resource_id}",
     },
     "chat_widget": {
         "model": ChatWidget,
@@ -64,6 +68,18 @@ RESOURCE_TAG_MAPPING = {
         "tag_model": ToolTag,
         "id_field": "tool_id",
         "cache_key_pattern": "tools:detail:tenant:{tenant_id}:tool:{resource_id}",
+    },
+    "external_app": {
+        "model": ExternalApp,
+        "tag_model": ExternalAppTag,
+        "id_field": "external_app_id",
+        "cache_key_pattern": "external_apps:detail:tenant:{tenant_id}:ea:{resource_id}",
+    },
+    "tenant_ai_model": {
+        "model": TenantAIModel,
+        "tag_model": TenantAIModelTag,
+        "id_field": "tenant_ai_model_id",
+        "cache_key_pattern": "tenant_ai_models:detail:tenant:{tenant_id}:aim:{resource_id}",
     },
 }
 
@@ -155,7 +171,7 @@ class TagHandler:
 
         Args:
             tenant_id: The ID of the tenant
-            resource_type: Type of resource (chat_agent, autonomous_agent, etc.)
+            resource_type: Type of resource (chat_agent, workflow, etc.)
             name_filter: Optional filter by tag name
             skip: Number of tags to skip (pagination)
             limit: Maximum number of tags to return
@@ -402,7 +418,7 @@ class TagHandler:
 
         Args:
             tenant_id: The ID of the tenant
-            resource_type: Type of resource (chat_agent, autonomous_agent, etc.)
+            resource_type: Type of resource (chat_agent, workflow, etc.)
             resource_id: The ID of the resource
             use_cache: Whether to use caching
 
@@ -464,7 +480,7 @@ class TagHandler:
 
         Args:
             tenant_id: The ID of the tenant
-            resource_type: Type of resource (chat_agent, autonomous_agent, etc.)
+            resource_type: Type of resource (chat_agent, workflow, etc.)
             resource_id: The ID of the resource
             tag_names: List of tag names to set
             user: ContextIdentityUser object
@@ -533,7 +549,7 @@ class TagHandler:
 
         Args:
             tenant_id: The ID of the tenant
-            resource_type: Type of resource (chat_agent, autonomous_agent, etc.)
+            resource_type: Type of resource (chat_agent, workflow, etc.)
             resource_id: The ID of the resource
         """
         logger.info(

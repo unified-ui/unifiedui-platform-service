@@ -13,9 +13,11 @@ from unifiedui.core.database.enums import OrganizationRoleEnum, PrincipalTypeEnu
 
 @pytest.fixture(autouse=True)
 def _disable_system_admin_restriction():
-    """Disable system_admin_email restriction for all org tests in this module."""
+    """Disable system admin restriction for all org tests in this module."""
     with patch("unifiedui.core.config.settings") as mock_settings:
-        mock_settings.system_admin_email = None
+        mock_settings.msal_system_admin_email = None
+        mock_settings.ldap_system_admin_username = None
+        mock_settings.oidc_zitadel_system_admin_username = None
         yield
 
 
@@ -40,7 +42,7 @@ PRINCIPAL_TYPE_GROUP = PrincipalTypeEnum.IDENTITY_GROUP.value
 
 
 def _create_org_data(
-    name: str = "Test Organization",
+    name: str | None = None,
     slug: str = "test-org",
     description: str | None = "A test organization",
     identity_provider: str = "entra_id",
@@ -49,7 +51,7 @@ def _create_org_data(
 ) -> dict[str, Any]:
     """Helper to create organization request data."""
     data: dict[str, Any] = {
-        "name": name,
+        "name": name if name is not None else f"Org {slug}",
         "slug": slug,
         "identity_provider": identity_provider,
         "identity_tenant_id": identity_tenant_id,
@@ -225,7 +227,7 @@ class TestOrganizationRoutes:
         data = response.json()
 
         assert data["id"] == org_id
-        assert data["name"] == "Test Organization"
+        assert data["name"] == "Org get-org-1"
         assert data["slug"] == "get-org-1"
 
     def test_get_organization_not_found(self, test_client: TestClient) -> None:

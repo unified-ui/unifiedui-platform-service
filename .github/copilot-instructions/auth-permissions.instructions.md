@@ -132,7 +132,7 @@ Permission check applied after `@authenticate()`.
 ### 3. `@authenticate_autonomous_agent_api_key()`
 API key authentication without Bearer token.
 
-- Validates `X-Unified-UI-Autonomous-Agent-API-Key` header
+- Validates `X-Unified-UI-Workflow-API-Key` header
 - Retrieves primary/secondary keys from vault (never cached for rotation support)
 - Stores `request.state.autonomous_agent` and `request.state.authenticated_via_api_key = True`
 - Requires `tenant_id` and `autonomous_agent_id` in path params

@@ -13,7 +13,6 @@ from starlette.testclient import TestClient
 
 from tests.conftest import create_auth_headers
 from tests.helpers.tenant import create_tenant_for_user
-from unifiedui.handlers.dependencies.autonomous_agents import get_autonomous_agent_handler
 from unifiedui.handlers.dependencies.chat_agents import get_chat_agent_handler
 from unifiedui.handlers.dependencies.chat_widgets import get_chat_widget_handler
 from unifiedui.handlers.dependencies.conversations import get_conversation_handler
@@ -21,6 +20,7 @@ from unifiedui.handlers.dependencies.credentials import get_credential_handler
 from unifiedui.handlers.dependencies.tags import get_tag_handler
 from unifiedui.handlers.dependencies.tenant_ai_models import get_tenant_ai_model_handler
 from unifiedui.handlers.dependencies.tools import get_tool_handler
+from unifiedui.handlers.dependencies.workflows import get_workflow_handler
 
 FAKE_ID = "00000000-0000-0000-0000-000000000099"
 TEST_SERVICE_KEY = "test-service-key-for-exception-tests"
@@ -786,32 +786,32 @@ class TestChatAgentRouteExceptionHandling:
         assert response.status_code == status.HTTP_400_BAD_REQUEST
 
 
-class TestAutonomousAgentRouteExceptionHandling:
+class TestWorkflowRouteExceptionHandling:
     """Test generic exception handling in autonomous agent routes."""
 
-    def test_list_autonomous_agents_500(self, test_client: TestClient, test_user_token: Any) -> None:
+    def test_list_workflows_500(self, test_client: TestClient, test_user_token: Any) -> None:
         """Test list autonomous agents returns 500 on unexpected error."""
         tenant_id = create_tenant_for_user(test_client, test_user_token)
         headers = create_auth_headers(test_user_token, use_cache=False)
 
         mock_handler = make_failing_handler()
-        test_client.app.dependency_overrides[get_autonomous_agent_handler] = lambda: mock_handler
+        test_client.app.dependency_overrides[get_workflow_handler] = lambda: mock_handler
 
-        response = test_client.get(f"/api/v1/platform-service/tenants/{tenant_id}/autonomous-agents", headers=headers)
+        response = test_client.get(f"/api/v1/platform-service/tenants/{tenant_id}/workflows", headers=headers)
         assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
 
-        del test_client.app.dependency_overrides[get_autonomous_agent_handler]
+        del test_client.app.dependency_overrides[get_workflow_handler]
 
-    def test_create_autonomous_agent_500(self, test_client: TestClient, test_user_token: Any) -> None:
+    def test_create_workflow_500(self, test_client: TestClient, test_user_token: Any) -> None:
         """Test create autonomous agent returns 500 on unexpected error."""
         tenant_id = create_tenant_for_user(test_client, test_user_token)
         headers = create_auth_headers(test_user_token, use_cache=False)
 
         mock_handler = make_failing_handler()
-        test_client.app.dependency_overrides[get_autonomous_agent_handler] = lambda: mock_handler
+        test_client.app.dependency_overrides[get_workflow_handler] = lambda: mock_handler
 
         response = test_client.post(
-            f"/api/v1/platform-service/tenants/{tenant_id}/autonomous-agents",
+            f"/api/v1/platform-service/tenants/{tenant_id}/workflows",
             json={
                 "name": "Agent",
                 "type": "N8N",
@@ -825,116 +825,114 @@ class TestAutonomousAgentRouteExceptionHandling:
         )
         assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
 
-        del test_client.app.dependency_overrides[get_autonomous_agent_handler]
+        del test_client.app.dependency_overrides[get_workflow_handler]
 
-    def test_get_autonomous_agent_500(self, test_client: TestClient, test_user_token: Any) -> None:
+    def test_get_workflow_500(self, test_client: TestClient, test_user_token: Any) -> None:
         """Test get autonomous agent returns 500 on unexpected error."""
         tenant_id = create_tenant_for_user(test_client, test_user_token)
         headers = create_auth_headers(test_user_token, use_cache=False)
 
         mock_handler = make_failing_handler()
-        test_client.app.dependency_overrides[get_autonomous_agent_handler] = lambda: mock_handler
+        test_client.app.dependency_overrides[get_workflow_handler] = lambda: mock_handler
 
         response = test_client.get(
-            f"/api/v1/platform-service/tenants/{tenant_id}/autonomous-agents/{FAKE_ID}",
+            f"/api/v1/platform-service/tenants/{tenant_id}/workflows/{FAKE_ID}",
             headers=headers,
         )
         assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
 
-        del test_client.app.dependency_overrides[get_autonomous_agent_handler]
+        del test_client.app.dependency_overrides[get_workflow_handler]
 
-    def test_update_autonomous_agent_500(self, test_client: TestClient, test_user_token: Any) -> None:
+    def test_update_workflow_500(self, test_client: TestClient, test_user_token: Any) -> None:
         """Test update autonomous agent returns 500 on unexpected error."""
         tenant_id = create_tenant_for_user(test_client, test_user_token)
         headers = create_auth_headers(test_user_token, use_cache=False)
 
         mock_handler = make_failing_handler()
-        test_client.app.dependency_overrides[get_autonomous_agent_handler] = lambda: mock_handler
+        test_client.app.dependency_overrides[get_workflow_handler] = lambda: mock_handler
 
         response = test_client.patch(
-            f"/api/v1/platform-service/tenants/{tenant_id}/autonomous-agents/{FAKE_ID}",
+            f"/api/v1/platform-service/tenants/{tenant_id}/workflows/{FAKE_ID}",
             json={"name": "Updated"},
             headers=headers,
         )
         assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
 
-        del test_client.app.dependency_overrides[get_autonomous_agent_handler]
+        del test_client.app.dependency_overrides[get_workflow_handler]
 
-    def test_delete_autonomous_agent_500(self, test_client: TestClient, test_user_token: Any) -> None:
+    def test_delete_workflow_500(self, test_client: TestClient, test_user_token: Any) -> None:
         """Test delete autonomous agent returns 500 on unexpected error."""
         tenant_id = create_tenant_for_user(test_client, test_user_token)
         headers = create_auth_headers(test_user_token, use_cache=False)
 
         mock_handler = make_failing_handler()
-        test_client.app.dependency_overrides[get_autonomous_agent_handler] = lambda: mock_handler
+        test_client.app.dependency_overrides[get_workflow_handler] = lambda: mock_handler
 
         response = test_client.delete(
-            f"/api/v1/platform-service/tenants/{tenant_id}/autonomous-agents/{FAKE_ID}",
+            f"/api/v1/platform-service/tenants/{tenant_id}/workflows/{FAKE_ID}",
             headers=headers,
         )
         assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
 
-        del test_client.app.dependency_overrides[get_autonomous_agent_handler]
+        del test_client.app.dependency_overrides[get_workflow_handler]
 
-    def test_list_autonomous_agent_principals_500(self, test_client: TestClient, test_user_token: Any) -> None:
+    def test_list_workflow_principals_500(self, test_client: TestClient, test_user_token: Any) -> None:
         """Test list autonomous agent principals returns 500 on unexpected error."""
         tenant_id = create_tenant_for_user(test_client, test_user_token)
         headers = create_auth_headers(test_user_token, use_cache=False)
 
         mock_handler = make_failing_handler()
-        test_client.app.dependency_overrides[get_autonomous_agent_handler] = lambda: mock_handler
+        test_client.app.dependency_overrides[get_workflow_handler] = lambda: mock_handler
 
         response = test_client.get(
-            f"/api/v1/platform-service/tenants/{tenant_id}/autonomous-agents/{FAKE_ID}/principals",
+            f"/api/v1/platform-service/tenants/{tenant_id}/workflows/{FAKE_ID}/principals",
             headers=headers,
         )
         assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
 
-        del test_client.app.dependency_overrides[get_autonomous_agent_handler]
+        del test_client.app.dependency_overrides[get_workflow_handler]
 
-    def test_set_autonomous_agent_permission_500(self, test_client: TestClient, test_user_token: Any) -> None:
+    def test_set_workflow_permission_500(self, test_client: TestClient, test_user_token: Any) -> None:
         """Test set autonomous agent permission returns 500 on unexpected error."""
         tenant_id = create_tenant_for_user(test_client, test_user_token)
         headers = create_auth_headers(test_user_token, use_cache=False)
 
         mock_handler = make_failing_handler()
-        test_client.app.dependency_overrides[get_autonomous_agent_handler] = lambda: mock_handler
+        test_client.app.dependency_overrides[get_workflow_handler] = lambda: mock_handler
 
         response = test_client.put(
-            f"/api/v1/platform-service/tenants/{tenant_id}/autonomous-agents/{FAKE_ID}/principals",
+            f"/api/v1/platform-service/tenants/{tenant_id}/workflows/{FAKE_ID}/principals",
             json={"principal_id": "user-1", "principal_type": "IDENTITY_USER", "role": "READ"},
             headers=headers,
         )
         assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
 
-        del test_client.app.dependency_overrides[get_autonomous_agent_handler]
+        del test_client.app.dependency_overrides[get_workflow_handler]
 
-    def test_delete_autonomous_agent_principal_500(self, test_client: TestClient, test_user_token: Any) -> None:
+    def test_delete_workflow_principal_500(self, test_client: TestClient, test_user_token: Any) -> None:
         """Test delete autonomous agent principal returns 500 on unexpected error."""
         tenant_id = create_tenant_for_user(test_client, test_user_token)
         headers = create_auth_headers(test_user_token, use_cache=False)
 
         mock_handler = make_failing_handler()
-        test_client.app.dependency_overrides[get_autonomous_agent_handler] = lambda: mock_handler
+        test_client.app.dependency_overrides[get_workflow_handler] = lambda: mock_handler
 
         response = test_client.request(
             "DELETE",
-            f"/api/v1/platform-service/tenants/{tenant_id}/autonomous-agents/{FAKE_ID}/principals",
+            f"/api/v1/platform-service/tenants/{tenant_id}/workflows/{FAKE_ID}/principals",
             json={"principal_id": FAKE_ID, "principal_type": "IDENTITY_USER", "role": "READ"},
             headers=headers,
         )
         assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
 
-        del test_client.app.dependency_overrides[get_autonomous_agent_handler]
+        del test_client.app.dependency_overrides[get_workflow_handler]
 
-    def test_list_autonomous_agents_invalid_tags_format(self, test_client: TestClient, test_user_token: Any) -> None:
+    def test_list_workflows_invalid_tags_format(self, test_client: TestClient, test_user_token: Any) -> None:
         """Test list autonomous agents with invalid tag IDs returns 400."""
         tenant_id = create_tenant_for_user(test_client, test_user_token)
         headers = create_auth_headers(test_user_token, use_cache=False)
 
-        response = test_client.get(
-            f"/api/v1/platform-service/tenants/{tenant_id}/autonomous-agents?tags=abc", headers=headers
-        )
+        response = test_client.get(f"/api/v1/platform-service/tenants/{tenant_id}/workflows?tags=abc", headers=headers)
         assert response.status_code == status.HTTP_400_BAD_REQUEST
 
 
@@ -1049,7 +1047,7 @@ class TestTagRouteExceptionHandling:
 
         del test_client.app.dependency_overrides[get_tag_handler]
 
-    def test_get_autonomous_agent_tags_500(self, test_client: TestClient, test_user_token: Any) -> None:
+    def test_get_workflow_tags_500(self, test_client: TestClient, test_user_token: Any) -> None:
         """Test get autonomous agent tags returns 500 on unexpected error."""
         tenant_id = create_tenant_for_user(test_client, test_user_token)
         headers = create_auth_headers(test_user_token, use_cache=False)
@@ -1058,14 +1056,14 @@ class TestTagRouteExceptionHandling:
         test_client.app.dependency_overrides[get_tag_handler] = lambda: mock_handler
 
         response = test_client.get(
-            f"/api/v1/platform-service/tenants/{tenant_id}/autonomous-agents/{FAKE_ID}/tags",
+            f"/api/v1/platform-service/tenants/{tenant_id}/workflows/{FAKE_ID}/tags",
             headers=headers,
         )
         assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
 
         del test_client.app.dependency_overrides[get_tag_handler]
 
-    def test_set_autonomous_agent_tags_500(self, test_client: TestClient, test_user_token: Any) -> None:
+    def test_set_workflow_tags_500(self, test_client: TestClient, test_user_token: Any) -> None:
         """Test set autonomous agent tags returns 500 on unexpected error."""
         tenant_id = create_tenant_for_user(test_client, test_user_token)
         headers = create_auth_headers(test_user_token, use_cache=False)
@@ -1074,7 +1072,7 @@ class TestTagRouteExceptionHandling:
         test_client.app.dependency_overrides[get_tag_handler] = lambda: mock_handler
 
         response = test_client.put(
-            f"/api/v1/platform-service/tenants/{tenant_id}/autonomous-agents/{FAKE_ID}/tags",
+            f"/api/v1/platform-service/tenants/{tenant_id}/workflows/{FAKE_ID}/tags",
             json={"tags": ["tag1"]},
             headers=headers,
         )
@@ -1082,7 +1080,7 @@ class TestTagRouteExceptionHandling:
 
         del test_client.app.dependency_overrides[get_tag_handler]
 
-    def test_delete_autonomous_agent_tags_500(self, test_client: TestClient, test_user_token: Any) -> None:
+    def test_delete_workflow_tags_500(self, test_client: TestClient, test_user_token: Any) -> None:
         """Test delete autonomous agent tags returns 500 on unexpected error."""
         tenant_id = create_tenant_for_user(test_client, test_user_token)
         headers = create_auth_headers(test_user_token, use_cache=False)
@@ -1091,14 +1089,14 @@ class TestTagRouteExceptionHandling:
         test_client.app.dependency_overrides[get_tag_handler] = lambda: mock_handler
 
         response = test_client.delete(
-            f"/api/v1/platform-service/tenants/{tenant_id}/autonomous-agents/{FAKE_ID}/tags",
+            f"/api/v1/platform-service/tenants/{tenant_id}/workflows/{FAKE_ID}/tags",
             headers=headers,
         )
         assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
 
         del test_client.app.dependency_overrides[get_tag_handler]
 
-    def test_list_autonomous_agent_type_tags_500(self, test_client: TestClient, test_user_token: Any) -> None:
+    def test_list_workflow_type_tags_500(self, test_client: TestClient, test_user_token: Any) -> None:
         """Test list autonomous agent type tags returns 500 on unexpected error."""
         tenant_id = create_tenant_for_user(test_client, test_user_token)
         headers = create_auth_headers(test_user_token, use_cache=False)
@@ -1107,7 +1105,7 @@ class TestTagRouteExceptionHandling:
         test_client.app.dependency_overrides[get_tag_handler] = lambda: mock_handler
 
         response = test_client.get(
-            f"/api/v1/platform-service/tenants/{tenant_id}/autonomous-agents/tags",
+            f"/api/v1/platform-service/tenants/{tenant_id}/workflows/tags",
             headers=headers,
         )
         assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR

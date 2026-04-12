@@ -24,3 +24,13 @@ class UpdateCredentialRequest(BaseModel):
     secret_value: str | None = Field(None, min_length=1, description="New secret value")
     metadata: dict | None = Field(None, description="Additional metadata")
     is_active: bool | None = Field(None, description="Whether the credential is active")
+
+
+class TestCredentialConnectionRequest(BaseModel):
+    """Request model for testing a credential connection."""
+
+    credential_type: str = Field(..., description="Type of credential (currently only ENTRA_ID_APP_REGISTRATION)")
+    tenant_id: str = Field(..., min_length=1, description="Azure Entra ID tenant ID")
+    client_id: str = Field(..., min_length=1, description="Azure Entra ID client/application ID")
+    client_secret: str = Field(..., min_length=1, description="Azure Entra ID client secret")
+    scopes: list[str] | None = Field(None, description="Optional OAuth 2.0 scopes for token acquisition")

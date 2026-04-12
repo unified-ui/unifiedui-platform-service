@@ -26,12 +26,14 @@ async def global_search(
     q: str = Query("", description="Search query string"),
     types: str | None = Query(None, description="Comma-separated entity types"),
     limit: int = Query(10, ge=1, le=50, description="Max results per type"),
+    offset: int = Query(0, ge=0, description="Number of results to skip per type"),
     handler: SearchHandler = Depends(get_search_handler),
 ):
     """Search across all entity types within the tenant.
 
-    Searches chat agents, autonomous agents, and conversations
-    by name and description, respecting RBAC permissions.
+    Searches chat agents, workflows, conversations, chat widgets,
+    external apps, credentials, tools, AI models, principals, and custom
+    groups by name and description, respecting RBAC permissions.
     """
     try:
         user: ContextIdentityUser = request.state.user
@@ -42,6 +44,7 @@ async def global_search(
             query=q,
             types=type_list,
             limit=limit,
+            offset=offset,
         )
     except HTTPException:
         raise

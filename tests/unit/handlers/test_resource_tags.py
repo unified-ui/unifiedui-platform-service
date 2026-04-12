@@ -7,12 +7,12 @@ import pytest
 
 from unifiedui.core.database.enums import PrincipalTypeEnum
 from unifiedui.core.database.models import (
-    AutonomousAgent,
     ChatAgent,
     Credential,
     Principal,
     Tag,
     Tenant,
+    Workflow,
 )
 from unifiedui.handlers.resource_tags import RESOURCE_TAG_CONFIG, ResourceTagsHandler
 
@@ -24,7 +24,7 @@ class TestResourceTagsHandlerConfig:
 
     def test_supported_resource_types(self):
         """Test that all expected resource types are configured."""
-        expected_types = ["chat_agent", "autonomous_agent", "chat_widget", "credential"]
+        expected_types = ["chat_agent", "workflow", "chat_widget", "credential"]
         for resource_type in expected_types:
             assert resource_type in RESOURCE_TAG_CONFIG
 
@@ -41,7 +41,9 @@ class TestResourceTagsHandlerConfig:
 
         assert "chat_agent" in types
         assert "credential" in types
-        assert len(types) == 4  # 4 resource types support tags
+        assert "external_app" in types
+        assert "tenant_ai_model" in types
+        assert len(types) == 6  # 6 resource types support tags
 
 
 class TestResourceTagsHandlerOperations:
@@ -391,7 +393,7 @@ class TestResourceTagsHandlerMultipleResourceTypes:
 
         # Create autonomous agent
         agent_id = str(uuid.uuid4())
-        agent = AutonomousAgent(
+        agent = Workflow(
             id=agent_id,
             tenant_id=tenant_id,
             name="Test Agent",
@@ -443,7 +445,7 @@ class TestResourceTagsHandlerMultipleResourceTypes:
 
         assert len(tags_result["tags"]) == 1
 
-    def test_add_tag_to_autonomous_agent(self, handler, setup_tenant_with_resources):
+    def test_add_tag_to_workflow(self, handler, setup_tenant_with_resources):
         """Test adding tag to autonomous agent resource type."""
         data = setup_tenant_with_resources
 
@@ -451,7 +453,7 @@ class TestResourceTagsHandlerMultipleResourceTypes:
         mock_user.identity.get_id.return_value = data["user_id"]
 
         result = handler.add_resource_tag(
-            resource_type="autonomous_agent",
+            resource_type="workflow",
             tenant_id=data["tenant_id"],
             resource_id=data["agent_id"],
             tag_name="AGENT-TAG",
@@ -477,7 +479,7 @@ class TestResourceTagsHandlerMultipleResourceTypes:
         )
 
         agent_result = handler.add_resource_tag(
-            resource_type="autonomous_agent",
+            resource_type="workflow",
             tenant_id=data["tenant_id"],
             resource_id=data["agent_id"],
             tag_name="SHARED-TAG",

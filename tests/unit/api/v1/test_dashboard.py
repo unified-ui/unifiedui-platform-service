@@ -9,12 +9,12 @@ from tests.conftest import create_auth_headers
 from tests.helpers.tenant import create_tenant_for_user
 from unifiedui.core.database.enums import PermissionActionEnum, PrincipalTypeEnum
 from unifiedui.core.database.models import (
-    AutonomousAgent,
-    AutonomousAgentMember,
     ChatAgent,
     ChatAgentMember,
     Conversation,
     ConversationMember,
+    Workflow,
+    WorkflowMember,
 )
 
 ENDPOINT_DASHBOARD_STATS = "/api/v1/platform-service/tenants/{tenant_id}/dashboard/stats"
@@ -57,7 +57,7 @@ def create_chat_agent_in_db(
     return app_id
 
 
-def create_autonomous_agent_in_db(
+def create_workflow_in_db(
     test_client: TestClient,
     tenant_id: str,
     user_id: str,
@@ -67,7 +67,7 @@ def create_autonomous_agent_in_db(
     """Create an autonomous agent directly in DB and return its ID."""
     agent_id = str(uuid.uuid4())
     with test_client.db_client.get_session() as session:
-        agent = AutonomousAgent(
+        agent = Workflow(
             id=agent_id,
             tenant_id=tenant_id,
             name=name,
@@ -80,10 +80,10 @@ def create_autonomous_agent_in_db(
         )
         session.add(agent)
         session.commit()
-        member = AutonomousAgentMember(
+        member = WorkflowMember(
             id=str(uuid.uuid4()),
             tenant_id=tenant_id,
-            autonomous_agent_id=agent_id,
+            workflow_id=agent_id,
             principal_id=user_id,
             role=PermissionActionEnum.ADMIN,
             created_by=user_id,
@@ -144,7 +144,7 @@ def test_get_dashboard_stats_empty(test_client: TestClient):
     assert data["chat_agents"]["total"] == 0
     assert data["chat_agents"]["active"] == 0
     assert data["chat_agents"]["inactive"] == 0
-    assert data["autonomous_agents"]["total"] == 0
+    assert data["workflows"]["total"] == 0
     assert data["conversations"]["total"] == 0
 
 
@@ -159,8 +159,8 @@ def test_get_dashboard_stats_with_entities(test_client: TestClient):
     create_chat_agent_in_db(test_client, tenant_id, user_id, "App2", is_active=True)
     create_chat_agent_in_db(test_client, tenant_id, user_id, "App3", is_active=False)
 
-    create_autonomous_agent_in_db(test_client, tenant_id, user_id, "Agent1", is_active=True)
-    create_autonomous_agent_in_db(test_client, tenant_id, user_id, "Agent2", is_active=False)
+    create_workflow_in_db(test_client, tenant_id, user_id, "Agent1", is_active=True)
+    create_workflow_in_db(test_client, tenant_id, user_id, "Agent2", is_active=False)
 
     create_conversation_in_db(test_client, tenant_id, user_id, app1_id, "Conv1")
     create_conversation_in_db(test_client, tenant_id, user_id, app1_id, "Conv2")
@@ -177,9 +177,9 @@ def test_get_dashboard_stats_with_entities(test_client: TestClient):
     assert data["chat_agents"]["active"] == 2
     assert data["chat_agents"]["inactive"] == 1
 
-    assert data["autonomous_agents"]["total"] == 2
-    assert data["autonomous_agents"]["active"] == 1
-    assert data["autonomous_agents"]["inactive"] == 1
+    assert data["workflows"]["total"] == 2
+    assert data["workflows"]["active"] == 1
+    assert data["workflows"]["inactive"] == 1
 
     assert data["conversations"]["total"] == 2
     assert data["conversations"]["active"] == 2

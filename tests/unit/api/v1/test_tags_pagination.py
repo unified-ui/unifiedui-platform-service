@@ -237,7 +237,7 @@ class TestResourceTypeTagsList:
         assert "PRODUCTION" in tag_names
         assert "UNUSED" not in tag_names
 
-    def test_list_autonomous_agent_tags(self, test_client: TestClient, test_user_token: Any) -> None:
+    def test_list_workflow_tags(self, test_client: TestClient, test_user_token: Any) -> None:
         """Test listing tags for autonomous agents."""
         # Setup
         headers = create_auth_headers(test_user_token, use_cache=False)
@@ -245,7 +245,7 @@ class TestResourceTypeTagsList:
 
         # Create agent via API
         agent_response = test_client.post(
-            f"/api/v1/platform-service/tenants/{tenant_id}/autonomous-agents",
+            f"/api/v1/platform-service/tenants/{tenant_id}/workflows",
             json={
                 "name": "Test Agent",
                 "description": "Test",
@@ -266,14 +266,14 @@ class TestResourceTypeTagsList:
         create_tag(test_client, tenant_id, headers, "AUTOMATION")
 
         test_client.put(
-            f"/api/v1/platform-service/tenants/{tenant_id}/autonomous-agents/{agent_id}/tags",
+            f"/api/v1/platform-service/tenants/{tenant_id}/workflows/{agent_id}/tags",
             json={"tags": ["AI", "AUTOMATION"]},
             headers=headers,
         )
 
         # Test
         response = test_client.get(
-            ENDPOINT_RESOURCE_TYPE_TAGS.format(tenant_id=tenant_id, resource_type="autonomous-agents"), headers=headers
+            ENDPOINT_RESOURCE_TYPE_TAGS.format(tenant_id=tenant_id, resource_type="workflows"), headers=headers
         )
 
         # Verify

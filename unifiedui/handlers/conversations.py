@@ -84,6 +84,7 @@ class ConversationHandler:
         order_direction: str | None = None,
         view: str | None = None,
         use_cache: bool = True,
+        id_list: list[str] | None = None,
     ) -> list[ConversationResponse] | list[QuickListItemResponse] | list[ConversationQuickListItemResponse]:
         """
         Get a list of conversations for a tenant (filtered by permissions).
@@ -137,7 +138,7 @@ class ConversationHandler:
         cache_key = f"conversations:list:tenant:{tenant_id}:user:{user_id}:skip:{skip}:limit:{limit}:view:{view_key}:order:{order_key}:active:{is_active_key}"
 
         # Check if any filters are applied
-        has_filters = name_filter is not None
+        has_filters = name_filter is not None or id_list is not None
 
         # Check cache (disable caching when any filters are applied)
         if use_cache and self.cache_client and not has_filters:
@@ -174,6 +175,9 @@ class ConversationHandler:
 
                 query = query.where(Conversation.id.in_(member_subquery))
 
+            if id_list:
+                query = query.where(Conversation.id.in_(id_list))
+
             if name_filter:
                 query = query.where(Conversation.name.ilike(f"%{name_filter}%"))
 
@@ -185,6 +189,9 @@ class ConversationHandler:
             if order_by and hasattr(Conversation, order_by):
                 column = getattr(Conversation, order_by)
                 query = query.order_by(column.desc()) if order_direction == "desc" else query.order_by(column.asc())
+            else:
+                # MSSQL requires ORDER BY when using OFFSET/LIMIT
+                query = query.order_by(Conversation.created_at.desc())
 
             query = query.offset(skip).limit(limit)
             conversations = session.execute(query).scalars().all()

@@ -5,11 +5,18 @@ from __future__ import annotations
 import uuid
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import selectinload
 
 from unifiedui.core.database.enums import ChatAgentTypeEnum, PermissionActionEnum
-from unifiedui.core.database.models import ChatAgent, ChatAgentMember, ChatAgentTag, ReActAgentVersion
+from unifiedui.core.database.models import (
+    ChatAgent,
+    ChatAgentMember,
+    ChatAgentTag,
+    ReActAgentVersion,
+    RecentVisit,
+    TenantAIModel,
+)
 from unifiedui.handlers.cache_utils import ResourceCacheInvalidator
 from unifiedui.handlers.permission_resolver import (
     check_is_admin,
@@ -34,12 +41,15 @@ if TYPE_CHECKING:
     )
     from unifiedui.schema.requests.permissions import SetResourcePermissionRequest
     from unifiedui.schema.responses.chat_agents import (
+        LLMConfigSettingsResponse,
         MicrosoftFoundryConfigSettingsResponse,
         N8NConfigSettingsResponse,
+        RestApiConfigSettingsResponse,
     )
     from unifiedui.schema.responses.re_act_agents import ReActAgentConfigSettingsResponse
 
 from unifiedui.exc.chat_agent_config import (
+    InvalidAIModelReferenceError,
     InvalidCredentialError,
 )
 from unifiedui.exc.chat_agents import ChatAgentNotFoundError
@@ -115,6 +125,7 @@ class ChatAgentHandler:
         view: str | None = None,
         type_filter: str | None = None,
         use_cache: bool = True,
+        id_list: list[str] | None = None,
     ) -> list[ChatAgentResponse] | list[QuickListItemResponse]:
         """
         Get a list of chat agents for a tenant (filtered by permissions).
@@ -164,7 +175,7 @@ class ChatAgentHandler:
         cache_key = f"chat_agents:list:tenant:{tenant_id}:user:{user_id}:skip:{skip}:limit:{limit}:view:{view_key}:order:{order_key}:active:{is_active_key}:type:{type_key}"
 
         # Check if any filters are applied (name_filter and tag_ids disable caching)
-        has_filters = name_filter is not None or tag_ids is not None or type_filter is not None
+        has_filters = name_filter is not None or tag_ids is not None or type_filter is not None or id_list is not None
 
         # Check cache (disable caching when any filters are applied)
         if use_cache and self.cache_client and not has_filters:
@@ -206,6 +217,9 @@ class ChatAgentHandler:
 
                 query = query.where(ChatAgent.id.in_(member_subquery))
 
+            if id_list:
+                query = query.where(ChatAgent.id.in_(id_list))
+
             if type_filter:
                 query = query.where(ChatAgent.type == type_filter)
 
@@ -229,6 +243,9 @@ class ChatAgentHandler:
             if order_by and hasattr(ChatAgent, order_by):
                 column = getattr(ChatAgent, order_by)
                 query = query.order_by(column.desc()) if order_direction == "desc" else query.order_by(column.asc())
+            else:
+                # MSSQL requires ORDER BY when using OFFSET/LIMIT
+                query = query.order_by(ChatAgent.created_at.desc())
 
             query = query.offset(skip).limit(limit)
             chat_agents = session.execute(query).scalars().all()
@@ -363,6 +380,9 @@ class ChatAgentHandler:
         chat_agent_id = str(uuid.uuid4())
 
         with self.db_client.get_session() as session:
+            if request.type == ChatAgentTypeEnum.LLM and validated_config.get("ai_model_id"):
+                self._validate_ai_model_reference(session, tenant_id, validated_config["ai_model_id"])
+
             chat_agent = ChatAgent(
                 id=chat_agent_id,
                 tenant_id=tenant_id,
@@ -372,6 +392,7 @@ class ChatAgentHandler:
                 config=validated_config,
                 is_active=request.is_active,
                 embed_allowed_origins=request.embed_allowed_origins,
+                greeting_messages=request.greeting_messages or [],
                 created_by=user_id,
                 updated_by=user_id,
             )
@@ -468,11 +489,15 @@ class ChatAgentHandler:
                 validated_config = ChatAgentConfigValidatorFactory.validate_config(
                     chat_agent_type=app_type, config=request.config
                 )
+                if app_type == ChatAgentTypeEnum.LLM and validated_config.get("ai_model_id"):
+                    self._validate_ai_model_reference(session, tenant_id, validated_config["ai_model_id"])
                 chat_agent.config = validated_config
             if request.is_active is not None:
                 chat_agent.is_active = request.is_active
             if request.embed_allowed_origins is not None:
                 chat_agent.embed_allowed_origins = request.embed_allowed_origins
+            if request.greeting_messages is not None:
+                chat_agent.greeting_messages = request.greeting_messages
 
             chat_agent.updated_by = user_id
 
@@ -516,6 +541,16 @@ class ChatAgentHandler:
                 raise ChatAgentNotFoundError(chat_agent_id)
 
             session.delete(chat_agent)
+
+            # Clean up recent visits for this resource
+            session.execute(
+                delete(RecentVisit).where(
+                    RecentVisit.tenant_id == tenant_id,
+                    RecentVisit.resource_type == "chat_agent",
+                    RecentVisit.resource_id == chat_agent_id,
+                )
+            )
+
             session.commit()
 
             logger.info("Chat agent deleted", extra={"chat_agent_id": chat_agent_id})
@@ -524,6 +559,129 @@ class ChatAgentHandler:
             self._invalidate_list_cache(tenant_id)
             self._invalidate_detail_cache(tenant_id, chat_agent_id)
             self._invalidate_permissions_cache(tenant_id, chat_agent_id)
+
+    def duplicate_chat_agent(
+        self, tenant_id: str, chat_agent_id: str, user_id: str, user: ContextIdentityUser
+    ) -> ChatAgentResponse:
+        """
+        Duplicate an existing chat agent.
+
+        Creates an exact copy of the chat agent with name + " Copy" (or " Copy(n)" if exists).
+        Tags and ReACT agent versions are NOT copied.
+
+        Args:
+            tenant_id: The ID of the tenant
+            chat_agent_id: The ID of the chat agent to duplicate
+            user_id: The ID of the user performing the duplication
+            user: The authenticated user context
+
+        Returns:
+            The newly created chat agent response
+
+        Raises:
+            ChatAgentNotFoundError: If the source chat agent is not found
+        """
+        logger.info("Duplicating chat agent", extra={"tenant_id": tenant_id, "chat_agent_id": chat_agent_id})
+
+        with self.db_client.get_session() as session:
+            query = (
+                select(ChatAgent)
+                .options(selectinload(ChatAgent.versions))
+                .where(ChatAgent.id == chat_agent_id, ChatAgent.tenant_id == tenant_id)
+            )
+            source_agent = session.execute(query).scalar_one_or_none()
+            if not source_agent:
+                raise ChatAgentNotFoundError(chat_agent_id)
+
+            new_name = self._generate_copy_name(session, tenant_id, source_agent.name)
+            new_agent_id = str(uuid.uuid4())
+            new_agent = ChatAgent(
+                id=new_agent_id,
+                tenant_id=tenant_id,
+                name=new_name,
+                description=source_agent.description,
+                type=source_agent.type,
+                config=source_agent.config.copy() if source_agent.config else {},
+                is_active=source_agent.is_active,
+                embed_allowed_origins=source_agent.embed_allowed_origins,
+                greeting_messages=source_agent.greeting_messages.copy() if source_agent.greeting_messages else [],
+                created_by=user_id,
+                updated_by=user_id,
+            )
+            session.add(new_agent)
+
+            if source_agent.type == ChatAgentTypeEnum.REACT_AGENT.value and source_agent.versions:
+                latest_version = max(source_agent.versions, key=lambda v: v.version)
+                new_version = ReActAgentVersion(
+                    id=str(uuid.uuid4()),
+                    chat_agent_id=new_agent_id,
+                    version=1,
+                    ai_model_ids=latest_version.ai_model_ids.copy() if latest_version.ai_model_ids else [],
+                    system_prompt=latest_version.system_prompt,
+                    tool_ids=latest_version.tool_ids.copy() if latest_version.tool_ids else [],
+                    security_prompt=latest_version.security_prompt,
+                    tool_use_prompt=latest_version.tool_use_prompt,
+                    response_prompt=latest_version.response_prompt,
+                    greeting_messages=latest_version.greeting_messages.copy()
+                    if latest_version.greeting_messages
+                    else [],
+                    config=latest_version.config.copy() if latest_version.config else {},
+                    created_by=user_id,
+                    updated_by=user_id,
+                )
+                session.add(new_version)
+
+            self.permissions_handler.add_creator_permission(
+                session=session,
+                resource_type="chat_agent",
+                tenant_id=tenant_id,
+                resource_id=new_agent_id,
+                user_id=user_id,
+                user=user,
+            )
+
+            session.commit()
+
+            query = (
+                select(ChatAgent)
+                .options(
+                    selectinload(ChatAgent.tags).selectinload(ChatAgentTag.tag),
+                    selectinload(ChatAgent.versions),
+                )
+                .where(ChatAgent.id == new_agent_id)
+            )
+            new_agent = session.execute(query).scalar_one()
+
+            logger.info(
+                "Chat agent duplicated",
+                extra={"source_id": chat_agent_id, "new_id": new_agent_id, "new_name": new_name},
+            )
+            self._invalidate_list_cache(tenant_id)
+            return self._model_to_response(new_agent)
+
+    def _generate_copy_name(self, session: Session, tenant_id: str, original_name: str) -> str:
+        """
+        Generate a unique copy name for duplicated resources.
+
+        Args:
+            session: SQLAlchemy session
+            tenant_id: The tenant ID
+            original_name: The original resource name
+
+        Returns:
+            A unique name like "Original Copy" or "Original Copy(2)"
+        """
+        base_name = f"{original_name} Copy"
+        query = (
+            select(func.count())
+            .select_from(ChatAgent)
+            .where(ChatAgent.tenant_id == tenant_id, ChatAgent.name.like(f"{original_name} Copy%"))
+        )
+        count = session.execute(query).scalar() or 0
+
+        if count == 0:
+            return base_name
+        return f"{base_name}({count + 1})"
 
     def get_chat_agent_config(
         self, tenant_id: str, chat_agent_id: str, user: ContextIdentityUser, credential_handler
@@ -579,13 +737,13 @@ class ChatAgentHandler:
                 api_credential_id = config.get("api_api_key_credential_id")
                 chat_credential_id = config.get("chat_auth_credential_id")
 
-                if not api_credential_id or not chat_credential_id:
+                if not api_credential_id:
                     raise InvalidCredentialError(
-                        credential_id=api_credential_id or chat_credential_id or "unknown",
-                        message="Chat agent config is missing required credential IDs",
+                        credential_id="unknown",
+                        message="Chat agent config is missing required API credential ID",
                     )
 
-                # Fetch credentials with secrets
+                # Fetch API credentials with secrets
                 try:
                     api_credential = credential_handler.get_credential(tenant_id, api_credential_id)
                     api_secret = credential_handler.get_credential_secret(tenant_id, api_credential_id)
@@ -596,26 +754,7 @@ class ChatAgentHandler:
                         message=f"Invalid or inaccessible API credential with ID '{api_credential_id}'",
                     )
 
-                try:
-                    chat_credential = credential_handler.get_credential(tenant_id, chat_credential_id)
-                    chat_secret = credential_handler.get_credential_secret(tenant_id, chat_credential_id)
-                except Exception as e:
-                    logger.error("Failed to fetch chat credential: %s", e)
-                    raise InvalidCredentialError(
-                        credential_id=chat_credential_id,
-                        message=f"Invalid or inaccessible chat credential with ID '{chat_credential_id}'",
-                    )
-
-                # Parse secrets based on credential type
                 api_secret_value = api_secret
-                chat_secret_value = chat_secret
-
-                # For BASIC_AUTH, parse as JSON dict
-                if chat_credential.type == "BASIC_AUTH":
-                    try:
-                        chat_secret_value = json.loads(chat_secret)
-                    except json.JSONDecodeError:
-                        chat_secret_value = chat_secret
 
                 api_credentials = CredentialSecretResponse(
                     id=api_credential.id,
@@ -627,19 +766,41 @@ class ChatAgentHandler:
                     secret=api_secret_value,
                 )
 
-                chat_credentials = CredentialSecretResponse(
-                    id=chat_credential.id,
-                    credentials_uri=chat_credential.credential_uri,
-                    name=chat_credential.name,
-                    description=chat_credential.description,
-                    type=chat_credential.type,
-                    is_active=chat_credential.is_active,
-                    secret=chat_secret_value,
-                )
+                # Fetch optional chat auth credentials
+                chat_credentials: CredentialSecretResponse | None = None
+                if chat_credential_id:
+                    try:
+                        chat_credential = credential_handler.get_credential(tenant_id, chat_credential_id)
+                        chat_secret = credential_handler.get_credential_secret(tenant_id, chat_credential_id)
+                    except Exception as e:
+                        logger.error("Failed to fetch chat credential: %s", e)
+                        raise InvalidCredentialError(
+                            credential_id=chat_credential_id,
+                            message=f"Invalid or inaccessible chat credential with ID '{chat_credential_id}'",
+                        )
+
+                    chat_secret_value = chat_secret
+                    if chat_credential.type == "BASIC_AUTH":
+                        try:
+                            chat_secret_value = json.loads(chat_secret)
+                        except json.JSONDecodeError:
+                            chat_secret_value = chat_secret
+
+                    chat_credentials = CredentialSecretResponse(
+                        id=chat_credential.id,
+                        credentials_uri=chat_credential.credential_uri,
+                        name=chat_credential.name,
+                        description=chat_credential.description,
+                        type=chat_credential.type,
+                        is_active=chat_credential.is_active,
+                        secret=chat_secret_value,
+                    )
 
                 settings: (
                     N8NConfigSettingsResponse
                     | MicrosoftFoundryConfigSettingsResponse
+                    | RestApiConfigSettingsResponse
+                    | LLMConfigSettingsResponse
                     | ReActAgentConfigSettingsResponse
                     | dict[Any, Any]
                 ) = N8NConfigSettingsResponse(
@@ -663,8 +824,68 @@ class ChatAgentHandler:
                     project_endpoint=config.get("project_endpoint", ""),
                     agent_name=config.get("agent_name", ""),
                 )
+            elif app_type == ChatAgentTypeEnum.REST_API:
+                from unifiedui.schema.responses.chat_agents import RestApiConfigSettingsResponse
+
+                credential_response = None
+                access_token = None
+                credential_id = config.get("credential_id")
+                auth_type = config.get("auth_type", "ANONYMOUS")
+
+                if credential_id and auth_type not in ("ANONYMOUS", "ENTRA_ID_USER_TOKEN"):
+                    try:
+                        credential = credential_handler.get_credential(tenant_id, credential_id)
+                        secret = credential_handler.get_credential_secret(tenant_id, credential_id)
+
+                        secret_value: str | dict = secret
+                        if credential.type in ("BASIC_AUTH", "ENTRA_ID_APP_REGISTRATION"):
+                            try:
+                                secret_value = json.loads(secret) if isinstance(secret, str) else secret
+                            except json.JSONDecodeError:
+                                secret_value = secret
+
+                        credential_response = CredentialSecretResponse(
+                            id=credential.id,
+                            credentials_uri=credential.credential_uri,
+                            name=credential.name,
+                            description=credential.description,
+                            type=credential.type,
+                            is_active=credential.is_active,
+                            secret=secret_value,
+                        )
+
+                        if auth_type == "ENTRA_ID_APP_REGISTRATION" and isinstance(secret_value, dict):
+                            from unifiedui.core.identity.client_credentials import ClientCredentialsTokenClient
+
+                            cc_client = ClientCredentialsTokenClient(
+                                tenant_id=secret_value["tenant_id"],
+                                client_id=secret_value["client_id"],
+                                client_secret=secret_value["client_secret"],
+                            )
+                            try:
+                                access_token = cc_client.acquire_token()
+                            except ValueError as e:
+                                logger.error("Failed to acquire client credentials token: %s", e)
+
+                    except Exception as e:
+                        logger.error("Failed to fetch REST API credential: %s", e)
+                        raise InvalidCredentialError(
+                            credential_id=credential_id,
+                            message=f"Invalid or inaccessible credential with ID '{credential_id}'",
+                        )
+
+                settings = RestApiConfigSettingsResponse(
+                    auth_type=auth_type,
+                    invoke_endpoint=config.get("invoke_endpoint", ""),
+                    credential=credential_response,
+                    api_key_header_name=config.get("api_key_header_name", "X-API-Key"),
+                    access_token=access_token,
+                    use_unified_chat_history=config.get("use_unified_chat_history", True),
+                    chat_history_count=config.get("chat_history_count", 30),
+                    create_conversation_endpoint=config.get("create_conversation_endpoint"),
+                )
             elif app_type == ChatAgentTypeEnum.REACT_AGENT:
-                from unifiedui.core.database.models import ReActAgentVersion, TenantAIModel, Tool
+                from unifiedui.core.database.models import ReActAgentVersion, Tool
                 from unifiedui.schema.responses.re_act_agents import (
                     ReActAgentAIModelResponse,
                     ReActAgentConfigSettingsResponse,
@@ -757,6 +978,45 @@ class ChatAgentHandler:
                     response_prompt=latest_version.response_prompt,
                     greeting_messages=latest_version.greeting_messages or [],
                     config=latest_version.config or {},
+                )
+            elif app_type == ChatAgentTypeEnum.LLM:
+                from unifiedui.schema.responses.chat_agents import (
+                    LLMConfigSettingsResponse,
+                    LLMResolvedAIModelResponse,
+                )
+
+                llm_ai_model_id = config.get("ai_model_id", "")
+                llm_model = session.execute(
+                    select(TenantAIModel).where(
+                        TenantAIModel.id == llm_ai_model_id,
+                        TenantAIModel.tenant_id == tenant_id,
+                    )
+                ).scalar_one_or_none()
+
+                if not llm_model:
+                    raise ChatAgentNotFoundError(chat_agent_id)
+
+                llm_credential_secret = None
+                if llm_model.credential_id:
+                    try:
+                        secret = credential_handler.get_credential_secret(tenant_id, llm_model.credential_id)
+                        llm_credential_secret = secret if isinstance(secret, dict) else {"api_key": secret}
+                    except Exception as e:
+                        logger.warning("Failed to resolve credential for AI model %s: %s", llm_model.id, e)
+
+                resolved_model = LLMResolvedAIModelResponse(
+                    id=llm_model.id,
+                    provider=llm_model.provider,
+                    config=llm_model.config or {},
+                    credential_secret=llm_credential_secret,
+                )
+
+                settings = LLMConfigSettingsResponse(
+                    ai_model_id=llm_ai_model_id,
+                    ai_model=resolved_model,
+                    system_prompt=config.get("system_prompt"),
+                    use_unified_chat_history=True,
+                    chat_history_count=30,
                 )
             else:
                 # For unsupported types, return raw config
@@ -1348,6 +1608,29 @@ class ChatAgentHandler:
         return f"{parsed.scheme}://{parsed.netloc}"
 
     @staticmethod
+    def _validate_ai_model_reference(session: Session, tenant_id: str, ai_model_id: str) -> None:
+        """Validate that the referenced AI model exists and is active for the tenant.
+
+        Args:
+            session: Active database session
+            tenant_id: The tenant ID to scope the query
+            ai_model_id: The AI model ID to validate
+
+        Raises:
+            InvalidAIModelReferenceError: If AI model not found or inactive
+        """
+        ai_model = session.execute(
+            select(TenantAIModel).where(
+                TenantAIModel.id == ai_model_id,
+                TenantAIModel.tenant_id == tenant_id,
+                TenantAIModel.is_active.is_(True),
+            )
+        ).scalar_one_or_none()
+
+        if not ai_model:
+            raise InvalidAIModelReferenceError(ai_model_id)
+
+    @staticmethod
     def _model_to_response(chat_agent: ChatAgent) -> ChatAgentResponse:
         """Convert ChatAgent model to ChatAgentResponse."""
         tags = []
@@ -1374,6 +1657,8 @@ class ChatAgentHandler:
                 "greeting_messages": latest.greeting_messages or [],
             }
 
+        greeting_messages = version_fields.pop("greeting_messages", None) or (chat_agent.greeting_messages or [])
+
         return ChatAgentResponse(
             id=chat_agent.id,
             tenant_id=chat_agent.tenant_id,
@@ -1388,6 +1673,7 @@ class ChatAgentHandler:
             updated_at=chat_agent.updated_at,
             created_by=chat_agent.created_by,
             updated_by=chat_agent.updated_by,
+            greeting_messages=greeting_messages,
             **version_fields,
         )
 

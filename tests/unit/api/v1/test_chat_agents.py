@@ -933,3 +933,160 @@ class TestChatAgentPrincipalRoutes:
         )
 
         assert response.status_code == status.HTTP_404_NOT_FOUND
+
+
+class TestChatAgentFieldsAndIds:
+    """Test suite for fields and ids query parameters."""
+
+    def test_list_with_fields_returns_filtered_response(self, test_client: TestClient, test_user_token: Any) -> None:
+        """Should return only requested fields plus id and my_permission."""
+        tenant_id = create_tenant_for_user(test_client, test_user_token)
+        headers = create_auth_headers(test_user_token, use_cache=False)
+
+        test_client.post(
+            ENDPOINT_CHAT_AGENTS.format(tenant_id=tenant_id),
+            json={"name": "Test Agent", "description": "Desc", "type": "N8N"},
+            headers=headers,
+        )
+
+        response = test_client.get(
+            f"{ENDPOINT_CHAT_AGENTS.format(tenant_id=tenant_id)}?fields=name",
+            headers=headers,
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert len(data) == 1
+        assert "id" in data[0]
+        assert "name" in data[0]
+        assert "my_permission" in data[0]
+        assert "description" not in data[0]
+        assert "config" not in data[0]
+
+    def test_list_with_invalid_fields_returns_400(self, test_client: TestClient, test_user_token: Any) -> None:
+        """Should return 400 for invalid field names."""
+        tenant_id = create_tenant_for_user(test_client, test_user_token)
+        headers = create_auth_headers(test_user_token, use_cache=False)
+
+        test_client.post(
+            ENDPOINT_CHAT_AGENTS.format(tenant_id=tenant_id),
+            json={"name": "Test Agent", "description": "Desc", "type": "N8N"},
+            headers=headers,
+        )
+
+        response = test_client.get(
+            f"{ENDPOINT_CHAT_AGENTS.format(tenant_id=tenant_id)}?fields=nonexistent_field",
+            headers=headers,
+        )
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+    def test_list_with_ids_filters_results(self, test_client: TestClient, test_user_token: Any) -> None:
+        """Should return only agents matching the specified IDs."""
+        tenant_id = create_tenant_for_user(test_client, test_user_token)
+        headers = create_auth_headers(test_user_token, use_cache=False)
+
+        r1 = test_client.post(
+            ENDPOINT_CHAT_AGENTS.format(tenant_id=tenant_id),
+            json={"name": "Agent 1", "description": "Desc", "type": "N8N"},
+            headers=headers,
+        )
+        r2 = test_client.post(
+            ENDPOINT_CHAT_AGENTS.format(tenant_id=tenant_id),
+            json={"name": "Agent 2", "description": "Desc", "type": "N8N"},
+            headers=headers,
+        )
+        test_client.post(
+            ENDPOINT_CHAT_AGENTS.format(tenant_id=tenant_id),
+            json={"name": "Agent 3", "description": "Desc", "type": "N8N"},
+            headers=headers,
+        )
+
+        id1 = r1.json()["id"]
+        id2 = r2.json()["id"]
+
+        response = test_client.get(
+            f"{ENDPOINT_CHAT_AGENTS.format(tenant_id=tenant_id)}?ids={id1},{id2}",
+            headers=headers,
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert len(data) == 2
+        returned_ids = {item["id"] for item in data}
+        assert returned_ids == {id1, id2}
+
+    def test_list_with_ids_and_fields_combined(self, test_client: TestClient, test_user_token: Any) -> None:
+        """Should filter by IDs and return only specified fields."""
+        tenant_id = create_tenant_for_user(test_client, test_user_token)
+        headers = create_auth_headers(test_user_token, use_cache=False)
+
+        r1 = test_client.post(
+            ENDPOINT_CHAT_AGENTS.format(tenant_id=tenant_id),
+            json={"name": "Agent 1", "description": "Desc 1", "type": "N8N"},
+            headers=headers,
+        )
+
+        agent_id = r1.json()["id"]
+
+        response = test_client.get(
+            f"{ENDPOINT_CHAT_AGENTS.format(tenant_id=tenant_id)}?ids={agent_id}&fields=name",
+            headers=headers,
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert len(data) == 1
+        assert data[0]["id"] == agent_id
+        assert data[0]["name"] == "Agent 1"
+        assert "description" not in data[0]
+
+    def test_get_with_fields_returns_filtered_response(self, test_client: TestClient, test_user_token: Any) -> None:
+        """Should return only requested fields on single-item get."""
+        tenant_id = create_tenant_for_user(test_client, test_user_token)
+        headers = create_auth_headers(test_user_token, use_cache=False)
+
+        r1 = test_client.post(
+            ENDPOINT_CHAT_AGENTS.format(tenant_id=tenant_id),
+            json={"name": "Test Agent", "description": "Desc", "type": "N8N"},
+            headers=headers,
+        )
+        agent_id = r1.json()["id"]
+
+        response = test_client.get(
+            f"{ENDPOINT_CHAT_AGENT_DETAIL.format(tenant_id=tenant_id, chat_agent_id=agent_id)}?fields=name,type",
+            headers=headers,
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert "id" in data
+        assert "name" in data
+        assert "type" in data
+        assert "description" not in data
+        assert "config" not in data
+
+    def test_list_without_fields_returns_full_response(self, test_client: TestClient, test_user_token: Any) -> None:
+        """Should return full response when fields is not specified."""
+        tenant_id = create_tenant_for_user(test_client, test_user_token)
+        headers = create_auth_headers(test_user_token, use_cache=False)
+
+        test_client.post(
+            ENDPOINT_CHAT_AGENTS.format(tenant_id=tenant_id),
+            json={"name": "Test Agent", "description": "Desc", "type": "N8N"},
+            headers=headers,
+        )
+
+        response = test_client.get(
+            ENDPOINT_CHAT_AGENTS.format(tenant_id=tenant_id),
+            headers=headers,
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert len(data) == 1
+        assert "id" in data[0]
+        assert "name" in data[0]
+        assert "description" in data[0]
+        assert "type" in data[0]
+        assert "config" in data[0]

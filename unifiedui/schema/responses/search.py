@@ -15,6 +15,7 @@ class SearchResultItem(BaseModel):
     match_field: str
     is_active: bool | None = None
     tags: list[str] = []
+    sub_type: str | None = None
 
 
 class SearchResponse(BaseModel):

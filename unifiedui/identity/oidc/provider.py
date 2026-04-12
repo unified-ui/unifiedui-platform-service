@@ -8,8 +8,11 @@ Works with any OIDC-compliant identity provider.
 import requests
 
 from unifiedui.core.identity.providers import BaseIdentityProvider, BaseIdentityToken
+from unifiedui.logger import get_logger
 from unifiedui.schema.responses.identity import IdentityGroupResponse, IdentityUserResponse
 from unifiedui.utils.api_query import APIFilterQuery
+
+logger = get_logger(__name__)
 
 
 class OIDCIdentityProvider(BaseIdentityProvider):
@@ -19,22 +22,27 @@ class OIDCIdentityProvider(BaseIdentityProvider):
         self,
         identity_token: BaseIdentityToken,
         userinfo_url: str | None = None,
+        extra_headers: dict[str, str] | None = None,
     ):
         """Initialize the Generic OIDC identity provider.
 
         Args:
             identity_token: The user's verified identity token.
             userinfo_url: OIDC UserInfo endpoint URL.
+            extra_headers: Additional HTTP headers (e.g. Host override for Docker).
         """
         super().__init__(identity_token)
         self._userinfo_url = userinfo_url
+        self._extra_headers = extra_headers or {}
 
     def _get_headers(self) -> dict[str, str]:
         """Build authorization headers for OIDC API calls."""
-        return {
+        headers = {
             "Authorization": f"Bearer {self.identity_token.token}",
             "Content-Type": "application/json",
         }
+        headers.update(self._extra_headers)
+        return headers
 
     def get_current_user_security_groups(self, query: APIFilterQuery | None = None) -> list[IdentityGroupResponse]:
         """Get groups from token claims.
@@ -133,9 +141,11 @@ class OIDCIdentityProvider(BaseIdentityProvider):
         """
         if self._userinfo_url:
             try:
+                logger.debug("Fetching OIDC userinfo from %s", self._userinfo_url)
                 response = requests.get(self._userinfo_url, headers=self._get_headers(), timeout=30)
                 response.raise_for_status()
                 data = response.json()
+                logger.info("OIDC userinfo response keys: %s", list(data.keys()))
                 return IdentityUserResponse(
                     id=data.get("sub", self.identity_token.get_id()),
                     identity_provider=self.identity_token.get_identity_provider(),
@@ -145,9 +155,10 @@ class OIDCIdentityProvider(BaseIdentityProvider):
                     firstname=data.get("given_name"),
                     lastname=data.get("family_name"),
                 )
-            except requests.RequestException:
-                pass
+            except requests.RequestException as exc:
+                logger.warning("OIDC userinfo request failed: %s", exc)
 
+        logger.debug("Falling back to token claims for user info")
         return IdentityUserResponse(
             id=self.identity_token.get_id(),
             identity_provider=self.identity_token.get_identity_provider(),

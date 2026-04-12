@@ -55,6 +55,7 @@ class CustomGroupHandler:
         order_by: str | None = None,
         order_direction: str | None = None,
         use_cache: bool = True,
+        id_list: list[str] | None = None,
     ) -> list[CustomGroupResponse]:
         """
         Get a list of custom groups in a tenant.
@@ -68,6 +69,7 @@ class CustomGroupHandler:
             order_by: Optional column name to order by
             order_direction: Optional sort direction ('asc' or 'desc')
             use_cache: Whether to use caching (default: True)
+            id_list: Optional list of IDs to filter by
 
         Returns:
             List of custom group responses
@@ -78,7 +80,7 @@ class CustomGroupHandler:
         cache_key = f"custom_groups:list:tenant:{tenant_id}:skip:{skip}:limit:{limit}"
 
         # Check if any filters are applied
-        has_filters = name_filter is not None or order_by is not None
+        has_filters = name_filter is not None or order_by is not None or id_list is not None
 
         # Check cache (disable caching when any filters are applied)
         if use_cache and self.cache_client and not has_filters:
@@ -97,6 +99,9 @@ class CustomGroupHandler:
                 Principal.tenant_id == tenant_id, Principal.principal_type == PrincipalTypeEnum.CUSTOM_GROUP.value
             )
 
+            if id_list:
+                query = query.where(Principal.principal_id.in_(id_list))
+
             if name_filter:
                 query = query.where(Principal.display_name.ilike(f"%{name_filter}%"))
 
@@ -110,6 +115,9 @@ class CustomGroupHandler:
             if order_by and order_by in field_mapping:
                 column = getattr(Principal, field_mapping[order_by])
                 query = query.order_by(column.desc()) if order_direction == "desc" else query.order_by(column.asc())
+            else:
+                # MSSQL requires ORDER BY when using OFFSET/LIMIT
+                query = query.order_by(Principal.created_at.desc())
 
             query = query.offset(skip).limit(limit)
             groups = session.execute(query).scalars().all()

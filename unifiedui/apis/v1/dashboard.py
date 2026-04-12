@@ -27,7 +27,7 @@ async def get_dashboard_stats(
 ):
     """Get dashboard quick stats for the tenant.
 
-    Returns counts of chat agents, autonomous agents, and conversations
+    Returns counts of chat agents, workflows, and conversations
     that the authenticated user has access to.
     """
     try:

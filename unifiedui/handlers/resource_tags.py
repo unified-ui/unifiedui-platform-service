@@ -5,7 +5,7 @@ resource types that support tagging.
 
 Supported resource types:
 - chat_agent
-- autonomous_agent
+- workflow
 - chat_widget
 - credential
 
@@ -20,15 +20,19 @@ from typing import TYPE_CHECKING, Any
 from sqlalchemy import delete, select
 
 from unifiedui.core.database.models import (
-    AutonomousAgent,
-    AutonomousAgentTag,
     ChatAgent,
     ChatAgentTag,
     ChatWidget,
     ChatWidgetTag,
     Credential,
     CredentialTag,
+    ExternalApp,
+    ExternalAppTag,
     Tag,
+    TenantAIModel,
+    TenantAIModelTag,
+    Workflow,
+    WorkflowTag,
 )
 from unifiedui.logger import get_logger
 
@@ -50,11 +54,11 @@ RESOURCE_TAG_CONFIG: dict[str, dict[str, Any]] = {
         "id_field": "chat_agent_id",
         "cache_prefix": "chat_agents",
     },
-    "autonomous_agent": {
-        "resource_model": AutonomousAgent,
-        "tag_model": AutonomousAgentTag,
-        "id_field": "autonomous_agent_id",
-        "cache_prefix": "autonomous_agents",
+    "workflow": {
+        "resource_model": Workflow,
+        "tag_model": WorkflowTag,
+        "id_field": "workflow_id",
+        "cache_prefix": "workflows",
     },
     "chat_widget": {
         "resource_model": ChatWidget,
@@ -67,6 +71,18 @@ RESOURCE_TAG_CONFIG: dict[str, dict[str, Any]] = {
         "tag_model": CredentialTag,
         "id_field": "credential_id",
         "cache_prefix": "credentials",
+    },
+    "external_app": {
+        "resource_model": ExternalApp,
+        "tag_model": ExternalAppTag,
+        "id_field": "external_app_id",
+        "cache_prefix": "external_apps",
+    },
+    "tenant_ai_model": {
+        "resource_model": TenantAIModel,
+        "tag_model": TenantAIModelTag,
+        "id_field": "tenant_ai_model_id",
+        "cache_prefix": "tenant_ai_models",
     },
 }
 

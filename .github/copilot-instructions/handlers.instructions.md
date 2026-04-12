@@ -244,3 +244,43 @@ if self.cache_client:
     self.cache_client.client.delete_pattern(f"{resources}:*:user:{user_id}:*")
     # Also invalidate group members if group permission changed
 ```
+
+---
+
+## Selective Field Fetching (`fields` and `ids`)
+
+All GET list endpoints support `fields` and `ids` query params. All GET-by-ID endpoints support `fields`.
+
+### Route-level: `fields` query param
+- Use `filtered_response(data, fields)` from `unifiedui.handlers.field_filter` to wrap handler returns
+- `filtered_response` returns the original model when `fields` is None, or a `JSONResponse` with only requested fields
+- `id` and `my_permission` are always included regardless of `fields` selection
+
+```python
+from unifiedui.handlers.field_filter import filtered_response, parse_ids
+
+@router.get("")
+async def list_resources(
+    ...,
+    ids: str | None = Query(None, description="Comma-separated list of IDs to filter by"),
+    fields: str | None = Query(None, description="Comma-separated list of fields to include in the response"),
+    ...
+):
+    return filtered_response(
+        handler.list_resources(..., id_list=parse_ids(ids)),
+        fields,
+    )
+```
+
+### Handler-level: `id_list` param
+- Add `id_list: list[str] | None = None` to the list method signature
+- Add `id_list is not None` to `has_filters` (disables caching)
+- Add `if id_list: query = query.where(Model.id.in_(id_list))` after permission filtering
+
+```python
+def list_resources(self, ..., id_list: list[str] | None = None):
+    has_filters = name_filter is not None or id_list is not None
+    ...
+    if id_list:
+        query = query.where(Resource.id.in_(id_list))
+```

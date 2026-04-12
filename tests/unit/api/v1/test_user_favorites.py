@@ -10,12 +10,12 @@ from tests.conftest import create_auth_headers
 from tests.helpers.tenant import create_tenant_for_user
 from unifiedui.core.database.enums import PermissionActionEnum
 from unifiedui.core.database.models import (
-    AutonomousAgent,
-    AutonomousAgentMember,
     ChatAgent,
     ChatAgentMember,
     Conversation,
     ConversationMember,
+    Workflow,
+    WorkflowMember,
 )
 
 # API Endpoints
@@ -58,13 +58,11 @@ def create_chat_agent_in_db(test_client: TestClient, tenant_id: str, user_id: st
     return app_id
 
 
-def create_autonomous_agent_in_db(
-    test_client: TestClient, tenant_id: str, user_id: str, name: str = "Test Agent"
-) -> str:
+def create_workflow_in_db(test_client: TestClient, tenant_id: str, user_id: str, name: str = "Test Agent") -> str:
     """Helper function to create an autonomous agent directly in DB and return its ID."""
     agent_id = str(uuid.uuid4())
     with test_client.db_client.get_session() as session:
-        agent = AutonomousAgent(
+        agent = Workflow(
             id=agent_id,
             tenant_id=tenant_id,
             name=name,
@@ -79,10 +77,10 @@ def create_autonomous_agent_in_db(
         session.commit()
 
         # Add user as ADMIN member
-        member = AutonomousAgentMember(
+        member = WorkflowMember(
             id=str(uuid.uuid4()),
             tenant_id=tenant_id,
-            autonomous_agent_id=agent_id,
+            workflow_id=agent_id,
             principal_id=user_id,
             role=PermissionActionEnum.ADMIN,
             created_by=user_id,
@@ -320,22 +318,22 @@ class TestUserFavoritesRoutes:
         assert response.status_code == status.HTTP_400_BAD_REQUEST
 
 
-class TestAutonomousAgentFavorites:
+class TestWorkflowFavorites:
     """Test suite for autonomous agent favorites."""
 
-    def test_add_and_list_autonomous_agent_favorite(self, test_client: TestClient, test_user_token: Any) -> None:
+    def test_add_and_list_workflow_favorite(self, test_client: TestClient, test_user_token: Any) -> None:
         """Test adding and listing autonomous agent favorites."""
         tenant_id = create_tenant_for_user(test_client, test_user_token)
         user_id = test_user_token.get_id()
         headers = create_auth_headers(test_user_token, use_cache=False)
 
         # Create an autonomous agent directly in DB
-        agent_id = create_autonomous_agent_in_db(test_client, tenant_id, user_id)
+        agent_id = create_workflow_in_db(test_client, tenant_id, user_id)
 
         # Add to favorites
         response = test_client.put(
             ENDPOINT_USER_FAVORITE_DETAIL.format(
-                tenant_id=tenant_id, user_id=user_id, resource_type="autonomous-agents", resource_id=agent_id
+                tenant_id=tenant_id, user_id=user_id, resource_type="workflows", resource_id=agent_id
             ),
             headers=headers,
         )
@@ -344,7 +342,7 @@ class TestAutonomousAgentFavorites:
 
         # List favorites
         response = test_client.get(
-            ENDPOINT_USER_FAVORITES.format(tenant_id=tenant_id, user_id=user_id, resource_type="autonomous-agents"),
+            ENDPOINT_USER_FAVORITES.format(tenant_id=tenant_id, user_id=user_id, resource_type="workflows"),
             headers=headers,
         )
 

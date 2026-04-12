@@ -20,6 +20,7 @@ from unifiedui.exc.organizations import (
     OrganizationAlreadyExistsError,
     OrganizationMemberAlreadyExistsError,
     OrganizationMemberNotFoundError,
+    OrganizationNameAlreadyExistsError,
     OrganizationNotFoundError,
     OrganizationSlugAlreadyExistsError,
     TenantCannotBeDeletedError,
@@ -122,6 +123,8 @@ class OrganizationHandler:
                 error_str = str(e)
                 if "uq_org_idp" in error_str:
                     raise OrganizationAlreadyExistsError(request.identity_tenant_id) from e
+                if "uq_organization_name" in error_str:
+                    raise OrganizationNameAlreadyExistsError(request.name) from e
                 if "slug" in error_str.lower():
                     raise OrganizationSlugAlreadyExistsError(request.slug) from e
                 raise
@@ -455,7 +458,17 @@ class OrganizationHandler:
                 updated_by=user_id,
             )
             session.add(tenant)
-            session.flush()
+
+            try:
+                session.flush()
+            except IntegrityError as e:
+                session.rollback()
+                error_str = str(e)
+                if "uq_tenant_org_name_env" in error_str:
+                    from unifiedui.exc.tenants import TenantAlreadyExistsError
+
+                    raise TenantAlreadyExistsError(request.name) from e
+                raise
 
             # Ensure principal exists and assign TENANT_GLOBAL_ADMIN on the new tenant
             ensure_principal_exists(

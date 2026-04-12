@@ -39,7 +39,7 @@ class AzureKeyVault(BaseVault):
         """Store a secret in Azure Key Vault."""
         try:
             # Azure Key Vault secret names must match ^[0-9a-zA-Z-]+$
-            secret_name = key.replace("_", "-").replace(".", "-")
+            secret_name = key.replace("_", "-").replace(".", "-").replace("/", "-")
 
             # Set secret with optional tags as metadata
             tags = metadata if metadata else {}
@@ -56,7 +56,7 @@ class AzureKeyVault(BaseVault):
     def build_secret_uri(self, key_name: str) -> str:
         """Build an Azure Key Vault URI for the given key name."""
         vault_name = self.vault_url.split("//")[1].split(".")[0] if "//" in self.vault_url else self.vault_url
-        secret_name = key_name.replace("_", "-").replace(".", "-")
+        secret_name = key_name.replace("_", "-").replace(".", "-").replace("/", "-")
         return f"azurekv://{vault_name}/{secret_name}"
 
     def get_secret(self, uri: str) -> str | None:

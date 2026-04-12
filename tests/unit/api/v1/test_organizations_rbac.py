@@ -13,9 +13,11 @@ from unifiedui.core.database.enums import OrganizationRoleEnum, PrincipalTypeEnu
 
 @pytest.fixture(autouse=True)
 def _disable_system_admin_restriction():
-    """Disable system_admin_email restriction for all org tests in this module."""
+    """Disable system admin restriction for all org tests in this module."""
     with patch("unifiedui.core.config.settings") as mock_settings:
-        mock_settings.system_admin_email = None
+        mock_settings.msal_system_admin_email = None
+        mock_settings.ldap_system_admin_username = None
+        mock_settings.oidc_zitadel_system_admin_username = None
         yield
 
 
@@ -40,7 +42,7 @@ PRINCIPAL_TYPE_GROUP = PrincipalTypeEnum.IDENTITY_GROUP.value
 
 
 def _create_org_data(
-    name: str = "RBAC Org",
+    name: str | None = None,
     slug: str = "rbac-org",
     identity_provider: str = "entra_id",
     identity_tenant_id: str = "rbac-idp-001",
@@ -48,7 +50,7 @@ def _create_org_data(
 ) -> dict[str, Any]:
     """Helper to create organization request data."""
     data: dict[str, Any] = {
-        "name": name,
+        "name": name if name is not None else f"Org {slug}",
         "slug": slug,
         "identity_provider": identity_provider,
         "identity_tenant_id": identity_tenant_id,
