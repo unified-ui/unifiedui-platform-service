@@ -58,7 +58,7 @@ dev = [
     "pytest-cov>=7.0.0",
     "pytest-xdist>=3.8.0",
     "ruff>=0.15.2",
-    "types-requests>=2.32.4.20260107",
+    "types-requests>=2.33.0.20260408",
 ]
 
 [tool.ruff]
