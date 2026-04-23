@@ -14,8 +14,6 @@ from unifiedui.identity.extra_id.provider import ExtraIDIdentityProvider
 from unifiedui.identity.extra_id.token import ExtraIDIdentityTokenSerializer
 from unifiedui.identity.google.provider import GoogleIdentityProvider
 from unifiedui.identity.google.token import GoogleIdentityTokenSerializer
-from unifiedui.identity.kerberos.provider import KerberosIdentityProvider
-from unifiedui.identity.kerberos.token import KerberosIdentityTokenSerializer
 from unifiedui.identity.ldap.provider import LDAPIdentityProvider
 from unifiedui.identity.ldap.token import LDAPIdentityTokenSerializer
 from unifiedui.identity.mock.provider import MockIdentityProvider
@@ -24,8 +22,6 @@ from unifiedui.identity.oidc.provider import OIDCIdentityProvider
 from unifiedui.identity.oidc.token import OIDCIdentityTokenSerializer
 from unifiedui.identity.okta.provider import OktaIdentityProvider
 from unifiedui.identity.okta.token import OktaIdentityTokenSerializer
-from unifiedui.identity.saml.provider import SAMLIdentityProvider
-from unifiedui.identity.saml.token import SAMLIdentityTokenSerializer
 
 
 def _create_mock_jwt(claims: dict, secret: str = "test-secret") -> str:
@@ -54,6 +50,23 @@ class TestIdentityTokenFactoryMock:
         assert isinstance(result, MockIdentityToken)
         assert result.get_id() == "mock-user-123"
         assert result.get_identity_provider() == IdenityProviderEnum.MOCK.value
+
+    def test_create_mock_token_disabled_when_flag_off(self, monkeypatch):
+        """Test that mock tokens are rejected when ALLOW_MOCK_IDENTITY_PROVIDER is False."""
+        from unifiedui.core.config import settings
+
+        monkeypatch.setattr(settings, "allow_mock_identity_provider", False)
+
+        now = int(time.time())
+        claims = {
+            "iss": "https://mock.identity.provider/test",
+            "oid": "mock-user-123",
+            "exp": now + 3600,
+        }
+        token_str = _create_mock_jwt(claims)
+
+        with pytest.raises(ValueError, match="Mock identity provider is disabled"):
+            IdentityTokenFactory.create(token_str)
 
     def test_create_mock_token_expired(self):
         """Test that an expired mock token raises ValueError."""
@@ -552,10 +565,8 @@ class TestIdentityTokenFactoryLDAP:
 
         with patch("unifiedui.core.config.settings") as mock_settings:
             mock_settings.oidc_issuer_url = None
-            mock_settings.saml_entity_id = None
             mock_settings.ldap_server_url = "ldap://ldap.acme.com"
             mock_settings.ldap_jwt_secret = "test-secret"
-            mock_settings.kerberos_realm = None
             result = IdentityTokenFactory.create(token_str)
 
         assert isinstance(result, LDAPIdentityTokenSerializer)
@@ -574,10 +585,8 @@ class TestIdentityTokenFactoryLDAP:
 
         with patch("unifiedui.core.config.settings") as mock_settings:
             mock_settings.oidc_issuer_url = None
-            mock_settings.saml_entity_id = None
             mock_settings.ldap_server_url = "ldap://ldap.acme.com"
             mock_settings.ldap_jwt_secret = "test-secret"
-            mock_settings.kerberos_realm = None
             with pytest.raises(ValueError, match="Invalid LDAP token: Signature has expired"):
                 IdentityTokenFactory.create(token_str)
 
@@ -593,113 +602,11 @@ class TestIdentityTokenFactoryLDAP:
 
         with patch("unifiedui.core.config.settings") as mock_settings:
             mock_settings.oidc_issuer_url = None
-            mock_settings.saml_entity_id = None
             mock_settings.ldap_server_url = "ldaps://ldap.acme.com"
             mock_settings.ldap_jwt_secret = "test-secret"
-            mock_settings.kerberos_realm = None
             result = IdentityTokenFactory.create(token_str)
 
         assert isinstance(result, LDAPIdentityTokenSerializer)
-
-
-class TestIdentityTokenFactoryKerberos:
-    """Test suite for IdentityTokenFactory with Kerberos tokens."""
-
-    def test_create_kerberos_token(self):
-        """Test creating a Kerberos token from a gateway-issued JWT."""
-        now = int(time.time())
-        claims = {
-            "iss": "krb://ACME.COM",
-            "sub": "krb-user-123",
-            "principal": "jdoe@ACME.COM",
-            "realm": "ACME.COM",
-            "exp": now + 3600,
-        }
-        token_str = _create_mock_jwt(claims)
-
-        with patch("unifiedui.core.config.settings") as mock_settings:
-            mock_settings.oidc_issuer_url = None
-            mock_settings.saml_entity_id = None
-            mock_settings.ldap_server_url = None
-            mock_settings.kerberos_realm = "ACME.COM"
-            result = IdentityTokenFactory.create(token_str)
-
-        assert isinstance(result, KerberosIdentityTokenSerializer)
-        assert result.get_id() == "krb-user-123"
-        assert result.get_identity_provider() == IdenityProviderEnum.KERBEROS.value
-
-    def test_create_kerberos_token_expired(self):
-        """Test that expired Kerberos token raises ValueError."""
-        now = int(time.time())
-        claims = {
-            "iss": "krb://ACME.COM",
-            "sub": "expired",
-            "exp": now - 100,
-        }
-        token_str = _create_mock_jwt(claims)
-
-        with patch("unifiedui.core.config.settings") as mock_settings:
-            mock_settings.oidc_issuer_url = None
-            mock_settings.saml_entity_id = None
-            mock_settings.ldap_server_url = None
-            mock_settings.kerberos_realm = "ACME.COM"
-            with pytest.raises(ValueError, match="Token has expired"):
-                IdentityTokenFactory.create(token_str)
-
-
-class TestIdentityTokenFactorySAML:
-    """Test suite for IdentityTokenFactory with SAML tokens."""
-
-    def test_create_saml_token(self):
-        """Test creating a SAML token from a gateway-converted JWT."""
-        now = int(time.time())
-        claims = {
-            "iss": "https://idp.acme.com/saml",
-            "uid": "saml-user-123",
-            "displayName": "John Doe",
-            "email": "john@acme.com",
-            "exp": now + 3600,
-        }
-        token_str = _create_mock_jwt(claims)
-
-        with patch("unifiedui.core.config.settings") as mock_settings:
-            mock_settings.oidc_issuer_url = None
-            mock_settings.saml_entity_id = "https://idp.acme.com/saml"
-            mock_settings.ldap_server_url = None
-            mock_settings.kerberos_realm = None
-            mock_settings.saml_attribute_map_id = "uid"
-            mock_settings.saml_attribute_map_email = "email"
-            mock_settings.saml_attribute_map_display_name = "displayName"
-            mock_settings.saml_attribute_map_first_name = "firstName"
-            mock_settings.saml_attribute_map_last_name = "lastName"
-            result = IdentityTokenFactory.create(token_str)
-
-        assert isinstance(result, SAMLIdentityTokenSerializer)
-        assert result.get_id() == "saml-user-123"
-        assert result.get_identity_provider() == IdenityProviderEnum.SAML.value
-
-    def test_create_saml_token_expired(self):
-        """Test that expired SAML token raises ValueError."""
-        now = int(time.time())
-        claims = {
-            "iss": "https://idp.acme.com/saml",
-            "uid": "expired-user",
-            "exp": now - 100,
-        }
-        token_str = _create_mock_jwt(claims)
-
-        with patch("unifiedui.core.config.settings") as mock_settings:
-            mock_settings.oidc_issuer_url = None
-            mock_settings.saml_entity_id = "https://idp.acme.com/saml"
-            mock_settings.ldap_server_url = None
-            mock_settings.kerberos_realm = None
-            mock_settings.saml_attribute_map_id = "uid"
-            mock_settings.saml_attribute_map_email = "email"
-            mock_settings.saml_attribute_map_display_name = "displayName"
-            mock_settings.saml_attribute_map_first_name = "firstName"
-            mock_settings.saml_attribute_map_last_name = "lastName"
-            with pytest.raises(ValueError, match="Token has expired"):
-                IdentityTokenFactory.create(token_str)
 
 
 class TestIdentityTokenFactoryOkta:
@@ -884,56 +791,6 @@ class TestIdentityProviderFactoryLDAP:
             mock_settings.ldap_server_url = None
             with pytest.raises(ValueError, match="LDAP_SERVER_URL"):
                 IdentityProviderFactory.create(token)
-
-
-class TestIdentityProviderFactoryKerberos:
-    """Test suite for IdentityProviderFactory with Kerberos tokens."""
-
-    def test_create_kerberos_provider(self):
-        """Test creating a Kerberos identity provider."""
-        deserialized = {
-            "sub": "krb-user-1",
-            "principal": "jdoe@ACME.COM",
-            "realm": "ACME.COM",
-        }
-        token = KerberosIdentityTokenSerializer("krb-token", deserialized)
-
-        with patch("unifiedui.core.config.settings") as mock_settings:
-            mock_settings.kerberos_ldap_url = "ldap://dc.acme.com"
-            mock_settings.kerberos_ldap_base_dn = "dc=acme,dc=com"
-            mock_settings.kerberos_realm = "ACME.COM"
-            provider = IdentityProviderFactory.create(token)
-
-        assert isinstance(provider, KerberosIdentityProvider)
-
-    def test_create_kerberos_provider_no_ldap(self):
-        """Test creating Kerberos provider without LDAP URL."""
-        deserialized = {"sub": "krb-user"}
-        token = KerberosIdentityTokenSerializer("krb-token", deserialized)
-
-        with patch("unifiedui.core.config.settings") as mock_settings:
-            mock_settings.kerberos_ldap_url = None
-            mock_settings.kerberos_ldap_base_dn = None
-            mock_settings.kerberos_realm = None
-            provider = IdentityProviderFactory.create(token)
-
-        assert isinstance(provider, KerberosIdentityProvider)
-
-
-class TestIdentityProviderFactorySAML:
-    """Test suite for IdentityProviderFactory with SAML tokens."""
-
-    def test_create_saml_provider(self):
-        """Test creating a SAML identity provider."""
-        deserialized = {
-            "uid": "saml-user-1",
-            "iss": "https://idp.acme.com/saml",
-            "displayName": "John Doe",
-        }
-        token = SAMLIdentityTokenSerializer("saml-token", deserialized)
-        provider = IdentityProviderFactory.create(token)
-
-        assert isinstance(provider, SAMLIdentityProvider)
 
 
 class TestIdentityProviderFactoryOkta:
