@@ -64,6 +64,18 @@ class RestApiAuthTypeEnum(StrEnum):
         return [auth_type.value for auth_type in RestApiAuthTypeEnum]
 
 
+class MicrosoftFoundryAuthTypeEnum(StrEnum):
+    """Supported authentication types for Microsoft Foundry chat agents."""
+
+    ENTRA_ID_USER_TOKEN = "ENTRA_ID_USER_TOKEN"
+    ENTRA_ID_APP_REGISTRATION = "ENTRA_ID_APP_REGISTRATION"
+    API_KEY = "API_KEY"
+
+    @classmethod
+    def all(cls) -> list[str]:
+        return [auth_type.value for auth_type in MicrosoftFoundryAuthTypeEnum]
+
+
 class WorkflowTypeEnum(StrEnum):
     """Supported workflow types."""
 
@@ -210,3 +222,42 @@ class FileContextTypeEnum(StrEnum):
     @classmethod
     def all(cls) -> list[str]:
         return [t.value for t in FileContextTypeEnum]
+
+
+class MessageMetricStatusEnum(StrEnum):
+    """Status of a message metric record."""
+
+    SUCCESS = "SUCCESS"
+    FAILED = "FAILED"
+    CANCELED = "CANCELED"
+
+    @classmethod
+    def all(cls) -> list[str]:
+        return [t.value for t in MessageMetricStatusEnum]
+
+
+class MessageFeedbackRatingEnum(StrEnum):
+    """Rating value for message feedback."""
+
+    THUMBS_UP = "THUMBS_UP"
+    THUMBS_DOWN = "THUMBS_DOWN"
+
+    @classmethod
+    def all(cls) -> list[str]:
+        return [t.value for t in MessageFeedbackRatingEnum]
+
+
+class MessageFeedbackReasonEnum(StrEnum):
+    """Structured reasons for message feedback."""
+
+    HALLUCINATION = "HALLUCINATION"
+    TOO_SLOW = "TOO_SLOW"
+    FORMATTING = "FORMATTING"
+    INACCURATE = "INACCURATE"
+    INAPPROPRIATE = "INAPPROPRIATE"
+    INCOMPLETE = "INCOMPLETE"
+    OTHER = "OTHER"
+
+    @classmethod
+    def all(cls) -> list[str]:
+        return [t.value for t in MessageFeedbackReasonEnum]

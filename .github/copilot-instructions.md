@@ -89,6 +89,41 @@ Read the relevant instruction file **before** working in that area.
 
 ---
 
+## Debug Backdoor (REQ 007)
+
+This service implements the platform-side debug backdoor used by Copilot for self-testing. See [unifiedui/.github/copilot-instructions.md](https://github.com/unified-ui/unifiedui/blob/main/.github/copilot-instructions.md) for the cross-service contract.
+
+| File | Role |
+|------|------|
+| `unifiedui/core/middleware/apis/v1/debug_backdoor.py` | Header constants, `build_backdoor_token()` (synthesises `MockIdentityToken`), structured-log helper |
+| `unifiedui/core/middleware/apis/v1/auth.py` | `@authenticate()` decorator checks `is_backdoor_enabled() and has_backdoor_headers(request)` BEFORE Bearer extraction |
+| `unifiedui/apis/v1/auth.py` | `POST /api/v1/platform-service/auth/debug-backdoor` issues a usable JWT for sessionless tools / the frontend's debug login button |
+| `unifiedui/apis/v1/health.py` | `GET /healthcheck` exposes `debug_backdoor_enabled: bool` |
+| `unifiedui/app.py` | `_emit_debug_backdoor_banner()` + 30 s reminder ticker on startup |
+| `unifiedui/core/config.py` | `enable_debug_back_door`, `debug_back_door_secret`; production validator forbids enabling in `DEPLOYMENT_MODE=production` and requires secret ≥ 32 chars + `allow_mock_identity_provider=True` |
+
+**Tests**: `tests/unit/core/middleware/test_debug_backdoor.py` (14 tests covering settings validation, healthcheck flag, end-to-end protected endpoint, login endpoint).
+
+**Synthetic token** flows through the normal `MockIdentityToken` → `IdentityTokenFactory` → `ContextIdentityUser` pipeline → all RBAC checks fire unchanged.
+
+## Microsoft Foundry — Copilot Reference Project
+
+`.env` carries `FOUNDRY_PROJECT_API_KEY`, `FOUNDRY_PROJECT_ENDPOINT`, `FOUNDRY_PROJECT_OPENAI_ENDPOINT`, `FOUNDRY_DEFAULT_MODEL`. They are NOT consumed by the service. They exist so Copilot can iterate on prompts via `unifiedui/scripts/debug/foundry_smoke.py`.
+
+```bash
+set -a && source .env && set +a
+cd ../unifiedui/scripts/debug
+uv run --with httpx python -i foundry_smoke.py
+>>> ping("gpt-4.1")
+>>> ask("gpt-4.1", "Refactor this prompt for clarity: ...")
+```
+
+API-key path supports prompt iteration only. Foundry agent CRUD requires AAD identity in the Foundry tenant — out of scope for Copilot unless the user grants explicit `az login` access.
+
+**Naming**: any Foundry resource Copilot creates MUST be prefixed `co-debug-`. Never touch resources without that prefix.
+
+---
+
 ## Comment Policy (CRITICAL)
 
 ### Mandatory docstrings:

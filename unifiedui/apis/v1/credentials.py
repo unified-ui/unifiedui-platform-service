@@ -5,9 +5,15 @@ from typing import TYPE_CHECKING
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import Response
 
-from unifiedui.core.database.enums import ListViewEnum, OrderDirectionEnum, PermissionActionEnum, TenantRolesEnum
+from unifiedui.core.database.enums import (
+    ListViewEnum,
+    OrderDirectionEnum,
+    PermissionActionEnum,
+    TenantRolesEnum,
+)
 from unifiedui.core.middleware.apis.v1.auth import authenticate, check_permissions
 from unifiedui.exc.credentials import CredentialNotFoundError
+from unifiedui.handlers.audit_helper import AuditActionEnum, AuditResourceTypeEnum, record_audit
 from unifiedui.handlers.credentials import CredentialHandler
 from unifiedui.handlers.dependencies import get_credential_handler
 from unifiedui.handlers.field_filter import filtered_response, parse_ids
@@ -165,9 +171,18 @@ async def create_credential(
             "API: Create credential",
             extra={"tenant_id": tenant_id, "user_id": user.identity.get_id(), "credential_name": create_request.name},
         )
-        return handler.create_credential(
+        result = handler.create_credential(
             tenant_id=tenant_id, request=create_request, user_id=user.identity.get_id(), user=user
         )
+        record_audit(
+            request=request,
+            tenant_id=tenant_id,
+            action=AuditActionEnum.CREATE,
+            resource_type=AuditResourceTypeEnum.CREDENTIAL,
+            resource_id=str(result.id),
+            resource_name=result.name,
+        )
+        return result
     except Exception as e:
         logger.error("Failed to create credential: %s", e)
         raise HTTPException(
@@ -326,9 +341,19 @@ async def update_credential(
             "API: Update credential",
             extra={"tenant_id": tenant_id, "credential_id": credential_id, "user_id": user.identity.get_id()},
         )
-        return handler.update_credential(
+        result = handler.update_credential(
             tenant_id=tenant_id, credential_id=credential_id, request=update_request, user_id=user.identity.get_id()
         )
+        record_audit(
+            request=request,
+            tenant_id=tenant_id,
+            action=AuditActionEnum.UPDATE,
+            resource_type=AuditResourceTypeEnum.CREDENTIAL,
+            resource_id=str(credential_id),
+            resource_name=getattr(result, "name", None),
+            changes=update_request.model_dump(exclude_unset=True, mode="json", exclude={"secret_value"}),
+        )
+        return result
     except CredentialNotFoundError as e:
         logger.warning("Credential not found: %s", e)
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
@@ -348,7 +373,10 @@ async def update_credential(
 @authenticate()
 @check_permissions(entity="credential", required_permissions=[PermissionActionEnum.ADMIN])
 async def delete_credential(
-    request: Request, tenant_id: str, credential_id: str, handler: CredentialHandler = Depends(get_credential_handler)
+    request: Request,
+    tenant_id: str,
+    credential_id: str,
+    handler: CredentialHandler = Depends(get_credential_handler),
 ) -> Response:
     """
     Delete a credential.
@@ -375,6 +403,13 @@ async def delete_credential(
             extra={"tenant_id": tenant_id, "credential_id": credential_id, "user_id": user.identity.get_id()},
         )
         handler.delete_credential(tenant_id=tenant_id, credential_id=credential_id)
+        record_audit(
+            request=request,
+            tenant_id=tenant_id,
+            action=AuditActionEnum.DELETE,
+            resource_type=AuditResourceTypeEnum.CREDENTIAL,
+            resource_id=str(credential_id),
+        )
         return Response(status_code=status.HTTP_204_NO_CONTENT)
     except CredentialNotFoundError as e:
         logger.warning("Credential not found: %s", e)
@@ -609,13 +644,25 @@ async def set_credential_permission(
                 "user_id": user.identity.get_id(),
             },
         )
-        return handler.set_credential_permission(
+        result = handler.set_credential_permission(
             tenant_id=tenant_id,
             credential_id=credential_id,
             request=permission_request,
             user_id=user.identity.get_id(),
             user=user,
         )
+        record_audit(
+            request=request,
+            tenant_id=tenant_id,
+            action=AuditActionEnum.MEMBER_ADD,
+            resource_type=AuditResourceTypeEnum.CREDENTIAL,
+            resource_id=str(credential_id),
+            changes={
+                "principal_id": permission_request.principal_id,
+                "role": str(getattr(permission_request, "role", None)),
+            },
+        )
+        return result
     except CredentialNotFoundError as e:
         logger.warning("Credential not found: %s", e)
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
@@ -673,6 +720,17 @@ async def delete_credential_permission(
             principal_id=delete_request.principal_id,
             principal_type=delete_request.principal_type,
             permission=delete_request.role,  # Changed from .permission to .role
+        )
+        record_audit(
+            request=request,
+            tenant_id=tenant_id,
+            action=AuditActionEnum.MEMBER_REMOVE,
+            resource_type=AuditResourceTypeEnum.CREDENTIAL,
+            resource_id=str(credential_id),
+            changes={
+                "principal_id": delete_request.principal_id,
+                "role": str(getattr(delete_request, "role", None)),
+            },
         )
         return Response(status_code=status.HTTP_204_NO_CONTENT)
     except CredentialNotFoundError as e:

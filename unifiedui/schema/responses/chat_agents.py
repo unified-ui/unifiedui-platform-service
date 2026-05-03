@@ -93,6 +93,10 @@ class MicrosoftFoundryConfigSettingsResponse(BaseModel):
     agent_type: str = Field(..., description="Agent type (AGENT or MULTI_AGENT)")
     project_endpoint: str = Field(..., description="Foundry project endpoint URL")
     agent_name: str = Field(..., description="Name of the agent in Foundry")
+    auth_type: str = Field(default="ENTRA_ID_USER_TOKEN", description="Authentication mode")
+    credential: CredentialSecretResponse | None = Field(
+        default=None, description="Resolved credential with secret (for ENTRA_ID_APP_REGISTRATION, API_KEY)"
+    )
 
     model_config = ConfigDict(from_attributes=True)
 

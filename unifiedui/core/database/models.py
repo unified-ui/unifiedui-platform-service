@@ -26,6 +26,8 @@ from unifiedui.core.database.enums import (
     ChatAgentTypeEnum,
     EnvironmentTypeEnum,
     FileContextTypeEnum,
+    MessageFeedbackRatingEnum,
+    MessageMetricStatusEnum,
     OrganizationRoleEnum,
     PermissionActionEnum,
     PrincipalTypeEnum,
@@ -1185,4 +1187,85 @@ class File(Base, IdMixin, AuditMixin, TenantScopedMixin):
         Index("ix_files_tenant", "tenant_id"),
         Index("ix_files_context", "tenant_id", "context_type", "context_id"),
         Index("ix_files_storage_path", "storage_path", unique=True),
+    )
+
+
+# ---------- Observability: Message Metrics ----------
+MessageMetricStatusSAEnum = SAEnum(
+    *MessageMetricStatusEnum.all(),
+    name="message_metric_status",
+    native_enum=False,
+    create_constraint=True,
+    validate_strings=True,
+)
+
+
+class MessageMetric(Base, IdMixin, TenantScopedMixin):
+    """Per-message telemetry record (tokens, latency, cost source)."""
+
+    __tablename__ = "message_metrics"
+
+    chat_agent_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("chat_agents.id", ondelete="SET NULL"), nullable=True
+    )
+    workflow_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("workflows.id", ondelete="SET NULL"), nullable=True
+    )
+    conversation_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("conversations.id", ondelete="SET NULL"), nullable=True
+    )
+    message_id: Mapped[str] = mapped_column(String(255), nullable=False)
+    user_id: Mapped[str | None] = mapped_column(String(50), nullable=True)
+
+    provider: Mapped[str] = mapped_column(String(64), nullable=False)
+    model: Mapped[str] = mapped_column(String(128), nullable=False)
+    tokens_input: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    tokens_output: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    latency_ms: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    agent_type: Mapped[str] = mapped_column(String(64), nullable=False)
+    status: Mapped[str] = mapped_column(MessageMetricStatusSAEnum, nullable=False)
+    error_code: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(HighPrecisionDateTime(), nullable=False, default=utc_now)
+
+    __table_args__ = (
+        Index("ix_message_metrics_message_id", "tenant_id", "message_id"),
+        Index("ix_message_metrics_tenant_time", "tenant_id", "created_at"),
+        Index("ix_message_metrics_tenant_agent_time", "tenant_id", "chat_agent_id", "created_at"),
+        Index("ix_message_metrics_tenant_workflow_time", "tenant_id", "workflow_id", "created_at"),
+        UniqueConstraint("tenant_id", "message_id", name="uq_message_metrics_tenant_message"),
+    )
+
+
+# ---------- Observability: Message Feedback ----------
+MessageFeedbackRatingSAEnum = SAEnum(
+    *MessageFeedbackRatingEnum.all(),
+    name="message_feedback_rating",
+    native_enum=False,
+    create_constraint=True,
+    validate_strings=True,
+)
+
+
+class MessageFeedback(Base, IdMixin, TenantScopedMixin):
+    """User feedback (rating + structured reasons + comment) on a single message."""
+
+    __tablename__ = "message_feedback"
+
+    conversation_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("conversations.id", ondelete="CASCADE"), nullable=False
+    )
+    message_id: Mapped[str] = mapped_column(String(255), nullable=False)
+    user_id: Mapped[str] = mapped_column(String(50), nullable=False)
+    rating: Mapped[str] = mapped_column(MessageFeedbackRatingSAEnum, nullable=False)
+    reasons: Mapped[list] = mapped_column(PortableJSON, nullable=False, default=list)
+    comment: Mapped[str | None] = mapped_column(String(4000), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(HighPrecisionDateTime(), nullable=False, default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(
+        HighPrecisionDateTime(), nullable=False, default=utc_now, onupdate=utc_now
+    )
+
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "message_id", "user_id", name="uq_message_feedback_per_user"),
+        Index("ix_message_feedback_message", "tenant_id", "message_id"),
+        Index("ix_message_feedback_conversation", "tenant_id", "conversation_id"),
     )

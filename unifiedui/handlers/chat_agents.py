@@ -815,14 +815,60 @@ class ChatAgentHandler:
                     chat_credentials=chat_credentials,
                 )
             elif app_type == ChatAgentTypeEnum.MICROSOFT_FOUNDRY:
-                # For Microsoft Foundry, return the config settings
                 from unifiedui.schema.responses.chat_agents import MicrosoftFoundryConfigSettingsResponse
 
+                foundry_credential_response = None
+                foundry_credential_id = config.get("credential_id")
+                foundry_auth_type = config.get("auth_type", "ENTRA_ID_USER_TOKEN")
+
+                if foundry_credential_id and foundry_auth_type in ("ENTRA_ID_APP_REGISTRATION", "API_KEY"):
+                    expected_type = (
+                        "ENTRA_ID_APP_REGISTRATION" if foundry_auth_type == "ENTRA_ID_APP_REGISTRATION" else "API_KEY"
+                    )
+                    try:
+                        foundry_credential = credential_handler.get_credential(tenant_id, foundry_credential_id)
+                        if foundry_credential.type != expected_type:
+                            raise InvalidCredentialError(
+                                credential_id=foundry_credential_id,
+                                message=(
+                                    f"Credential type mismatch: auth_type='{foundry_auth_type}' "
+                                    f"requires credential type '{expected_type}', got '{foundry_credential.type}'"
+                                ),
+                            )
+                        foundry_secret = credential_handler.get_credential_secret(tenant_id, foundry_credential_id)
+                        foundry_secret_value: str | dict = foundry_secret
+                        if foundry_credential.type == "ENTRA_ID_APP_REGISTRATION":
+                            try:
+                                foundry_secret_value = (
+                                    json.loads(foundry_secret) if isinstance(foundry_secret, str) else foundry_secret
+                                )
+                            except json.JSONDecodeError:
+                                foundry_secret_value = foundry_secret
+                        foundry_credential_response = CredentialSecretResponse(
+                            id=foundry_credential.id,
+                            credentials_uri=foundry_credential.credential_uri,
+                            name=foundry_credential.name,
+                            description=foundry_credential.description,
+                            type=foundry_credential.type,
+                            is_active=foundry_credential.is_active,
+                            secret=foundry_secret_value,
+                        )
+                    except InvalidCredentialError:
+                        raise
+                    except Exception as e:
+                        logger.error("Failed to fetch Foundry credential: %s", e)
+                        raise InvalidCredentialError(
+                            credential_id=foundry_credential_id,
+                            message=f"Invalid or inaccessible Foundry credential with ID '{foundry_credential_id}'",
+                        )
+
                 settings = MicrosoftFoundryConfigSettingsResponse(
-                    api_version=config.get("api_version", "2025-11-15-preview"),
+                    api_version=config.get("api_version", "v1"),
                     agent_type=config.get("agent_type", "AGENT"),
                     project_endpoint=config.get("project_endpoint", ""),
                     agent_name=config.get("agent_name", ""),
+                    auth_type=foundry_auth_type,
+                    credential=foundry_credential_response,
                 )
             elif app_type == ChatAgentTypeEnum.REST_API:
                 from unifiedui.schema.responses.chat_agents import RestApiConfigSettingsResponse

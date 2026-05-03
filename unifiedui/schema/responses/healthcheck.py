@@ -7,3 +7,4 @@ class HealthCheckResponse(BaseModel):
     status: str
     timestamp: str
     version: str
+    debug_backdoor_enabled: bool = False

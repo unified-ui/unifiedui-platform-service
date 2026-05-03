@@ -16,10 +16,13 @@ from unifiedui.core.middleware.apis.v1.auth import authenticate, check_permissio
 from unifiedui.exc.chat_agent_config import InvalidCredentialError
 from unifiedui.exc.chat_agents import ChatAgentNotFoundError
 from unifiedui.exc.re_act_agents import ReActAgentVersionNotFoundError
+from unifiedui.handlers.audit_helper import AuditActionEnum, AuditResourceTypeEnum, record_audit
 from unifiedui.handlers.chat_agents import ChatAgentHandler
 from unifiedui.handlers.credentials import CredentialHandler
 from unifiedui.handlers.dependencies import get_chat_agent_handler, get_credential_handler
+from unifiedui.handlers.dependencies.foundry_connection import get_foundry_connection_tester
 from unifiedui.handlers.field_filter import filtered_response, parse_ids
+from unifiedui.handlers.foundry_connection import FoundryConnectionTester
 from unifiedui.logger import get_logger
 from unifiedui.schema.requests.chat_agents import (
     CreateChatAgentRequest,
@@ -30,6 +33,7 @@ from unifiedui.schema.requests.permissions import SetResourcePermissionRequest
 from unifiedui.schema.responses.chat_agents import ChatAgentConfigResponse, ChatAgentResponse
 from unifiedui.schema.responses.principals import PrincipalWithRolesResponse, ResourcePrincipalsResponse
 from unifiedui.schema.responses.re_act_agents import ReActAgentVersionResponse
+from unifiedui.schema.test_connection import TestConnectionRequest, TestConnectionResponse
 
 if TYPE_CHECKING:
     from unifiedui.core.identity.users import ContextIdentityUser
@@ -37,6 +41,55 @@ if TYPE_CHECKING:
 logger = get_logger(__name__)
 
 router = APIRouter(prefix="/chat-agents")
+
+
+@router.post(
+    "/test-connection",
+    response_model=TestConnectionResponse,
+    summary="Test chat-agent connection",
+    description=(
+        "Probe a Foundry chat agent for reachability and authentication. "
+        "Works for unsaved configs (create/edit dialog)."
+    ),
+)
+@authenticate()
+@check_permissions(
+    entity="tenant",
+    required_permissions=[
+        TenantRolesEnum.TENANT_GLOBAL_ADMIN,
+        TenantRolesEnum.CHAT_AGENTS_ADMIN,
+        TenantRolesEnum.CHAT_AGENTS_CREATOR,
+    ],
+)
+async def test_chat_agent_connection(
+    request: Request,
+    tenant_id: str,
+    payload: TestConnectionRequest,
+    tester: FoundryConnectionTester = Depends(get_foundry_connection_tester),
+) -> TestConnectionResponse:
+    """Test connection to a Foundry chat agent without persisting it.
+
+    Args:
+        request: FastAPI request providing the user identity and bearer token.
+        tenant_id: Tenant scope used for credential lookup.
+        payload: Foundry config to probe.
+        tester: Foundry connection tester dependency.
+
+    Returns:
+        TestConnectionResponse with success/error/latency metadata.
+    """
+    user: ContextIdentityUser = request.state.user
+    user_token = getattr(user, "raw_token", None) or getattr(user.identity, "raw_token", None)
+    logger.info(
+        "API: Test chat-agent connection",
+        extra={
+            "tenant_id": tenant_id,
+            "user_id": user.identity.get_id(),
+            "auth_type": payload.auth_type,
+            "agent_name": payload.agent_name,
+        },
+    )
+    return tester.test(tenant_id=tenant_id, request=payload, user_token=user_token)
 
 
 @router.get(
@@ -174,9 +227,18 @@ async def create_chat_agent(
         "API: Create chat agent",
         extra={"tenant_id": tenant_id, "user_id": user.identity.get_id(), "app_name": create_request.name},
     )
-    return handler.create_chat_agent(
+    result = handler.create_chat_agent(
         tenant_id=tenant_id, request=create_request, user_id=user.identity.get_id(), user=user
     )
+    record_audit(
+        request=request,
+        tenant_id=tenant_id,
+        action=AuditActionEnum.CREATE,
+        resource_type=AuditResourceTypeEnum.CHAT_AGENT,
+        resource_id=str(result.id),
+        resource_name=result.name,
+    )
+    return result
 
 
 @router.get(
@@ -277,9 +339,19 @@ async def update_chat_agent(
         "API: Update chat agent",
         extra={"tenant_id": tenant_id, "chat_agent_id": chat_agent_id, "user_id": user.identity.get_id()},
     )
-    return handler.update_chat_agent(
+    result = handler.update_chat_agent(
         tenant_id=tenant_id, chat_agent_id=chat_agent_id, request=update_request, user_id=user.identity.get_id()
     )
+    record_audit(
+        request=request,
+        tenant_id=tenant_id,
+        action=AuditActionEnum.UPDATE,
+        resource_type=AuditResourceTypeEnum.CHAT_AGENT,
+        resource_id=str(chat_agent_id),
+        resource_name=getattr(result, "name", None),
+        changes=update_request.model_dump(exclude_unset=True, mode="json"),
+    )
+    return result
 
 
 @router.delete(
@@ -298,7 +370,10 @@ async def update_chat_agent(
     ],
 )
 async def delete_chat_agent(
-    request: Request, tenant_id: str, chat_agent_id: str, handler: ChatAgentHandler = Depends(get_chat_agent_handler)
+    request: Request,
+    tenant_id: str,
+    chat_agent_id: str,
+    handler: ChatAgentHandler = Depends(get_chat_agent_handler),
 ) -> Response:
     """
     Delete a chat agent.
@@ -322,6 +397,13 @@ async def delete_chat_agent(
             extra={"tenant_id": tenant_id, "chat_agent_id": chat_agent_id, "user_id": user.identity.get_id()},
         )
         handler.delete_chat_agent(tenant_id=tenant_id, chat_agent_id=chat_agent_id)
+        record_audit(
+            request=request,
+            tenant_id=tenant_id,
+            action=AuditActionEnum.DELETE,
+            resource_type=AuditResourceTypeEnum.CHAT_AGENT,
+            resource_id=str(chat_agent_id),
+        )
         return Response(status_code=status.HTTP_204_NO_CONTENT)
     except ChatAgentNotFoundError as e:
         logger.warning("Chat agent not found: %s", e)
@@ -350,7 +432,10 @@ async def delete_chat_agent(
     ],
 )
 async def duplicate_chat_agent(
-    request: Request, tenant_id: str, chat_agent_id: str, handler: ChatAgentHandler = Depends(get_chat_agent_handler)
+    request: Request,
+    tenant_id: str,
+    chat_agent_id: str,
+    handler: ChatAgentHandler = Depends(get_chat_agent_handler),
 ) -> ChatAgentResponse:
     """
     Duplicate a chat agent.
@@ -372,9 +457,19 @@ async def duplicate_chat_agent(
             "API: Duplicate chat agent",
             extra={"tenant_id": tenant_id, "chat_agent_id": chat_agent_id, "user_id": user.identity.get_id()},
         )
-        return handler.duplicate_chat_agent(
+        result = handler.duplicate_chat_agent(
             tenant_id=tenant_id, chat_agent_id=chat_agent_id, user_id=user.identity.get_id(), user=user
         )
+        record_audit(
+            request=request,
+            tenant_id=tenant_id,
+            action=AuditActionEnum.CREATE,
+            resource_type=AuditResourceTypeEnum.CHAT_AGENT,
+            resource_id=str(result.id),
+            resource_name=result.name,
+            changes={"duplicated_from": str(chat_agent_id)},
+        )
+        return result
     except ChatAgentNotFoundError as e:
         logger.warning("Chat agent not found: %s", e)
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
@@ -497,12 +592,22 @@ async def update_chat_agent_version(
     """
     try:
         user: ContextIdentityUser = request.state.user
-        return handler.update_chat_agent_version(
+        result = handler.update_chat_agent_version(
             tenant_id=tenant_id,
             chat_agent_id=chat_agent_id,
             request=body,
             user_id=user.identity.get_id(),
         )
+        record_audit(
+            request=request,
+            tenant_id=tenant_id,
+            action=AuditActionEnum.UPDATE,
+            resource_type=AuditResourceTypeEnum.CHAT_AGENT,
+            resource_id=str(chat_agent_id),
+            resource_name=getattr(result, "name", None),
+            changes={"version": "new"},
+        )
+        return result
     except ChatAgentNotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
@@ -659,12 +764,22 @@ async def restore_chat_agent_version(
     """
     try:
         user: ContextIdentityUser = request.state.user
-        return handler.restore_chat_agent_version(
+        result = handler.restore_chat_agent_version(
             tenant_id=tenant_id,
             chat_agent_id=chat_agent_id,
             version=version,
             user_id=user.identity.get_id(),
         )
+        record_audit(
+            request=request,
+            tenant_id=tenant_id,
+            action=AuditActionEnum.UPDATE,
+            resource_type=AuditResourceTypeEnum.CHAT_AGENT,
+            resource_id=str(chat_agent_id),
+            resource_name=getattr(result, "name", None),
+            changes={"restored_from_version": version},
+        )
+        return result
     except (ChatAgentNotFoundError, ReActAgentVersionNotFoundError) as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
@@ -870,13 +985,25 @@ async def set_chat_agent_permission(
                 "user_id": user.identity.get_id(),
             },
         )
-        return handler.set_chat_agent_permission(
+        result = handler.set_chat_agent_permission(
             tenant_id=tenant_id,
             chat_agent_id=chat_agent_id,
             request=permission_request,
             user_id=user.identity.get_id(),
             user=user,
         )
+        record_audit(
+            request=request,
+            tenant_id=tenant_id,
+            action=AuditActionEnum.MEMBER_ADD,
+            resource_type=AuditResourceTypeEnum.CHAT_AGENT,
+            resource_id=str(chat_agent_id),
+            changes={
+                "principal_id": permission_request.principal_id,
+                "role": str(getattr(permission_request, "role", None)),
+            },
+        )
+        return result
     except ChatAgentNotFoundError as e:
         logger.warning("Chat agent not found: %s", e)
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
@@ -941,6 +1068,17 @@ async def delete_chat_agent_permission(
             principal_id=delete_request.principal_id,
             principal_type=delete_request.principal_type.value,
             permission=delete_request.role.value,
+        )
+        record_audit(
+            request=request,
+            tenant_id=tenant_id,
+            action=AuditActionEnum.MEMBER_REMOVE,
+            resource_type=AuditResourceTypeEnum.CHAT_AGENT,
+            resource_id=str(chat_agent_id),
+            changes={
+                "principal_id": delete_request.principal_id,
+                "role": str(getattr(delete_request, "role", None)),
+            },
         )
         return Response(status_code=status.HTTP_204_NO_CONTENT)
     except ChatAgentNotFoundError as e:

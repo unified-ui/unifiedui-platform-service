@@ -330,30 +330,45 @@ def authenticate(required_service_auth_key: str | None = None) -> Callable:
                 request.state.service_authenticated = True
                 request.state.service_key_name = required_service_auth_key
 
-            # Extract Authorization header
-            auth_header = request.headers.get("Authorization")
-            if not auth_header:
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Authorization header missing",
-                    headers={"WWW-Authenticate": "Bearer"},
-                )
+            # Debug Backdoor (REQ 007): if enabled and the request carries the
+            # backdoor secret header, build a synthetic mock token and skip
+            # Bearer-token extraction. The synthetic token then flows through the
+            # normal ContextIdentityUser pipeline so RBAC checks still apply.
+            from unifiedui.core.middleware.apis.v1.debug_backdoor import (
+                build_backdoor_token,
+                has_backdoor_headers,
+                is_backdoor_enabled,
+            )
 
-            # Extract Bearer token
-            if not auth_header.startswith("Bearer "):
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Invalid authorization scheme. Expected 'Bearer'",
-                    headers={"WWW-Authenticate": "Bearer"},
-                )
+            backdoor_active = is_backdoor_enabled() and has_backdoor_headers(request)
+            if backdoor_active:
+                token = build_backdoor_token(request)
+                request.state.debug_backdoor = True
+            else:
+                # Extract Authorization header
+                auth_header = request.headers.get("Authorization")
+                if not auth_header:
+                    raise HTTPException(
+                        status_code=status.HTTP_401_UNAUTHORIZED,
+                        detail="Authorization header missing",
+                        headers={"WWW-Authenticate": "Bearer"},
+                    )
 
-            token = auth_header[7:]  # Remove "Bearer " prefix
-            if not token:
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Token is empty",
-                    headers={"WWW-Authenticate": "Bearer"},
-                )
+                # Extract Bearer token
+                if not auth_header.startswith("Bearer "):
+                    raise HTTPException(
+                        status_code=status.HTTP_401_UNAUTHORIZED,
+                        detail="Invalid authorization scheme. Expected 'Bearer'",
+                        headers={"WWW-Authenticate": "Bearer"},
+                    )
+
+                token = auth_header[7:]  # Remove "Bearer " prefix
+                if not token:
+                    raise HTTPException(
+                        status_code=status.HTTP_401_UNAUTHORIZED,
+                        detail="Token is empty",
+                        headers={"WWW-Authenticate": "Bearer"},
+                    )
 
             # Extract cache preference from header (default: True)
             use_cache_header = request.headers.get("X-Use-Cache", "true")

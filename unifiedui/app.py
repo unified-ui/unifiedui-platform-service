@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from unifiedui.apis.v1 import (
+    admin_analytics,
     auth,
     chat_agents,
     chat_widgets,
@@ -17,10 +18,13 @@ from unifiedui.apis.v1 import (
     foundry,
     health,
     identity,
+    internal_metrics,
+    message_feedback,
     n8n,
     organizations,
     principals,
     recent_visits,
+    resource_analytics,
     search,
     tags,
     tenant_ai_models,
@@ -44,6 +48,7 @@ from unifiedui.exc.credentials import CredentialNotFoundError
 from unifiedui.exc.custom_groups import CustomGroupError, CustomGroupNotFoundError
 from unifiedui.exc.external_apps import ExternalAppAlreadyExistsError, ExternalAppNotFoundError
 from unifiedui.exc.files import FileNotFoundByIdError, FileStorageNotConfiguredError, FileTooLargeError
+from unifiedui.exc.message_feedback import MessageFeedbackNotFoundError
 from unifiedui.exc.organizations import (
     OrganizationAlreadyExistsError,
     OrganizationError,
@@ -84,6 +89,20 @@ logger = get_logger(__name__)
 load_dotenv()
 
 
+def _emit_debug_backdoor_banner() -> None:
+    """Print a loud warning banner when the debug backdoor is enabled."""
+    banner = (
+        "\n"
+        "================================================================\n"
+        "  !!! DEBUG BACKDOOR ENABLED — DEV/TEST ONLY !!!                \n"
+        "  ENABLE_DEBUG_BACK_DOOR=true                                   \n"
+        "  This service accepts synthetic auth via X-Debug-* headers.    \n"
+        "  NEVER expose this configuration to production.                \n"
+        "================================================================\n"
+    )
+    logger.warning(banner)
+
+
 def create_app() -> FastAPI:
     """Create and configure FastAPI application following best practices."""
 
@@ -95,6 +114,22 @@ def create_app() -> FastAPI:
         redoc_url="/redoc",
         openapi_url="/openapi.json",
     )
+
+    if settings.enable_debug_back_door:
+        _emit_debug_backdoor_banner()
+
+        @app.on_event("startup")
+        async def _start_debug_backdoor_reminder() -> None:
+            """Spawn a background task that periodically logs a backdoor warning."""
+            import asyncio
+
+            async def _ticker() -> None:
+                while True:
+                    await asyncio.sleep(30)
+                    logger.warning("DEBUG BACKDOOR is ENABLED — never run this configuration in production")
+
+            task = asyncio.create_task(_ticker())
+            app.state.debug_backdoor_task = task
 
     # CORS Middleware
     app.add_middleware(
@@ -233,6 +268,11 @@ def create_app() -> FastAPI:
         """Handle conversation not found errors."""
         return JSONResponse(status_code=404, content={"detail": str(exc)})
 
+    @app.exception_handler(MessageFeedbackNotFoundError)
+    async def message_feedback_not_found_handler(request: Request, exc: MessageFeedbackNotFoundError):
+        """Handle missing message feedback errors."""
+        return JSONResponse(status_code=404, content={"detail": str(exc)})
+
     # Workflow exception handlers
 
     @app.exception_handler(WorkflowNotFoundError)
@@ -362,6 +402,12 @@ def create_app() -> FastAPI:
 
     app.include_router(health.router, prefix="/api/v1/platform-service", tags=["Health"])
 
+    app.include_router(
+        internal_metrics.router,
+        prefix="/api/v1/platform-service",
+        tags=["Internal · Metrics"],
+    )
+
     app.include_router(identity.router, prefix="/api/v1/platform-service/identity", tags=["Identity"])
 
     app.include_router(organizations.router, prefix="/api/v1/platform-service/organizations", tags=["Organizations"])
@@ -394,6 +440,24 @@ def create_app() -> FastAPI:
 
     app.include_router(
         conversations.router, prefix="/api/v1/platform-service/tenants/{tenant_id}", tags=["Conversations"]
+    )
+
+    app.include_router(
+        message_feedback.router,
+        prefix="/api/v1/platform-service/tenants/{tenant_id}",
+        tags=["Message Feedback"],
+    )
+
+    app.include_router(
+        admin_analytics.router,
+        prefix="/api/v1/platform-service/tenants/{tenant_id}",
+        tags=["Admin · Analytics"],
+    )
+
+    app.include_router(
+        resource_analytics.router,
+        prefix="/api/v1/platform-service/tenants/{tenant_id}",
+        tags=["Analytics"],
     )
 
     app.include_router(

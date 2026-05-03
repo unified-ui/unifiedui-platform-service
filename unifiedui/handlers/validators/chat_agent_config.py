@@ -6,7 +6,11 @@ from typing import Any
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-from unifiedui.core.database.enums import ChatAgentTypeEnum, RestApiAuthTypeEnum
+from unifiedui.core.database.enums import (
+    ChatAgentTypeEnum,
+    MicrosoftFoundryAuthTypeEnum,
+    RestApiAuthTypeEnum,
+)
 from unifiedui.exc.chat_agent_config import ChatAgentConfigValidationError, UnsupportedChatAgentTypeError
 from unifiedui.logger import get_logger
 
@@ -152,6 +156,7 @@ class MicrosoftFoundryApiVersionEnum(StrEnum):
     """Supported Microsoft Foundry API versions."""
 
     V2025_11_15_PREVIEW = "2025-11-15-preview"
+    V1 = "v1"
 
     @classmethod
     def all(cls) -> list[str]:
@@ -166,10 +171,18 @@ class MicrosoftFoundryChatAgentConfig(BaseModel):
 
     agent_type: MicrosoftFoundryAgentTypeEnum = Field(..., description="Agent type (AGENT or MULTI_AGENT)")
     api_version: MicrosoftFoundryApiVersionEnum = Field(
-        ..., description="API version (currently only '2025-11-15-preview' supported)"
+        ..., description="API version (e.g., 'v1' or '2025-11-15-preview')"
     )
     project_endpoint: str = Field(..., min_length=1, description="Foundry project endpoint URL")
     agent_name: str = Field(..., min_length=1, description="Name of the agent in Foundry")
+    auth_type: MicrosoftFoundryAuthTypeEnum = Field(
+        default=MicrosoftFoundryAuthTypeEnum.ENTRA_ID_USER_TOKEN,
+        description="Authentication type (defaults to ENTRA_ID_USER_TOKEN for backward compatibility)",
+    )
+    credential_id: str | None = Field(
+        default=None,
+        description="Credential ID (required for ENTRA_ID_APP_REGISTRATION and API_KEY)",
+    )
 
     @field_validator("project_endpoint")
     @classmethod
@@ -180,6 +193,17 @@ class MicrosoftFoundryChatAgentConfig(BaseModel):
         if "services.ai.azure.com/api/projects" not in v:
             raise ValueError("project_endpoint must contain 'services.ai.azure.com/api/projects'")
         return v
+
+    @model_validator(mode="after")
+    def validate_credential_required(self) -> "MicrosoftFoundryChatAgentConfig":
+        """Validate that credential_id is provided when auth_type requires it."""
+        requires_credential = {
+            MicrosoftFoundryAuthTypeEnum.ENTRA_ID_APP_REGISTRATION,
+            MicrosoftFoundryAuthTypeEnum.API_KEY,
+        }
+        if self.auth_type in requires_credential and not self.credential_id:
+            raise ValueError(f"credential_id is required for auth_type '{self.auth_type}'")
+        return self
 
 
 # ========== Microsoft Foundry Validator ==========
