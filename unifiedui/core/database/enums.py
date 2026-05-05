@@ -224,18 +224,6 @@ class FileContextTypeEnum(StrEnum):
         return [t.value for t in FileContextTypeEnum]
 
 
-class MessageMetricStatusEnum(StrEnum):
-    """Status of a message metric record."""
-
-    SUCCESS = "SUCCESS"
-    FAILED = "FAILED"
-    CANCELED = "CANCELED"
-
-    @classmethod
-    def all(cls) -> list[str]:
-        return [t.value for t in MessageMetricStatusEnum]
-
-
 class MessageFeedbackRatingEnum(StrEnum):
     """Rating value for message feedback."""
 

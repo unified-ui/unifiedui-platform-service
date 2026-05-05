@@ -4,7 +4,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from unifiedui.apis.v1 import (
-    admin_analytics,
     auth,
     chat_agents,
     chat_widgets,
@@ -14,17 +13,16 @@ from unifiedui.apis.v1 import (
     custom_groups,
     dashboard,
     external_apps,
+    feedback_stats,
     files,
     foundry,
     health,
     identity,
-    internal_metrics,
     message_feedback,
     n8n,
     organizations,
     principals,
     recent_visits,
-    resource_analytics,
     search,
     tags,
     tenant_ai_models,
@@ -402,12 +400,6 @@ def create_app() -> FastAPI:
 
     app.include_router(health.router, prefix="/api/v1/platform-service", tags=["Health"])
 
-    app.include_router(
-        internal_metrics.router,
-        prefix="/api/v1/platform-service",
-        tags=["Internal · Metrics"],
-    )
-
     app.include_router(identity.router, prefix="/api/v1/platform-service/identity", tags=["Identity"])
 
     app.include_router(organizations.router, prefix="/api/v1/platform-service/organizations", tags=["Organizations"])
@@ -449,15 +441,9 @@ def create_app() -> FastAPI:
     )
 
     app.include_router(
-        admin_analytics.router,
+        feedback_stats.router,
         prefix="/api/v1/platform-service/tenants/{tenant_id}",
-        tags=["Admin · Analytics"],
-    )
-
-    app.include_router(
-        resource_analytics.router,
-        prefix="/api/v1/platform-service/tenants/{tenant_id}",
-        tags=["Analytics"],
+        tags=["Feedback Stats"],
     )
 
     app.include_router(
