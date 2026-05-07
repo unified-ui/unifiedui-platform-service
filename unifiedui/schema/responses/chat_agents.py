@@ -91,11 +91,22 @@ class MicrosoftFoundryConfigSettingsResponse(BaseModel):
 
     api_version: str = Field(..., description="API version (e.g., '2025-11-15-preview')")
     agent_type: str = Field(..., description="Agent type (AGENT or MULTI_AGENT)")
-    project_endpoint: str = Field(..., description="Foundry project endpoint URL")
-    agent_name: str = Field(..., description="Name of the agent in Foundry")
+    project_endpoint: str = Field(default="", description="Foundry project endpoint URL")
+    agent_name: str = Field(default="", description="Name of the agent in Foundry")
     auth_type: str = Field(default="ENTRA_ID_USER_TOKEN", description="Authentication mode")
     credential: CredentialSecretResponse | None = Field(
         default=None, description="Resolved credential with secret (for ENTRA_ID_APP_REGISTRATION, API_KEY)"
+    )
+    custom_rest_api_endpoint: str | None = Field(default=None, description="Custom REST API proxy endpoint URL")
+    custom_rest_api_auth_type: str | None = Field(
+        default=None,
+        description="Auth type for the custom REST API proxy (API_KEY, USER_TOKEN, ENTRA_ID_APP_REGISTRATION)",
+    )
+    custom_rest_api_api_key_header: str = Field(
+        default="X-API-Key", description="Custom header name for API key auth to the proxy"
+    )
+    access_token: str | None = Field(
+        default=None, description="Pre-acquired access token (for proxy ENTRA_ID_APP_REGISTRATION auth type)"
     )
 
     model_config = ConfigDict(from_attributes=True)

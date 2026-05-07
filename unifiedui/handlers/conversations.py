@@ -338,8 +338,12 @@ class ConversationHandler:
             if not chat_agent:
                 raise ValueError(f"ChatAgent with ID '{request.chat_agent_id}' not found")
 
-            # If chat_agent type is MICROSOFT_FOUNDRY, create external conversation
-            if chat_agent.type == ChatAgentTypeEnum.MICROSOFT_FOUNDRY.value:
+            # If chat_agent type is MICROSOFT_FOUNDRY (non-proxy), create external conversation
+            is_foundry_proxy = (
+                chat_agent.type == ChatAgentTypeEnum.MICROSOFT_FOUNDRY.value
+                and (chat_agent.config or {}).get("auth_type") == "CUSTOM_REST_API"
+            )
+            if chat_agent.type == ChatAgentTypeEnum.MICROSOFT_FOUNDRY.value and not is_foundry_proxy:
                 if not foundry_api_key:
                     raise FoundryConversationCreationError(
                         message="X-Microsoft-Foundry-API-Key header is required for MICROSOFT_FOUNDRY chat agents"

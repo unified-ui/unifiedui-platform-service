@@ -820,10 +820,23 @@ class ChatAgentHandler:
                 foundry_credential_response = None
                 foundry_credential_id = config.get("credential_id")
                 foundry_auth_type = config.get("auth_type", "ENTRA_ID_USER_TOKEN")
+                custom_rest_api_auth_type = config.get("custom_rest_api_auth_type")
 
-                if foundry_credential_id and foundry_auth_type in ("ENTRA_ID_APP_REGISTRATION", "API_KEY"):
+                if foundry_credential_id and (
+                    foundry_auth_type in ("ENTRA_ID_APP_REGISTRATION", "API_KEY")
+                    or (
+                        foundry_auth_type == "CUSTOM_REST_API"
+                        and custom_rest_api_auth_type in ("API_KEY", "ENTRA_ID_APP_REGISTRATION")
+                    )
+                ):
+                    is_proxy_entra = (
+                        foundry_auth_type == "CUSTOM_REST_API"
+                        and custom_rest_api_auth_type == "ENTRA_ID_APP_REGISTRATION"
+                    )
                     expected_type = (
-                        "ENTRA_ID_APP_REGISTRATION" if foundry_auth_type == "ENTRA_ID_APP_REGISTRATION" else "API_KEY"
+                        "ENTRA_ID_APP_REGISTRATION"
+                        if foundry_auth_type == "ENTRA_ID_APP_REGISTRATION" or is_proxy_entra
+                        else "API_KEY"
                     )
                     try:
                         foundry_credential = credential_handler.get_credential(tenant_id, foundry_credential_id)
@@ -862,6 +875,25 @@ class ChatAgentHandler:
                             message=f"Invalid or inaccessible Foundry credential with ID '{foundry_credential_id}'",
                         )
 
+                foundry_access_token = None
+                if (
+                    foundry_auth_type == "CUSTOM_REST_API"
+                    and custom_rest_api_auth_type == "ENTRA_ID_APP_REGISTRATION"
+                    and foundry_credential_response
+                    and isinstance(foundry_credential_response.secret, dict)
+                ):
+                    from unifiedui.core.identity.client_credentials import ClientCredentialsTokenClient
+
+                    cc_client = ClientCredentialsTokenClient(
+                        tenant_id=foundry_credential_response.secret["tenant_id"],
+                        client_id=foundry_credential_response.secret["client_id"],
+                        client_secret=foundry_credential_response.secret["client_secret"],
+                    )
+                    try:
+                        foundry_access_token = cc_client.acquire_token()
+                    except ValueError as e:
+                        logger.error("Failed to acquire client credentials token for Foundry proxy: %s", e)
+
                 settings = MicrosoftFoundryConfigSettingsResponse(
                     api_version=config.get("api_version", "v1"),
                     agent_type=config.get("agent_type", "AGENT"),
@@ -869,6 +901,10 @@ class ChatAgentHandler:
                     agent_name=config.get("agent_name", ""),
                     auth_type=foundry_auth_type,
                     credential=foundry_credential_response,
+                    custom_rest_api_endpoint=config.get("custom_rest_api_endpoint"),
+                    custom_rest_api_auth_type=custom_rest_api_auth_type,
+                    custom_rest_api_api_key_header=config.get("custom_rest_api_api_key_header", "X-API-Key"),
+                    access_token=foundry_access_token,
                 )
             elif app_type == ChatAgentTypeEnum.REST_API:
                 from unifiedui.schema.responses.chat_agents import RestApiConfigSettingsResponse

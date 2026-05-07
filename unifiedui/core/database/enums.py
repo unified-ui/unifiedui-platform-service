@@ -70,10 +70,23 @@ class MicrosoftFoundryAuthTypeEnum(StrEnum):
     ENTRA_ID_USER_TOKEN = "ENTRA_ID_USER_TOKEN"
     ENTRA_ID_APP_REGISTRATION = "ENTRA_ID_APP_REGISTRATION"
     API_KEY = "API_KEY"
+    CUSTOM_REST_API = "CUSTOM_REST_API"
 
     @classmethod
     def all(cls) -> list[str]:
         return [auth_type.value for auth_type in MicrosoftFoundryAuthTypeEnum]
+
+
+class MicrosoftFoundryCustomRestApiAuthTypeEnum(StrEnum):
+    """Supported authentication types for Custom REST API proxy in Foundry mode."""
+
+    API_KEY = "API_KEY"
+    USER_TOKEN = "USER_TOKEN"
+    ENTRA_ID_APP_REGISTRATION = "ENTRA_ID_APP_REGISTRATION"
+
+    @classmethod
+    def all(cls) -> list[str]:
+        return [auth_type.value for auth_type in MicrosoftFoundryCustomRestApiAuthTypeEnum]
 
 
 class WorkflowTypeEnum(StrEnum):
