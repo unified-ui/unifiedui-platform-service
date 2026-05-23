@@ -1,6 +1,6 @@
 from collections.abc import Callable
 from functools import wraps
-from typing import Any
+from typing import Any, NoReturn
 
 from fastapi import HTTPException, Request, status
 from sqlalchemy import select
@@ -30,6 +30,29 @@ from unifiedui.handlers.dependencies.database import get_db_client
 from unifiedui.logger import get_logger
 
 logger = get_logger(__name__)
+
+
+def _raise_permission_denied(
+    detail: str,
+    required_roles: list[str] | None = None,
+    user_roles: list[str] | None = None,
+) -> NoReturn:
+    """Raise a structured 403 HTTPException with permission context.
+
+    Args:
+        detail: Human-readable error description
+        required_roles: Roles that would grant access
+        user_roles: Roles the current user has
+    """
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail={
+            "detail": detail,
+            "error_code": "PERMISSION_DENIED",
+            "required_roles": required_roles or [],
+            "user_roles": user_roles or [],
+        },
+    )
 
 
 def _validate_service_key(request: Request, required_service_auth_config: str) -> bool:
@@ -473,8 +496,7 @@ def authenticate(required_service_auth_key: str | None = None) -> Callable:
                     has_org_bypass = bool(set(org_roles) & org_bypass_roles)
 
                     if not has_org_bypass:
-                        raise HTTPException(
-                            status_code=status.HTTP_403_FORBIDDEN,
+                        _raise_permission_denied(
                             detail=f"Access denied: User does not have access to tenant {tenant_id}",
                         )
 
@@ -589,9 +611,9 @@ def check_permissions(
                             return await func(*args, **kwargs)
 
                 # If org roles were required but not met, deny
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
+                _raise_permission_denied(
                     detail=f"Access denied: User does not have required organization roles. Required one of: {required_org_roles}",
+                    required_roles=required_org_roles,
                 )
 
             # Check permissions based on entity type
@@ -620,8 +642,7 @@ def check_permissions(
                 matching_tenant = next((t for t in user_tenants if t["tenant"]["id"] == tenant_id), None)
 
                 if not matching_tenant:
-                    raise HTTPException(
-                        status_code=status.HTTP_403_FORBIDDEN,
+                    _raise_permission_denied(
                         detail=f"Access denied: User does not have access to tenant {tenant_id}",
                     )
 
@@ -634,9 +655,10 @@ def check_permissions(
                 has_permission = any(perm in user_roles for perm in required_perms_str)
 
                 if not has_permission:
-                    raise HTTPException(
-                        status_code=status.HTTP_403_FORBIDDEN,
+                    _raise_permission_denied(
                         detail=f"Access denied: User does not have required permissions. Required: {required_perms_str}, Has: {user_roles}",
+                        required_roles=required_perms_str,
+                        user_roles=user_roles,
                     )
 
             elif entity == "tag":
@@ -682,9 +704,9 @@ def check_permissions(
                             return await func(*args, **kwargs)
 
                 # No permission matched
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
+                _raise_permission_denied(
                     detail=f"Access denied: User does not have required permissions on this tag (ID: {tag_id})",
+                    required_roles=[p.value if hasattr(p, "value") else p for p in (required_permissions or [])],
                 )
 
             elif entity == "user_favorite":
@@ -708,8 +730,7 @@ def check_permissions(
                         return await func(*args, **kwargs)
 
                 # No permission matched
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
+                _raise_permission_denied(
                     detail="Access denied: User can only manage their own favorites",
                 )
 
@@ -841,9 +862,9 @@ def check_permissions(
                     result = session.execute(query).scalars().first()
 
                     if not result:
-                        raise HTTPException(
-                            status_code=status.HTTP_403_FORBIDDEN,
+                        _raise_permission_denied(
                             detail=f"Access denied: User does not have required permissions on this {entity} (ID: {entity_id}). Required one of: {required_perms_str}, Allowed roles: {list(allowed_roles)}",
+                            required_roles=required_perms_str,
                         )
 
             return await func(*args, **kwargs)

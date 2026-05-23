@@ -142,7 +142,15 @@ def create_app() -> FastAPI:
     @app.exception_handler(PermissionDeniedError)
     async def permission_denied_handler(request: Request, exc: PermissionDeniedError):
         """Handle permission denied errors."""
-        return JSONResponse(status_code=403, content={"detail": str(exc)})
+        return JSONResponse(
+            status_code=403,
+            content={
+                "detail": str(exc),
+                "error_code": "PERMISSION_DENIED",
+                "required_roles": exc.required_roles,
+                "user_roles": exc.user_roles,
+            },
+        )
 
     @app.exception_handler(TenantNotFoundError)
     async def tenant_not_found_handler(request: Request, exc: TenantNotFoundError):
