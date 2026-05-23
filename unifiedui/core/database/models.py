@@ -389,9 +389,6 @@ class ChatAgent(Base, IdNameDescriptionMixin, TenantScopedMixin):
     user_favorites: Mapped[list[ChatAgentUserFavorite]] = relationship(
         back_populates="chat_agent", cascade="all, delete-orphan"
     )
-    versions: Mapped[list[ReActAgentVersion]] = relationship(
-        back_populates="chat_agent", cascade="all, delete-orphan", order_by="ReActAgentVersion.version.desc()"
-    )
 
     __table_args__ = (
         UniqueConstraint("tenant_id", "name", name="uq_chat_agent_tenant_name"),
@@ -667,7 +664,6 @@ class Tag(Base, AuditMixin):
     workflow_tags: Mapped[list[WorkflowTag]] = relationship(back_populates="tag", cascade="all, delete-orphan")
     chat_widget_tags: Mapped[list[ChatWidgetTag]] = relationship(back_populates="tag", cascade="all, delete-orphan")
     credential_tags: Mapped[list[CredentialTag]] = relationship(back_populates="tag", cascade="all, delete-orphan")
-    tool_tags: Mapped[list[ToolTag]] = relationship(back_populates="tag", cascade="all, delete-orphan")
     external_app_tags: Mapped[list[ExternalAppTag]] = relationship(back_populates="tag", cascade="all, delete-orphan")
     tenant_ai_model_tags: Mapped[list[TenantAIModelTag]] = relationship(
         back_populates="tag", cascade="all, delete-orphan"
@@ -929,29 +925,6 @@ class ExternalAppUserFavorite(Base, AuditMixin):
     )
 
 
-# ---------- Tools (ReACT Agent Tools) ----------
-class Tool(Base, IdNameDescriptionMixin, TenantScopedMixin):
-    """Tool entity for ReACT agent tools (MCP servers, OpenAPI definitions)."""
-
-    __tablename__ = "tools"
-
-    type: Mapped[str] = mapped_column(String(50), nullable=False)
-    config: Mapped[dict] = mapped_column(PortableJSON, nullable=False, default=dict)
-    credential_id: Mapped[str | None] = mapped_column(
-        String(36), ForeignKey("credentials.id", ondelete="SET NULL"), nullable=True
-    )
-    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-
-    credential: Mapped[Credential | None] = relationship(foreign_keys=[credential_id])
-    members: Mapped[list[ToolMember]] = relationship(back_populates="tool", cascade="all, delete-orphan")
-    tags: Mapped[list[ToolTag]] = relationship(back_populates="tool", cascade="all, delete-orphan")
-
-    __table_args__ = (
-        UniqueConstraint("tenant_id", "name", name="uq_tool_tenant_name"),
-        Index("ix_tools_tenant", "tenant_id"),
-    )
-
-
 class TenantAIModel(Base, IdNameDescriptionMixin, TenantScopedMixin):
     """Tenant AI model entity for LLM and embedding model configurations."""
 
@@ -994,58 +967,6 @@ class ExternalApp(Base, IdNameDescriptionMixin, TenantScopedMixin):
     __table_args__ = (
         UniqueConstraint("tenant_id", "name", name="uq_external_app_tenant_name"),
         Index("ix_external_apps_tenant", "tenant_id"),
-    )
-
-
-class ToolMember(Base, IdMixin, AuditMixin):
-    """Tool membership table."""
-
-    __tablename__ = "tool_members"
-
-    tenant_id: Mapped[str] = mapped_column(String(36), nullable=False)
-    tool_id: Mapped[str] = mapped_column(String(36), ForeignKey("tools.id", ondelete="CASCADE"), nullable=False)
-    principal_id: Mapped[str] = mapped_column(String(50), nullable=False)
-
-    role: Mapped[str] = mapped_column(PermissionActionSAEnum, nullable=False)
-
-    tool: Mapped[Tool] = relationship(back_populates="members")
-    principal: Mapped[Principal] = relationship(
-        foreign_keys="[ToolMember.tenant_id, ToolMember.principal_id]",
-        primaryjoin="and_(ToolMember.tenant_id == Principal.tenant_id, ToolMember.principal_id == Principal.principal_id)",
-    )
-
-    __table_args__ = (
-        ForeignKeyConstraint(
-            ["tenant_id", "principal_id"],
-            ["principals.tenant_id", "principals.principal_id"],
-            ondelete="CASCADE",
-            name="fk_tool_members_principal",
-        ),
-        UniqueConstraint("tool_id", "principal_id", name="uq_tool_members"),
-        Index("ix_tool_members_tool", "tool_id"),
-        Index("ix_tool_members_principal", "principal_id"),
-    )
-
-
-class ToolTag(Base, AuditMixin):
-    """Junction table for tool tags."""
-
-    __tablename__ = "tool_tags"
-
-    tenant_id: Mapped[str] = mapped_column(String(36), nullable=False, primary_key=True)
-    tag_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("tags.id", ondelete="CASCADE"), nullable=False, primary_key=True
-    )
-    tool_id: Mapped[str] = mapped_column(
-        String(36), ForeignKey("tools.id", ondelete="CASCADE"), nullable=False, primary_key=True
-    )
-
-    tag: Mapped[Tag] = relationship(back_populates="tool_tags")
-    tool: Mapped[Tool] = relationship(back_populates="tags")
-
-    __table_args__ = (
-        Index("ix_tt_tool", "tool_id"),
-        Index("ix_tt_tag", "tag_id"),
     )
 
 
@@ -1120,34 +1041,6 @@ class TenantAIModelTag(Base, AuditMixin):
     __table_args__ = (
         Index("ix_tamt_tenant_ai_model", "tenant_ai_model_id"),
         Index("ix_tamt_tag", "tag_id"),
-    )
-
-
-# ---------- ReACT Agent Versions (linked to ChatAgent) ----------
-class ReActAgentVersion(Base, IdMixin, AuditMixin):
-    """Versioned configuration for a ReACT Agent (chat_agent with type=REACT_AGENT)."""
-
-    __tablename__ = "re_act_agent_versions"
-
-    chat_agent_id: Mapped[str] = mapped_column(
-        String(36), ForeignKey("chat_agents.id", ondelete="CASCADE"), nullable=False
-    )
-    version: Mapped[int] = mapped_column(Integer, nullable=False)
-    ai_model_ids: Mapped[list] = mapped_column(PortableJSON, nullable=False, default=list)
-    system_prompt: Mapped[str | None] = mapped_column(String(8000), nullable=True)
-    tool_ids: Mapped[list] = mapped_column(PortableJSON, nullable=False, default=list)
-    security_prompt: Mapped[str | None] = mapped_column(String(8000), nullable=True)
-    tool_use_prompt: Mapped[str | None] = mapped_column(String(8000), nullable=True)
-    response_prompt: Mapped[str | None] = mapped_column(String(8000), nullable=True)
-    greeting_messages: Mapped[list] = mapped_column(PortableJSON, nullable=False, default=list)
-    config: Mapped[dict] = mapped_column(PortableJSON, nullable=False, default=dict)
-
-    chat_agent: Mapped[ChatAgent] = relationship(back_populates="versions")
-
-    __table_args__ = (
-        UniqueConstraint("chat_agent_id", "version", name="uq_re_act_agent_version"),
-        Index("ix_re_act_agent_versions_agent", "chat_agent_id"),
-        Index("ix_re_act_agent_versions_agent_version", "chat_agent_id", "version"),
     )
 
 

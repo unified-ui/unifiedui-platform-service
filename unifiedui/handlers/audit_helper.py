@@ -36,7 +36,6 @@ class AuditResourceTypeEnum(StrEnum):
     CHAT_AGENT = "CHAT_AGENT"
     WORKFLOW = "WORKFLOW"
     CREDENTIAL = "CREDENTIAL"
-    TOOL = "TOOL"
     TAG = "TAG"
     PRINCIPAL = "PRINCIPAL"
     CUSTOM_GROUP = "CUSTOM_GROUP"

@@ -5,7 +5,6 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field
 
 from unifiedui.core.database.enums import ChatAgentTypeEnum
-from unifiedui.schema.responses.re_act_agents import ReActAgentConfigSettingsResponse
 from unifiedui.schema.responses.tags import TagSummary
 
 
@@ -22,14 +21,7 @@ class ChatAgentResponse(BaseModel):
     embed_allowed_origins: str | None = Field(
         None, description="Semicolon-separated list of allowed origins for embed iframe"
     )
-    current_version: int | None = Field(None, description="Current version number (REACT_AGENT only)")
-    ai_model_ids: list[str] = Field(default_factory=list, description="AI model IDs (REACT_AGENT only)")
-    system_prompt: str | None = Field(None, description="System prompt (REACT_AGENT only)")
-    tool_ids: list[str] = Field(default_factory=list, description="Tool IDs (REACT_AGENT only)")
-    security_prompt: str | None = Field(None, description="Security prompt (REACT_AGENT only)")
-    tool_use_prompt: str | None = Field(None, description="Tool use instructions (REACT_AGENT only)")
-    response_prompt: str | None = Field(None, description="Response formatting (REACT_AGENT only)")
-    greeting_messages: list[str] = Field(default_factory=list, description="Greeting messages (REACT_AGENT only)")
+    greeting_messages: list[str] = Field(default_factory=list, description="Greeting messages")
     tags: list[TagSummary] = Field(default_factory=list, description="Tags on the chat agent")
     created_at: datetime = Field(..., description="Creation timestamp")
     updated_at: datetime = Field(..., description="Last update timestamp")
@@ -171,7 +163,6 @@ class ChatAgentConfigResponse(BaseModel):
         | MicrosoftFoundryConfigSettingsResponse
         | RestApiConfigSettingsResponse
         | LLMConfigSettingsResponse
-        | ReActAgentConfigSettingsResponse
         | dict
     ) = Field(..., description="Chat agent settings with resolved credentials")
     user: UserInfoResponse = Field(..., description="User information")

@@ -27,9 +27,6 @@ from unifiedui.core.database.models import (
     Tag,
     TenantAIModel,
     TenantAIModelTag,
-    Tool,
-    ToolMember,
-    ToolTag,
     Workflow,
     WorkflowMember,
     WorkflowTag,
@@ -52,7 +49,6 @@ VALID_SEARCH_TYPES = {
     "chat_widget",
     "external_app",
     "credential",
-    "tool",
     "tenant_ai_model",
     "principal",
     "custom_group",
@@ -123,17 +119,6 @@ MEMBER_SEARCH_TYPE_CONFIG = {
         "admin_roles": [
             TenantRolesEnum.TENANT_GLOBAL_ADMIN,
             TenantRolesEnum.CREDENTIALS_ADMIN,
-        ],
-    },
-    "tool": {
-        "entity_model": Tool,
-        "member_model": ToolMember,
-        "entity_id_field": "tool_id",
-        "tag_model": ToolTag,
-        "tag_entity_id_field": "tool_id",
-        "admin_roles": [
-            TenantRolesEnum.TENANT_GLOBAL_ADMIN,
-            TenantRolesEnum.REACT_AGENT_ADMIN,
         ],
     },
 }

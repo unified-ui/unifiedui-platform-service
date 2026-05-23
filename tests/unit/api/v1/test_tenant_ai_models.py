@@ -70,7 +70,7 @@ class TestTenantAIModelRoutes:
             "description": "Azure OpenAI GPT-4o deployment",
             "type": "LLM_MODEL",
             "provider": "AZURE_OPENAI",
-            "purpose_groups": ["CONVERSATION_TITLE_GENERATION", "TRACE_ANALYSIS"],
+            "purpose_groups": ["CONVERSATION_TITLE_GENERATION", "DESCRIPTION_GENERATION"],
             "config": {
                 "endpoint": "https://my-endpoint.openai.azure.com/",
                 "deployment_name": "gpt-4o",
@@ -539,14 +539,14 @@ class TestTenantAIModelRoutes:
 
         response = test_client.patch(
             ENDPOINT_AI_MODEL_DETAIL.format(tenant_id=tenant_id, model_id=model_id),
-            json={"purpose_groups": ["CONVERSATION_TITLE_GENERATION", "TRACE_ANALYSIS", "DESCRIPTION_GENERATION"]},
+            json={"purpose_groups": ["CONVERSATION_TITLE_GENERATION", "GENERAL", "DESCRIPTION_GENERATION"]},
             headers=headers,
         )
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert "CONVERSATION_TITLE_GENERATION" in data["purpose_groups"]
-        assert "TRACE_ANALYSIS" in data["purpose_groups"]
+        assert "GENERAL" in data["purpose_groups"]
         assert "DESCRIPTION_GENERATION" in data["purpose_groups"]
 
     def test_update_ai_model_priority(

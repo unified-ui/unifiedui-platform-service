@@ -16,8 +16,6 @@ from unifiedui.core.database.models import (
     ChatWidgetMember,
     Credential,
     CredentialMember,
-    Tool,
-    ToolMember,
     Workflow,
     WorkflowMember,
 )
@@ -29,7 +27,6 @@ ENDPOINT_CHAT_AGENT_TAGS = "/api/v1/platform-service/tenants/{tenant_id}/chat-ag
 ENDPOINT_AUTONOMOUS_AGENT_TAGS = "/api/v1/platform-service/tenants/{tenant_id}/workflows/{workflow_id}/tags"
 ENDPOINT_CHAT_WIDGET_TAGS = "/api/v1/platform-service/tenants/{tenant_id}/chat-widgets/{chat_widget_id}/tags"
 ENDPOINT_CREDENTIAL_TAGS = "/api/v1/platform-service/tenants/{tenant_id}/credentials/{credential_id}/tags"
-ENDPOINT_TOOL_TAGS = "/api/v1/platform-service/tenants/{tenant_id}/tools/{tool_id}/tags"
 
 # Resource endpoints for list with tags filter
 ENDPOINT_CHAT_AGENTS = "/api/v1/platform-service/tenants/{tenant_id}/chat-agents"
@@ -39,7 +36,6 @@ ENDPOINT_CREDENTIALS = "/api/v1/platform-service/tenants/{tenant_id}/credentials
 ENDPOINT_DEVELOPMENT_PLATFORMS = "/api/v1/platform-service/tenants/{tenant_id}/development-platforms"
 
 # Resource-type tag list endpoints
-ENDPOINT_TOOLS_TAGS_LIST = "/api/v1/platform-service/tenants/{tenant_id}/tools/tags"
 ENDPOINT_CHAT_AGENTS_TAGS_LIST = "/api/v1/platform-service/tenants/{tenant_id}/chat-agents/tags"
 ENDPOINT_WORKFLOWS_TAGS_LIST = "/api/v1/platform-service/tenants/{tenant_id}/workflows/tags"
 ENDPOINT_CHAT_WIDGETS_TAGS_LIST = "/api/v1/platform-service/tenants/{tenant_id}/chat-widgets/tags"
@@ -173,38 +169,6 @@ def create_credential_in_db(test_client: TestClient, tenant_id: str, user_id: st
         session.add(member)
         session.commit()
     return cred_id
-
-
-def create_tool_in_db(test_client: TestClient, tenant_id: str, user_id: str, name: str = "Test Tool") -> str:
-    """Helper function to create a tool directly in DB and return its ID."""
-    tool_id = str(uuid.uuid4())
-    with test_client.db_client.get_session() as session:
-        tool = Tool(
-            id=tool_id,
-            tenant_id=tenant_id,
-            name=name,
-            description="Test tool",
-            type="MCP_SERVER",
-            config={},
-            is_active=True,
-            created_by=user_id,
-            updated_by=user_id,
-        )
-        session.add(tool)
-        session.commit()
-
-        member = ToolMember(
-            id=str(uuid.uuid4()),
-            tenant_id=tenant_id,
-            tool_id=tool_id,
-            principal_id=user_id,
-            role=PermissionActionEnum.ADMIN,
-            created_by=user_id,
-            updated_by=user_id,
-        )
-        session.add(member)
-        session.commit()
-    return tool_id
 
 
 class TestTagRoutes:
@@ -716,107 +680,8 @@ class TestTagCascadeDelete:
         assert tags[0]["name"] == "KEEP-ME"
 
 
-class TestToolTagRoutes:
-    """Test suite for tool tag management."""
-
-    def test_get_tool_tags_empty(self, test_client: TestClient, test_user_token: Any) -> None:
-        """Test getting tags for a tool with no tags."""
-        tenant_id = create_tenant_for_user(test_client, test_user_token)
-        tool_id = create_tool_in_db(test_client, tenant_id, test_user_token.get_id())
-        headers = create_auth_headers(test_user_token, use_cache=False)
-
-        response = test_client.get(ENDPOINT_TOOL_TAGS.format(tenant_id=tenant_id, tool_id=tool_id), headers=headers)
-
-        assert response.status_code == status.HTTP_200_OK
-        assert response.json() == []
-
-    def test_set_and_get_tool_tags(self, test_client: TestClient, test_user_token: Any) -> None:
-        """Test setting and getting tags on a tool."""
-        tenant_id = create_tenant_for_user(test_client, test_user_token)
-        tool_id = create_tool_in_db(test_client, tenant_id, test_user_token.get_id())
-        headers = create_auth_headers(test_user_token, use_cache=False)
-
-        response = test_client.put(
-            ENDPOINT_TOOL_TAGS.format(tenant_id=tenant_id, tool_id=tool_id),
-            json={"tags": ["mcp", "EXTERNAL"]},
-            headers=headers,
-        )
-
-        assert response.status_code == status.HTTP_200_OK
-        data = response.json()
-        assert len(data) == 2
-
-        get_response = test_client.get(ENDPOINT_TOOL_TAGS.format(tenant_id=tenant_id, tool_id=tool_id), headers=headers)
-        assert get_response.status_code == status.HTTP_200_OK
-        assert len(get_response.json()) == 2
-
-    def test_set_tool_tags_replaces_existing(self, test_client: TestClient, test_user_token: Any) -> None:
-        """Test that setting tags replaces existing tags."""
-        tenant_id = create_tenant_for_user(test_client, test_user_token)
-        tool_id = create_tool_in_db(test_client, tenant_id, test_user_token.get_id())
-        headers = create_auth_headers(test_user_token, use_cache=False)
-
-        test_client.put(
-            ENDPOINT_TOOL_TAGS.format(tenant_id=tenant_id, tool_id=tool_id),
-            json={"tags": ["OLD-TAG"]},
-            headers=headers,
-        )
-
-        response = test_client.put(
-            ENDPOINT_TOOL_TAGS.format(tenant_id=tenant_id, tool_id=tool_id),
-            json={"tags": ["NEW-TAG-A", "NEW-TAG-B"]},
-            headers=headers,
-        )
-
-        assert response.status_code == status.HTTP_200_OK
-        tag_names = [t["name"] for t in response.json()]
-        assert "NEW-TAG-A" in tag_names
-        assert "NEW-TAG-B" in tag_names
-        assert "OLD-TAG" not in tag_names
-
-    def test_delete_tool_tags(self, test_client: TestClient, test_user_token: Any) -> None:
-        """Test deleting all tags from a tool."""
-        tenant_id = create_tenant_for_user(test_client, test_user_token)
-        tool_id = create_tool_in_db(test_client, tenant_id, test_user_token.get_id())
-        headers = create_auth_headers(test_user_token, use_cache=False)
-
-        test_client.put(
-            ENDPOINT_TOOL_TAGS.format(tenant_id=tenant_id, tool_id=tool_id),
-            json={"tags": ["TAG1", "TAG2"]},
-            headers=headers,
-        )
-
-        response = test_client.delete(ENDPOINT_TOOL_TAGS.format(tenant_id=tenant_id, tool_id=tool_id), headers=headers)
-
-        assert response.status_code == status.HTTP_204_NO_CONTENT
-
-        get_response = test_client.get(ENDPOINT_TOOL_TAGS.format(tenant_id=tenant_id, tool_id=tool_id), headers=headers)
-        assert get_response.json() == []
-
-
 class TestResourceTypeTagListEndpoints:
     """Test suite for resource-type tag list endpoints."""
-
-    def test_list_tool_tags(self, test_client: TestClient, test_user_token: Any) -> None:
-        """Test listing tags filtered by tools resource type."""
-        tenant_id = create_tenant_for_user(test_client, test_user_token)
-        tool_id = create_tool_in_db(test_client, tenant_id, test_user_token.get_id())
-        headers = create_auth_headers(test_user_token, use_cache=False)
-
-        test_client.put(
-            ENDPOINT_TOOL_TAGS.format(tenant_id=tenant_id, tool_id=tool_id),
-            json={"tags": ["TOOL-TAG-1", "TOOL-TAG-2"]},
-            headers=headers,
-        )
-
-        response = test_client.get(ENDPOINT_TOOLS_TAGS_LIST.format(tenant_id=tenant_id), headers=headers)
-
-        assert response.status_code == status.HTTP_200_OK
-        data = response.json()
-        assert len(data) >= 2
-        tag_names = [t["name"] for t in data]
-        assert "TOOL-TAG-1" in tag_names
-        assert "TOOL-TAG-2" in tag_names
 
     def test_list_chat_agent_tags(self, test_client: TestClient, test_user_token: Any) -> None:
         """Test listing tags filtered by chat agents resource type."""
@@ -889,34 +754,3 @@ class TestResourceTypeTagListEndpoints:
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert len(data) >= 1
-
-    def test_resource_type_tag_isolation(self, test_client: TestClient, test_user_token: Any) -> None:
-        """Test that resource-type tag list only returns tags for that resource type."""
-        tenant_id = create_tenant_for_user(test_client, test_user_token)
-        headers = create_auth_headers(test_user_token, use_cache=False)
-
-        tool_id = create_tool_in_db(test_client, tenant_id, test_user_token.get_id())
-        chat_agent_id = create_chat_agent_in_db(test_client, tenant_id, test_user_token.get_id())
-
-        test_client.put(
-            ENDPOINT_TOOL_TAGS.format(tenant_id=tenant_id, tool_id=tool_id),
-            json={"tags": ["ONLY-TOOL"]},
-            headers=headers,
-        )
-        test_client.put(
-            ENDPOINT_CHAT_AGENT_TAGS.format(tenant_id=tenant_id, chat_agent_id=chat_agent_id),
-            json={"tags": ["ONLY-CHAT-AGENT"]},
-            headers=headers,
-        )
-
-        tool_tags_response = test_client.get(ENDPOINT_TOOLS_TAGS_LIST.format(tenant_id=tenant_id), headers=headers)
-        tool_tag_names = [t["name"] for t in tool_tags_response.json()]
-        assert "ONLY-TOOL" in tool_tag_names
-        assert "ONLY-CHAT-AGENT" not in tool_tag_names
-
-        chat_agent_tags_response = test_client.get(
-            ENDPOINT_CHAT_AGENTS_TAGS_LIST.format(tenant_id=tenant_id), headers=headers
-        )
-        chat_agent_tag_names = [t["name"] for t in chat_agent_tags_response.json()]
-        assert "ONLY-CHAT-AGENT" in chat_agent_tag_names
-        assert "ONLY-TOOL" not in chat_agent_tag_names

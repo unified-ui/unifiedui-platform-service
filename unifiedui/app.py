@@ -27,7 +27,6 @@ from unifiedui.apis.v1 import (
     tags,
     tenant_ai_models,
     tenants,
-    tools,
     user_favorites,
     workflows,
 )
@@ -67,12 +66,6 @@ from unifiedui.exc.tenant_ai_models import (
     UnsupportedAIModelProviderError,
 )
 from unifiedui.exc.tenants import TenantAlreadyExistsError, TenantError, TenantNotFoundError
-from unifiedui.exc.tools import (
-    InvalidToolCredentialError,
-    ToolConfigValidationError,
-    ToolNotFoundError,
-    UnsupportedToolTypeError,
-)
 from unifiedui.exc.workflows import WorkflowNotFoundError
 from unifiedui.handlers.validators.credential_validator import (
     CredentialValidationError,
@@ -339,28 +332,6 @@ def create_app() -> FastAPI:
         """Handle principal not found errors."""
         return JSONResponse(status_code=404, content={"detail": str(exc)})
 
-    # Tool exception handlers
-
-    @app.exception_handler(ToolNotFoundError)
-    async def tool_not_found_handler(request: Request, exc: ToolNotFoundError):
-        """Handle tool not found errors."""
-        return JSONResponse(status_code=404, content={"detail": str(exc)})
-
-    @app.exception_handler(ToolConfigValidationError)
-    async def tool_config_validation_handler(request: Request, exc: ToolConfigValidationError):
-        """Handle tool config validation errors."""
-        return JSONResponse(status_code=400, content={"detail": exc.message, "errors": exc.errors})
-
-    @app.exception_handler(UnsupportedToolTypeError)
-    async def unsupported_tool_type_handler(request: Request, exc: UnsupportedToolTypeError):
-        """Handle unsupported tool type errors."""
-        return JSONResponse(status_code=400, content={"detail": str(exc)})
-
-    @app.exception_handler(InvalidToolCredentialError)
-    async def invalid_tool_credential_handler(request: Request, exc: InvalidToolCredentialError):
-        """Handle invalid tool credential errors."""
-        return JSONResponse(status_code=400, content={"detail": str(exc), "credential_id": exc.credential_id})
-
     @app.exception_handler(TenantAIModelNotFoundError)
     async def tenant_ai_model_not_found_handler(request: Request, exc: TenantAIModelNotFoundError):
         """Handle tenant AI model not found errors."""
@@ -491,16 +462,6 @@ def create_app() -> FastAPI:
     app.include_router(
         tags.credential_tags_router, prefix="/api/v1/platform-service/tenants/{tenant_id}", tags=["Credentials"]
     )
-
-    # Tools routes - tags list router MUST be before tools router to avoid path conflicts
-    app.include_router(
-        tags.tools_tags_list_router, prefix="/api/v1/platform-service/tenants/{tenant_id}", tags=["Tools"]
-    )
-
-    app.include_router(tools.router, prefix="/api/v1/platform-service/tenants/{tenant_id}", tags=["Tools"])
-
-    # Tool-specific tag routes
-    app.include_router(tags.tool_tags_router, prefix="/api/v1/platform-service/tenants/{tenant_id}", tags=["Tools"])
 
     # User Favorites routes
     app.include_router(

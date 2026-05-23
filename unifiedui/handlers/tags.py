@@ -18,8 +18,6 @@ from unifiedui.core.database.models import (
     Tag,
     TenantAIModel,
     TenantAIModelTag,
-    Tool,
-    ToolTag,
     Workflow,
     WorkflowTag,
 )
@@ -62,12 +60,6 @@ RESOURCE_TAG_MAPPING = {
         "tag_model": CredentialTag,
         "id_field": "credential_id",
         "cache_key_pattern": "credentials:detail:tenant:{tenant_id}:cred:{resource_id}",
-    },
-    "tool": {
-        "model": Tool,
-        "tag_model": ToolTag,
-        "id_field": "tool_id",
-        "cache_key_pattern": "tools:detail:tenant:{tenant_id}:tool:{resource_id}",
     },
     "external_app": {
         "model": ExternalApp,

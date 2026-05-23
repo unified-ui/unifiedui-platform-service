@@ -16,8 +16,6 @@ class TenantRolesEnum(StrEnum):
     WORKFLOWS_CREATOR = "WORKFLOWS_CREATOR"
     CHAT_WIDGETS_ADMIN = "CHAT_WIDGETS_ADMIN"
     CHAT_WIDGETS_CREATOR = "CHAT_WIDGETS_CREATOR"
-    REACT_AGENT_ADMIN = "REACT_AGENT_ADMIN"
-    REACT_AGENT_CREATOR = "REACT_AGENT_CREATOR"
     TENANT_AI_MODELS_ADMIN = "TENANT_AI_MODELS_ADMIN"
     EXTERNAL_APPS_ADMIN = "EXTERNAL_APPS_ADMIN"
     EXTERNAL_APPS_CREATOR = "EXTERNAL_APPS_CREATOR"
@@ -27,22 +25,10 @@ class TenantRolesEnum(StrEnum):
         return [permission.value for permission in TenantRolesEnum]
 
 
-class ToolTypeEnum(StrEnum):
-    """Supported tool types for ReACT agents."""
-
-    MCP_SERVER = "MCP_SERVER"
-    OPENAPI_DEFINITION = "OPENAPI_DEFINITION"
-
-    @classmethod
-    def all(cls) -> list[str]:
-        return [tool_type.value for tool_type in ToolTypeEnum]
-
-
 class ChatAgentTypeEnum(StrEnum):
     N8N = "N8N"
     MICROSOFT_FOUNDRY = "MICROSOFT_FOUNDRY"
     REST_API = "REST_API"
-    REACT_AGENT = "REACT_AGENT"
     LLM = "LLM"
 
     @classmethod
@@ -216,9 +202,7 @@ class AIModelPurposeGroupEnum(StrEnum):
     CONVERSATION_TITLE_GENERATION = "CONVERSATION_TITLE_GENERATION"
     CONVERSATION_SUMMARIZATION = "CONVERSATION_SUMMARIZATION"
     DESCRIPTION_GENERATION = "DESCRIPTION_GENERATION"
-    TRACE_ANALYSIS = "TRACE_ANALYSIS"
     GENERAL = "GENERAL"
-    REACT_AGENT = "REACT_AGENT"
     DIRECT_CHAT = "DIRECT_CHAT"
 
     @classmethod

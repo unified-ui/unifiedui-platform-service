@@ -22,7 +22,6 @@ from unifiedui.core.database.models import (
     CustomGroupMember,
     ExternalAppMember,
     Tag,
-    ToolMember,
     WorkflowMember,
 )
 from unifiedui.core.identity.users import ContextIdentityUser
@@ -518,7 +517,7 @@ def check_permissions(
     Args:
         entity: The entity type to check permissions for
                Options: "tenant", "organization", "chat_agent", "credential", "workflow",
-                        "custom_group", "conversation", "tag", "chat_widget", "tool", "external_app"
+                        "custom_group", "conversation", "tag", "chat_widget", "external_app"
         required_permissions: List of required permission enums
                             - For tenant: [TenantPermissionEnum.TENANT_GLOBAL_ADMIN, TenantPermissionEnum.READER, etc.]
                             - For resources: [PermissionActionEnum.READ, PermissionActionEnum.WRITE, PermissionActionEnum.ADMIN]
@@ -746,7 +745,6 @@ def check_permissions(
                     "custom_group": (CustomGroupMember, "custom_group_id"),
                     "conversation": (ConversationMember, "conversation_id"),
                     "chat_widget": (ChatWidgetMember, "chat_widget_id"),
-                    "tool": (ToolMember, "tool_id"),
                     "external_app": (ExternalAppMember, "external_app_id"),
                 }
 
@@ -793,7 +791,6 @@ def check_permissions(
                         "custom_group": TenantRolesEnum.CUSTOM_GROUPS_ADMIN.value,
                         "conversation": TenantRolesEnum.CONVERSATIONS_ADMIN.value,
                         "chat_widget": TenantRolesEnum.CHAT_WIDGETS_ADMIN.value,
-                        "tool": TenantRolesEnum.REACT_AGENT_ADMIN.value,
                         "external_app": TenantRolesEnum.EXTERNAL_APPS_ADMIN.value,
                     }
 

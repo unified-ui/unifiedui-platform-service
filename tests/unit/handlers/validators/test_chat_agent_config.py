@@ -6,7 +6,6 @@ from pydantic import ValidationError
 from unifiedui.core.database.enums import ChatAgentTypeEnum
 from unifiedui.exc.chat_agent_config import (
     ChatAgentConfigValidationError,
-    UnsupportedChatAgentTypeError,
 )
 from unifiedui.handlers.validators.chat_agent_config import (
     ChatAgentConfigValidatorFactory,
@@ -297,11 +296,6 @@ class TestChatAgentConfigValidatorFactory:
         validator = ChatAgentConfigValidatorFactory.get_validator(ChatAgentTypeEnum.N8N)
         assert isinstance(validator, N8NConfigValidator)
 
-    def test_get_validator_unsupported_type(self):
-        """Test getting validator for unsupported type raises error."""
-        with pytest.raises(UnsupportedChatAgentTypeError):
-            ChatAgentConfigValidatorFactory.get_validator(ChatAgentTypeEnum.REACT_AGENT)
-
     def test_validate_config_n8n(self):
         """Test validate_config with N8N type."""
         config = {
@@ -326,20 +320,9 @@ class TestChatAgentConfigValidatorFactory:
         result = ChatAgentConfigValidatorFactory.validate_config(ChatAgentTypeEnum.N8N, {})
         assert result == {}
 
-    def test_validate_config_unsupported_type(self):
-        """Test validate_config with unsupported type raises error."""
-        config = {"key": "value"}
-
-        with pytest.raises(UnsupportedChatAgentTypeError):
-            ChatAgentConfigValidatorFactory.validate_config(ChatAgentTypeEnum.REACT_AGENT, config)
-
     def test_is_supported_n8n(self):
         """Test is_supported returns True for N8N."""
         assert ChatAgentConfigValidatorFactory.is_supported(ChatAgentTypeEnum.N8N) is True
-
-    def test_is_supported_unsupported_type(self):
-        """Test is_supported returns False for unsupported types."""
-        assert ChatAgentConfigValidatorFactory.is_supported(ChatAgentTypeEnum.REACT_AGENT) is False
 
     def test_get_supported_types(self):
         """Test get_supported_types returns list with N8N and MICROSOFT_FOUNDRY."""
