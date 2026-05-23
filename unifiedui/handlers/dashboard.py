@@ -177,7 +177,7 @@ class DashboardHandler:
             member_model=WorkflowMember,
             entity_id_field="workflow_id",
             is_admin=is_admin,
-            has_active_field=True,
+            has_active_field=False,
         )
 
         conversations = self._count_entity_with_permissions(

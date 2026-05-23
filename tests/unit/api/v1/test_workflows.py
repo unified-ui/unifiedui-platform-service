@@ -73,7 +73,6 @@ class TestWorkflowRoutes:
         assert data["description"] == agent_data["description"]
         assert data["type"] == AGENT_TYPE_N8N
         assert data["config"] == agent_data["config"]
-        assert not data["is_active"]
         assert "id" in data
         assert data["tenant_id"] == tenant_id
         assert "created_at" in data
@@ -378,7 +377,6 @@ class TestWorkflowRoutes:
             assert "updated_at" not in item
             assert "created_by" not in item
             assert "updated_by" not in item
-            assert "is_active" not in item
 
     def test_update_workflow_success(self, test_client: TestClient, test_user_token: Any) -> None:
         """Test successful autonomous agent update."""
@@ -437,40 +435,9 @@ class TestWorkflowRoutes:
             "type": AGENT_TYPE_N8N,
             "config": VALID_N8N_CONFIG,
         }
-        test_client.post(ENDPOINT_WORKFLOWS.format(tenant_id=tenant_id), json=agent_data, headers=headers)
-
-    def test_update_workflow_is_active(self, test_client: TestClient, test_user_token: Any) -> None:
-        """Test updating autonomous agent is_active status."""
-        tenant_id = create_tenant_for_user(test_client, test_user_token)
-        headers = create_auth_headers(test_user_token, use_cache=False)
-
-        # Create an autonomous agent (default is_active=False)
-        agent_data = {"name": "Test Agent", "description": "Test", "type": AGENT_TYPE_N8N, "config": VALID_N8N_CONFIG}
         create_response = test_client.post(
             ENDPOINT_WORKFLOWS.format(tenant_id=tenant_id), json=agent_data, headers=headers
         )
-        agent_id = create_response.json()["id"]
-        assert not create_response.json()["is_active"]
-
-        # Update to active
-        update_response = test_client.patch(
-            ENDPOINT_AUTONOMOUS_AGENT_DETAIL.format(tenant_id=tenant_id, workflow_id=agent_id),
-            json={"is_active": True},
-            headers=headers,
-        )
-
-        assert update_response.status_code == status.HTTP_200_OK
-        assert update_response.json()["is_active"]
-
-        # Update back to inactive
-        update_response2 = test_client.patch(
-            ENDPOINT_AUTONOMOUS_AGENT_DETAIL.format(tenant_id=tenant_id, workflow_id=agent_id),
-            json={"is_active": False},
-            headers=headers,
-        )
-
-        assert update_response2.status_code == status.HTTP_200_OK
-        assert not update_response2.json()["is_active"]
         agent_id = create_response.json()["id"]
 
         # Update only the name
@@ -1242,49 +1209,12 @@ class TestWorkflowConfigEndpoint:
         )
         assert keys_response.status_code == status.HTTP_200_OK
 
-        # Activate the agent (required for config access)
-        test_client.patch(
-            ENDPOINT_AUTONOMOUS_AGENT_DETAIL.format(tenant_id=tenant_id, workflow_id=agent_id),
-            json={"is_active": True},
-            headers=headers,
-        )
-
         # Try with invalid API key
         response = test_client.get(
             ENDPOINT_AUTONOMOUS_AGENT_CONFIG.format(tenant_id=tenant_id, workflow_id=agent_id),
             headers={API_KEY_HEADER: "invalid-api-key"},
         )
 
-        assert response.status_code == status.HTTP_403_FORBIDDEN
-
-    def test_config_endpoint_rejects_inactive_agent(self, test_client: TestClient, test_user_token: Any) -> None:
-        """Test that config endpoint rejects access if agent is not active."""
-        tenant_id = create_tenant_for_user(test_client, test_user_token)
-        headers = create_auth_headers(test_user_token, use_cache=False)
-
-        # Create an inactive agent with keys
-        agent_data = {"name": "Test Agent", "type": AGENT_TYPE_N8N, "config": VALID_N8N_CONFIG, "allow_api_keys": True}
-        create_response = test_client.post(
-            ENDPOINT_WORKFLOWS.format(tenant_id=tenant_id), json=agent_data, headers=headers
-        )
-        agent_id = create_response.json()["id"]
-
-        # Rotate keys (PUT /keys/1/rotate generates a new key)
-        keys_response = test_client.put(
-            f"{ENDPOINT_AUTONOMOUS_AGENT_DETAIL.format(tenant_id=tenant_id, workflow_id=agent_id)}/keys/1/rotate",
-            headers=headers,
-        )
-        assert keys_response.status_code == status.HTTP_200_OK
-        api_key = keys_response.json()["key"]
-
-        # Agent is NOT activated (is_active=False)
-        # Try to access config
-        response = test_client.get(
-            ENDPOINT_AUTONOMOUS_AGENT_CONFIG.format(tenant_id=tenant_id, workflow_id=agent_id),
-            headers={API_KEY_HEADER: api_key},
-        )
-
-        # Should fail because agent is not active
         assert response.status_code == status.HTTP_403_FORBIDDEN
 
     def test_config_endpoint_not_found_agent(self, test_client: TestClient, test_user_token: Any) -> None:

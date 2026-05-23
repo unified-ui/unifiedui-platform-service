@@ -42,7 +42,6 @@ def create_ai_model(
         "purpose_groups": ["CONVERSATION_TITLE_GENERATION"],
         "config": config,
         "priority": 0,
-        "is_active": False,
     }
     response = test_client.post(
         ENDPOINT_AI_MODELS.format(tenant_id=tenant_id),
@@ -77,7 +76,6 @@ class TestTenantAIModelRoutes:
                 "api_version": "2024-02-01",
             },
             "priority": 0,
-            "is_active": False,
         }
 
         response = test_client.post(
@@ -96,7 +94,6 @@ class TestTenantAIModelRoutes:
         assert data["description"] == model_data["description"]
         assert data["type"] == model_data["type"]
         assert data["provider"] == model_data["provider"]
-        assert not data["is_active"]
         assert data["priority"] == 0
         assert "id" in data
         assert data["tenant_id"] == tenant_id
@@ -122,7 +119,6 @@ class TestTenantAIModelRoutes:
                 "model_name": "gpt-4",
             },
             "priority": 1,
-            "is_active": True,
         }
 
         response = test_client.post(
@@ -134,7 +130,6 @@ class TestTenantAIModelRoutes:
         assert response.status_code == status.HTTP_201_CREATED
         data = response.json()
         assert data["provider"] == "OPENAI"
-        assert data["is_active"]
         assert data["priority"] == 1
 
     def test_create_ai_model_embedding_type(
@@ -456,14 +451,13 @@ class TestTenantAIModelRoutes:
 
         response = test_client.patch(
             ENDPOINT_AI_MODEL_DETAIL.format(tenant_id=tenant_id, model_id=model_id),
-            json={"name": "Updated Model Name", "is_active": True},
+            json={"name": "Updated Model Name"},
             headers=headers,
         )
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert data["name"] == "Updated Model Name"
-        assert data["is_active"]
 
     def test_update_ai_model_not_found(
         self,
@@ -683,23 +677,6 @@ class TestTenantAIModelByPurposeS2S:
         data = response.json()
         assert len(data) == 1
         assert data[0]["name"] == "Alpha Model"
-
-    def test_list_ai_models_filter_by_active_status(self, test_client: TestClient, test_user_token: Any) -> None:
-        """Test listing AI models with active status filter."""
-        tenant_id = create_tenant_for_user(test_client, test_user_token)
-        headers = create_auth_headers(test_user_token, use_cache=False)
-
-        create_ai_model(test_client, tenant_id, headers, "Inactive Model")
-
-        response = test_client.get(
-            ENDPOINT_AI_MODELS.format(tenant_id=tenant_id) + "?is_active=0",
-            headers=headers,
-        )
-
-        assert response.status_code == status.HTTP_200_OK
-        data = response.json()
-        for item in data:
-            assert not item["is_active"]
 
     def test_list_ai_models_ordering(self, test_client: TestClient, test_user_token: Any) -> None:
         """Test listing AI models with ordering."""

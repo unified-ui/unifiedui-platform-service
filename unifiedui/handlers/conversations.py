@@ -79,7 +79,6 @@ class ConversationHandler:
         skip: int = 0,
         limit: int = 100,
         name_filter: str | None = None,
-        is_active: int | None = None,
         order_by: str | None = None,
         order_direction: str | None = None,
         view: str | None = None,
@@ -95,7 +94,6 @@ class ConversationHandler:
             skip: Number of items to skip
             limit: Maximum number of items to return
             name_filter: Optional filter by conversation name
-            is_active: Optional filter by active status (None=all, 1=active, 0=inactive)
             order_by: Optional column name to order by
             order_direction: Optional sort direction ('asc' or 'desc')
             view: Optional view type ('full' or 'quick-list')
@@ -134,8 +132,7 @@ class ConversationHandler:
         # Build cache key (without filters - caching only for unfiltered results)
         view_key = view or "full"
         order_key = f"{order_by or 'default'}:{order_direction or 'asc'}"
-        is_active_key = "all" if is_active is None else str(is_active)
-        cache_key = f"conversations:list:tenant:{tenant_id}:user:{user_id}:skip:{skip}:limit:{limit}:view:{view_key}:order:{order_key}:active:{is_active_key}"
+        cache_key = f"conversations:list:tenant:{tenant_id}:user:{user_id}:skip:{skip}:limit:{limit}:view:{view_key}:order:{order_key}"
 
         # Check if any filters are applied
         has_filters = name_filter is not None or id_list is not None
@@ -180,10 +177,6 @@ class ConversationHandler:
 
             if name_filter:
                 query = query.where(Conversation.name.ilike(f"%{name_filter}%"))
-
-            # Filter by is_active status
-            if is_active is not None:
-                query = query.where(Conversation.is_active == bool(is_active))
 
             # Apply ordering if specified
             if order_by and hasattr(Conversation, order_by):
@@ -438,8 +431,6 @@ class ConversationHandler:
                 conversation.name = request.name
             if request.description is not None:
                 conversation.description = request.description
-            if request.is_active is not None:
-                conversation.is_active = request.is_active
 
             conversation.updated_by = user_id
 
@@ -735,7 +726,6 @@ class ConversationHandler:
             ext_conversation_id=conversation.ext_conversation_id,
             name=conversation.name,
             description=conversation.description,
-            is_active=conversation.is_active,
             created_at=conversation.created_at,
             updated_at=conversation.updated_at,
             created_by=conversation.created_by,

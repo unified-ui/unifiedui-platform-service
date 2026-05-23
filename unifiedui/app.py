@@ -388,6 +388,12 @@ def create_app() -> FastAPI:
         """Handle general auth errors."""
         return JSONResponse(status_code=400, content={"detail": str(exc)})
 
+    @app.exception_handler(Exception)
+    async def unhandled_exception_handler(request: Request, exc: Exception):
+        """Handle all unhandled exceptions with a generic error message."""
+        logger.error("Unhandled exception on %s %s: %s", request.method, request.url.path, exc, exc_info=True)
+        return JSONResponse(status_code=500, content={"detail": "An internal error occurred"})
+
     # Include routers
     app.include_router(auth.router, prefix="/api/v1/platform-service/auth", tags=["Authentication"])
 

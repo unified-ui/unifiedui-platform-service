@@ -24,7 +24,6 @@ class ConversationResponse(BaseModel):
     ext_conversation_id: str | None = Field(None, description="External conversation ID (e.g., from Microsoft Foundry)")
     name: str = Field(..., description="Conversation name")
     description: str | None = Field(None, description="Conversation description")
-    is_active: bool = Field(..., description="Whether the conversation is active")
     created_at: datetime = Field(..., description="Creation timestamp")
     updated_at: datetime = Field(..., description="Last update timestamp")
     created_by: str | None = Field(None, description="Creator user ID")

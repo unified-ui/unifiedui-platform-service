@@ -957,6 +957,7 @@ class ChatAgentHandler:
                 type=app_type,
                 tenant_id=tenant_id,
                 chat_agent_id=chat_agent_id,
+                is_active=chat_agent.is_active,
                 settings=settings,
                 user=user_info,
             )
@@ -1247,7 +1248,6 @@ class ChatAgentHandler:
             select(TenantAIModel).where(
                 TenantAIModel.id == ai_model_id,
                 TenantAIModel.tenant_id == tenant_id,
-                TenantAIModel.is_active.is_(True),
             )
         ).scalar_one_or_none()
 

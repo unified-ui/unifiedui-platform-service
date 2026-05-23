@@ -210,10 +210,6 @@ def authenticate_workflow_api_key() -> Callable:
                         detail=f"Workflow not found: {workflow_id}",
                     )
 
-                # Check if workflow is active
-                if not workflow.is_active:
-                    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Workflow is not active")
-
                 # Check if API key authentication is allowed
                 if not workflow.allow_api_keys:
                     raise HTTPException(

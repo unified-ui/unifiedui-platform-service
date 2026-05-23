@@ -558,14 +558,14 @@ class TestChatAgentListCaching:
         headers = create_auth_headers(user_token, use_cache=False)
         tenant_id = create_tenant_for_user(test_client, user_token)
 
-        # Create two chat agents (default is_active=False)
-        create_chat_agent(test_client, tenant_id, headers, "App Inactive")
-        app_id_2 = create_chat_agent(test_client, tenant_id, headers, "App Active")
+        # Create two chat agents (default is_active=True)
+        app_id_1 = create_chat_agent(test_client, tenant_id, headers, "App Inactive")
+        create_chat_agent(test_client, tenant_id, headers, "App Active")
 
-        # Activate second app
+        # Deactivate first app
         test_client.patch(
-            ENDPOINT_CHAT_AGENT_DETAIL.format(tenant_id=tenant_id, chat_agent_id=app_id_2),
-            json={"is_active": True},
+            ENDPOINT_CHAT_AGENT_DETAIL.format(tenant_id=tenant_id, chat_agent_id=app_id_1),
+            json={"is_active": False},
             headers=headers,
         )
 

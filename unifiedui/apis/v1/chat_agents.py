@@ -472,9 +472,7 @@ async def duplicate_chat_agent(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
         logger.error("Failed to duplicate chat agent: %s", e)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to duplicate chat agent: {e!s}"
-        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to duplicate chat agent")
 
 
 # ========== Chat Agent Config Endpoint (for Agent Service) ==========
@@ -540,9 +538,7 @@ async def get_chat_agent_config(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e.message))
     except Exception as e:
         logger.error("Failed to get chat agent config: %s", e)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to get chat agent config: {e!s}"
-        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to get chat agent config")
 
 
 # ========== Chat Agent Permission Endpoints ==========
@@ -766,7 +762,7 @@ async def set_chat_agent_permission(
     except Exception as e:
         logger.error("Failed to set chat agent permission: %s", e)
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to set chat agent permission: {e!s}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to set chat agent permission"
         )
 
 

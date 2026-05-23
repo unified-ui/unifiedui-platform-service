@@ -113,7 +113,6 @@ class WorkflowHandler:
         skip: int = 0,
         limit: int = 100,
         name_filter: str | None = None,
-        is_active: int | None = None,
         tag_ids: list[int] | None = None,
         order_by: str | None = None,
         order_direction: str | None = None,
@@ -130,7 +129,6 @@ class WorkflowHandler:
             skip: Number of items to skip
             limit: Maximum number of items to return
             name_filter: Optional filter by workflow name
-            is_active: Optional filter by active status (None=all, 1=active, 0=inactive)
             tag_ids: Optional list of tag IDs to filter by (agents must have AT LEAST ONE of the tags - OR logic)
             order_by: Optional column name to order by
             order_direction: Optional sort direction ('asc' or 'desc')
@@ -166,11 +164,9 @@ class WorkflowHandler:
             ]
             custom_group_ids = [g.id for g in user.groups if g.principal_type == PrincipalTypeEnum.CUSTOM_GROUP.value]
 
-        # Build cache key with order and is_active parameters
         view_key = view or "full"
         order_key = f"{order_by or 'default'}:{order_direction or 'asc'}"
-        is_active_key = "all" if is_active is None else str(is_active)
-        cache_key = f"workflows:list:tenant:{tenant_id}:user:{user_id}:skip:{skip}:limit:{limit}:view:{view_key}:order:{order_key}:active:{is_active_key}"
+        cache_key = f"workflows:list:tenant:{tenant_id}:user:{user_id}:skip:{skip}:limit:{limit}:view:{view_key}:order:{order_key}"
 
         # Check if any filters are applied (name_filter and tag_ids disable caching)
         has_filters = name_filter is not None or tag_ids is not None or id_list is not None
@@ -199,9 +195,6 @@ class WorkflowHandler:
                     query = query.where(Workflow.id.in_(id_list))
                 if name_filter:
                     query = query.where(Workflow.name.ilike(f"%{name_filter}%"))
-                # Filter by is_active status
-                if is_active is not None:
-                    query = query.where(Workflow.is_active == bool(is_active))
                 # Filter by tags (agents must have ALL specified tags)
                 if tag_ids:
                     for tag_id in tag_ids:
@@ -248,10 +241,6 @@ class WorkflowHandler:
 
                 if name_filter:
                     query = query.where(Workflow.name.ilike(f"%{name_filter}%"))
-
-                # Filter by is_active status
-                if is_active is not None:
-                    query = query.where(Workflow.is_active == bool(is_active))
 
                 # Filter by tags (agents must have AT LEAST ONE of the specified tags - OR logic)
                 if tag_ids:
@@ -474,7 +463,6 @@ class WorkflowHandler:
                 description=request.description,
                 type=request.type.value,
                 config=validated_config,
-                is_active=request.is_active,
                 allow_api_keys=request.allow_api_keys,
                 primary_key_vault_uri=primary_key_vault_uri,
                 secondary_key_vault_uri=secondary_key_vault_uri,
@@ -553,8 +541,6 @@ class WorkflowHandler:
                     agent_type=WorkflowTypeEnum(workflow.type), config=request.config
                 )
                 workflow.config = validated_config
-            if request.is_active is not None:
-                workflow.is_active = request.is_active
             if request.allow_api_keys is not None:
                 workflow.allow_api_keys = request.allow_api_keys
 
@@ -714,7 +700,6 @@ class WorkflowHandler:
                 description=source_agent.description,
                 type=source_agent.type,
                 config=source_agent.config.copy() if source_agent.config else {},
-                is_active=source_agent.is_active,
                 allow_api_keys=source_agent.allow_api_keys,
                 primary_key_vault_uri=primary_key_vault_uri,
                 secondary_key_vault_uri=secondary_key_vault_uri,
@@ -1684,7 +1669,6 @@ class WorkflowHandler:
             name=agent.name,
             description=agent.description,
             type=WorkflowTypeEnum(agent.type),
-            is_active=agent.is_active,
             allow_api_keys=agent.allow_api_keys,
             config=agent.config,
             last_full_import=agent.last_full_import,

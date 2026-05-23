@@ -66,7 +66,6 @@ class TestConversationHandlerFoundryIntegration:
         mock_conversation.ext_conversation_id = None
         mock_conversation.name = "Test Conversation"
         mock_conversation.description = None
-        mock_conversation.is_active = False
         mock_conversation.created_at = Mock()
         mock_conversation.updated_at = Mock()
         mock_conversation.created_by = "user-123"
@@ -83,7 +82,6 @@ class TestConversationHandlerFoundryIntegration:
                 "ext_conversation_id",
                 "name",
                 "description",
-                "is_active",
                 "created_at",
                 "updated_at",
                 "created_by",
@@ -205,7 +203,6 @@ class TestConversationHandlerFoundryIntegration:
             obj.chat_agent_id = "app-123"
             obj.name = "Test Conversation"
             obj.description = None
-            obj.is_active = False
             obj.created_at = Mock()
             obj.updated_at = Mock()
             obj.created_by = "user-123"

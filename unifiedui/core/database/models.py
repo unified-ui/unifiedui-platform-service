@@ -380,7 +380,7 @@ class ChatAgent(Base, IdNameDescriptionMixin, TenantScopedMixin):
 
     type: Mapped[str] = mapped_column(ChatAgentTypeSAEnum, nullable=False)
     config: Mapped[dict] = mapped_column(PortableJSON, nullable=False, default=dict)
-    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     embed_allowed_origins: Mapped[str | None] = mapped_column(String(2000), nullable=True, default=None)
     greeting_messages: Mapped[list] = mapped_column(PortableJSON, nullable=False, default=list)
 
@@ -403,7 +403,6 @@ class Conversation(Base, IdNameDescriptionMixin, TenantScopedMixin):
         String(36), ForeignKey("chat_agents.id", ondelete="CASCADE"), nullable=False
     )
     ext_conversation_id: Mapped[str | None] = mapped_column(String(100), nullable=True, default=None)
-    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
     chat_agent: Mapped[ChatAgent] = relationship()
     members: Mapped[list[ConversationMember]] = relationship(
@@ -426,7 +425,6 @@ class Workflow(Base, IdNameDescriptionMixin, TenantScopedMixin):
 
     type: Mapped[str] = mapped_column(WorkflowTypeSAEnum, nullable=False)
     config: Mapped[dict] = mapped_column(PortableJSON, nullable=False, default=dict)
-    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     allow_api_keys: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     primary_key_vault_uri: Mapped[str | None] = mapped_column(String(2000), nullable=True)
     secondary_key_vault_uri: Mapped[str | None] = mapped_column(String(2000), nullable=True)
@@ -450,7 +448,7 @@ class Credential(Base, IdNameDescriptionMixin, TenantScopedMixin):
     type: Mapped[str] = mapped_column(String(50), nullable=False)
     source: Mapped[str] = mapped_column(String(255), nullable=False)
     credential_uri: Mapped[str] = mapped_column(String(2000), nullable=False)
-    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
     members: Mapped[list[CredentialMember]] = relationship(back_populates="credential", cascade="all, delete-orphan")
     tags: Mapped[list[CredentialTag]] = relationship(back_populates="credential", cascade="all, delete-orphan")
@@ -596,7 +594,6 @@ class ChatWidget(Base, IdNameDescriptionMixin, TenantScopedMixin):
 
     type: Mapped[str | None] = mapped_column(String(50), nullable=True)
     config: Mapped[dict] = mapped_column(PortableJSON, nullable=False, default=dict)
-    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
     members: Mapped[list[ChatWidgetMember]] = relationship(back_populates="chat_widget", cascade="all, delete-orphan")
     tags: Mapped[list[ChatWidgetTag]] = relationship(back_populates="chat_widget", cascade="all, delete-orphan")
@@ -938,7 +935,6 @@ class TenantAIModel(Base, IdNameDescriptionMixin, TenantScopedMixin):
         String(36), ForeignKey("credentials.id", ondelete="SET NULL"), nullable=True
     )
     priority: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
     credential: Mapped[Credential | None] = relationship(foreign_keys=[credential_id])
     tags: Mapped[list[TenantAIModelTag]] = relationship(back_populates="tenant_ai_model", cascade="all, delete-orphan")

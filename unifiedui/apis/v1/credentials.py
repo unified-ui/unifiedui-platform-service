@@ -185,9 +185,7 @@ async def create_credential(
         return result
     except Exception as e:
         logger.error("Failed to create credential: %s", e)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to create credential: {e!s}"
-        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to create credential")
 
 
 @router.get(
@@ -359,9 +357,7 @@ async def update_credential(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
         logger.error("Failed to update credential: %s", e)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to update credential: {e!s}"
-        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to update credential")
 
 
 @router.delete(
@@ -669,7 +665,7 @@ async def set_credential_permission(
     except Exception as e:
         logger.error("Failed to set credential permission: %s", e)
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to set credential permission: {e!s}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to set credential permission"
         )
 
 

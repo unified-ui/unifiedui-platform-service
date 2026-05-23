@@ -12,7 +12,7 @@ class CreateChatAgentRequest(BaseModel):
     description: str | None = Field(None, max_length=2000, description="Chat agent description")
     type: ChatAgentTypeEnum = Field(..., description="Chat agent type (N8N, MICROSOFT_FOUNDRY, REST_API, LLM)")
     config: dict | None = Field(default_factory=dict, description="Chat agent configuration")
-    is_active: bool = Field(False, description="Whether the chat agent is active")
+    is_active: bool = Field(True, description="Whether the chat agent is active")
     embed_allowed_origins: str | None = Field(
         None, max_length=2000, description="Semicolon-separated list of allowed origins for embed iframe"
     )

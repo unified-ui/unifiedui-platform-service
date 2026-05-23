@@ -17,7 +17,6 @@ class WorkflowResponse(BaseModel):
     description: str | None = Field(None, description="Workflow description")
     type: WorkflowTypeEnum = Field(..., description="Type of workflow")
     config: dict = Field(default_factory=dict, description="Workflow configuration")
-    is_active: bool = Field(..., description="Whether the workflow is active")
     allow_api_keys: bool = Field(..., description="Whether API key authentication is allowed for this workflow")
     last_full_import: datetime | None = Field(None, description="Timestamp of last full import (system managed)")
     tags: list[TagSummary] = Field(default_factory=list, description="Tags on the workflow")

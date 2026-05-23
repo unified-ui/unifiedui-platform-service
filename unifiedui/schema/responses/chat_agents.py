@@ -158,6 +158,7 @@ class ChatAgentConfigResponse(BaseModel):
     type: ChatAgentTypeEnum = Field(..., description="Chat agent type")
     tenant_id: str = Field(..., description="Tenant ID")
     chat_agent_id: str = Field(..., description="Chat agent ID")
+    is_active: bool = Field(..., description="Whether the chat agent is active")
     settings: (
         N8NConfigSettingsResponse
         | MicrosoftFoundryConfigSettingsResponse

@@ -572,7 +572,6 @@ class TestResourcePermissionsHandlerMultipleResourceTypes:
             chat_agent_id=chat_agent_id,
             name="Test Conversation",
             description="Test",
-            is_active=True,
             created_by=user_id,
             updated_by=user_id,
         )

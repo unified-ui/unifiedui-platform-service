@@ -37,7 +37,6 @@ async def list_conversations(
     skip: int = Query(0, ge=0, description="Number of items to skip"),
     limit: int = Query(100, ge=1, le=1000, description="Maximum number of items to return"),
     name: str | None = Query(None, description="Filter by conversation name"),
-    is_active: int | None = Query(None, ge=0, le=1, description="Filter by active status (1=active, 0=inactive)"),
     order_by: str | None = Query(
         None, description="Column name to order by (e.g., 'name', 'created_at', 'updated_at')"
     ),
@@ -61,7 +60,6 @@ async def list_conversations(
         skip: Number of items to skip
         limit: Maximum number of items to return
         name: Optional filter by conversation name
-        is_active: Optional filter by active status (None=all, 1=active, 0=inactive)
         handler: Conversation handler dependency
 
     Returns:
@@ -81,7 +79,6 @@ async def list_conversations(
                 skip=skip,
                 limit=limit,
                 name_filter=name,
-                is_active=is_active,
                 order_by=order_by,
                 order_direction=order_direction.value if order_direction else None,
                 view=view.value if view else None,
@@ -152,9 +149,7 @@ async def create_conversation(
         raise HTTPException(status_code=e.status_code or status.HTTP_502_BAD_GATEWAY, detail=e.message)
     except Exception as e:
         logger.error("Failed to create conversation: %s", e)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to create conversation: {e!s}"
-        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to create conversation")
 
 
 @router.get(
@@ -267,9 +262,7 @@ async def update_conversation(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
         logger.error("Failed to update conversation: %s", e)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to update conversation: {e!s}"
-        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to update conversation")
 
 
 @router.delete(
@@ -533,7 +526,7 @@ async def set_conversation_permission(
     except Exception as e:
         logger.error("Failed to set conversation permission: %s", e)
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to set conversation permission: {e!s}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to set conversation permission"
         )
 
 

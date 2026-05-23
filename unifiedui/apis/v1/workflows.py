@@ -61,7 +61,6 @@ async def list_workflows(
     skip: int = Query(0, ge=0, description="Number of items to skip"),
     limit: int = Query(100, ge=1, le=1000, description="Maximum number of items to return"),
     name: str | None = Query(None, description="Filter by workflow name"),
-    is_active: int | None = Query(None, ge=0, le=1, description="Filter by active status (1=active, 0=inactive)"),
     tags: str | None = Query(
         None, description="Comma-separated list of tag IDs to filter by (e.g., '10001,10002,10003')"
     ),
@@ -88,7 +87,6 @@ async def list_workflows(
         skip: Number of items to skip
         limit: Maximum number of items to return
         name: Optional filter by workflow name
-        is_active: Optional filter by active status (None=all, 1=active, 0=inactive)
         tags: Optional comma-separated tag IDs to filter by
         handler: Workflow handler dependency
 
@@ -115,7 +113,6 @@ async def list_workflows(
                 skip=skip,
                 limit=limit,
                 name_filter=name,
-                is_active=is_active,
                 tag_ids=tag_ids,
                 order_by=order_by,
                 order_direction=order_direction.value if order_direction else None,
@@ -388,9 +385,7 @@ async def duplicate_workflow(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
         logger.error("Failed to duplicate workflow: %s", e, exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to duplicate workflow: {e!s}"
-        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to duplicate workflow")
 
 
 # ========== Workflow Permission Endpoints ==========
