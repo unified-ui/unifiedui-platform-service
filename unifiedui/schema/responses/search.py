@@ -12,6 +12,7 @@ class SearchResultItem(BaseModel):
     id: str
     name: str
     description: str | None = None
+    subtitle: str | None = None
     match_field: str
     is_active: bool | None = None
     tags: list[str] = []

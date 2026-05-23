@@ -282,12 +282,27 @@ class SearchHandler:
 
         sub_type_col = sql_cast(entity_model.type, String) if has_type_col else literal(None)
 
+        if search_type == "conversation":
+            return (
+                select(
+                    literal(search_type).label("entity_type"),
+                    entity_model.id.label("entity_id"),
+                    entity_model.name.label("entity_name"),
+                    entity_model.description.label("entity_description"),
+                    sub_type_col.label("sub_type"),
+                    ChatAgent.name.label("subtitle"),
+                )
+                .outerjoin(ChatAgent, entity_model.chat_agent_id == ChatAgent.id)
+                .where(*base_filters)
+            )
+
         return select(
             literal(search_type).label("entity_type"),
             entity_model.id.label("entity_id"),
             entity_model.name.label("entity_name"),
             entity_model.description.label("entity_description"),
             sub_type_col.label("sub_type"),
+            literal(None).label("subtitle"),
         ).where(*base_filters)
 
     def _build_tenant_scoped_subquery(
@@ -316,6 +331,7 @@ class SearchHandler:
             entity_model.name.label("entity_name"),
             entity_model.description.label("entity_description"),
             literal(None).label("sub_type"),
+            literal(None).label("subtitle"),
         ).where(
             entity_model.tenant_id == tenant_id,
             or_(
@@ -348,6 +364,7 @@ class SearchHandler:
             Principal.display_name.label("entity_name"),
             Principal.description.label("entity_description"),
             literal(None).label("sub_type"),
+            literal(None).label("subtitle"),
         ).where(
             Principal.tenant_id == tenant_id,
             Principal.principal_type == principal_type.value,
@@ -497,6 +514,7 @@ class SearchHandler:
                 name = row.entity_name
                 description = row.entity_description
                 sub_type = row.sub_type
+                subtitle = row.subtitle
 
                 match_field = "name" if query.lower() in (name or "").lower() else "description"
                 entity_tags = tags_map.get(entity_type, {}).get(entity_id, [])
@@ -507,6 +525,7 @@ class SearchHandler:
                         id=entity_id,
                         name=name,
                         description=description,
+                        subtitle=subtitle,
                         match_field=match_field,
                         is_active=None,
                         tags=entity_tags,
