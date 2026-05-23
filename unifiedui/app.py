@@ -43,6 +43,10 @@ from unifiedui.exc.chat_widgets import ChatWidgetNotFoundError
 from unifiedui.exc.conversations import ConversationNotFoundError
 from unifiedui.exc.credentials import CredentialNotFoundError
 from unifiedui.exc.custom_groups import CustomGroupError, CustomGroupNotFoundError
+from unifiedui.exc.external_app_config import (
+    ExternalAppConfigValidationError,
+    UnsupportedExternalAppModeError,
+)
 from unifiedui.exc.external_apps import ExternalAppAlreadyExistsError, ExternalAppNotFoundError
 from unifiedui.exc.files import FileNotFoundByIdError, FileStorageNotConfiguredError, FileTooLargeError
 from unifiedui.exc.message_feedback import MessageFeedbackNotFoundError
@@ -297,6 +301,16 @@ def create_app() -> FastAPI:
     async def external_app_already_exists_handler(request: Request, exc: ExternalAppAlreadyExistsError):
         """Handle external app already exists errors."""
         return JSONResponse(status_code=409, content={"detail": str(exc)})
+
+    @app.exception_handler(ExternalAppConfigValidationError)
+    async def external_app_config_validation_handler(request: Request, exc: ExternalAppConfigValidationError):
+        """Handle external app config validation errors."""
+        return JSONResponse(status_code=400, content={"detail": exc.message, "errors": exc.errors})
+
+    @app.exception_handler(UnsupportedExternalAppModeError)
+    async def unsupported_external_app_mode_handler(request: Request, exc: UnsupportedExternalAppModeError):
+        """Handle unsupported external app mode errors."""
+        return JSONResponse(status_code=400, content={"detail": str(exc)})
 
     # File exception handlers
 

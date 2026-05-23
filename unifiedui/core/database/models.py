@@ -954,7 +954,7 @@ class ExternalApp(Base, IdNameDescriptionMixin, TenantScopedMixin):
 
     __tablename__ = "external_apps"
 
-    url: Mapped[str] = mapped_column(String(2000), nullable=False)
+    config: Mapped[dict] = mapped_column(PortableJSON, nullable=False, default=dict)
     image_url: Mapped[str | None] = mapped_column(String(2000), nullable=True)
     image_file_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
 

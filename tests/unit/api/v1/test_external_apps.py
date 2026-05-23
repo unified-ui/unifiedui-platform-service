@@ -20,7 +20,11 @@ def create_external_app(
     """Helper function to create an external app and return its ID."""
     response = test_client.post(
         ENDPOINT_EXTERNAL_APPS.format(tenant_id=tenant_id),
-        json={"name": name, "description": f"Description for {name}", "url": url},
+        json={
+            "name": name,
+            "description": f"Description for {name}",
+            "config": {"mode": "url", "url": url, "params": {}},
+        },
         headers=headers,
     )
     assert response.status_code == status.HTTP_201_CREATED
@@ -38,7 +42,7 @@ class TestExternalAppRoutes:
         app_data = {
             "name": "Test External App",
             "description": "A test external app",
-            "url": "https://example.com/app",
+            "config": {"mode": "url", "url": "https://example.com/app", "params": {}},
             "image_url": "https://example.com/image.png",
         }
 
@@ -49,7 +53,8 @@ class TestExternalAppRoutes:
 
         assert data["name"] == app_data["name"]
         assert data["description"] == app_data["description"]
-        assert data["url"] == app_data["url"]
+        assert data["config"]["mode"] == "url"
+        assert data["config"]["url"] == "https://example.com/app"
         assert data["image_url"] == app_data["image_url"]
         assert "id" in data
         assert data["tenant_id"] == tenant_id
@@ -62,7 +67,7 @@ class TestExternalAppRoutes:
         tenant_id = create_tenant_for_user(test_client, test_user_token)
         headers = create_auth_headers(test_user_token, use_cache=False)
 
-        app_data = {"name": "Minimal App", "url": "https://example.com"}
+        app_data = {"name": "Minimal App", "config": {"mode": "url", "url": "https://example.com", "params": {}}}
 
         response = test_client.post(ENDPOINT_EXTERNAL_APPS.format(tenant_id=tenant_id), json=app_data, headers=headers)
 
@@ -79,13 +84,13 @@ class TestExternalAppRoutes:
 
         response = test_client.post(
             ENDPOINT_EXTERNAL_APPS.format(tenant_id=tenant_id),
-            json={"url": "https://example.com"},
+            json={"config": {"mode": "url", "url": "https://example.com", "params": {}}},
             headers=headers,
         )
         assert response.status_code == 422
 
     def test_create_external_app_missing_url(self, test_client: TestClient, test_user_token: Any) -> None:
-        """Test external app creation with missing URL."""
+        """Test external app creation with missing config."""
         tenant_id = create_tenant_for_user(test_client, test_user_token)
         headers = create_auth_headers(test_user_token, use_cache=False)
 
@@ -103,7 +108,7 @@ class TestExternalAppRoutes:
 
         response = test_client.post(
             ENDPOINT_EXTERNAL_APPS.format(tenant_id=tenant_id),
-            json={"name": "", "url": "https://example.com"},
+            json={"name": "", "config": {"mode": "url", "url": "https://example.com", "params": {}}},
             headers=headers,
         )
         assert response.status_code == 422
@@ -229,14 +234,17 @@ class TestExternalAppRoutes:
 
         response = test_client.patch(
             ENDPOINT_EXTERNAL_APP_DETAIL.format(tenant_id=tenant_id, external_app_id=app_id),
-            json={"name": "Updated App", "url": "https://updated.example.com"},
+            json={
+                "name": "Updated App",
+                "config": {"mode": "url", "url": "https://updated.example.com", "params": {}},
+            },
             headers=headers,
         )
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert data["name"] == "Updated App"
-        assert data["url"] == "https://updated.example.com"
+        assert data["config"]["url"] == "https://updated.example.com"
 
     def test_update_external_app_partial(self, test_client: TestClient, test_user_token: Any) -> None:
         """Test partial external app update."""
@@ -254,7 +262,7 @@ class TestExternalAppRoutes:
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert data["name"] == "New Name"
-        assert data["url"] == "https://original.com"
+        assert data["config"]["url"] == "https://original.com"
 
     def test_update_external_app_not_found(self, test_client: TestClient, test_user_token: Any) -> None:
         """Test updating a non-existent external app."""

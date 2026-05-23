@@ -18,7 +18,11 @@ def create_external_app(test_client: TestClient, tenant_id: str, headers: dict, 
     """Helper function to create an external app and return its ID."""
     response = test_client.post(
         ENDPOINT_EXTERNAL_APPS.format(tenant_id=tenant_id),
-        json={"name": name, "description": f"Description for {name}", "url": "https://example.com"},
+        json={
+            "name": name,
+            "description": f"Description for {name}",
+            "config": {"mode": "url", "url": "https://example.com", "params": {}},
+        },
         headers=headers,
     )
     assert response.status_code == status.HTTP_201_CREATED
@@ -36,7 +40,7 @@ class TestExternalAppRBAC:
 
         response = test_client.post(
             ENDPOINT_EXTERNAL_APPS.format(tenant_id=tenant_id),
-            json={"name": "Admin App", "url": "https://example.com"},
+            json={"name": "Admin App", "config": {"mode": "url", "url": "https://example.com", "params": {}}},
             headers=headers,
         )
         assert response.status_code == status.HTTP_201_CREATED
@@ -55,7 +59,7 @@ class TestExternalAppRBAC:
 
         response = test_client.post(
             ENDPOINT_EXTERNAL_APPS.format(tenant_id=tenant_id),
-            json={"name": "Admin Created App", "url": "https://example.com"},
+            json={"name": "Admin Created App", "config": {"mode": "url", "url": "https://example.com", "params": {}}},
             headers=user_headers,
         )
         assert response.status_code == status.HTTP_201_CREATED
@@ -74,7 +78,7 @@ class TestExternalAppRBAC:
 
         response = test_client.post(
             ENDPOINT_EXTERNAL_APPS.format(tenant_id=tenant_id),
-            json={"name": "Creator App", "url": "https://example.com"},
+            json={"name": "Creator App", "config": {"mode": "url", "url": "https://example.com", "params": {}}},
             headers=user_headers,
         )
         assert response.status_code == status.HTTP_201_CREATED
@@ -91,7 +95,7 @@ class TestExternalAppRBAC:
 
         response = test_client.post(
             ENDPOINT_EXTERNAL_APPS.format(tenant_id=tenant_id),
-            json={"name": "Reader App", "url": "https://example.com"},
+            json={"name": "Reader App", "config": {"mode": "url", "url": "https://example.com", "params": {}}},
             headers=reader_headers,
         )
         assert response.status_code == status.HTTP_403_FORBIDDEN
