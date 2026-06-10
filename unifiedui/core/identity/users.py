@@ -91,10 +91,8 @@ class ContextIdentityUser:
         has_profile = bool(self.identity.get_display_name() or self.identity.get_mail())
         if not has_profile:
             try:
-                users, _ = self.idp.get_users()
-                if users:
-                    self._user_profile = users[0]
-                    return self._user_profile
+                self._user_profile = self.idp.get_user_by_id(self.identity.get_id())
+                return self._user_profile
             except Exception as exc:
                 logger.warning("Failed to fetch user profile from provider: %s", exc)
 
