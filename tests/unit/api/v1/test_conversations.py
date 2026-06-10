@@ -79,7 +79,6 @@ class TestConversationRoutes:
         assert data["name"] == conversation_data["name"]
         assert data["description"] == conversation_data["description"]
         assert data["chat_agent_id"] == chat_agent_id
-        assert not data["is_active"]
         assert "id" in data
         assert data["tenant_id"] == tenant_id
         assert "created_at" in data
@@ -360,45 +359,11 @@ class TestConversationRoutes:
     def test_update_conversation_partial(self, test_client: TestClient, test_user_token: Any) -> None:
         """Test partial conversation update (only name)."""
         tenant_id = create_tenant_for_user(test_client, test_user_token)
-        create_auth_headers(test_user_token, use_cache=False)
-        create_chat_agent_for_user(test_client, test_user_token, tenant_id)
-
-        # Create conversation
-
-    def test_update_conversation_is_active(self, test_client: TestClient, test_user_token: Any) -> None:
-        """Test updating conversation is_active status."""
-        tenant_id = create_tenant_for_user(test_client, test_user_token)
         headers = create_auth_headers(test_user_token, use_cache=False)
         chat_agent_id = create_chat_agent_for_user(test_client, test_user_token, tenant_id)
 
-        # Create conversation (default is_active=False)
-        create_response = test_client.post(
-            ENDPOINT_CONVERSATIONS.format(tenant_id=tenant_id),
-            json={"chat_agent_id": chat_agent_id, "name": "Test Conversation", "description": "Test"},
-            headers=headers,
-        )
-        conversation_id = create_response.json()["id"]
-        assert not create_response.json()["is_active"]
+        # Create conversation
 
-        # Update to active
-        update_response = test_client.patch(
-            ENDPOINT_CONVERSATION_DETAIL.format(tenant_id=tenant_id, conversation_id=conversation_id),
-            json={"is_active": True},
-            headers=headers,
-        )
-
-        assert update_response.status_code == status.HTTP_200_OK
-        assert update_response.json()["is_active"]
-
-        # Update back to inactive
-        update_response2 = test_client.patch(
-            ENDPOINT_CONVERSATION_DETAIL.format(tenant_id=tenant_id, conversation_id=conversation_id),
-            json={"is_active": False},
-            headers=headers,
-        )
-
-        assert update_response2.status_code == status.HTTP_200_OK
-        assert not update_response2.json()["is_active"]
         create_response = test_client.post(
             ENDPOINT_CONVERSATIONS.format(tenant_id=tenant_id),
             json={"chat_agent_id": chat_agent_id, "name": "Original", "description": "Keep this"},

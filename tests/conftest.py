@@ -11,8 +11,22 @@ Actual fixture implementations are organized in the fixtures/ directory:
 
 import logging
 
+import pytest
+
 # Configure logging for tests
 logging.basicConfig(level=logging.DEBUG, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+
+
+@pytest.fixture(autouse=True)
+def _enable_mock_identity_provider(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Enable the mock identity provider for the entire test suite.
+
+    Production rejects mock tokens by default; tests rely on them.
+    """
+    from unifiedui.core.config import settings
+
+    monkeypatch.setattr(settings, "allow_mock_identity_provider", True)
+
 
 # Import all fixtures - pytest will automatically discover them
 from tests.fixtures.auth import (

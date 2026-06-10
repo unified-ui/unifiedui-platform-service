@@ -20,9 +20,9 @@ class ResourceCacheInvalidator:
 
     Args:
         cache_client: Optional CacheClient wrapper instance.
-        prefix: Cache key prefix (e.g. ``"chat_agents"``, ``"tools"``).
+        prefix: Cache key prefix (e.g. ``"chat_agents"``, ``"credentials"``).
         resource_key: Short key used in detail/permissions cache keys
-            (e.g. ``"chat_agent"``, ``"tool"``).
+            (e.g. ``"chat_agent"``, ``"credential"``).
     """
 
     def __init__(

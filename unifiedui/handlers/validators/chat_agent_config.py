@@ -6,7 +6,12 @@ from typing import Any
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-from unifiedui.core.database.enums import ChatAgentTypeEnum, RestApiAuthTypeEnum
+from unifiedui.core.database.enums import (
+    ChatAgentTypeEnum,
+    MicrosoftFoundryAuthTypeEnum,
+    MicrosoftFoundryCustomRestApiAuthTypeEnum,
+    RestApiAuthTypeEnum,
+)
 from unifiedui.exc.chat_agent_config import ChatAgentConfigValidationError, UnsupportedChatAgentTypeError
 from unifiedui.logger import get_logger
 
@@ -152,6 +157,7 @@ class MicrosoftFoundryApiVersionEnum(StrEnum):
     """Supported Microsoft Foundry API versions."""
 
     V2025_11_15_PREVIEW = "2025-11-15-preview"
+    V1 = "v1"
 
     @classmethod
     def all(cls) -> list[str]:
@@ -166,20 +172,83 @@ class MicrosoftFoundryChatAgentConfig(BaseModel):
 
     agent_type: MicrosoftFoundryAgentTypeEnum = Field(..., description="Agent type (AGENT or MULTI_AGENT)")
     api_version: MicrosoftFoundryApiVersionEnum = Field(
-        ..., description="API version (currently only '2025-11-15-preview' supported)"
+        ..., description="API version (e.g., 'v1' or '2025-11-15-preview')"
     )
-    project_endpoint: str = Field(..., min_length=1, description="Foundry project endpoint URL")
-    agent_name: str = Field(..., min_length=1, description="Name of the agent in Foundry")
+    project_endpoint: str = Field(default="", description="Foundry project endpoint URL")
+    agent_name: str = Field(default="", description="Name of the agent in Foundry")
+    auth_type: MicrosoftFoundryAuthTypeEnum = Field(
+        default=MicrosoftFoundryAuthTypeEnum.ENTRA_ID_USER_TOKEN,
+        description="Authentication type (defaults to ENTRA_ID_USER_TOKEN for backward compatibility)",
+    )
+    credential_id: str | None = Field(
+        default=None,
+        description="Credential ID (required for ENTRA_ID_APP_REGISTRATION and API_KEY)",
+    )
+    custom_rest_api_endpoint: str | None = Field(
+        default=None,
+        description="Custom REST API proxy endpoint URL (required for CUSTOM_REST_API auth_type)",
+    )
+    custom_rest_api_auth_type: MicrosoftFoundryCustomRestApiAuthTypeEnum | None = Field(
+        default=None,
+        description="Auth type for the custom REST API proxy (required for CUSTOM_REST_API auth_type)",
+    )
+    custom_rest_api_api_key_header: str = Field(
+        default="X-API-Key",
+        description="Custom header name for API key auth to the proxy (default: X-API-Key)",
+    )
 
     @field_validator("project_endpoint")
     @classmethod
     def validate_project_endpoint(cls, v: str) -> str:
         """Validate that project_endpoint is a valid Foundry endpoint URL."""
+        if not v:
+            return v
         if not v.startswith("https://"):
             raise ValueError("project_endpoint must start with https://")
         if "services.ai.azure.com/api/projects" not in v:
             raise ValueError("project_endpoint must contain 'services.ai.azure.com/api/projects'")
         return v
+
+    @field_validator("custom_rest_api_endpoint")
+    @classmethod
+    def validate_custom_rest_api_endpoint(cls, v: str | None) -> str | None:
+        """Validate that custom_rest_api_endpoint is a valid URL."""
+        if not v:
+            return v
+        if not v.startswith(("https://", "http://localhost", "http://host.docker.internal")):
+            raise ValueError(
+                "custom_rest_api_endpoint must start with https://, http://localhost, or http://host.docker.internal"
+            )
+        return v
+
+    @model_validator(mode="after")
+    def validate_auth_requirements(self) -> "MicrosoftFoundryChatAgentConfig":
+        """Validate fields required by the selected auth_type."""
+        if self.auth_type == MicrosoftFoundryAuthTypeEnum.CUSTOM_REST_API:
+            if not self.custom_rest_api_endpoint:
+                raise ValueError("custom_rest_api_endpoint is required for auth_type 'CUSTOM_REST_API'")
+            if not self.custom_rest_api_auth_type:
+                raise ValueError("custom_rest_api_auth_type is required for auth_type 'CUSTOM_REST_API'")
+            proxy_requires_credential = {
+                MicrosoftFoundryCustomRestApiAuthTypeEnum.API_KEY,
+                MicrosoftFoundryCustomRestApiAuthTypeEnum.ENTRA_ID_APP_REGISTRATION,
+            }
+            if self.custom_rest_api_auth_type in proxy_requires_credential and not self.credential_id:
+                raise ValueError(
+                    f"credential_id is required for custom_rest_api_auth_type '{self.custom_rest_api_auth_type}'"
+                )
+        else:
+            requires_credential = {
+                MicrosoftFoundryAuthTypeEnum.ENTRA_ID_APP_REGISTRATION,
+                MicrosoftFoundryAuthTypeEnum.API_KEY,
+            }
+            if not self.project_endpoint:
+                raise ValueError("project_endpoint is required for non-CUSTOM_REST_API auth types")
+            if not self.agent_name:
+                raise ValueError("agent_name is required for non-CUSTOM_REST_API auth types")
+            if self.auth_type in requires_credential and not self.credential_id:
+                raise ValueError(f"credential_id is required for auth_type '{self.auth_type}'")
+        return self
 
 
 # ========== Microsoft Foundry Validator ==========

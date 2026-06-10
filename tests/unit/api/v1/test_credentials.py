@@ -63,7 +63,7 @@ class TestCredentialRoutes:
         assert data["description"] == credential_data["description"]
         assert data["type"] == credential_data["credential_type"]
         assert data["source"] == credential_data["source"]
-        assert not data["is_active"]
+        assert data["is_active"]
         assert "id" in data
         assert data["tenant_id"] == tenant_id
         assert "created_at" in data
@@ -398,7 +398,7 @@ class TestCredentialRoutes:
         tenant_id = create_tenant_for_user(test_client, test_user_token)
         headers = create_auth_headers(test_user_token, use_cache=False)
 
-        # Create credential (default is_active=False)
+        # Create credential (default is_active=True)
         create_response = test_client.post(
             ENDPOINT_CREDENTIALS.format(tenant_id=tenant_id),
             json={
@@ -410,7 +410,7 @@ class TestCredentialRoutes:
             headers=headers,
         )
         credential_id = create_response.json()["id"]
-        assert not create_response.json()["is_active"]
+        assert create_response.json()["is_active"]
 
         # Update to active
         update_response = test_client.patch(

@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, Query, Request, status
 
 from unifiedui.core.database.enums import TenantRolesEnum
 from unifiedui.core.middleware.apis.v1.auth import authenticate, check_permissions
+from unifiedui.handlers.audit_helper import AuditActionEnum, AuditResourceTypeEnum, record_audit
 from unifiedui.handlers.dependencies.principals import get_principal_handler
 from unifiedui.handlers.principals import PrincipalHandler
 from unifiedui.schema.requests.principals import TenantRefreshPrincipalRequest, UpdatePrincipalStatusRequest
@@ -149,6 +150,18 @@ async def set_principal_permission(
         user_id=user_id,
         user=user,
     )
+    record_audit(
+        request=request,
+        tenant_id=tenant_id,
+        action=AuditActionEnum.ROLE_CHANGE,
+        resource_type=AuditResourceTypeEnum.PRINCIPAL,
+        resource_id=str(role_data.principal_id),
+        changes={
+            "principal_type": str(role_data.principal_type),
+            "role": str(role_data.role),
+            "op": "set",
+        },
+    )
     return PrincipalsResponse(**result)
 
 
@@ -187,6 +200,18 @@ async def delete_principal_permission(
         principal_id=role_data.principal_id,
         principal_type=role_data.principal_type,
         permission=role_data.role,
+    )
+    record_audit(
+        request=request,
+        tenant_id=tenant_id,
+        action=AuditActionEnum.ROLE_CHANGE,
+        resource_type=AuditResourceTypeEnum.PRINCIPAL,
+        resource_id=str(role_data.principal_id),
+        changes={
+            "principal_type": str(role_data.principal_type),
+            "role": str(role_data.role),
+            "op": "delete",
+        },
     )
     return PrincipalsResponse(**result)
 
@@ -231,9 +256,19 @@ async def refresh_principal(
         ValueError: If principal type is invalid
     """
     user: ContextIdentityUser = request.state.user
-    return handler.refresh_principal(
+    result = handler.refresh_principal(
         tenant_id=tenant_id, principal_id=principal_id, principal_type=body.principal_type, user=user
     )
+    record_audit(
+        request=request,
+        tenant_id=tenant_id,
+        action=AuditActionEnum.UPDATE,
+        resource_type=AuditResourceTypeEnum.PRINCIPAL,
+        resource_id=str(principal_id),
+        resource_name=getattr(result, "display_name", None) or getattr(result, "principal_name", None),
+        changes={"op": "refresh", "principal_type": str(body.principal_type)},
+    )
+    return result
 
 
 @router.patch(
@@ -272,4 +307,14 @@ async def update_principal_status(
         PermissionDeniedError: If user doesn't have TENANT_GLOBAL_ADMIN role
         ValueError: If principal is not found
     """
-    return handler.update_principal_status(tenant_id=tenant_id, principal_id=principal_id, is_active=body.is_active)
+    result = handler.update_principal_status(tenant_id=tenant_id, principal_id=principal_id, is_active=body.is_active)
+    record_audit(
+        request=request,
+        tenant_id=tenant_id,
+        action=AuditActionEnum.UPDATE,
+        resource_type=AuditResourceTypeEnum.PRINCIPAL,
+        resource_id=str(principal_id),
+        resource_name=getattr(result, "display_name", None) or getattr(result, "principal_name", None),
+        changes={"is_active": body.is_active},
+    )
+    return result

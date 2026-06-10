@@ -146,7 +146,10 @@ async def download_file(
         return StreamingResponse(
             data,
             media_type=content_type,
-            headers={"Content-Disposition": f'attachment; filename="{file_name}"'},
+            headers={
+                "Content-Disposition": f'attachment; filename="{file_name}"',
+                "Cache-Control": "private, max-age=600",
+            },
         )
     except (FileNotFoundByIdError, FileStorageNotConfiguredError):
         raise

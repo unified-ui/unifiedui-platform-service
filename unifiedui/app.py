@@ -13,10 +13,12 @@ from unifiedui.apis.v1 import (
     custom_groups,
     dashboard,
     external_apps,
+    feedback_stats,
     files,
     foundry,
     health,
     identity,
+    message_feedback,
     n8n,
     organizations,
     principals,
@@ -25,7 +27,6 @@ from unifiedui.apis.v1 import (
     tags,
     tenant_ai_models,
     tenants,
-    tools,
     user_favorites,
     workflows,
 )
@@ -42,8 +43,13 @@ from unifiedui.exc.chat_widgets import ChatWidgetNotFoundError
 from unifiedui.exc.conversations import ConversationNotFoundError
 from unifiedui.exc.credentials import CredentialNotFoundError
 from unifiedui.exc.custom_groups import CustomGroupError, CustomGroupNotFoundError
+from unifiedui.exc.external_app_config import (
+    ExternalAppConfigValidationError,
+    UnsupportedExternalAppModeError,
+)
 from unifiedui.exc.external_apps import ExternalAppAlreadyExistsError, ExternalAppNotFoundError
 from unifiedui.exc.files import FileNotFoundByIdError, FileStorageNotConfiguredError, FileTooLargeError
+from unifiedui.exc.message_feedback import MessageFeedbackNotFoundError
 from unifiedui.exc.organizations import (
     OrganizationAlreadyExistsError,
     OrganizationError,
@@ -64,12 +70,6 @@ from unifiedui.exc.tenant_ai_models import (
     UnsupportedAIModelProviderError,
 )
 from unifiedui.exc.tenants import TenantAlreadyExistsError, TenantError, TenantNotFoundError
-from unifiedui.exc.tools import (
-    InvalidToolCredentialError,
-    ToolConfigValidationError,
-    ToolNotFoundError,
-    UnsupportedToolTypeError,
-)
 from unifiedui.exc.workflows import WorkflowNotFoundError
 from unifiedui.handlers.validators.credential_validator import (
     CredentialValidationError,
@@ -84,6 +84,20 @@ logger = get_logger(__name__)
 load_dotenv()
 
 
+def _emit_debug_backdoor_banner() -> None:
+    """Print a loud warning banner when the debug backdoor is enabled."""
+    banner = (
+        "\n"
+        "================================================================\n"
+        "  !!! DEBUG BACKDOOR ENABLED — DEV/TEST ONLY !!!                \n"
+        "  ENABLE_DEBUG_BACK_DOOR=true                                   \n"
+        "  This service accepts synthetic auth via X-Debug-* headers.    \n"
+        "  NEVER expose this configuration to production.                \n"
+        "================================================================\n"
+    )
+    logger.warning(banner)
+
+
 def create_app() -> FastAPI:
     """Create and configure FastAPI application following best practices."""
 
@@ -95,6 +109,22 @@ def create_app() -> FastAPI:
         redoc_url="/redoc",
         openapi_url="/openapi.json",
     )
+
+    if settings.enable_debug_back_door:
+        _emit_debug_backdoor_banner()
+
+        @app.on_event("startup")
+        async def _start_debug_backdoor_reminder() -> None:
+            """Spawn a background task that periodically logs a backdoor warning."""
+            import asyncio
+
+            async def _ticker() -> None:
+                while True:
+                    await asyncio.sleep(30)
+                    logger.warning("DEBUG BACKDOOR is ENABLED — never run this configuration in production")
+
+            task = asyncio.create_task(_ticker())
+            app.state.debug_backdoor_task = task
 
     # CORS Middleware
     app.add_middleware(
@@ -109,7 +139,15 @@ def create_app() -> FastAPI:
     @app.exception_handler(PermissionDeniedError)
     async def permission_denied_handler(request: Request, exc: PermissionDeniedError):
         """Handle permission denied errors."""
-        return JSONResponse(status_code=403, content={"detail": str(exc)})
+        return JSONResponse(
+            status_code=403,
+            content={
+                "detail": str(exc),
+                "error_code": "PERMISSION_DENIED",
+                "required_roles": exc.required_roles,
+                "user_roles": exc.user_roles,
+            },
+        )
 
     @app.exception_handler(TenantNotFoundError)
     async def tenant_not_found_handler(request: Request, exc: TenantNotFoundError):
@@ -233,6 +271,11 @@ def create_app() -> FastAPI:
         """Handle conversation not found errors."""
         return JSONResponse(status_code=404, content={"detail": str(exc)})
 
+    @app.exception_handler(MessageFeedbackNotFoundError)
+    async def message_feedback_not_found_handler(request: Request, exc: MessageFeedbackNotFoundError):
+        """Handle missing message feedback errors."""
+        return JSONResponse(status_code=404, content={"detail": str(exc)})
+
     # Workflow exception handlers
 
     @app.exception_handler(WorkflowNotFoundError)
@@ -258,6 +301,16 @@ def create_app() -> FastAPI:
     async def external_app_already_exists_handler(request: Request, exc: ExternalAppAlreadyExistsError):
         """Handle external app already exists errors."""
         return JSONResponse(status_code=409, content={"detail": str(exc)})
+
+    @app.exception_handler(ExternalAppConfigValidationError)
+    async def external_app_config_validation_handler(request: Request, exc: ExternalAppConfigValidationError):
+        """Handle external app config validation errors."""
+        return JSONResponse(status_code=400, content={"detail": exc.message, "errors": exc.errors})
+
+    @app.exception_handler(UnsupportedExternalAppModeError)
+    async def unsupported_external_app_mode_handler(request: Request, exc: UnsupportedExternalAppModeError):
+        """Handle unsupported external app mode errors."""
+        return JSONResponse(status_code=400, content={"detail": str(exc)})
 
     # File exception handlers
 
@@ -292,28 +345,6 @@ def create_app() -> FastAPI:
     async def principal_not_found_handler(request: Request, exc: PrincipalNotFoundError):
         """Handle principal not found errors."""
         return JSONResponse(status_code=404, content={"detail": str(exc)})
-
-    # Tool exception handlers
-
-    @app.exception_handler(ToolNotFoundError)
-    async def tool_not_found_handler(request: Request, exc: ToolNotFoundError):
-        """Handle tool not found errors."""
-        return JSONResponse(status_code=404, content={"detail": str(exc)})
-
-    @app.exception_handler(ToolConfigValidationError)
-    async def tool_config_validation_handler(request: Request, exc: ToolConfigValidationError):
-        """Handle tool config validation errors."""
-        return JSONResponse(status_code=400, content={"detail": exc.message, "errors": exc.errors})
-
-    @app.exception_handler(UnsupportedToolTypeError)
-    async def unsupported_tool_type_handler(request: Request, exc: UnsupportedToolTypeError):
-        """Handle unsupported tool type errors."""
-        return JSONResponse(status_code=400, content={"detail": str(exc)})
-
-    @app.exception_handler(InvalidToolCredentialError)
-    async def invalid_tool_credential_handler(request: Request, exc: InvalidToolCredentialError):
-        """Handle invalid tool credential errors."""
-        return JSONResponse(status_code=400, content={"detail": str(exc), "credential_id": exc.credential_id})
 
     @app.exception_handler(TenantAIModelNotFoundError)
     async def tenant_ai_model_not_found_handler(request: Request, exc: TenantAIModelNotFoundError):
@@ -357,6 +388,12 @@ def create_app() -> FastAPI:
         """Handle general auth errors."""
         return JSONResponse(status_code=400, content={"detail": str(exc)})
 
+    @app.exception_handler(Exception)
+    async def unhandled_exception_handler(request: Request, exc: Exception):
+        """Handle all unhandled exceptions with a generic error message."""
+        logger.error("Unhandled exception on %s %s: %s", request.method, request.url.path, exc, exc_info=True)
+        return JSONResponse(status_code=500, content={"detail": "An internal error occurred"})
+
     # Include routers
     app.include_router(auth.router, prefix="/api/v1/platform-service/auth", tags=["Authentication"])
 
@@ -397,6 +434,18 @@ def create_app() -> FastAPI:
     )
 
     app.include_router(
+        message_feedback.router,
+        prefix="/api/v1/platform-service/tenants/{tenant_id}",
+        tags=["Message Feedback"],
+    )
+
+    app.include_router(
+        feedback_stats.router,
+        prefix="/api/v1/platform-service/tenants/{tenant_id}",
+        tags=["Feedback Stats"],
+    )
+
+    app.include_router(
         tags.workflows_tags_list_router,
         prefix="/api/v1/platform-service/tenants/{tenant_id}",
         tags=["Workflows"],
@@ -433,16 +482,6 @@ def create_app() -> FastAPI:
     app.include_router(
         tags.credential_tags_router, prefix="/api/v1/platform-service/tenants/{tenant_id}", tags=["Credentials"]
     )
-
-    # Tools routes - tags list router MUST be before tools router to avoid path conflicts
-    app.include_router(
-        tags.tools_tags_list_router, prefix="/api/v1/platform-service/tenants/{tenant_id}", tags=["Tools"]
-    )
-
-    app.include_router(tools.router, prefix="/api/v1/platform-service/tenants/{tenant_id}", tags=["Tools"])
-
-    # Tool-specific tag routes
-    app.include_router(tags.tool_tags_router, prefix="/api/v1/platform-service/tenants/{tenant_id}", tags=["Tools"])
 
     # User Favorites routes
     app.include_router(

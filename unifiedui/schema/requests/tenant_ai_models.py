@@ -18,7 +18,6 @@ class CreateTenantAIModelRequest(BaseModel):
     config: dict = Field(default_factory=dict, description="Provider-specific configuration")
     credential_id: str | None = Field(None, description="Optional credential ID for API key")
     priority: int = Field(0, ge=0, description="Priority for load-balancing (0 = highest)")
-    is_active: bool = Field(False, description="Whether the model is active")
 
 
 class UpdateTenantAIModelRequest(BaseModel):
@@ -30,4 +29,3 @@ class UpdateTenantAIModelRequest(BaseModel):
     config: dict | None = Field(None, description="Provider-specific configuration")
     credential_id: str | None = Field(None, description="Optional credential ID for API key")
     priority: int | None = Field(None, ge=0, description="Priority for load-balancing")
-    is_active: bool | None = Field(None, description="Whether the model is active")

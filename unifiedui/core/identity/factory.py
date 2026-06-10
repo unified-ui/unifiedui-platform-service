@@ -15,8 +15,6 @@ from unifiedui.identity.extra_id.provider import ExtraIDIdentityProvider
 from unifiedui.identity.extra_id.token import ExtraIDIdentityTokenSerializer
 from unifiedui.identity.google.provider import GoogleIdentityProvider
 from unifiedui.identity.google.token import GoogleIdentityTokenSerializer
-from unifiedui.identity.kerberos.provider import KerberosIdentityProvider
-from unifiedui.identity.kerberos.token import KerberosIdentityTokenSerializer
 from unifiedui.identity.ldap.provider import LDAPIdentityProvider
 from unifiedui.identity.ldap.token import LDAPIdentityTokenSerializer
 from unifiedui.identity.mock.provider import MockIdentityProvider
@@ -26,8 +24,6 @@ from unifiedui.identity.oidc.token import OIDCIdentityTokenSerializer
 from unifiedui.identity.oidc.zitadel import ZitadelIdentityProvider
 from unifiedui.identity.okta.provider import OktaIdentityProvider
 from unifiedui.identity.okta.token import OktaIdentityTokenSerializer
-from unifiedui.identity.saml.provider import SAMLIdentityProvider
-from unifiedui.identity.saml.token import SAMLIdentityTokenSerializer
 from unifiedui.logger import get_logger
 
 logger = get_logger(__name__)
@@ -85,6 +81,12 @@ class IdentityTokenFactory:
         iss: str = unverified_claims.get("iss", "")
 
         if iss.startswith("https://mock.identity.provider/"):
+            from unifiedui.core.config import settings as _settings
+
+            if not _settings.allow_mock_identity_provider:
+                raise ValueError(
+                    "Mock identity provider is disabled. Set ALLOW_MOCK_IDENTITY_PROVIDER=true to enable (non-production only)."
+                )
             return IdentityTokenFactory._create_mock_token(token, unverified_claims)
 
         is_entra_v1 = iss.startswith("https://sts.windows.net/")
@@ -109,14 +111,8 @@ class IdentityTokenFactory:
         if settings.oidc_issuer_url and iss == settings.oidc_issuer_url:
             return IdentityTokenFactory._create_oidc_token(token)
 
-        if settings.saml_entity_id and iss == settings.saml_entity_id:
-            return IdentityTokenFactory._create_saml_token(token, unverified_claims)
-
         if settings.ldap_server_url and (iss.startswith("ldap://") or iss.startswith("ldaps://")):
             return IdentityTokenFactory._create_ldap_token(token, unverified_claims)
-
-        if settings.kerberos_realm and iss.startswith("krb://"):
-            return IdentityTokenFactory._create_kerberos_token(token, unverified_claims)
 
         raise ValueError(f"Unsupported token issuer: {iss}")
 
@@ -259,50 +255,6 @@ class IdentityTokenFactory:
             raise ValueError(f"Invalid LDAP token: {e!s}")
 
     @staticmethod
-    def _create_kerberos_token(token: str, unverified_claims: dict) -> KerberosIdentityTokenSerializer:
-        """Create a Kerberos identity token (gateway-converted JWT).
-
-        Args:
-            token: Raw JWT token string.
-            unverified_claims: Pre-decoded claims.
-
-        Returns:
-            KerberosIdentityTokenSerializer instance.
-        """
-        exp = unverified_claims.get("exp")
-        if exp and int(time.time()) >= exp:
-            raise ValueError("Token has expired")
-
-        return KerberosIdentityTokenSerializer(token, unverified_claims)
-
-    @staticmethod
-    def _create_saml_token(token: str, unverified_claims: dict) -> SAMLIdentityTokenSerializer:
-        """Create a SAML identity token (assertion-converted JWT).
-
-        Args:
-            token: Raw JWT token string.
-            unverified_claims: Pre-decoded claims.
-
-        Returns:
-            SAMLIdentityTokenSerializer instance with configured attribute mapping.
-        """
-        from unifiedui.core.config import settings
-
-        exp = unverified_claims.get("exp")
-        if exp and int(time.time()) >= exp:
-            raise ValueError("Token has expired")
-
-        return SAMLIdentityTokenSerializer(
-            token,
-            unverified_claims,
-            attribute_map_id=settings.saml_attribute_map_id,
-            attribute_map_email=settings.saml_attribute_map_email,
-            attribute_map_display_name=settings.saml_attribute_map_display_name,
-            attribute_map_first_name=settings.saml_attribute_map_first_name,
-            attribute_map_last_name=settings.saml_attribute_map_last_name,
-        )
-
-    @staticmethod
     def _create_okta_token(token: str, issuer_url: str) -> OktaIdentityTokenSerializer:
         """Create an Okta identity token with JWKS signature verification.
 
@@ -391,10 +343,6 @@ class IdentityProviderFactory:
                 return IdentityProviderFactory._create_aws_cognito_provider(identity_token)
             case IdenityProviderEnum.LDAP.value:
                 return IdentityProviderFactory._create_ldap_provider(identity_token)
-            case IdenityProviderEnum.KERBEROS.value:
-                return IdentityProviderFactory._create_kerberos_provider(identity_token)
-            case IdenityProviderEnum.SAML.value:
-                return SAMLIdentityProvider(identity_token=identity_token)
             case IdenityProviderEnum.OKTA.value:
                 return IdentityProviderFactory._create_okta_provider(identity_token)
             case IdenityProviderEnum.OIDC.value:
@@ -495,25 +443,6 @@ class IdentityProviderFactory:
             user_search_filter=settings.ldap_user_search_filter,
             group_search_filter=settings.ldap_group_search_filter,
             use_ssl=settings.ldap_use_ssl,
-        )
-
-    @staticmethod
-    def _create_kerberos_provider(identity_token: BaseIdentityToken) -> KerberosIdentityProvider:
-        """Create a Kerberos identity provider.
-
-        Args:
-            identity_token: The user's verified Kerberos identity token.
-
-        Returns:
-            Configured KerberosIdentityProvider instance.
-        """
-        from unifiedui.core.config import settings
-
-        return KerberosIdentityProvider(
-            identity_token=identity_token,
-            ldap_url=settings.kerberos_ldap_url,
-            ldap_base_dn=settings.kerberos_ldap_base_dn or "",
-            realm=settings.kerberos_realm or "",
         )
 
     @staticmethod

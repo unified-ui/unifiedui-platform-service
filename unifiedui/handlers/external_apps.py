@@ -31,6 +31,7 @@ if TYPE_CHECKING:
     from unifiedui.schema.requests.permissions import SetResourcePermissionRequest
 
 from unifiedui.exc.external_apps import ExternalAppAlreadyExistsError, ExternalAppNotFoundError
+from unifiedui.handlers.validators.external_app_config import ExternalAppConfigValidatorFactory
 from unifiedui.logger import get_logger
 from unifiedui.schema.responses.external_apps import ExternalAppResponse
 from unifiedui.schema.responses.principals import PrincipalWithRolesResponse, ResourcePrincipalsResponse
@@ -287,6 +288,8 @@ class ExternalAppHandler:
         """
         logger.info("Creating external app", extra={"tenant_id": tenant_id, "app_name": request.name})
 
+        validated_config = ExternalAppConfigValidatorFactory.validate_config(request.config)
+
         external_app_id = str(uuid.uuid4())
 
         with self.db_client.get_session() as session:
@@ -295,7 +298,7 @@ class ExternalAppHandler:
                 tenant_id=tenant_id,
                 name=request.name,
                 description=request.description,
-                url=request.url,
+                config=validated_config,
                 image_url=request.image_url,
                 image_file_id=request.image_file_id,
                 created_by=user_id,
@@ -363,8 +366,8 @@ class ExternalAppHandler:
                 external_app.name = request.name
             if request.description is not None:
                 external_app.description = request.description
-            if request.url is not None:
-                external_app.url = request.url
+            if request.config is not None:
+                external_app.config = ExternalAppConfigValidatorFactory.validate_config(request.config)
             if request.image_url is not None:
                 external_app.image_url = request.image_url
             if request.image_file_id is not None:
@@ -675,7 +678,7 @@ class ExternalAppHandler:
             tenant_id=external_app.tenant_id,
             name=external_app.name,
             description=external_app.description,
-            url=external_app.url,
+            config=dict(external_app.config) if external_app.config else {},
             image_url=external_app.image_url,
             image_file_id=external_app.image_file_id,
             tags=tags,

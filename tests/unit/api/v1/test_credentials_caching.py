@@ -590,14 +590,14 @@ class TestCredentialListCaching:
         headers = create_auth_headers(user_token, use_cache=False)
         tenant_id = create_tenant_for_user(test_client, user_token)
 
-        # Create two credentials (default is_active=False)
-        create_credential(test_client, tenant_id, headers, "Cred Inactive")
-        cred_id_2 = create_credential(test_client, tenant_id, headers, "Cred Active")
+        # Create two credentials (default is_active=True)
+        cred_id_1 = create_credential(test_client, tenant_id, headers, "Cred Inactive")
+        create_credential(test_client, tenant_id, headers, "Cred Active")
 
-        # Activate second credential
+        # Deactivate first credential
         test_client.patch(
-            ENDPOINT_CREDENTIAL_DETAIL.format(tenant_id=tenant_id, credential_id=cred_id_2),
-            json={"is_active": True},
+            ENDPOINT_CREDENTIAL_DETAIL.format(tenant_id=tenant_id, credential_id=cred_id_1),
+            json={"is_active": False},
             headers=headers,
         )
 

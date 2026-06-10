@@ -359,7 +359,7 @@ async def set_external_app_permission(
     except Exception as e:
         logger.error("Failed to set external app permission: %s", e)
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to set external app permission: {e!s}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to set external app permission"
         )
 
 

@@ -32,7 +32,7 @@ async def global_search(
     """Search across all entity types within the tenant.
 
     Searches chat agents, workflows, conversations, chat widgets,
-    external apps, credentials, tools, AI models, principals, and custom
+    external apps, credentials, AI models, principals, and custom
     groups by name and description, respecting RBAC permissions.
     """
     try:

@@ -75,7 +75,6 @@ class TenantAIModelHandler:
         name_filter: str | None = None,
         type_filter: Sequence[str] | None = None,
         provider_filter: Sequence[str] | None = None,
-        is_active: int | None = None,
         tag_ids: list[int] | None = None,
         order_by: str | None = None,
         order_direction: str | None = None,
@@ -91,7 +90,6 @@ class TenantAIModelHandler:
             name_filter: Optional filter by name.
             type_filter: Optional list of model types to filter by.
             provider_filter: Optional list of providers to filter by.
-            is_active: Optional filter by active status.
             tag_ids: Optional list of tag IDs to filter by (OR logic).
             order_by: Optional column to order by.
             order_direction: Optional sort direction.
@@ -104,10 +102,7 @@ class TenantAIModelHandler:
         logger.info("Listing tenant AI models", extra={"tenant_id": tenant_id})
 
         order_key = f"{order_by or 'default'}:{order_direction or 'asc'}"
-        is_active_key = "all" if is_active is None else str(is_active)
-        cache_key = (
-            f"ai_models:list:tenant:{tenant_id}:skip:{skip}:limit:{limit}:order:{order_key}:active:{is_active_key}"
-        )
+        cache_key = f"ai_models:list:tenant:{tenant_id}:skip:{skip}:limit:{limit}:order:{order_key}"
 
         has_filters = (
             name_filter is not None
@@ -141,8 +136,6 @@ class TenantAIModelHandler:
                 query = query.where(TenantAIModel.type.in_(type_filter))
             if provider_filter:
                 query = query.where(TenantAIModel.provider.in_(provider_filter))
-            if is_active is not None:
-                query = query.where(TenantAIModel.is_active == bool(is_active))
 
             if tag_ids:
                 tag_subquery = (
@@ -278,7 +271,6 @@ class TenantAIModelHandler:
                 config=validated_config,
                 credential_id=request.credential_id,
                 priority=request.priority,
-                is_active=request.is_active,
                 created_by=user_id,
                 updated_by=user_id,
             )
@@ -355,8 +347,6 @@ class TenantAIModelHandler:
                     ai_model.credential_id = None
             if request.priority is not None:
                 ai_model.priority = request.priority
-            if request.is_active is not None:
-                ai_model.is_active = request.is_active
 
             ai_model.updated_by = user_id
 
@@ -422,7 +412,6 @@ class TenantAIModelHandler:
         with self.db_client.get_session() as session:
             query = select(TenantAIModel).where(
                 TenantAIModel.tenant_id == tenant_id,
-                TenantAIModel.is_active,
             )
 
             if model_type:
@@ -493,7 +482,6 @@ class TenantAIModelHandler:
                 select(TenantAIModel).where(
                     TenantAIModel.id == model_id,
                     TenantAIModel.tenant_id == tenant_id,
-                    TenantAIModel.is_active,
                 )
             ).scalar_one_or_none()
 
@@ -578,7 +566,6 @@ class TenantAIModelHandler:
             config=model.config or {},
             credential_id=model.credential_id,
             priority=model.priority,
-            is_active=model.is_active,
             tags=tags,
             created_at=model.created_at,
             updated_at=model.updated_at,

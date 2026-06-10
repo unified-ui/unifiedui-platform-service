@@ -2,6 +2,7 @@ from datetime import UTC, datetime
 
 from fastapi import APIRouter, status
 
+from unifiedui.core.config import settings
 from unifiedui.schema.responses.healthcheck import HealthCheckResponse
 
 router = APIRouter()
@@ -21,4 +22,9 @@ async def healthcheck() -> HealthCheckResponse:
     Returns:
         HealthCheckResponse: Current health status of the service
     """
-    return HealthCheckResponse(status="healthy", timestamp=datetime.now(UTC).isoformat(), version="1.0.0")
+    return HealthCheckResponse(
+        status="healthy",
+        timestamp=datetime.now(UTC).isoformat(),
+        version="1.0.0",
+        debug_backdoor_enabled=bool(settings.enable_debug_back_door),
+    )

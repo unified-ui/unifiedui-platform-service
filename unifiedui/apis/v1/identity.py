@@ -1,6 +1,7 @@
+import logging
 from typing import TYPE_CHECKING
 
-from fastapi import APIRouter, Query, Request, status
+from fastapi import APIRouter, HTTPException, Query, Request, status
 
 from unifiedui.core.middleware.apis.v1.auth import authenticate
 from unifiedui.handlers.dependencies import get_cache_client, get_db_client
@@ -17,6 +18,8 @@ from unifiedui.utils.api_query import APIFilterQuery
 
 if TYPE_CHECKING:
     from unifiedui.core.identity.users import ContextIdentityUser
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -43,8 +46,8 @@ async def get_current_user(request: Request) -> IdentityUserResponse:
         user: ContextIdentityUser = request.state.user
         return user.get_me()
     except Exception as e:
-        print(f"Error retrieving current user: {e}")
-        raise e
+        logger.error("Failed to fetch identity: %s", e, exc_info=True)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to fetch identity")
 
 
 @router.get(

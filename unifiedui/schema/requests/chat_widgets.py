@@ -12,7 +12,6 @@ class CreateChatWidgetRequest(BaseModel):
     description: str | None = Field(None, max_length=2000, description="Chat widget description")
     type: ChatWidgetTypeEnum | None = Field(None, description="Chat widget type (IFRAME or FORM)")
     config: dict = Field(..., description="Chat widget configuration (required)")
-    is_active: bool = Field(False, description="Whether the chat widget is active")
 
 
 class UpdateChatWidgetRequest(BaseModel):
@@ -22,4 +21,3 @@ class UpdateChatWidgetRequest(BaseModel):
     description: str | None = Field(None, max_length=2000, description="Chat widget description")
     type: ChatWidgetTypeEnum | None = Field(None, description="Chat widget type (IFRAME or FORM)")
     config: dict | None = Field(None, description="Chat widget configuration")
-    is_active: bool | None = Field(None, description="Whether the chat widget is active")

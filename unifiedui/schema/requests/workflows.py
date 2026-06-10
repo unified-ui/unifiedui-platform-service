@@ -12,7 +12,6 @@ class CreateWorkflowRequest(BaseModel):
     description: str | None = Field(None, max_length=2000, description="Workflow description")
     type: WorkflowTypeEnum = Field(..., description="Type of workflow (e.g., N8N)")
     config: dict = Field(..., description="Workflow configuration (required, type-specific)")
-    is_active: bool = Field(False, description="Whether the workflow is active")
     allow_api_keys: bool = Field(False, description="Whether API key authentication is allowed for this workflow")
 
 
@@ -22,7 +21,6 @@ class UpdateWorkflowRequest(BaseModel):
     name: str | None = Field(None, min_length=1, max_length=255, description="Workflow name")
     description: str | None = Field(None, max_length=2000, description="Workflow description")
     config: dict | None = Field(None, description="Workflow configuration")
-    is_active: bool | None = Field(None, description="Whether the workflow is active")
     allow_api_keys: bool | None = Field(None, description="Whether API key authentication is allowed for this workflow")
     # Note: type, primary_key_vault_uri, secondary_key_vault_uri, last_full_import are NOT updatable via PATCH
 

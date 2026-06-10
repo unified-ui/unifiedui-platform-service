@@ -68,7 +68,7 @@ class TestChatAgentRoutes:
         assert data["description"] == app_data["description"]
         assert data["type"] == app_data["type"]
         assert data["config"] == n8n_config
-        assert not data["is_active"]
+        assert data["is_active"]
         assert "id" in data
         assert data["tenant_id"] == tenant_id
         assert "created_at" in data
@@ -549,13 +549,13 @@ class TestChatAgentRoutes:
         tenant_id = create_tenant_for_user(test_client, test_user_token)
         headers = create_auth_headers(test_user_token, use_cache=False)
 
-        # Create a chat agent (default is_active=False)
+        # Create a chat agent (default is_active=True)
         app_data = {"name": "Test App", "description": "Test", "type": "N8N"}
         create_response = test_client.post(
             ENDPOINT_CHAT_AGENTS.format(tenant_id=tenant_id), json=app_data, headers=headers
         )
         app_id = create_response.json()["id"]
-        assert not create_response.json()["is_active"]
+        assert create_response.json()["is_active"]
 
         # Update to active
         update_response = test_client.patch(
