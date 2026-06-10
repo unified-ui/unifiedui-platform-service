@@ -27,7 +27,6 @@ from unifiedui.handlers.dependencies.tags import get_tag_handler
 
 # Handler dependencies
 from unifiedui.handlers.dependencies.tenants import get_tenant_handler
-from unifiedui.handlers.dependencies.tools import get_tool_handler
 from unifiedui.handlers.dependencies.user_favorites import get_user_favorites_handler
 
 # Vault dependencies
@@ -56,7 +55,6 @@ __all__ = [
     "get_tag_handler",
     # Handlers
     "get_tenant_handler",
-    "get_tool_handler",
     "get_user_favorites_handler",
     # Vault
     "get_vault_client",

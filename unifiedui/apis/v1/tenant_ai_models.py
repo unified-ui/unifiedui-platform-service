@@ -49,7 +49,6 @@ async def list_tenant_ai_models(
     provider: str | None = Query(
         None, description="Comma-separated list of providers to filter by (e.g., 'OPENAI,AZURE_OPENAI')"
     ),
-    is_active: int | None = Query(None, ge=0, le=1, description="Filter by active status (1=active, 0=inactive)"),
     tags: str | None = Query(None, description="Comma-separated list of tag IDs to filter by (OR logic)"),
     order_by: str | None = Query(None, description="Column name to order by"),
     order_direction: OrderDirectionEnum | None = Query(None, description="Sort direction: 'asc' or 'desc'"),
@@ -88,7 +87,6 @@ async def list_tenant_ai_models(
                 name_filter=name,
                 type_filter=types,
                 provider_filter=providers,
-                is_active=is_active,
                 tag_ids=tag_ids,
                 order_by=order_by,
                 order_direction=order_direction.value if order_direction else None,
@@ -154,7 +152,7 @@ async def create_tenant_ai_model(
     except Exception as e:
         logger.error("Failed to create tenant AI model: %s", e)
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to create tenant AI model: {e!s}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to create tenant AI model"
         )
 
 
@@ -252,7 +250,7 @@ async def update_tenant_ai_model(
     except Exception as e:
         logger.error("Failed to update tenant AI model: %s", e)
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to update tenant AI model: {e!s}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to update tenant AI model"
         )
 
 

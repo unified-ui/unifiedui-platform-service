@@ -37,7 +37,6 @@ async def list_chat_widgets(
     skip: int = Query(0, ge=0, description="Number of items to skip"),
     limit: int = Query(100, ge=1, le=1000, description="Maximum number of items to return"),
     name: str | None = Query(None, description="Filter by chat widget name"),
-    is_active: int | None = Query(None, ge=0, le=1, description="Filter by active status (1=active, 0=inactive)"),
     tags: str | None = Query(
         None, description="Comma-separated list of tag IDs to filter by (e.g., '10001,10002,10003')"
     ),
@@ -64,7 +63,6 @@ async def list_chat_widgets(
         skip: Number of items to skip
         limit: Maximum number of items to return
         name: Optional filter by chat widget name
-        is_active: Optional filter by active status (None=all, 1=active, 0=inactive)
         tags: Optional comma-separated tag IDs to filter by
         handler: Chat widget handler dependency
 
@@ -96,7 +94,6 @@ async def list_chat_widgets(
                 skip=skip,
                 limit=limit,
                 name_filter=name,
-                is_active=is_active,
                 user=user,
                 tag_ids=tag_ids,
                 order_by=order_by,
@@ -158,9 +155,7 @@ async def create_chat_widget(
         )
     except Exception as e:
         logger.error("Failed to create chat widget: %s", e)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to create chat widget: {e!s}"
-        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to create chat widget")
 
 
 @router.get(
@@ -273,9 +268,7 @@ async def update_chat_widget(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
         logger.error("Failed to update chat widget: %s", e)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to update chat widget: {e!s}"
-        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to update chat widget")
 
 
 @router.delete(
@@ -376,9 +369,7 @@ async def duplicate_chat_widget(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
         logger.error("Failed to duplicate chat widget: %s", e)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to duplicate chat widget: {e!s}"
-        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to duplicate chat widget")
 
 
 # ========== Chat Widget Permission Endpoints ==========
@@ -590,7 +581,7 @@ async def set_chat_widget_permission(
     except Exception as e:
         logger.error("Failed to set chat widget permission: %s", e)
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to set chat widget permission: {e!s}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to set chat widget permission"
         )
 
 

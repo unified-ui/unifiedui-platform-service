@@ -35,8 +35,6 @@ from unifiedui.core.database.models import (
     ExternalApp,
     ExternalAppMember,
     Principal,
-    Tool,
-    ToolMember,
     Workflow,
     WorkflowMember,
 )
@@ -96,13 +94,6 @@ RESOURCE_PERMISSION_CONFIG: dict[str, dict[str, Any]] = {
         "id_field": "custom_group_id",
         "cache_prefix": "custom_groups",
         "tenant_admin_role": TenantRolesEnum.CUSTOM_GROUPS_ADMIN,
-    },
-    "tool": {
-        "resource_model": Tool,
-        "member_model": ToolMember,
-        "id_field": "tool_id",
-        "cache_prefix": "tools",
-        "tenant_admin_role": TenantRolesEnum.REACT_AGENT_ADMIN,
     },
     "external_app": {
         "resource_model": ExternalApp,

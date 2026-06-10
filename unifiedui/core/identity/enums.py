@@ -7,7 +7,5 @@ class IdenityProviderEnum(StrEnum):
     AWS_COGNITO = "AWS_COGNITO"
     GOOGLE_IDENTITY = "GOOGLE_IDENTITY"
     LDAP = "LDAP"
-    KERBEROS = "KERBEROS"
-    SAML = "SAML"
     OKTA = "OKTA"
     OIDC = "OIDC"

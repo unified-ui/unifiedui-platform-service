@@ -21,7 +21,6 @@ class TenantAIModelResponse(BaseModel):
     config: dict = Field(default_factory=dict, description="Provider-specific configuration")
     credential_id: str | None = Field(None, description="Linked credential ID")
     priority: int = Field(..., description="Priority for load-balancing")
-    is_active: bool = Field(..., description="Whether the model is active")
     tags: list[TagSummary] = Field(default_factory=list, description="Tags on the AI model")
     created_at: datetime = Field(..., description="Creation timestamp")
     updated_at: datetime = Field(..., description="Last update timestamp")

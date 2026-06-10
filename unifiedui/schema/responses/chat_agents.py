@@ -5,7 +5,6 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field
 
 from unifiedui.core.database.enums import ChatAgentTypeEnum
-from unifiedui.schema.responses.re_act_agents import ReActAgentConfigSettingsResponse
 from unifiedui.schema.responses.tags import TagSummary
 
 
@@ -22,14 +21,7 @@ class ChatAgentResponse(BaseModel):
     embed_allowed_origins: str | None = Field(
         None, description="Semicolon-separated list of allowed origins for embed iframe"
     )
-    current_version: int | None = Field(None, description="Current version number (REACT_AGENT only)")
-    ai_model_ids: list[str] = Field(default_factory=list, description="AI model IDs (REACT_AGENT only)")
-    system_prompt: str | None = Field(None, description="System prompt (REACT_AGENT only)")
-    tool_ids: list[str] = Field(default_factory=list, description="Tool IDs (REACT_AGENT only)")
-    security_prompt: str | None = Field(None, description="Security prompt (REACT_AGENT only)")
-    tool_use_prompt: str | None = Field(None, description="Tool use instructions (REACT_AGENT only)")
-    response_prompt: str | None = Field(None, description="Response formatting (REACT_AGENT only)")
-    greeting_messages: list[str] = Field(default_factory=list, description="Greeting messages (REACT_AGENT only)")
+    greeting_messages: list[str] = Field(default_factory=list, description="Greeting messages")
     tags: list[TagSummary] = Field(default_factory=list, description="Tags on the chat agent")
     created_at: datetime = Field(..., description="Creation timestamp")
     updated_at: datetime = Field(..., description="Last update timestamp")
@@ -91,8 +83,23 @@ class MicrosoftFoundryConfigSettingsResponse(BaseModel):
 
     api_version: str = Field(..., description="API version (e.g., '2025-11-15-preview')")
     agent_type: str = Field(..., description="Agent type (AGENT or MULTI_AGENT)")
-    project_endpoint: str = Field(..., description="Foundry project endpoint URL")
-    agent_name: str = Field(..., description="Name of the agent in Foundry")
+    project_endpoint: str = Field(default="", description="Foundry project endpoint URL")
+    agent_name: str = Field(default="", description="Name of the agent in Foundry")
+    auth_type: str = Field(default="ENTRA_ID_USER_TOKEN", description="Authentication mode")
+    credential: CredentialSecretResponse | None = Field(
+        default=None, description="Resolved credential with secret (for ENTRA_ID_APP_REGISTRATION, API_KEY)"
+    )
+    custom_rest_api_endpoint: str | None = Field(default=None, description="Custom REST API proxy endpoint URL")
+    custom_rest_api_auth_type: str | None = Field(
+        default=None,
+        description="Auth type for the custom REST API proxy (API_KEY, USER_TOKEN, ENTRA_ID_APP_REGISTRATION)",
+    )
+    custom_rest_api_api_key_header: str = Field(
+        default="X-API-Key", description="Custom header name for API key auth to the proxy"
+    )
+    access_token: str | None = Field(
+        default=None, description="Pre-acquired access token (for proxy ENTRA_ID_APP_REGISTRATION auth type)"
+    )
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -151,12 +158,12 @@ class ChatAgentConfigResponse(BaseModel):
     type: ChatAgentTypeEnum = Field(..., description="Chat agent type")
     tenant_id: str = Field(..., description="Tenant ID")
     chat_agent_id: str = Field(..., description="Chat agent ID")
+    is_active: bool = Field(..., description="Whether the chat agent is active")
     settings: (
         N8NConfigSettingsResponse
         | MicrosoftFoundryConfigSettingsResponse
         | RestApiConfigSettingsResponse
         | LLMConfigSettingsResponse
-        | ReActAgentConfigSettingsResponse
         | dict
     ) = Field(..., description="Chat agent settings with resolved credentials")
     user: UserInfoResponse = Field(..., description="User information")

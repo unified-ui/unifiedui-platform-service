@@ -6,7 +6,6 @@ from pydantic import ValidationError
 from unifiedui.core.database.enums import ChatAgentTypeEnum
 from unifiedui.exc.chat_agent_config import (
     ChatAgentConfigValidationError,
-    UnsupportedChatAgentTypeError,
 )
 from unifiedui.handlers.validators.chat_agent_config import (
     ChatAgentConfigValidatorFactory,
@@ -297,11 +296,6 @@ class TestChatAgentConfigValidatorFactory:
         validator = ChatAgentConfigValidatorFactory.get_validator(ChatAgentTypeEnum.N8N)
         assert isinstance(validator, N8NConfigValidator)
 
-    def test_get_validator_unsupported_type(self):
-        """Test getting validator for unsupported type raises error."""
-        with pytest.raises(UnsupportedChatAgentTypeError):
-            ChatAgentConfigValidatorFactory.get_validator(ChatAgentTypeEnum.REACT_AGENT)
-
     def test_validate_config_n8n(self):
         """Test validate_config with N8N type."""
         config = {
@@ -326,20 +320,9 @@ class TestChatAgentConfigValidatorFactory:
         result = ChatAgentConfigValidatorFactory.validate_config(ChatAgentTypeEnum.N8N, {})
         assert result == {}
 
-    def test_validate_config_unsupported_type(self):
-        """Test validate_config with unsupported type raises error."""
-        config = {"key": "value"}
-
-        with pytest.raises(UnsupportedChatAgentTypeError):
-            ChatAgentConfigValidatorFactory.validate_config(ChatAgentTypeEnum.REACT_AGENT, config)
-
     def test_is_supported_n8n(self):
         """Test is_supported returns True for N8N."""
         assert ChatAgentConfigValidatorFactory.is_supported(ChatAgentTypeEnum.N8N) is True
-
-    def test_is_supported_unsupported_type(self):
-        """Test is_supported returns False for unsupported types."""
-        assert ChatAgentConfigValidatorFactory.is_supported(ChatAgentTypeEnum.REACT_AGENT) is False
 
     def test_get_supported_types(self):
         """Test get_supported_types returns list with N8N and MICROSOFT_FOUNDRY."""
@@ -554,6 +537,71 @@ class TestChatAgentConfigValidatorFactoryMicrosoftFoundry:
     def test_is_supported_microsoft_foundry(self):
         """Test is_supported returns True for MICROSOFT_FOUNDRY."""
         assert ChatAgentConfigValidatorFactory.is_supported(ChatAgentTypeEnum.MICROSOFT_FOUNDRY) is True
+
+
+class TestMicrosoftFoundryAuthModes:
+    """Tests for new Microsoft Foundry authentication modes (REQ 008)."""
+
+    BASE_CONFIG = {
+        "agent_type": "AGENT",
+        "api_version": "v1",
+        "project_endpoint": "https://engo-foundry.services.ai.azure.com/api/projects/proj-default-2",
+        "agent_name": "BasicAgent",
+    }
+
+    def test_default_auth_type_is_user_token(self):
+        """Default auth_type stays ENTRA_ID_USER_TOKEN for backward compatibility."""
+        config = MicrosoftFoundryChatAgentConfig(**self.BASE_CONFIG)
+        assert config.auth_type.value == "ENTRA_ID_USER_TOKEN"
+        assert config.credential_id is None
+
+    def test_user_token_does_not_require_credential(self):
+        """ENTRA_ID_USER_TOKEN does not require credential_id."""
+        config = MicrosoftFoundryChatAgentConfig(**self.BASE_CONFIG, auth_type="ENTRA_ID_USER_TOKEN")
+        assert config.credential_id is None
+
+    def test_app_registration_requires_credential(self):
+        """ENTRA_ID_APP_REGISTRATION rejects missing credential_id."""
+        with pytest.raises(ValidationError) as exc_info:
+            MicrosoftFoundryChatAgentConfig(**self.BASE_CONFIG, auth_type="ENTRA_ID_APP_REGISTRATION")
+        assert "credential_id is required" in str(exc_info.value)
+
+    def test_app_registration_with_credential_ok(self):
+        """ENTRA_ID_APP_REGISTRATION accepts credential_id."""
+        config = MicrosoftFoundryChatAgentConfig(
+            **self.BASE_CONFIG,
+            auth_type="ENTRA_ID_APP_REGISTRATION",
+            credential_id="cred-123",
+        )
+        assert config.credential_id == "cred-123"
+
+    def test_api_key_requires_credential(self):
+        """API_KEY rejects missing credential_id."""
+        with pytest.raises(ValidationError) as exc_info:
+            MicrosoftFoundryChatAgentConfig(**self.BASE_CONFIG, auth_type="API_KEY")
+        assert "credential_id is required" in str(exc_info.value)
+
+    def test_api_key_with_credential_ok(self):
+        """API_KEY accepts credential_id."""
+        config = MicrosoftFoundryChatAgentConfig(
+            **self.BASE_CONFIG,
+            auth_type="API_KEY",
+            credential_id="cred-456",
+        )
+        assert config.credential_id == "cred-456"
+
+    def test_api_version_v1_supported(self):
+        """api_version=v1 is now valid."""
+        config = MicrosoftFoundryChatAgentConfig(**self.BASE_CONFIG)
+        assert config.api_version.value == "v1"
+
+    def test_validator_round_trip_with_auth(self):
+        """Validator round-trips auth_type and credential_id."""
+        validator = MicrosoftFoundryConfigValidator()
+        cfg = {**self.BASE_CONFIG, "auth_type": "API_KEY", "credential_id": "abc"}
+        result = validator.validate(cfg)
+        assert result["auth_type"] == "API_KEY"
+        assert result["credential_id"] == "abc"
 
 
 # ========== REST API Tests ==========

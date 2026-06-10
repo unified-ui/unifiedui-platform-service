@@ -37,7 +37,6 @@ def create_ai_model(
                 "api_version": "2024-02-01",
             },
             "priority": 0,
-            "is_active": False,
         },
         headers=headers,
     )

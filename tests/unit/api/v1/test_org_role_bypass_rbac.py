@@ -2,7 +2,7 @@
 
 Verifies that ORGANISATION_GLOBAL_ADMIN and ORGANISATION_TENANT_ADMIN
 bypass ALL tenant-level permission checks (tenant, chat_agent, credential,
-workflow, conversation, custom_group, chat_widget, tool,
+workflow, conversation, custom_group, chat_widget,
 tag, tenant_ai_model). Also verifies that ORGANISATION_TENANT_CREATOR does NOT
 get bypass.
 """

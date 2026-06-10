@@ -69,7 +69,6 @@ def create_workflow_in_db(test_client: TestClient, tenant_id: str, user_id: str,
             description="Test autonomous agent",
             type="N8N",
             config={},
-            is_active=True,
             created_by=user_id,
             updated_by=user_id,
         )
@@ -133,7 +132,6 @@ def create_conversation_in_db(
             chat_agent_id=chat_agent_id,
             name=name,
             description="Test conversation",
-            is_active=True,
             created_by=user_id,
             updated_by=user_id,
         )

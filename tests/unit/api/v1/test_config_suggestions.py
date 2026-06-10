@@ -55,7 +55,6 @@ def create_workflow_with_config(
             description="Test workflow",
             type=workflow_type,
             config=config,
-            is_active=True,
             created_by=user_id,
             updated_by=user_id,
         )

@@ -62,7 +62,6 @@ def create_workflow_in_db(
     tenant_id: str,
     user_id: str,
     name: str = "Test Agent",
-    is_active: bool = True,
 ) -> str:
     """Create an autonomous agent directly in DB and return its ID."""
     agent_id = str(uuid.uuid4())
@@ -74,7 +73,6 @@ def create_workflow_in_db(
             description="Test agent",
             type="N8N",
             config={},
-            is_active=is_active,
             created_by=user_id,
             updated_by=user_id,
         )
@@ -159,8 +157,8 @@ def test_get_dashboard_stats_with_entities(test_client: TestClient):
     create_chat_agent_in_db(test_client, tenant_id, user_id, "App2", is_active=True)
     create_chat_agent_in_db(test_client, tenant_id, user_id, "App3", is_active=False)
 
-    create_workflow_in_db(test_client, tenant_id, user_id, "Agent1", is_active=True)
-    create_workflow_in_db(test_client, tenant_id, user_id, "Agent2", is_active=False)
+    create_workflow_in_db(test_client, tenant_id, user_id, "Agent1")
+    create_workflow_in_db(test_client, tenant_id, user_id, "Agent2")
 
     create_conversation_in_db(test_client, tenant_id, user_id, app1_id, "Conv1")
     create_conversation_in_db(test_client, tenant_id, user_id, app1_id, "Conv2")
@@ -178,12 +176,8 @@ def test_get_dashboard_stats_with_entities(test_client: TestClient):
     assert data["chat_agents"]["inactive"] == 1
 
     assert data["workflows"]["total"] == 2
-    assert data["workflows"]["active"] == 1
-    assert data["workflows"]["inactive"] == 1
 
     assert data["conversations"]["total"] == 2
-    assert data["conversations"]["active"] == 2
-    assert data["conversations"]["inactive"] == 0
 
 
 def test_get_dashboard_stats_permission_filtering(test_client: TestClient):

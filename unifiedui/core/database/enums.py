@@ -16,8 +16,6 @@ class TenantRolesEnum(StrEnum):
     WORKFLOWS_CREATOR = "WORKFLOWS_CREATOR"
     CHAT_WIDGETS_ADMIN = "CHAT_WIDGETS_ADMIN"
     CHAT_WIDGETS_CREATOR = "CHAT_WIDGETS_CREATOR"
-    REACT_AGENT_ADMIN = "REACT_AGENT_ADMIN"
-    REACT_AGENT_CREATOR = "REACT_AGENT_CREATOR"
     TENANT_AI_MODELS_ADMIN = "TENANT_AI_MODELS_ADMIN"
     EXTERNAL_APPS_ADMIN = "EXTERNAL_APPS_ADMIN"
     EXTERNAL_APPS_CREATOR = "EXTERNAL_APPS_CREATOR"
@@ -27,22 +25,10 @@ class TenantRolesEnum(StrEnum):
         return [permission.value for permission in TenantRolesEnum]
 
 
-class ToolTypeEnum(StrEnum):
-    """Supported tool types for ReACT agents."""
-
-    MCP_SERVER = "MCP_SERVER"
-    OPENAPI_DEFINITION = "OPENAPI_DEFINITION"
-
-    @classmethod
-    def all(cls) -> list[str]:
-        return [tool_type.value for tool_type in ToolTypeEnum]
-
-
 class ChatAgentTypeEnum(StrEnum):
     N8N = "N8N"
     MICROSOFT_FOUNDRY = "MICROSOFT_FOUNDRY"
     REST_API = "REST_API"
-    REACT_AGENT = "REACT_AGENT"
     LLM = "LLM"
 
     @classmethod
@@ -62,6 +48,31 @@ class RestApiAuthTypeEnum(StrEnum):
     @classmethod
     def all(cls) -> list[str]:
         return [auth_type.value for auth_type in RestApiAuthTypeEnum]
+
+
+class MicrosoftFoundryAuthTypeEnum(StrEnum):
+    """Supported authentication types for Microsoft Foundry chat agents."""
+
+    ENTRA_ID_USER_TOKEN = "ENTRA_ID_USER_TOKEN"
+    ENTRA_ID_APP_REGISTRATION = "ENTRA_ID_APP_REGISTRATION"
+    API_KEY = "API_KEY"
+    CUSTOM_REST_API = "CUSTOM_REST_API"
+
+    @classmethod
+    def all(cls) -> list[str]:
+        return [auth_type.value for auth_type in MicrosoftFoundryAuthTypeEnum]
+
+
+class MicrosoftFoundryCustomRestApiAuthTypeEnum(StrEnum):
+    """Supported authentication types for Custom REST API proxy in Foundry mode."""
+
+    API_KEY = "API_KEY"
+    USER_TOKEN = "USER_TOKEN"
+    ENTRA_ID_APP_REGISTRATION = "ENTRA_ID_APP_REGISTRATION"
+
+    @classmethod
+    def all(cls) -> list[str]:
+        return [auth_type.value for auth_type in MicrosoftFoundryCustomRestApiAuthTypeEnum]
 
 
 class WorkflowTypeEnum(StrEnum):
@@ -191,9 +202,7 @@ class AIModelPurposeGroupEnum(StrEnum):
     CONVERSATION_TITLE_GENERATION = "CONVERSATION_TITLE_GENERATION"
     CONVERSATION_SUMMARIZATION = "CONVERSATION_SUMMARIZATION"
     DESCRIPTION_GENERATION = "DESCRIPTION_GENERATION"
-    TRACE_ANALYSIS = "TRACE_ANALYSIS"
     GENERAL = "GENERAL"
-    REACT_AGENT = "REACT_AGENT"
     DIRECT_CHAT = "DIRECT_CHAT"
 
     @classmethod
@@ -210,3 +219,30 @@ class FileContextTypeEnum(StrEnum):
     @classmethod
     def all(cls) -> list[str]:
         return [t.value for t in FileContextTypeEnum]
+
+
+class MessageFeedbackRatingEnum(StrEnum):
+    """Rating value for message feedback."""
+
+    THUMBS_UP = "THUMBS_UP"
+    THUMBS_DOWN = "THUMBS_DOWN"
+
+    @classmethod
+    def all(cls) -> list[str]:
+        return [t.value for t in MessageFeedbackRatingEnum]
+
+
+class MessageFeedbackReasonEnum(StrEnum):
+    """Structured reasons for message feedback."""
+
+    HALLUCINATION = "HALLUCINATION"
+    TOO_SLOW = "TOO_SLOW"
+    FORMATTING = "FORMATTING"
+    INACCURATE = "INACCURATE"
+    INAPPROPRIATE = "INAPPROPRIATE"
+    INCOMPLETE = "INCOMPLETE"
+    OTHER = "OTHER"
+
+    @classmethod
+    def all(cls) -> list[str]:
+        return [t.value for t in MessageFeedbackReasonEnum]

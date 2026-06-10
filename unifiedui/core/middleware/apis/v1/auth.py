@@ -1,6 +1,6 @@
 from collections.abc import Callable
 from functools import wraps
-from typing import Any
+from typing import Any, NoReturn
 
 from fastapi import HTTPException, Request, status
 from sqlalchemy import select
@@ -22,7 +22,6 @@ from unifiedui.core.database.models import (
     CustomGroupMember,
     ExternalAppMember,
     Tag,
-    ToolMember,
     WorkflowMember,
 )
 from unifiedui.core.identity.users import ContextIdentityUser
@@ -30,6 +29,29 @@ from unifiedui.handlers.dependencies.database import get_db_client
 from unifiedui.logger import get_logger
 
 logger = get_logger(__name__)
+
+
+def _raise_permission_denied(
+    detail: str,
+    required_roles: list[str] | None = None,
+    user_roles: list[str] | None = None,
+) -> NoReturn:
+    """Raise a structured 403 HTTPException with permission context.
+
+    Args:
+        detail: Human-readable error description
+        required_roles: Roles that would grant access
+        user_roles: Roles the current user has
+    """
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail={
+            "detail": detail,
+            "error_code": "PERMISSION_DENIED",
+            "required_roles": required_roles or [],
+            "user_roles": user_roles or [],
+        },
+    )
 
 
 def _validate_service_key(request: Request, required_service_auth_config: str) -> bool:
@@ -188,10 +210,6 @@ def authenticate_workflow_api_key() -> Callable:
                         detail=f"Workflow not found: {workflow_id}",
                     )
 
-                # Check if workflow is active
-                if not workflow.is_active:
-                    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Workflow is not active")
-
                 # Check if API key authentication is allowed
                 if not workflow.allow_api_keys:
                     raise HTTPException(
@@ -330,30 +348,45 @@ def authenticate(required_service_auth_key: str | None = None) -> Callable:
                 request.state.service_authenticated = True
                 request.state.service_key_name = required_service_auth_key
 
-            # Extract Authorization header
-            auth_header = request.headers.get("Authorization")
-            if not auth_header:
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Authorization header missing",
-                    headers={"WWW-Authenticate": "Bearer"},
-                )
+            # Debug Backdoor (REQ 007): if enabled and the request carries the
+            # backdoor secret header, build a synthetic mock token and skip
+            # Bearer-token extraction. The synthetic token then flows through the
+            # normal ContextIdentityUser pipeline so RBAC checks still apply.
+            from unifiedui.core.middleware.apis.v1.debug_backdoor import (
+                build_backdoor_token,
+                has_backdoor_headers,
+                is_backdoor_enabled,
+            )
 
-            # Extract Bearer token
-            if not auth_header.startswith("Bearer "):
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Invalid authorization scheme. Expected 'Bearer'",
-                    headers={"WWW-Authenticate": "Bearer"},
-                )
+            backdoor_active = is_backdoor_enabled() and has_backdoor_headers(request)
+            if backdoor_active:
+                token = build_backdoor_token(request)
+                request.state.debug_backdoor = True
+            else:
+                # Extract Authorization header
+                auth_header = request.headers.get("Authorization")
+                if not auth_header:
+                    raise HTTPException(
+                        status_code=status.HTTP_401_UNAUTHORIZED,
+                        detail="Authorization header missing",
+                        headers={"WWW-Authenticate": "Bearer"},
+                    )
 
-            token = auth_header[7:]  # Remove "Bearer " prefix
-            if not token:
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Token is empty",
-                    headers={"WWW-Authenticate": "Bearer"},
-                )
+                # Extract Bearer token
+                if not auth_header.startswith("Bearer "):
+                    raise HTTPException(
+                        status_code=status.HTTP_401_UNAUTHORIZED,
+                        detail="Invalid authorization scheme. Expected 'Bearer'",
+                        headers={"WWW-Authenticate": "Bearer"},
+                    )
+
+                token = auth_header[7:]  # Remove "Bearer " prefix
+                if not token:
+                    raise HTTPException(
+                        status_code=status.HTTP_401_UNAUTHORIZED,
+                        detail="Token is empty",
+                        headers={"WWW-Authenticate": "Bearer"},
+                    )
 
             # Extract cache preference from header (default: True)
             use_cache_header = request.headers.get("X-Use-Cache", "true")
@@ -458,8 +491,7 @@ def authenticate(required_service_auth_key: str | None = None) -> Callable:
                     has_org_bypass = bool(set(org_roles) & org_bypass_roles)
 
                     if not has_org_bypass:
-                        raise HTTPException(
-                            status_code=status.HTTP_403_FORBIDDEN,
+                        _raise_permission_denied(
                             detail=f"Access denied: User does not have access to tenant {tenant_id}",
                         )
 
@@ -481,7 +513,7 @@ def check_permissions(
     Args:
         entity: The entity type to check permissions for
                Options: "tenant", "organization", "chat_agent", "credential", "workflow",
-                        "custom_group", "conversation", "tag", "chat_widget", "tool", "external_app"
+                        "custom_group", "conversation", "tag", "chat_widget", "external_app"
         required_permissions: List of required permission enums
                             - For tenant: [TenantPermissionEnum.TENANT_GLOBAL_ADMIN, TenantPermissionEnum.READER, etc.]
                             - For resources: [PermissionActionEnum.READ, PermissionActionEnum.WRITE, PermissionActionEnum.ADMIN]
@@ -574,9 +606,9 @@ def check_permissions(
                             return await func(*args, **kwargs)
 
                 # If org roles were required but not met, deny
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
+                _raise_permission_denied(
                     detail=f"Access denied: User does not have required organization roles. Required one of: {required_org_roles}",
+                    required_roles=required_org_roles,
                 )
 
             # Check permissions based on entity type
@@ -605,8 +637,7 @@ def check_permissions(
                 matching_tenant = next((t for t in user_tenants if t["tenant"]["id"] == tenant_id), None)
 
                 if not matching_tenant:
-                    raise HTTPException(
-                        status_code=status.HTTP_403_FORBIDDEN,
+                    _raise_permission_denied(
                         detail=f"Access denied: User does not have access to tenant {tenant_id}",
                     )
 
@@ -619,9 +650,10 @@ def check_permissions(
                 has_permission = any(perm in user_roles for perm in required_perms_str)
 
                 if not has_permission:
-                    raise HTTPException(
-                        status_code=status.HTTP_403_FORBIDDEN,
+                    _raise_permission_denied(
                         detail=f"Access denied: User does not have required permissions. Required: {required_perms_str}, Has: {user_roles}",
+                        required_roles=required_perms_str,
+                        user_roles=user_roles,
                     )
 
             elif entity == "tag":
@@ -667,9 +699,9 @@ def check_permissions(
                             return await func(*args, **kwargs)
 
                 # No permission matched
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
+                _raise_permission_denied(
                     detail=f"Access denied: User does not have required permissions on this tag (ID: {tag_id})",
+                    required_roles=[p.value if hasattr(p, "value") else p for p in (required_permissions or [])],
                 )
 
             elif entity == "user_favorite":
@@ -693,8 +725,7 @@ def check_permissions(
                         return await func(*args, **kwargs)
 
                 # No permission matched
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
+                _raise_permission_denied(
                     detail="Access denied: User can only manage their own favorites",
                 )
 
@@ -710,7 +741,6 @@ def check_permissions(
                     "custom_group": (CustomGroupMember, "custom_group_id"),
                     "conversation": (ConversationMember, "conversation_id"),
                     "chat_widget": (ChatWidgetMember, "chat_widget_id"),
-                    "tool": (ToolMember, "tool_id"),
                     "external_app": (ExternalAppMember, "external_app_id"),
                 }
 
@@ -757,7 +787,6 @@ def check_permissions(
                         "custom_group": TenantRolesEnum.CUSTOM_GROUPS_ADMIN.value,
                         "conversation": TenantRolesEnum.CONVERSATIONS_ADMIN.value,
                         "chat_widget": TenantRolesEnum.CHAT_WIDGETS_ADMIN.value,
-                        "tool": TenantRolesEnum.REACT_AGENT_ADMIN.value,
                         "external_app": TenantRolesEnum.EXTERNAL_APPS_ADMIN.value,
                     }
 
@@ -826,9 +855,9 @@ def check_permissions(
                     result = session.execute(query).scalars().first()
 
                     if not result:
-                        raise HTTPException(
-                            status_code=status.HTTP_403_FORBIDDEN,
+                        _raise_permission_denied(
                             detail=f"Access denied: User does not have required permissions on this {entity} (ID: {entity_id}). Required one of: {required_perms_str}, Allowed roles: {list(allowed_roles)}",
+                            required_roles=required_perms_str,
                         )
 
             return await func(*args, **kwargs)

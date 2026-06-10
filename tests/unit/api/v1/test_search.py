@@ -65,7 +65,6 @@ def create_workflow_in_db(
     user_id: str,
     name: str = "Test Agent",
     description: str = "Test agent",
-    is_active: bool = True,
 ) -> str:
     """Create an autonomous agent directly in DB and return its ID."""
     agent_id = str(uuid.uuid4())
@@ -77,7 +76,6 @@ def create_workflow_in_db(
             description=description,
             type="N8N",
             config={},
-            is_active=is_active,
             created_by=user_id,
             updated_by=user_id,
         )

@@ -400,7 +400,6 @@ class TestResourceTagsHandlerMultipleResourceTypes:
             description="Test",
             type="N8N",
             config={},
-            is_active=True,
             created_by=user_id,
             updated_by=user_id,
         )

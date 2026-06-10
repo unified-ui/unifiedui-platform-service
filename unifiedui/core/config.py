@@ -1,5 +1,6 @@
 """Application configuration using Pydantic Settings."""
 
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -93,6 +94,9 @@ class Settings(BaseSettings):
     identity_jwks_url: str = "https://login.microsoftonline.com/common/discovery/v2.0/keys"
     identity_token_algorithms: list[str] = ["RS256"]
     identity_verify_signature: bool = True
+    identity_issuer: str | None = None
+
+    allow_mock_identity_provider: bool = False
 
     # Google Identity Configuration
     google_client_id: str | None = None
@@ -117,25 +121,6 @@ class Settings(BaseSettings):
     ldap_jwt_refresh_secret: str | None = None
     ldap_access_token_expiry_seconds: int = 900
     ldap_refresh_token_expiry_seconds: int = 604800
-
-    # Kerberos Identity Configuration
-    kerberos_realm: str | None = None
-    kerberos_kdc_host: str | None = None
-    kerberos_service_principal: str | None = None
-    kerberos_keytab_path: str | None = None
-    kerberos_ldap_url: str | None = None
-    kerberos_ldap_base_dn: str | None = None
-
-    # SAML Identity Configuration
-    saml_entity_id: str | None = None
-    saml_sso_url: str | None = None
-    saml_certificate: str | None = None
-    saml_metadata_url: str | None = None
-    saml_attribute_map_id: str = "uid"
-    saml_attribute_map_email: str = "email"
-    saml_attribute_map_display_name: str = "displayName"
-    saml_attribute_map_first_name: str = "firstName"
-    saml_attribute_map_last_name: str = "lastName"
 
     # Okta Identity Configuration
     okta_domain: str | None = None
@@ -171,12 +156,43 @@ class Settings(BaseSettings):
     # Logging Configuration
     log_level: str = "INFO"
 
+    # Debug Backdoor (E2E testing & self-debugging — see REQ 007)
+    enable_debug_back_door: bool = False
+    debug_back_door_secret: str | None = None
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="ignore",  # Ignore extra fields for forward compatibility
     )
+
+    @model_validator(mode="after")
+    def _enforce_production_security(self) -> "Settings":
+        """Enforce hard security guarantees in production deployments.
+
+        Refuses to start when production-mode runs with disabled signature
+        verification, with the mock identity provider enabled, or with the
+        debug backdoor enabled.
+        """
+        if self.deployment_mode == "production":
+            if not self.identity_verify_signature:
+                raise ValueError("identity_verify_signature MUST be True when deployment_mode='production'")
+            if self.allow_mock_identity_provider:
+                raise ValueError("allow_mock_identity_provider MUST be False when deployment_mode='production'")
+            if self.enable_debug_back_door:
+                raise ValueError("enable_debug_back_door MUST be False when deployment_mode='production'")
+        if self.enable_debug_back_door:
+            if not self.debug_back_door_secret or len(self.debug_back_door_secret) < 32:
+                raise ValueError(
+                    "debug_back_door_secret MUST be set and at least 32 characters when enable_debug_back_door=True"
+                )
+            if not self.allow_mock_identity_provider:
+                raise ValueError(
+                    "allow_mock_identity_provider MUST be True when enable_debug_back_door=True "
+                    "(backdoor builds synthetic mock tokens)"
+                )
+        return self
 
 
 # Global settings instance

@@ -43,16 +43,6 @@ class TestIdenityProviderEnum:
         assert hasattr(IdenityProviderEnum, "LDAP")
         assert IdenityProviderEnum.LDAP == "LDAP"
 
-    def test_has_kerberos_value(self):
-        """Test KERBEROS value exists."""
-        assert hasattr(IdenityProviderEnum, "KERBEROS")
-        assert IdenityProviderEnum.KERBEROS == "KERBEROS"
-
-    def test_has_saml_value(self):
-        """Test SAML value exists."""
-        assert hasattr(IdenityProviderEnum, "SAML")
-        assert IdenityProviderEnum.SAML == "SAML"
-
     def test_has_okta_value(self):
         """Test OKTA value exists."""
         assert hasattr(IdenityProviderEnum, "OKTA")
@@ -70,7 +60,7 @@ class TestIdenityProviderEnum:
 
     def test_enum_members_count(self):
         """Test the number of enum members."""
-        assert len(IdenityProviderEnum) == 9
+        assert len(IdenityProviderEnum) == 7
 
     def test_can_create_from_string(self):
         """Test enum can be created from string."""

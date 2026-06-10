@@ -89,7 +89,6 @@ class ChatWidgetHandler:
         skip: int = 0,
         limit: int = 100,
         name_filter: str | None = None,
-        is_active: int | None = None,
         tag_ids: list[int] | None = None,
         order_by: str | None = None,
         order_direction: str | None = None,
@@ -106,7 +105,6 @@ class ChatWidgetHandler:
             skip: Number of items to skip
             limit: Maximum number of items to return
             name_filter: Optional filter by chat widget name
-            is_active: Optional filter by active status (None=all, 1=active, 0=inactive)
             tag_ids: Optional list of tag IDs to filter by (chat widgets must have AT LEAST ONE of the tags - OR logic)
             order_by: Optional column name to order by
             order_direction: Optional sort direction ('asc' or 'desc')
@@ -140,11 +138,9 @@ class ChatWidgetHandler:
             ]
             custom_group_ids = [g.id for g in user.groups if g.principal_type == PrincipalTypeEnum.CUSTOM_GROUP.value]
 
-        # Build cache key with order and is_active parameters
         view_key = view or "full"
         order_key = f"{order_by or 'default'}:{order_direction or 'asc'}"
-        is_active_key = "all" if is_active is None else str(is_active)
-        cache_key = f"chat_widgets:list:tenant:{tenant_id}:user:{user_id}:skip:{skip}:limit:{limit}:view:{view_key}:order:{order_key}:active:{is_active_key}"
+        cache_key = f"chat_widgets:list:tenant:{tenant_id}:user:{user_id}:skip:{skip}:limit:{limit}:view:{view_key}:order:{order_key}"
 
         # Check if any filters are applied (name_filter and tag_ids disable caching)
         has_filters = name_filter is not None or tag_ids is not None or id_list is not None
@@ -191,9 +187,6 @@ class ChatWidgetHandler:
 
             if name_filter:
                 query = query.where(ChatWidget.name.ilike(f"%{name_filter}%"))
-
-            if is_active is not None:
-                query = query.where(ChatWidget.is_active == bool(is_active))
 
             # Filter by tags (chat widgets must have AT LEAST ONE of the specified tags - OR logic)
             if tag_ids:
@@ -404,8 +397,6 @@ class ChatWidgetHandler:
                 chat_widget.type = request.type.value
             if request.config is not None:
                 chat_widget.config = request.config
-            if request.is_active is not None:
-                chat_widget.is_active = request.is_active
 
             chat_widget.updated_by = user_id
 
@@ -508,7 +499,6 @@ class ChatWidgetHandler:
                 description=source_widget.description,
                 type=source_widget.type,
                 config=source_widget.config.copy() if source_widget.config else {},
-                is_active=source_widget.is_active,
                 created_by=user_id,
                 updated_by=user_id,
             )
@@ -807,7 +797,6 @@ class ChatWidgetHandler:
             tenant_id=chat_widget.tenant_id,
             name=chat_widget.name,
             description=chat_widget.description,
-            is_active=chat_widget.is_active,
             type=chat_widget.type,
             config=chat_widget.config,
             tags=tags,

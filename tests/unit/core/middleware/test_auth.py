@@ -287,7 +287,7 @@ class TestAuthenticateDecorator:
                         await test_handler(mock_request)
 
         assert exc_info.value.status_code == status.HTTP_403_FORBIDDEN
-        assert "does not have access to tenant" in exc_info.value.detail
+        assert "does not have access to tenant" in exc_info.value.detail["detail"]
 
     @pytest.mark.asyncio
     async def test_authenticate_allows_tenant_access(self):
