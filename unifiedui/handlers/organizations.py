@@ -315,6 +315,7 @@ class OrganizationHandler:
         organization_id: str,
         request: SetOrganizationPrincipalRequest,
         user_id: str,
+        user: ContextIdentityUser,
     ) -> OrganizationPrincipalRoleResponse:
         """Add or set a principal role in the organization.
 
@@ -322,6 +323,7 @@ class OrganizationHandler:
             organization_id: The organization ID
             request: Request containing principal_id, principal_type, and role
             user_id: The ID of the user making the change
+            user: The authenticated user context (for IDP access)
 
         Returns:
             OrganizationPrincipalRoleResponse with the created role entry
@@ -337,6 +339,14 @@ class OrganizationHandler:
 
         with self.db_client.get_session() as session:
             self._validate_organization_exists(session, organization_id)
+
+            self._ensure_principal_for_organization(
+                session=session,
+                organization_id=organization_id,
+                principal_id=request.principal_id,
+                principal_type=request.principal_type,
+                user=user,
+            )
 
             existing = session.execute(
                 select(OrganizationMember).where(
@@ -575,6 +585,59 @@ class OrganizationHandler:
         if not org:
             raise OrganizationNotFoundError(organization_id)
         return org
+
+    @staticmethod
+    def _ensure_principal_for_organization(
+        session: Session,
+        organization_id: str,
+        principal_id: str,
+        principal_type: str,
+        user: ContextIdentityUser,
+    ) -> None:
+        """Ensure a Principal row exists for a principal added at the organization level.
+
+        Principals are tenant-scoped, while organization membership is not. To make the
+        principal's display name resolvable in the organization IAM view, this anchors a
+        Principal row to a tenant belonging to the organization (reusing an existing row
+        from any of the org's tenants when present).
+
+        Args:
+            session: Database session
+            organization_id: The organization ID
+            principal_id: The principal to ensure
+            principal_type: The type of principal
+            user: The authenticated user context (for IDP access)
+        """
+        existing = session.execute(
+            select(Principal.principal_id)
+            .where(
+                Principal.tenant_id.in_(select(Tenant.id).where(Tenant.organization_id == organization_id)),
+                Principal.principal_id == principal_id,
+            )
+            .limit(1)
+        ).scalar_one_or_none()
+
+        if existing:
+            return
+
+        anchor_tenant_id = session.execute(
+            select(Tenant.id).where(Tenant.organization_id == organization_id).limit(1)
+        ).scalar_one_or_none()
+
+        if anchor_tenant_id is None:
+            logger.warning(
+                "Cannot resolve principal display name: organization has no tenants",
+                extra={"organization_id": organization_id, "principal_id": principal_id},
+            )
+            return
+
+        ensure_principal_exists(
+            session=session,
+            tenant_id=anchor_tenant_id,
+            principal_id=principal_id,
+            principal_type=principal_type,
+            user=user,
+        )
 
     @staticmethod
     def _org_to_response(org: Organization) -> OrganizationResponse:

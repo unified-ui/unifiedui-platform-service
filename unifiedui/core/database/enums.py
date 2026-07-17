@@ -233,7 +233,7 @@ class MessageFeedbackRatingEnum(StrEnum):
 
 
 class MessageFeedbackReasonEnum(StrEnum):
-    """Structured reasons for message feedback."""
+    """Structured reasons for message feedback (negative and positive)."""
 
     HALLUCINATION = "HALLUCINATION"
     TOO_SLOW = "TOO_SLOW"
@@ -241,6 +241,11 @@ class MessageFeedbackReasonEnum(StrEnum):
     INACCURATE = "INACCURATE"
     INAPPROPRIATE = "INAPPROPRIATE"
     INCOMPLETE = "INCOMPLETE"
+    ACCURATE = "ACCURATE"
+    HELPFUL = "HELPFUL"
+    COMPLETE = "COMPLETE"
+    WELL_FORMATTED = "WELL_FORMATTED"
+    FAST = "FAST"
     OTHER = "OTHER"
 
     @classmethod

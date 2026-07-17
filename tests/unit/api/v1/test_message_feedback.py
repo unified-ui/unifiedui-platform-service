@@ -14,6 +14,7 @@ ENDPOINT_FEEDBACK = (
     "/api/v1/platform-service/tenants/{tenant_id}/conversations/{conversation_id}/messages/{message_id}/feedback"
 )
 ENDPOINT_CONV_FEEDBACK = "/api/v1/platform-service/tenants/{tenant_id}/conversations/{conversation_id}/feedback"
+ENDPOINT_FEEDBACK_STATS = "/api/v1/platform-service/tenants/{tenant_id}/feedback/stats"
 
 
 def _setup_conversation(test_client: TestClient, user_token: Any) -> tuple[str, str, dict]:
@@ -137,3 +138,34 @@ class TestMessageFeedback:
             json={"rating": "THUMBS_UP", "reasons": [], "comment": None},
         )
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
+
+
+class TestFeedbackStats:
+    """Tests for the aggregated feedback-stats endpoint."""
+
+    def test_stats_include_positive_and_negative(self, test_client: TestClient, test_user_token: Any) -> None:
+        tenant_id, conv_id, headers = _setup_conversation(test_client, test_user_token)
+        test_client.post(
+            ENDPOINT_FEEDBACK.format(tenant_id=tenant_id, conversation_id=conv_id, message_id="pos-1"),
+            json={"rating": "THUMBS_UP", "reasons": ["HELPFUL"], "comment": "very helpful"},
+            headers=headers,
+        )
+        test_client.post(
+            ENDPOINT_FEEDBACK.format(tenant_id=tenant_id, conversation_id=conv_id, message_id="neg-1"),
+            json={"rating": "THUMBS_DOWN", "reasons": ["INACCURATE"], "comment": "wrong"},
+            headers=headers,
+        )
+
+        response = test_client.get(
+            ENDPOINT_FEEDBACK_STATS.format(tenant_id=tenant_id),
+            headers=headers,
+        )
+        assert response.status_code == status.HTTP_200_OK
+        aggregate = response.json()["aggregate"]
+        assert aggregate["total_feedbacks"] == 2
+        assert aggregate["thumbs_up"] == 1
+        assert aggregate["thumbs_down"] == 1
+        assert len(aggregate["recent_negative"]) == 1
+        assert len(aggregate["recent_positive"]) == 1
+        assert aggregate["recent_positive"][0]["comment"] == "very helpful"
+        assert aggregate["recent_positive"][0]["rating"] == "THUMBS_UP"
