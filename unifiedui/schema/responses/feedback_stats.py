@@ -40,6 +40,7 @@ class FeedbackStatsResponse(BaseModel):
     score: float | None
     reason_breakdown: list[ReasonBreakdownEntry]
     recent_negative: list[RecentFeedbackEntry]
+    recent_positive: list[RecentFeedbackEntry] = []
     timeline: list[FeedbackTimelineEntry]
 
 
