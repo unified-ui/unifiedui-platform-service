@@ -47,6 +47,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq5 \
     curl \
     gnupg2 \
+    gosu \
     unixodbc \
     && curl -fsSL https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor -o /usr/share/keyrings/microsoft-prod.gpg \
     && curl https://packages.microsoft.com/config/debian/12/prod.list > /etc/apt/sources.list.d/mssql-release.list \
@@ -70,11 +71,12 @@ ENV PATH="/app/.venv/bin:$PATH"
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
 
+# Copy entrypoint (fixes file-storage volume ownership before dropping privileges)
+COPY docker/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
 # Change ownership to non-root user
 RUN chown -R appuser:appuser /app
-
-# Switch to non-root user
-USER appuser
 
 # Expose the API port
 EXPOSE 8000
@@ -82,6 +84,9 @@ EXPOSE 8000
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
     CMD curl -f http://localhost:8000/api/v1/healthcheck || exit 1
+
+# Entrypoint runs as root to fix storage permissions, then drops to appuser
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 
 # Run uvicorn in production mode
 CMD ["python", "-m", "uvicorn", "unifiedui.app:app", "--host", "0.0.0.0", "--port", "8000"]
