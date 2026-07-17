@@ -382,6 +382,39 @@ class TestOrganizationPrincipalRoutes:
         assert "id" in data
         assert "created_at" in data
 
+    def test_set_principal_resolves_display_name_when_added_org_first(self, test_client: TestClient) -> None:
+        """Adding a principal via org IAM first must resolve its display name from the IDP.
+
+        Regression test: previously the org add did not create a Principal row, so the
+        organization IAM list showed a raw principal_id instead of the display name until
+        the same principal was added at the tenant level.
+        """
+        user_token = test_client.create_test_user("org-prin-name-1", "Org Prin Name")
+        headers = create_auth_headers(user_token, use_cache=False)
+
+        org = _create_org(test_client, headers, identity_tenant_id="idp-name-set-1", slug="name-set-org")
+        org_id = org["id"]
+
+        test_client.post(
+            ENDPOINT_ORGANIZATION_PRINCIPALS.format(organization_id=org_id),
+            json={
+                "principal_id": "org-first-user",
+                "principal_type": PRINCIPAL_TYPE_USER,
+                "role": ROLE_ORG_TENANT_CREATOR,
+            },
+            headers=headers,
+        )
+
+        list_response = test_client.get(
+            ENDPOINT_ORGANIZATION_PRINCIPALS.format(organization_id=org_id), headers=headers
+        )
+        assert list_response.status_code == status.HTTP_200_OK
+        principals = list_response.json()["principals"]
+        added = next((p for p in principals if p["principal_id"] == "org-first-user"), None)
+        assert added is not None
+        assert added["display_name"] is not None
+        assert added["display_name"] != "org-first-user"
+
     def test_set_principal_multiple_roles(self, test_client: TestClient) -> None:
         """Test adding multiple roles to the same member."""
         user_token = test_client.create_test_user("org-prin-multi-1", "Org Prin Multi")

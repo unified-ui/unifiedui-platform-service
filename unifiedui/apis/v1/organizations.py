@@ -165,7 +165,7 @@ async def set_organization_principal(
     """Add or set a principal role in the organization."""
     user: ContextIdentityUser = request.state.user
     user_id = user.identity.get_id()
-    return handler.set_principal(organization_id, principal_data, user_id)
+    return handler.set_principal(organization_id, principal_data, user_id, user)
 
 
 @router.delete(

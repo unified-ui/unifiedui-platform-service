@@ -118,6 +118,37 @@ class FeedbackStatsHandler:
                 for fb, agent_id, agent_name in recent_rows
             ]
 
+            recent_positive_stmt = (
+                select(
+                    MessageFeedback,
+                    Conversation.chat_agent_id,
+                    ChatAgent.name,
+                )
+                .outerjoin(Conversation, Conversation.id == MessageFeedback.conversation_id)
+                .outerjoin(ChatAgent, ChatAgent.id == Conversation.chat_agent_id)
+                .where(
+                    *base_filter,
+                    MessageFeedback.rating == MessageFeedbackRatingEnum.THUMBS_UP,
+                )
+                .order_by(MessageFeedback.created_at.desc())
+                .limit(100)
+            )
+            recent_positive_rows = session.execute(recent_positive_stmt).all()
+
+            recent_positive = [
+                RecentFeedbackEntry(
+                    message_id=fb.message_id,
+                    conversation_id=fb.conversation_id,
+                    chat_agent_id=agent_id,
+                    chat_agent_name=agent_name,
+                    rating=fb.rating,
+                    reasons=fb.reasons if fb.reasons else [],
+                    comment=fb.comment,
+                    created_at=fb.created_at.isoformat(),
+                )
+                for fb, agent_id, agent_name in recent_positive_rows
+            ]
+
             reason_counts: dict[str, int] = {}
             for fb, _agent_id, _agent_name in recent_rows:
                 if fb.reasons:
@@ -212,6 +243,7 @@ class FeedbackStatsHandler:
                 score=score,
                 reason_breakdown=reason_breakdown,
                 recent_negative=recent_negative,
+                recent_positive=recent_positive,
                 timeline=timeline,
             )
             return FeedbackStatsBatchResponse(aggregate=aggregate, per_agent=per_agent)
