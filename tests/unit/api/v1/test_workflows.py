@@ -40,6 +40,13 @@ VALID_N8N_CONFIG = {
     "api_api_key_credential_id": "test-credential-id",
 }
 
+# Config as it is normalized and persisted by the N8N config validator
+STORED_N8N_CONFIG = {
+    **VALID_N8N_CONFIG,
+    "enable_form_trigger": False,
+    "form_open_mode": "TAB",
+}
+
 # Endpoint for config
 ENDPOINT_AUTONOMOUS_AGENT_CONFIG = "/api/v1/platform-service/tenants/{tenant_id}/workflows/{workflow_id}/config"
 
@@ -72,7 +79,7 @@ class TestWorkflowRoutes:
         assert data["name"] == agent_data["name"]
         assert data["description"] == agent_data["description"]
         assert data["type"] == AGENT_TYPE_N8N
-        assert data["config"] == agent_data["config"]
+        assert data["config"] == STORED_N8N_CONFIG
         assert "id" in data
         assert data["tenant_id"] == tenant_id
         assert "created_at" in data
@@ -408,7 +415,7 @@ class TestWorkflowRoutes:
 
         assert data["name"] == "Updated Name"
         assert data["description"] == "Updated description"
-        assert data["config"] == VALID_N8N_CONFIG  # Config should remain unchanged
+        assert data["config"] == STORED_N8N_CONFIG  # Config should remain unchanged
 
     def test_update_workflow_not_found(self, test_client: TestClient, test_user_token: Any) -> None:
         """Test autonomous agent update with non-existent ID."""

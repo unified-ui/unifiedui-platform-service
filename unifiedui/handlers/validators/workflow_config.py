@@ -1,9 +1,11 @@
 """Workflow configuration validators using factory pattern."""
 
 from abc import ABC, abstractmethod
+from enum import StrEnum
 from typing import Any
+from urllib.parse import urlparse
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from unifiedui.core.database.enums import WorkflowTypeEnum
 from unifiedui.exc.workflows import UnsupportedWorkflowTypeError, WorkflowConfigValidationError
@@ -13,6 +15,13 @@ logger = get_logger(__name__)
 
 
 # ========== N8N Config Schema ==========
+
+
+class WorkflowFormOpenModeEnum(StrEnum):
+    """Supported browser open modes for a workflow form trigger."""
+
+    TAB = "TAB"
+    WINDOW = "WINDOW"
 
 
 class N8NWorkflowConfig(BaseModel):
@@ -36,6 +45,18 @@ class N8NWorkflowConfig(BaseModel):
     default_query_params: dict[str, str] | None = Field(
         None,
         description="Optional default query parameters pre-filled when starting the workflow via webhook",
+    )
+    enable_form_trigger: bool = Field(
+        False,
+        description="Whether the workflow is started through an N8N form trigger instead of a webhook",
+    )
+    form_trigger_url: str | None = Field(
+        None,
+        description="Production form URL of the N8N form trigger (e.g., 'http://localhost:5678/form/<form-id>')",
+    )
+    form_open_mode: WorkflowFormOpenModeEnum = Field(
+        WorkflowFormOpenModeEnum.TAB,
+        description="Whether the form is opened in a new browser tab or a separate window",
     )
 
     @field_validator("api_version")
@@ -89,6 +110,36 @@ class N8NWorkflowConfig(BaseModel):
             if not isinstance(key, str) or not isinstance(val, str):
                 raise ValueError("default_query_params keys and values must be strings")
         return v
+
+    @field_validator("form_trigger_url")
+    @classmethod
+    def validate_form_trigger_url(cls, v: str | None) -> str | None:
+        """Validate that form_trigger_url is a safe http(s) form URL if provided."""
+        if v is None or v == "":
+            return None
+        parsed = urlparse(v)
+        if parsed.scheme not in ("http", "https"):
+            raise ValueError("form_trigger_url must start with http:// or https://")
+        if not parsed.netloc:
+            raise ValueError("form_trigger_url must contain a host")
+        if "/form/" not in parsed.path:
+            raise ValueError("form_trigger_url must contain '/form/' path with the form ID")
+        return v
+
+    @model_validator(mode="after")
+    def validate_form_trigger_consistency(self) -> "N8NWorkflowConfig":
+        """Validate that form trigger and webhook trigger are mutually exclusive and complete."""
+        if self.enable_form_trigger:
+            if not self.form_trigger_url:
+                raise ValueError("form_trigger_url is required when enable_form_trigger is true")
+            if self.webhook_url or self.default_body or self.default_query_params:
+                raise ValueError(
+                    "webhook_url, default_body and default_query_params must not be set "
+                    "when enable_form_trigger is true"
+                )
+        elif self.form_trigger_url:
+            raise ValueError("form_trigger_url must not be set when enable_form_trigger is false")
+        return self
 
 
 # ========== Base Validator Interface ==========

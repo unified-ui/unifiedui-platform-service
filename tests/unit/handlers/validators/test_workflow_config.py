@@ -11,6 +11,7 @@ from unifiedui.handlers.validators.workflow_config import (
     N8NWorkflowConfig,
     N8NWorkflowConfigValidator,
     WorkflowConfigValidatorFactory,
+    WorkflowFormOpenModeEnum,
 )
 
 
@@ -265,4 +266,141 @@ class TestN8NWorkflowConfigApiVersion:
                 api_version="V1",  # Uppercase should fail
                 workflow_endpoint="http://localhost:5678/workflow/test",
                 api_api_key_credential_id="cred-123",
+            )
+
+
+class TestN8NWorkflowConfigFormTrigger:
+    """Tests for the N8N form trigger configuration fields."""
+
+    BASE_CONFIG = {
+        "api_version": "v1",
+        "workflow_endpoint": "http://localhost:5678/workflow/test",
+        "api_api_key_credential_id": "cred-123",
+    }
+
+    def test_defaults_when_form_trigger_omitted(self):
+        """Test that existing configs without form trigger fields stay valid."""
+        config = N8NWorkflowConfig(**self.BASE_CONFIG)
+
+        assert config.enable_form_trigger is False
+        assert config.form_trigger_url is None
+        assert config.form_open_mode == WorkflowFormOpenModeEnum.TAB
+
+    def test_valid_form_trigger_with_default_open_mode(self):
+        """Test a valid form trigger config without explicit open mode."""
+        config = N8NWorkflowConfig(
+            **self.BASE_CONFIG,
+            enable_form_trigger=True,
+            form_trigger_url="http://localhost:5678/form/form-id",
+        )
+
+        assert config.enable_form_trigger is True
+        assert config.form_trigger_url == "http://localhost:5678/form/form-id"
+        assert config.form_open_mode == WorkflowFormOpenModeEnum.TAB
+
+    def test_valid_form_trigger_with_window_open_mode(self):
+        """Test that WINDOW is an accepted open mode."""
+        config = N8NWorkflowConfig(
+            **self.BASE_CONFIG,
+            enable_form_trigger=True,
+            form_trigger_url="https://n8n.example.com/form/form-id",
+            form_open_mode="WINDOW",
+        )
+
+        assert config.form_open_mode == WorkflowFormOpenModeEnum.WINDOW
+
+    def test_invalid_open_mode_rejected(self):
+        """Test that an unknown open mode is rejected."""
+        with pytest.raises(ValidationError):
+            N8NWorkflowConfig(
+                **self.BASE_CONFIG,
+                enable_form_trigger=True,
+                form_trigger_url="http://localhost:5678/form/form-id",
+                form_open_mode="POPUP",
+            )
+
+    def test_form_trigger_url_required_when_enabled(self):
+        """Test that enabling the form trigger requires a form URL."""
+        with pytest.raises(ValidationError) as exc_info:
+            N8NWorkflowConfig(**self.BASE_CONFIG, enable_form_trigger=True)
+
+        assert "form_trigger_url is required" in str(exc_info.value)
+
+    def test_form_trigger_url_rejected_when_disabled(self):
+        """Test that a form URL without an enabled form trigger is rejected."""
+        with pytest.raises(ValidationError) as exc_info:
+            N8NWorkflowConfig(**self.BASE_CONFIG, form_trigger_url="http://localhost:5678/form/form-id")
+
+        assert "must not be set when enable_form_trigger is false" in str(exc_info.value)
+
+    @pytest.mark.parametrize(
+        "url",
+        [
+            "javascript:alert(1)",
+            "data:text/html;base64,PHNjcmlwdD4=",
+            "file:///etc/passwd",
+            "ftp://localhost:5678/form/form-id",
+        ],
+    )
+    def test_form_trigger_url_rejects_unsafe_schemes(self, url):
+        """Test that only http(s) schemes are accepted for the form URL."""
+        with pytest.raises(ValidationError) as exc_info:
+            N8NWorkflowConfig(**self.BASE_CONFIG, enable_form_trigger=True, form_trigger_url=url)
+
+        assert "must start with http:// or https://" in str(exc_info.value)
+
+    def test_form_trigger_url_requires_form_path(self):
+        """Test that the form URL must contain the '/form/' path segment."""
+        with pytest.raises(ValidationError) as exc_info:
+            N8NWorkflowConfig(
+                **self.BASE_CONFIG,
+                enable_form_trigger=True,
+                form_trigger_url="http://localhost:5678/webhook/form-id",
+            )
+
+        assert "must contain '/form/' path" in str(exc_info.value)
+
+    @pytest.mark.parametrize(
+        "webhook_field",
+        [
+            {"webhook_url": "http://localhost:5678/webhook/hook"},
+            {"default_body": {"key": "value"}},
+            {"default_query_params": {"key": "value"}},
+        ],
+    )
+    def test_form_trigger_is_exclusive_with_webhook(self, webhook_field):
+        """Test that form trigger and webhook trigger cannot be combined."""
+        with pytest.raises(ValidationError) as exc_info:
+            N8NWorkflowConfig(
+                **self.BASE_CONFIG,
+                enable_form_trigger=True,
+                form_trigger_url="http://localhost:5678/form/form-id",
+                **webhook_field,
+            )
+
+        assert "must not be set" in str(exc_info.value)
+
+    def test_validator_returns_form_trigger_fields(self):
+        """Test that the N8N validator preserves the form trigger fields."""
+        validator = N8NWorkflowConfigValidator()
+
+        result = validator.validate(
+            {
+                **self.BASE_CONFIG,
+                "enable_form_trigger": True,
+                "form_trigger_url": "http://localhost:5678/form/form-id",
+                "form_open_mode": "WINDOW",
+            }
+        )
+
+        assert result["enable_form_trigger"] is True
+        assert result["form_trigger_url"] == "http://localhost:5678/form/form-id"
+        assert result["form_open_mode"] == "WINDOW"
+
+    def test_factory_rejects_invalid_form_trigger_config(self):
+        """Test that the factory surfaces form trigger errors as domain errors."""
+        with pytest.raises(WorkflowConfigValidationError):
+            WorkflowConfigValidatorFactory.validate_config(
+                WorkflowTypeEnum.N8N,
+                {**self.BASE_CONFIG, "enable_form_trigger": True},
             )
